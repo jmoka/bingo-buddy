@@ -1,0 +1,240 @@
+import { useState, useRef } from 'react';
+import { Button } from './ui/button';
+import { Input } from './ui/input';
+import { generateCardId } from '@/utils/bingoUtils';
+import { BingoCard } from '@/types/bingo';
+import { Upload, Loader2, Camera, X, Check } from 'lucide-react';
+import { createWorker } from 'tesseract.js';
+
+interface ImageCardUploadProps {
+  onAddCard: (card: BingoCard) => void;
+}
+
+export const ImageCardUpload = ({ onAddCard }: ImageCardUploadProps) => {
+  const [name, setName] = useState('');
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [extractedNumbers, setExtractedNumbers] = useState<number[][] | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [error, setError] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const extractNumbersFromText = (text: string): number[][] | null => {
+    // Extract all numbers from the OCR text
+    const numbers = text.match(/\d+/g)?.map(n => parseInt(n, 10)).filter(n => n >= 1 && n <= 75) || [];
+    
+    // We need exactly 24 numbers (excluding FREE space in center)
+    if (numbers.length < 24) {
+      return null;
+    }
+
+    // Take first 24 valid numbers and create 5x5 grid
+    const validNumbers = numbers.slice(0, 24);
+    const grid: number[][] = [];
+    let numIndex = 0;
+
+    for (let row = 0; row < 5; row++) {
+      const rowNumbers: number[] = [];
+      for (let col = 0; col < 5; col++) {
+        if (row === 2 && col === 2) {
+          // FREE space - use 0 as placeholder
+          rowNumbers.push(0);
+        } else {
+          rowNumbers.push(validNumbers[numIndex++]);
+        }
+      }
+      grid.push(rowNumbers);
+    }
+
+    return grid;
+  };
+
+  const processImage = async (imageData: string) => {
+    setIsProcessing(true);
+    setError('');
+    setExtractedNumbers(null);
+
+    try {
+      const worker = await createWorker('por');
+      
+      const { data: { text } } = await worker.recognize(imageData);
+      await worker.terminate();
+
+      console.log('OCR Result:', text);
+
+      const grid = extractNumbersFromText(text);
+      
+      if (!grid) {
+        setError('Não foi possível extrair 24 números válidos da imagem. Tente uma foto mais nítida.');
+        return;
+      }
+
+      setExtractedNumbers(grid);
+    } catch (err) {
+      console.error('OCR Error:', err);
+      setError('Erro ao processar a imagem. Tente novamente.');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      setError('Por favor, selecione uma imagem.');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const imageData = event.target?.result as string;
+      setImagePreview(imageData);
+      processImage(imageData);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleConfirm = () => {
+    if (!extractedNumbers) return;
+
+    if (!name.trim()) {
+      setError('Digite o nome da cartela');
+      return;
+    }
+
+    const card: BingoCard = {
+      id: generateCardId(),
+      name: name.trim(),
+      numbers: extractedNumbers,
+      markedNumbers: new Set(),
+    };
+
+    onAddCard(card);
+    resetForm();
+  };
+
+  const resetForm = () => {
+    setName('');
+    setImagePreview(null);
+    setExtractedNumbers(null);
+    setError('');
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  return (
+    <div className="card-container">
+      <h3 className="font-heading font-semibold text-lg text-foreground mb-4">
+        Adicionar via Imagem
+      </h3>
+
+      <div className="space-y-4">
+        <div>
+          <Input
+            placeholder="Nome da cartela (ex: Cartela 1)"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            className="bg-secondary border-0"
+          />
+        </div>
+
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          onChange={handleFileChange}
+          className="hidden"
+        />
+
+        {!imagePreview && (
+          <Button
+            type="button"
+            variant="outline"
+            className="w-full h-24 border-dashed border-2 hover:bg-secondary/50"
+            onClick={() => fileInputRef.current?.click()}
+          >
+            <div className="flex flex-col items-center gap-2">
+              <div className="flex items-center gap-3">
+                <Camera className="w-6 h-6 text-muted-foreground" />
+                <Upload className="w-6 h-6 text-muted-foreground" />
+              </div>
+              <span className="text-sm text-muted-foreground">
+                Tirar foto ou selecionar imagem
+              </span>
+            </div>
+          </Button>
+        )}
+
+        {imagePreview && (
+          <div className="relative">
+            <img
+              src={imagePreview}
+              alt="Preview da cartela"
+              className="w-full rounded-lg border border-border"
+            />
+            <Button
+              type="button"
+              variant="destructive"
+              size="icon"
+              className="absolute top-2 right-2"
+              onClick={resetForm}
+            >
+              <X className="w-4 h-4" />
+            </Button>
+          </div>
+        )}
+
+        {isProcessing && (
+          <div className="flex items-center justify-center gap-2 py-4 text-muted-foreground">
+            <Loader2 className="w-5 h-5 animate-spin" />
+            <span>Processando imagem...</span>
+          </div>
+        )}
+
+        {extractedNumbers && (
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Números extraídos (confirme se estão corretos):
+            </p>
+            <div className="grid grid-cols-5 gap-1 p-2 bg-secondary rounded-lg">
+              {extractedNumbers.map((row, rowIndex) =>
+                row.map((num, colIndex) => (
+                  <div
+                    key={`${rowIndex}-${colIndex}`}
+                    className={`
+                      aspect-square flex items-center justify-center text-sm font-bold rounded
+                      ${rowIndex === 2 && colIndex === 2
+                        ? 'bg-primary text-primary-foreground'
+                        : 'bg-background'
+                      }
+                    `}
+                  >
+                    {rowIndex === 2 && colIndex === 2 ? 'FREE' : num}
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        )}
+
+        {error && (
+          <p className="text-sm text-destructive animate-slide-up">{error}</p>
+        )}
+
+        {extractedNumbers && (
+          <Button
+            type="button"
+            className="w-full gradient-primary shadow-button"
+            onClick={handleConfirm}
+          >
+            <Check className="w-4 h-4 mr-2" />
+            Confirmar e Adicionar
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+};
