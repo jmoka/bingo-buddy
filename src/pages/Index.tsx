@@ -1,5 +1,6 @@
 import { Header } from '@/components/Header';
 import { AddCardForm } from '@/components/AddCardForm';
+import { ImageCardUpload } from '@/components/ImageCardUpload';
 import { BingoCardDisplay } from '@/components/BingoCardDisplay';
 import { NumberCaller } from '@/components/NumberCaller';
 import { GameTypeSelector } from '@/components/GameTypeSelector';
@@ -39,6 +40,7 @@ const Index = () => {
               onChange={setGameType}
             />
             <AddCardForm onAddCard={addCard} />
+            <ImageCardUpload onAddCard={addCard} />
           </div>
 
           {/* Right column - Cards */}
