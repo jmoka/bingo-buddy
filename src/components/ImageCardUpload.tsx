@@ -3,8 +3,8 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { generateCardId } from '@/utils/bingoUtils';
 import { BingoCard } from '@/types/bingo';
-import { Upload, Loader2, Camera, X, Check } from 'lucide-react';
-import { createWorker } from 'tesseract.js';
+import { Upload, Loader2, Camera, X, Check, AlertCircle } from 'lucide-react';
+import Tesseract from 'tesseract.js';
 
 interface ImageCardUploadProps {
   onAddCard: (card: BingoCard) => void;
@@ -15,15 +15,26 @@ export const ImageCardUpload = ({ onAddCard }: ImageCardUploadProps) => {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [extractedNumbers, setExtractedNumbers] = useState<number[][] | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [progress, setProgress] = useState(0);
   const [error, setError] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const extractNumbersFromText = (text: string): number[][] | null => {
-    // Extract all numbers from the OCR text
-    const numbers = text.match(/\d+/g)?.map(n => parseInt(n, 10)).filter(n => n >= 1 && n <= 75) || [];
+    console.log('Raw OCR text:', text);
     
-    // We need exactly 24 numbers (excluding FREE space in center)
+    // Extract all numbers from the OCR text
+    const allMatches = text.match(/\d+/g) || [];
+    console.log('All number matches:', allMatches);
+    
+    const numbers = allMatches
+      .map(n => parseInt(n, 10))
+      .filter(n => n >= 1 && n <= 75);
+    
+    console.log('Valid bingo numbers (1-75):', numbers);
+    
+    // We need at least 24 numbers (excluding FREE space in center)
     if (numbers.length < 24) {
+      console.log(`Only found ${numbers.length} valid numbers, need 24`);
       return null;
     }
 
@@ -45,6 +56,7 @@ export const ImageCardUpload = ({ onAddCard }: ImageCardUploadProps) => {
       grid.push(rowNumbers);
     }
 
+    console.log('Created grid:', grid);
     return grid;
   };
 
@@ -52,28 +64,44 @@ export const ImageCardUpload = ({ onAddCard }: ImageCardUploadProps) => {
     setIsProcessing(true);
     setError('');
     setExtractedNumbers(null);
+    setProgress(0);
 
     try {
-      const worker = await createWorker('por');
+      console.log('Starting OCR processing...');
       
-      const { data: { text } } = await worker.recognize(imageData);
-      await worker.terminate();
+      const result = await Tesseract.recognize(
+        imageData,
+        'eng', // Use English - better for digit recognition
+        {
+          logger: (m) => {
+            console.log('Tesseract:', m);
+            if (m.status === 'recognizing text') {
+              setProgress(Math.round(m.progress * 100));
+            }
+          },
+        }
+      );
 
-      console.log('OCR Result:', text);
+      console.log('OCR Complete. Full result:', result);
+      console.log('OCR Text:', result.data.text);
 
-      const grid = extractNumbersFromText(text);
+      const grid = extractNumbersFromText(result.data.text);
       
       if (!grid) {
-        setError('Não foi possível extrair 24 números válidos da imagem. Tente uma foto mais nítida.');
+        setError(`Não foi possível extrair 24 números válidos. Encontrados: ${(result.data.text.match(/\d+/g) || []).filter(n => {
+          const num = parseInt(n, 10);
+          return num >= 1 && num <= 75;
+        }).length}. Tente uma foto mais nítida ou com melhor iluminação.`);
         return;
       }
 
       setExtractedNumbers(grid);
     } catch (err) {
       console.error('OCR Error:', err);
-      setError('Erro ao processar a imagem. Tente novamente.');
+      setError(`Erro ao processar: ${err instanceof Error ? err.message : 'Erro desconhecido'}. Tente novamente.`);
     } finally {
       setIsProcessing(false);
+      setProgress(0);
     }
   };
 
@@ -81,16 +109,25 @@ export const ImageCardUpload = ({ onAddCard }: ImageCardUploadProps) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    console.log('File selected:', file.name, file.type, file.size);
+
     if (!file.type.startsWith('image/')) {
       setError('Por favor, selecione uma imagem.');
       return;
     }
 
+    setError('');
+    
     const reader = new FileReader();
     reader.onload = (event) => {
       const imageData = event.target?.result as string;
+      console.log('Image loaded, size:', imageData.length);
       setImagePreview(imageData);
       processImage(imageData);
+    };
+    reader.onerror = (err) => {
+      console.error('FileReader error:', err);
+      setError('Erro ao ler o arquivo. Tente novamente.');
     };
     reader.readAsDataURL(file);
   };
@@ -119,6 +156,7 @@ export const ImageCardUpload = ({ onAddCard }: ImageCardUploadProps) => {
     setImagePreview(null);
     setExtractedNumbers(null);
     setError('');
+    setProgress(0);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -181,6 +219,7 @@ export const ImageCardUpload = ({ onAddCard }: ImageCardUploadProps) => {
               size="icon"
               className="absolute top-2 right-2"
               onClick={resetForm}
+              disabled={isProcessing}
             >
               <X className="w-4 h-4" />
             </Button>
@@ -188,9 +227,20 @@ export const ImageCardUpload = ({ onAddCard }: ImageCardUploadProps) => {
         )}
 
         {isProcessing && (
-          <div className="flex items-center justify-center gap-2 py-4 text-muted-foreground">
-            <Loader2 className="w-5 h-5 animate-spin" />
-            <span>Processando imagem...</span>
+          <div className="space-y-2">
+            <div className="flex items-center justify-center gap-2 py-2 text-muted-foreground">
+              <Loader2 className="w-5 h-5 animate-spin" />
+              <span>Processando imagem... {progress}%</span>
+            </div>
+            <div className="w-full bg-secondary rounded-full h-2">
+              <div 
+                className="bg-primary h-2 rounded-full transition-all duration-300"
+                style={{ width: `${progress}%` }}
+              />
+            </div>
+            <p className="text-xs text-muted-foreground text-center">
+              O processamento pode levar alguns segundos
+            </p>
           </div>
         )}
 
@@ -221,7 +271,10 @@ export const ImageCardUpload = ({ onAddCard }: ImageCardUploadProps) => {
         )}
 
         {error && (
-          <p className="text-sm text-destructive animate-slide-up">{error}</p>
+          <div className="flex items-start gap-2 p-3 bg-destructive/10 rounded-lg text-destructive animate-slide-up">
+            <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+            <p className="text-sm">{error}</p>
+          </div>
         )}
 
         {extractedNumbers && (
