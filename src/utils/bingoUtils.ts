@@ -98,9 +98,24 @@ export const parseCardNumbers = (input: string): number[][] | null => {
   if (lines.length !== 5) return null;
 
   const grid: number[][] = [];
-  for (const line of lines) {
-    const numbers = line.split(/[\s,]+/).map(n => parseInt(n.trim(), 10));
-    if (numbers.length !== 5 || numbers.some(isNaN)) return null;
+  for (let rowIndex = 0; rowIndex < lines.length; rowIndex++) {
+    const line = lines[rowIndex];
+    const parts = line.split(/[\s,]+/);
+    if (parts.length !== 5) return null;
+    
+    const numbers: number[] = [];
+    for (let colIndex = 0; colIndex < parts.length; colIndex++) {
+      const part = parts[colIndex].trim().toUpperCase();
+      
+      // Center cell (row 2, col 2) can be FREE or any number
+      if (rowIndex === 2 && colIndex === 2 && (part === 'FREE' || part === 'LIVRE' || part === '*')) {
+        numbers.push(0); // Use 0 as placeholder for FREE space
+      } else {
+        const num = parseInt(part, 10);
+        if (isNaN(num)) return null;
+        numbers.push(num);
+      }
+    }
     grid.push(numbers);
   }
 
