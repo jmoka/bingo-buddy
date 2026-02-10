@@ -60,6 +60,37 @@ export const ImageCardUpload = ({ onAddCard }: ImageCardUploadProps) => {
     return grid;
   };
 
+  const preprocessImage = (imageData: string): Promise<string> => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const scale = Math.max(1, 2000 / Math.max(img.width, img.height));
+        canvas.width = img.width * scale;
+        canvas.height = img.height * scale;
+        const ctx = canvas.getContext('2d')!;
+        
+        // Draw scaled image
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        
+        // Convert to grayscale and apply threshold (binarize)
+        const imageDataObj = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const data = imageDataObj.data;
+        for (let i = 0; i < data.length; i += 4) {
+          const gray = data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
+          const bw = gray < 140 ? 0 : 255; // Threshold
+          data[i] = bw;
+          data[i + 1] = bw;
+          data[i + 2] = bw;
+        }
+        ctx.putImageData(imageDataObj, 0, 0);
+        
+        resolve(canvas.toDataURL('image/png'));
+      };
+      img.src = imageData;
+    });
+  };
+
   const processImage = async (imageData: string) => {
     setIsProcessing(true);
     setError('');
@@ -69,12 +100,14 @@ export const ImageCardUpload = ({ onAddCard }: ImageCardUploadProps) => {
     try {
       console.log('Starting OCR processing...');
       
+      // Preprocess: upscale + binarize for better OCR
+      const processedImage = await preprocessImage(imageData);
+      
       const result = await Tesseract.recognize(
-        imageData,
-        'eng', // Use English - better for digit recognition
+        processedImage,
+        'eng',
         {
           logger: (m) => {
-            console.log('Tesseract:', m);
             if (m.status === 'recognizing text') {
               setProgress(Math.round(m.progress * 100));
             }
@@ -82,8 +115,7 @@ export const ImageCardUpload = ({ onAddCard }: ImageCardUploadProps) => {
         }
       );
 
-      console.log('OCR Complete. Full result:', result);
-      console.log('OCR Text:', result.data.text);
+      console.log('OCR Complete. Text:', result.data.text);
 
       const grid = extractNumbersFromText(result.data.text);
       
