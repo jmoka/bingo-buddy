@@ -47,12 +47,13 @@ export const useBingoGame = () => {
   }, []);
 
   // Mark numbers on cards when a number is called
+  // 0 (FREE space) is always considered marked
   useEffect(() => {
     setCards((prev) =>
       prev.map((card) => ({
         ...card,
         markedNumbers: new Set(
-          card.numbers.flat().filter((num) => calledNumbers.has(num))
+          card.numbers.flat().filter((num) => num === 0 || calledNumbers.has(num))
         ),
       }))
     );
