@@ -22,54 +22,38 @@ export const ImageCardUpload = ({ onAddCard }: ImageCardUploadProps) => {
   const extractNumbersFromText = (text: string): number[][] | null => {
     console.log('Raw OCR text:', text);
     
-    // Extract all tokens (numbers and FREE/LIVRE words)
-    const allTokens = text.match(/\b(?:\d+|free|livre)\b/gi) || [];
-    console.log('All tokens:', allTokens);
+    // Extract only numbers from the OCR text (ignore ALL words/symbols)
+    const allMatches = text.match(/\d+/g) || [];
+    console.log('All number matches:', allMatches);
     
-    const values: number[] = [];
-    for (const token of allTokens) {
-      const upper = token.toUpperCase();
-      if (upper === 'FREE' || upper === 'LIVRE') {
-        values.push(0); // FREE = 0
-      } else {
-        const n = parseInt(token, 10);
-        if (n >= 0 && n <= 75) {
-          values.push(n);
-        }
-      }
-    }
+    // Keep only valid bingo numbers (1-75)
+    const numbers = allMatches
+      .map(n => parseInt(n, 10))
+      .filter(n => n >= 1 && n <= 75);
     
-    console.log('Valid bingo values (0=FREE, 1-75):', values);
+    console.log('Valid bingo numbers (1-75):', numbers);
     
-    // We need at least 25 values (including FREE as 0)
-    if (values.length < 25) {
-      // Try without FREE - need 24 numbers + we add FREE at center
-      const numbersOnly = values.filter(n => n >= 1 && n <= 75);
-      if (numbersOnly.length < 24) {
-        console.log(`Only found ${numbersOnly.length} valid numbers, need 24`);
-        return null;
-      }
-      // Build grid with 24 numbers + FREE center
-      const grid: number[][] = [];
-      let idx = 0;
-      for (let row = 0; row < 5; row++) {
-        const rowNumbers: number[] = [];
-        for (let col = 0; col < 5; col++) {
-          if (row === 2 && col === 2) {
-            rowNumbers.push(0);
-          } else {
-            rowNumbers.push(numbersOnly[idx++]);
-          }
-        }
-        grid.push(rowNumbers);
-      }
-      return grid;
+    if (numbers.length < 24) {
+      console.log(`Only found ${numbers.length} valid numbers, need at least 24`);
+      return null;
     }
 
-    // Take first 25 values and create 5x5 grid directly
+    // Take first 24 valid numbers and build 5x5 grid
+    // Center position [2][2] is ALWAYS 0 (FREE / any symbol)
+    const validNumbers = numbers.slice(0, 24);
     const grid: number[][] = [];
+    let idx = 0;
+
     for (let row = 0; row < 5; row++) {
-      grid.push(values.slice(row * 5, row * 5 + 5));
+      const rowNumbers: number[] = [];
+      for (let col = 0; col < 5; col++) {
+        if (row === 2 && col === 2) {
+          rowNumbers.push(0); // Always FREE
+        } else {
+          rowNumbers.push(validNumbers[idx++]);
+        }
+      }
+      grid.push(rowNumbers);
     }
 
     console.log('Created grid:', grid);
