@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
-import { generateBingoCard, BINGO_RANGES, validateCardGrid } from '@/utils/bingoUtils';
+import { BINGO_RANGES, validateCardGrid } from '@/utils/bingoUtils';
+import { generateBingoCard } from '@/contexts/GameContext';
 import { AlertCircle, Dices } from 'lucide-react';
 
 interface CardEditorProps {

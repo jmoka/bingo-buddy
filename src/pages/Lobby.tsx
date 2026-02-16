@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useGame } from '@/contexts/GameContext';
+import { useGame, generateBingoCard } from '@/contexts/GameContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Match, PlayerCard } from '@/types/match';
-import { gameTypeLabels, generateBingoCard } from '@/utils/bingoUtils';
+import { gameTypeLabels } from '@/utils/bingoUtils';
 import { 
   LogIn, LogOut, Coins, Plus, Trophy, Users, Settings, Wallet, 
   CreditCard, Timer, DoorOpen, Ticket, Trash2, Check
