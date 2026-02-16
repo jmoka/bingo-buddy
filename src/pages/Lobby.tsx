@@ -3,11 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { useGame, generateBingoCard } from '@/contexts/GameContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Match, PlayerCard } from '@/types/match';
+import { Match } from '@/types/match';
 import { gameTypeLabels } from '@/utils/bingoUtils';
 import { 
   LogIn, LogOut, Coins, Plus, Trophy, Users, Settings, Wallet, 
-  CreditCard, Timer, DoorOpen, Ticket, Trash2, Check
+  CreditCard, Timer, DoorOpen, Ticket, Check, Zap, ZapOff
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
@@ -19,7 +19,7 @@ const Lobby = () => {
   const { toast } = useToast();
   const { 
     currentPlayer, registerPlayer, logoutPlayer, buyCredits, createPlayerCard,
-    matches, joinMatch, getPlayerMatchCards, playerCards,
+    matches, joinMatch, getPlayerMatchCards, playerCards, buyCardUses,
   } = useGame();
 
   const [playerName, setPlayerName] = useState('');
@@ -75,7 +75,16 @@ const Lobby = () => {
       toast({ title: '🎉 Você entrou na partida!', description: `${newMatchCards.length} cartela(s) inscrita(s).` });
       setJoinDialogOpen(false);
     } else {
-      toast({ title: 'Erro ao entrar', description: 'Verifique seus créditos ou o status da partida.', variant: 'destructive' });
+      toast({ title: 'Erro ao entrar', description: 'Verifique seus créditos, o status da partida ou os usos das cartelas.', variant: 'destructive' });
+    }
+  };
+
+  const handleBuyUses = (cardId: string) => {
+    const cost = 5;
+    if (buyCardUses(cardId, 1)) {
+      toast({ title: 'Cartela Recarregada!', description: 'Você comprou mais um uso para sua cartela.' });
+    } else {
+      toast({ title: 'Créditos insuficientes', description: `Você precisa de ${cost} créditos para recarregar.`, variant: 'destructive' });
     }
   };
 
@@ -86,12 +95,6 @@ const Lobby = () => {
     const m = Math.floor((diff % 3600000) / 60000);
     const s = Math.floor((diff % 60000) / 1000);
     return `${h > 0 ? `${h}h ` : ''}${m > 0 ? `${m}m ` : ''}${s}s`;
-  };
-
-  const getPrizeDisplay = (match: Match) => {
-    if (match.prize.type === 'product') return `🎁 ${match.prize.productName}`;
-    if (match.prize.type === 'fixed') return `💰 ${match.prize.value} créditos`;
-    return `📊 ${match.prize.value}% do pote`;
   };
 
   if (!currentPlayer) {
@@ -171,8 +174,21 @@ const Lobby = () => {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {myOwnedCards.map(card => (
-                <div key={card.id} className="card-container p-3">
-                  <h3 className="font-heading font-semibold text-foreground mb-2">{card.name}</h3>
+                <div key={card.id} className={`card-container p-3 transition-opacity ${card.usesLeft === 0 ? 'opacity-60' : ''}`}>
+                  <div className="flex justify-between items-start mb-2">
+                    <h3 className="font-heading font-semibold text-foreground">{card.name}</h3>
+                    <div className="flex items-center gap-2">
+                      <div className={`flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-full ${card.usesLeft > 0 ? 'bg-success/10 text-success' : 'bg-destructive/10 text-destructive'}`}>
+                        {card.usesLeft > 0 ? <Zap className="w-3 h-3" /> : <ZapOff className="w-3 h-3" />}
+                        <span>{card.usesLeft} uso(s)</span>
+                      </div>
+                      {card.usesLeft === 0 && (
+                        <Button size="sm" variant="outline" onClick={() => handleBuyUses(card.id)}>
+                          Recarregar (5 <Coins className="w-3 h-3 ml-1" />)
+                        </Button>
+                      )}
+                    </div>
+                  </div>
                   <div className="grid grid-cols-5 gap-1">
                     {card.numbers.flat().map((num, i) => <BingoCell key={i} number={num} isMarked={false} isFreeSpace={i === 12} />)}
                   </div>
@@ -191,7 +207,7 @@ const Lobby = () => {
             {matches.filter(m => m.status !== 'finished').map(match => {
               const myMatchCards = getPlayerMatchCards(match.id, currentPlayer.id);
               const alreadyJoined = myMatchCards.length > 0;
-              const canJoin = match.status === 'open' && myOwnedCards.length > 0;
+              const canJoin = match.status === 'open' && myOwnedCards.some(c => c.usesLeft > 0);
 
               return (
                 <div key={match.id} className={`card-container ${match.status === 'in_progress' ? 'ring-2 ring-accent' : ''}`}>
@@ -232,13 +248,21 @@ const Lobby = () => {
           <div className="max-h-[60vh] overflow-y-auto p-1 space-y-3">
             {myOwnedCards.map(card => {
               const isSelected = cardsToJoin.has(card.id);
+              const isDisabled = card.usesLeft === 0;
               return (
-                <div key={card.id} onClick={() => setCardsToJoin(prev => {
-                  const next = new Set(prev);
-                  if (isSelected) next.delete(card.id); else next.add(card.id);
-                  return next;
-                })} className={`p-3 rounded-lg cursor-pointer border-2 ${isSelected ? 'border-primary bg-primary/5' : 'border-transparent bg-secondary'}`}>
-                  <h3 className="font-heading font-semibold">{card.name}</h3>
+                <div 
+                  key={card.id} 
+                  onClick={() => !isDisabled && setCardsToJoin(prev => {
+                    const next = new Set(prev);
+                    if (isSelected) next.delete(card.id); else next.add(card.id);
+                    return next;
+                  })} 
+                  className={`p-3 rounded-lg border-2 ${isDisabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'} ${isSelected ? 'border-primary bg-primary/5' : 'border-transparent bg-secondary'}`}
+                >
+                  <div className="flex justify-between items-center">
+                    <h3 className="font-heading font-semibold">{card.name}</h3>
+                    {isDisabled && <span className="text-xs text-destructive font-medium">Sem usos</span>}
+                  </div>
                 </div>
               );
             })}

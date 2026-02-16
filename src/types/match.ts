@@ -38,6 +38,7 @@ export interface PlayerCard {
   playerId: string;
   name: string;
   numbers: number[][];
+  usesLeft: number;
 }
 
 // An instance of a card used in a match

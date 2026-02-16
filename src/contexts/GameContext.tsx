@@ -22,6 +22,7 @@ interface GameContextType {
   buyCredits: (amount: number) => void;
   createPlayerCard: (options: { name: string, numbers: number[][] }) => PlayerCard | null;
   joinMatch: (matchId: string, playerCardIds: string[]) => MatchCard[];
+  buyCardUses: (playerCardId: string, amount: number) => boolean;
   
   // Data
   matches: Match[];
@@ -162,7 +163,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const cardCost = 10; // Fixed price for a new card template
     if (currentPlayer.credits < cardCost) return null;
 
-    const newCard: PlayerCard = { id: generateCardId(), playerId: currentPlayer.id, name: options.name, numbers: options.numbers };
+    const newCard: PlayerCard = { id: generateCardId(), playerId: currentPlayer.id, name: options.name, numbers: options.numbers, usesLeft: 1 };
     
     setPlayerCards(prev => [...prev, newCard]);
     setPlayers(prev => prev.map(p => p.id === currentPlayer.id ? { ...p, credits: p.credits - cardCost, ownedCardIds: [...p.ownedCardIds, newCard.id] } : p));
@@ -174,21 +175,34 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const match = matches.find(m => m.id === matchId);
     if (!match || match.status !== 'open') return [];
 
+    const cardsToUse = playerCards.filter(pc => playerCardIds.includes(pc.id));
+    const allCardsAreValid = cardsToUse.every(c => c.usesLeft > 0 && c.playerId === currentPlayer.id);
+    if (cardsToUse.length !== playerCardIds.length || !allCardsAreValid) {
+      console.error("Algumas cartelas selecionadas são inválidas ou não tem usos restantes.");
+      return [];
+    }
+
     const totalCost = playerCardIds.length * match.cardPrice;
     if (currentPlayer.credits < totalCost) return [];
 
     setPlayers(prev => prev.map(p => p.id === currentPlayer.id ? { ...p, credits: p.credits - totalCost } : p));
     setMatches(prev => prev.map(m => m.id === matchId ? { ...m, pot: m.pot + totalCost, playerIds: m.playerIds.includes(currentPlayer.id) ? m.playerIds : [...m.playerIds, currentPlayer.id] } : m));
+    
+    setPlayerCards(prev => prev.map(pc => {
+      if (playerCardIds.includes(pc.id)) {
+        return { ...pc, usesLeft: pc.usesLeft - 1 };
+      }
+      return pc;
+    }));
 
-    const newMatchCards: MatchCard[] = playerCardIds.map(pCardId => {
-      const playerCard = playerCards.find(pc => pc.id === pCardId);
+    const newMatchCards: MatchCard[] = cardsToUse.map(playerCard => {
       return {
         id: generateId(),
-        playerCardId: pCardId,
+        playerCardId: playerCard.id,
         playerId: currentPlayer.id,
         matchId,
-        name: playerCard!.name,
-        numbers: playerCard!.numbers,
+        name: playerCard.name,
+        numbers: playerCard.numbers,
         markedNumbers: new Set([0]),
       };
     });
@@ -197,13 +211,26 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return newMatchCards;
   }, [currentPlayer, matches, playerCards]);
 
+  const buyCardUses = useCallback((playerCardId: string, amount: number): boolean => {
+    if (!currentPlayer) return false;
+    const costPerUse = 5;
+    const totalCost = costPerUse * amount;
+
+    if (currentPlayer.credits < totalCost) return false;
+
+    setPlayers(prev => prev.map(p => p.id === currentPlayer.id ? { ...p, credits: p.credits - totalCost } : p));
+    setPlayerCards(prev => prev.map(pc => pc.id === playerCardId ? { ...pc, usesLeft: pc.usesLeft + amount } : pc));
+    
+    return true;
+  }, [currentPlayer]);
+
   const getMatchCards = useCallback((matchId: string) => matchCards.filter(c => c.matchId === matchId), [matchCards]);
   const getPlayerMatchCards = useCallback((matchId: string, playerId: string) => matchCards.filter(c => c.matchId === matchId && c.playerId === playerId), [matchCards]);
 
   return (
     <GameContext.Provider value={{
       isAdmin, adminLogin, adminLogout, createMatch, openMatch, startMatch, callNumber, finishMatch, deleteMatch,
-      currentPlayer, registerPlayer, logoutPlayer, buyCredits, createPlayerCard, joinMatch,
+      currentPlayer, registerPlayer, logoutPlayer, buyCredits, createPlayerCard, joinMatch, buyCardUses,
       matches, players, playerCards, matchCards, getMatchCards, getPlayerMatchCards,
     }}>
       {children}
