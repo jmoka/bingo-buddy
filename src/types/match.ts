@@ -14,7 +14,7 @@ export interface Match {
   name: string;
   gameType: GameType;
   maxCardsPerPlayer: number;
-  cardPrice: number; // cost per card in credits
+  cardPrice: number; // cost per card in credits TO JOIN
   prize: Prize;
   startTime: string; // ISO date string
   status: MatchStatus;
@@ -29,13 +29,24 @@ export interface Player {
   id: string;
   name: string;
   credits: number;
-  ownedCardIds: string[]; // card IDs the player owns
+  ownedCardIds: string[]; // IDs of PlayerCard
 }
 
+// A card template owned by a player
 export interface PlayerCard {
   id: string;
   playerId: string;
+  name: string;
+  numbers: number[][];
+}
+
+// An instance of a card used in a match
+export interface MatchCard {
+  id: string;
+  playerCardId: string; // link to the template
+  playerId: string;
   matchId: string;
-  numbers: number[][]; // 5x5 grid
+  name: string; // copied from PlayerCard
+  numbers: number[][]; // copied from PlayerCard
   markedNumbers: Set<number>;
 }

@@ -4,18 +4,11 @@ import { BingoCell } from '@/components/BingoCell';
 import { Button } from '@/components/ui/button';
 import { gameTypeLabels } from '@/utils/bingoUtils';
 import { ArrowLeft, Coins, Trophy, Users } from 'lucide-react';
-import { useEffect, useState } from 'react';
 
 const MatchView = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { matches, currentPlayer, getPlayerMatchCards } = useGame();
-  const [now, setNow] = useState(Date.now());
-
-  useEffect(() => {
-    const interval = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(interval);
-  }, []);
 
   const match = matches.find(m => m.id === id);
   const myCards = currentPlayer && id ? getPlayerMatchCards(id, currentPlayer.id) : [];
@@ -51,7 +44,6 @@ const MatchView = () => {
                 </div>
               </div>
             </div>
-            {/* Current ball */}
             {lastCalled && (
               <div className="bingo-ball animate-bounce-in text-xl" key={lastCalled}>
                 {lastCalled}
@@ -62,7 +54,6 @@ const MatchView = () => {
       </header>
 
       <main className="container max-w-6xl mx-auto py-6 px-4">
-        {/* Called numbers */}
         <div className="card-container mb-6">
           <p className="text-sm text-muted-foreground mb-2">Números sorteados ({match.calledNumbers.length})</p>
           <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto">
@@ -77,14 +68,13 @@ const MatchView = () => {
           </div>
         </div>
 
-        {/* My cards */}
         <h2 className="font-heading text-lg font-bold text-foreground mb-4">
           Minhas Cartelas ({myCards.length})
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {myCards.map((card, idx) => (
+          {myCards.map((card) => (
             <div key={card.id} className="card-container">
-              <h3 className="font-heading font-semibold text-foreground mb-3">Cartela {idx + 1}</h3>
+              <h3 className="font-heading font-semibold text-foreground mb-3">{card.name}</h3>
               <div className="grid grid-cols-5 gap-1.5">
                 {['B', 'I', 'N', 'G', 'O'].map(letter => (
                   <div key={letter} className="w-12 h-8 rounded-md flex items-center justify-center text-sm font-heading font-bold gradient-primary text-primary-foreground">

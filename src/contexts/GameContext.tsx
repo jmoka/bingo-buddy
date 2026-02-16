@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
-import { Match, Player, PlayerCard, MatchStatus, Prize } from '@/types/match';
+import { Match, Player, PlayerCard, MatchCard, MatchStatus } from '@/types/match';
 import { GameType } from '@/types/bingo';
 import { generateCardId } from '@/utils/bingoUtils';
 
@@ -20,23 +20,26 @@ interface GameContextType {
   registerPlayer: (name: string) => void;
   logoutPlayer: () => void;
   buyCredits: (amount: number) => void;
-  joinMatch: (matchId: string, cardCount: number) => PlayerCard[];
+  createPlayerCard: (options: { name: string, numbers: number[][] }) => PlayerCard | null;
+  joinMatch: (matchId: string, playerCardIds: string[]) => MatchCard[];
   
   // Data
   matches: Match[];
   players: Player[];
-  playerCards: PlayerCard[];
-  getMatchCards: (matchId: string) => PlayerCard[];
-  getPlayerMatchCards: (matchId: string, playerId: string) => PlayerCard[];
+  playerCards: PlayerCard[]; // Owned cards
+  matchCards: MatchCard[]; // Cards in matches
+  getMatchCards: (matchId: string) => MatchCard[];
+  getPlayerMatchCards: (matchId: string, playerId: string) => MatchCard[];
 }
 
 const GameContext = createContext<GameContextType | null>(null);
 
-const ADMIN_PASSWORD = 'admin123'; // Simple password for demo
+const ADMIN_PASSWORD = 'admin123';
 const STORAGE_KEYS = {
   matches: 'bingo_matches',
   players: 'bingo_players',
   playerCards: 'bingo_player_cards',
+  matchCards: 'bingo_match_cards',
   currentPlayer: 'bingo_current_player',
   isAdmin: 'bingo_is_admin',
 };
@@ -45,47 +48,39 @@ function generateId(): string {
   return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 }
 
-function generateBingoCard(): number[][] {
+export function generateBingoCard(): number[][] {
   const ranges = [
-    [1, 15],   // B
-    [16, 30],  // I
-    [31, 45],  // N
-    [46, 60],  // G
-    [61, 75],  // O
+    [1, 15], [16, 30], [31, 45], [46, 60], [61, 75]
   ];
-
-  const grid: number[][] = [];
-  for (let row = 0; row < 5; row++) {
-    const rowNums: number[] = [];
-    for (let col = 0; col < 5; col++) {
-      if (row === 2 && col === 2) {
-        rowNums.push(0); // FREE space
+  const card: number[][] = Array(5).fill(0).map(() => Array(5).fill(0));
+  
+  for (let col = 0; col < 5; col++) {
+    const [min, max] = ranges[col];
+    const columnNumbers = new Set<number>();
+    while (columnNumbers.size < 5) {
+      if (col === 2 && columnNumbers.size === 2) {
+        columnNumbers.add(0); // Free space
       } else {
-        const [min, max] = ranges[col];
-        let num: number;
-        do {
-          num = Math.floor(Math.random() * (max - min + 1)) + min;
-        } while (
-          grid.some(r => r[col] === num) ||
-          rowNums.includes(num)
-        );
-        rowNums.push(num);
+        const num = Math.floor(Math.random() * (max - min + 1)) + min;
+        columnNumbers.add(num);
       }
     }
-    grid.push(rowNums);
+    const sortedCol = Array.from(columnNumbers).sort((a, b) => a - b);
+    for (let row = 0; row < 5; row++) {
+      card[row][col] = sortedCol[row];
+    }
   }
-  return grid;
+  return card;
 }
 
-// Serialize/deserialize helpers for Sets
-function serializeCards(cards: PlayerCard[]): string {
+function serializeMatchCards(cards: MatchCard[]): string {
   return JSON.stringify(cards.map(c => ({
     ...c,
     markedNumbers: Array.from(c.markedNumbers),
   })));
 }
 
-function deserializeCards(json: string): PlayerCard[] {
+function deserializeMatchCards(json: string): MatchCard[] {
   const arr = JSON.parse(json);
   return arr.map((c: any) => ({
     ...c,
@@ -94,218 +89,122 @@ function deserializeCards(json: string): PlayerCard[] {
 }
 
 export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [matches, setMatches] = useState<Match[]>(() => {
-    const saved = localStorage.getItem(STORAGE_KEYS.matches);
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [matches, setMatches] = useState<Match[]>(() => JSON.parse(localStorage.getItem(STORAGE_KEYS.matches) || '[]'));
+  const [players, setPlayers] = useState<Player[]>(() => JSON.parse(localStorage.getItem(STORAGE_KEYS.players) || '[]'));
+  const [playerCards, setPlayerCards] = useState<PlayerCard[]>(() => JSON.parse(localStorage.getItem(STORAGE_KEYS.playerCards) || '[]'));
+  const [matchCards, setMatchCards] = useState<MatchCard[]>(() => deserializeMatchCards(localStorage.getItem(STORAGE_KEYS.matchCards) || '[]'));
+  const [currentPlayer, setCurrentPlayer] = useState<Player | null>(() => JSON.parse(localStorage.getItem(STORAGE_KEYS.currentPlayer) || 'null'));
+  const [isAdmin, setIsAdmin] = useState<boolean>(() => localStorage.getItem(STORAGE_KEYS.isAdmin) === 'true');
 
-  const [players, setPlayers] = useState<Player[]>(() => {
-    const saved = localStorage.getItem(STORAGE_KEYS.players);
-    return saved ? JSON.parse(saved) : [];
-  });
-
-  const [playerCards, setPlayerCards] = useState<PlayerCard[]>(() => {
-    const saved = localStorage.getItem(STORAGE_KEYS.playerCards);
-    return saved ? deserializeCards(saved) : [];
-  });
-
-  const [currentPlayer, setCurrentPlayer] = useState<Player | null>(() => {
-    const saved = localStorage.getItem(STORAGE_KEYS.currentPlayer);
-    return saved ? JSON.parse(saved) : null;
-  });
-
-  const [isAdmin, setIsAdmin] = useState<boolean>(() => {
-    return localStorage.getItem(STORAGE_KEYS.isAdmin) === 'true';
-  });
-
-  // Persist state
+  useEffect(() => { localStorage.setItem(STORAGE_KEYS.matches, JSON.stringify(matches)); }, [matches]);
+  useEffect(() => { localStorage.setItem(STORAGE_KEYS.players, JSON.stringify(players)); }, [players]);
+  useEffect(() => { localStorage.setItem(STORAGE_KEYS.playerCards, JSON.stringify(playerCards)); }, [playerCards]);
+  useEffect(() => { localStorage.setItem(STORAGE_KEYS.matchCards, serializeMatchCards(matchCards)); }, [matchCards]);
+  useEffect(() => { localStorage.setItem(STORAGE_KEYS.isAdmin, String(isAdmin)); }, [isAdmin]);
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.matches, JSON.stringify(matches));
-  }, [matches]);
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.players, JSON.stringify(players));
-  }, [players]);
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.playerCards, serializeCards(playerCards));
-  }, [playerCards]);
-
-  useEffect(() => {
-    if (currentPlayer) {
-      localStorage.setItem(STORAGE_KEYS.currentPlayer, JSON.stringify(currentPlayer));
-    } else {
-      localStorage.removeItem(STORAGE_KEYS.currentPlayer);
-    }
+    if (currentPlayer) localStorage.setItem(STORAGE_KEYS.currentPlayer, JSON.stringify(currentPlayer));
+    else localStorage.removeItem(STORAGE_KEYS.currentPlayer);
   }, [currentPlayer]);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.isAdmin, String(isAdmin));
-  }, [isAdmin]);
-
-  // Sync currentPlayer with players array
-  useEffect(() => {
     if (currentPlayer) {
       const updated = players.find(p => p.id === currentPlayer.id);
-      if (updated && (updated.credits !== currentPlayer.credits || updated.name !== currentPlayer.name)) {
+      if (updated && JSON.stringify(updated) !== JSON.stringify(currentPlayer)) {
         setCurrentPlayer(updated);
       }
     }
   }, [players, currentPlayer]);
 
-  // Admin functions
-  const adminLogin = useCallback((password: string): boolean => {
-    if (password === ADMIN_PASSWORD) {
-      setIsAdmin(true);
-      return true;
-    }
-    return false;
-  }, []);
-
-  const adminLogout = useCallback(() => {
-    setIsAdmin(false);
-  }, []);
+  const adminLogin = useCallback((password: string) => { if (password === ADMIN_PASSWORD) { setIsAdmin(true); return true; } return false; }, []);
+  const adminLogout = useCallback(() => setIsAdmin(false), []);
 
   const createMatch = useCallback((data: Omit<Match, 'id' | 'status' | 'playerIds' | 'calledNumbers' | 'pot' | 'createdAt'>): Match => {
-    const match: Match = {
-      ...data,
-      id: generateId(),
-      status: 'waiting',
-      playerIds: [],
-      calledNumbers: [],
-      pot: 0,
-      createdAt: new Date().toISOString(),
-    };
+    const match: Match = { ...data, id: generateId(), status: 'waiting', playerIds: [], calledNumbers: [], pot: 0, createdAt: new Date().toISOString() };
     setMatches(prev => [...prev, match]);
     return match;
   }, []);
 
-  const openMatch = useCallback((matchId: string) => {
-    setMatches(prev => prev.map(m => m.id === matchId ? { ...m, status: 'open' as MatchStatus } : m));
-  }, []);
-
-  const startMatch = useCallback((matchId: string) => {
-    setMatches(prev => prev.map(m => m.id === matchId ? { ...m, status: 'in_progress' as MatchStatus } : m));
-  }, []);
-
+  const openMatch = useCallback((matchId: string) => setMatches(prev => prev.map(m => m.id === matchId ? { ...m, status: 'open' as MatchStatus } : m)), []);
+  const startMatch = useCallback((matchId: string) => setMatches(prev => prev.map(m => m.id === matchId ? { ...m, status: 'in_progress' as MatchStatus } : m)), []);
+  const finishMatch = useCallback((matchId: string) => setMatches(prev => prev.map(m => m.id === matchId ? { ...m, status: 'finished' as MatchStatus } : m)), []);
+  
   const callNumber = useCallback((matchId: string, num: number) => {
-    setMatches(prev => prev.map(m => {
-      if (m.id !== matchId) return m;
-      if (m.calledNumbers.includes(num)) return m;
-      return { ...m, calledNumbers: [...m.calledNumbers, num] };
-    }));
-
-    // Mark numbers on player cards
-    setPlayerCards(prev => prev.map(card => {
+    setMatches(prev => prev.map(m => m.id === matchId && !m.calledNumbers.includes(num) ? { ...m, calledNumbers: [...m.calledNumbers, num] } : m));
+    setMatchCards(prev => prev.map(card => {
       if (card.matchId !== matchId) return card;
       const newMarked = new Set(card.markedNumbers);
-      card.numbers.flat().forEach(n => {
-        if (n === num || n === 0) newMarked.add(n);
-      });
+      if (card.numbers.flat().includes(num)) newMarked.add(num);
       return { ...card, markedNumbers: newMarked };
     }));
   }, []);
 
-  const finishMatch = useCallback((matchId: string) => {
-    setMatches(prev => prev.map(m => m.id === matchId ? { ...m, status: 'finished' as MatchStatus } : m));
-  }, []);
-
   const deleteMatch = useCallback((matchId: string) => {
     setMatches(prev => prev.filter(m => m.id !== matchId));
-    setPlayerCards(prev => prev.filter(c => c.matchId !== matchId));
+    setMatchCards(prev => prev.filter(c => c.matchId !== matchId));
   }, []);
 
-  // Player functions
   const registerPlayer = useCallback((name: string) => {
-    const existing = players.find(p => p.name === name);
-    if (existing) {
-      setCurrentPlayer(existing);
-      return;
-    }
-    const player: Player = {
-      id: generateId(),
-      name,
-      credits: 100, // Start with 100 credits
-      ownedCardIds: [],
-    };
+    const existing = players.find(p => p.name.toLowerCase() === name.toLowerCase());
+    if (existing) { setCurrentPlayer(existing); return; }
+    const player: Player = { id: generateId(), name, credits: 100, ownedCardIds: [] };
     setPlayers(prev => [...prev, player]);
     setCurrentPlayer(player);
   }, [players]);
 
-  const logoutPlayer = useCallback(() => {
-    setCurrentPlayer(null);
-  }, []);
-
+  const logoutPlayer = useCallback(() => setCurrentPlayer(null), []);
   const buyCredits = useCallback((amount: number) => {
     if (!currentPlayer) return;
     setPlayers(prev => prev.map(p => p.id === currentPlayer.id ? { ...p, credits: p.credits + amount } : p));
   }, [currentPlayer]);
 
-  const joinMatch = useCallback((matchId: string, cardCount: number): PlayerCard[] => {
-    if (!currentPlayer) return [];
+  const createPlayerCard = useCallback((options: { name: string, numbers: number[][] }): PlayerCard | null => {
+    if (!currentPlayer) return null;
+    const cardCost = 10; // Fixed price for a new card template
+    if (currentPlayer.credits < cardCost) return null;
+
+    const newCard: PlayerCard = { id: generateCardId(), playerId: currentPlayer.id, name: options.name, numbers: options.numbers };
     
+    setPlayerCards(prev => [...prev, newCard]);
+    setPlayers(prev => prev.map(p => p.id === currentPlayer.id ? { ...p, credits: p.credits - cardCost, ownedCardIds: [...p.ownedCardIds, newCard.id] } : p));
+    return newCard;
+  }, [currentPlayer]);
+
+  const joinMatch = useCallback((matchId: string, playerCardIds: string[]): MatchCard[] => {
+    if (!currentPlayer || playerCardIds.length === 0) return [];
     const match = matches.find(m => m.id === matchId);
     if (!match || match.status !== 'open') return [];
 
-    const totalCost = cardCount * match.cardPrice;
+    const totalCost = playerCardIds.length * match.cardPrice;
     if (currentPlayer.credits < totalCost) return [];
 
-    // Debit credits
     setPlayers(prev => prev.map(p => p.id === currentPlayer.id ? { ...p, credits: p.credits - totalCost } : p));
+    setMatches(prev => prev.map(m => m.id === matchId ? { ...m, pot: m.pot + totalCost, playerIds: m.playerIds.includes(currentPlayer.id) ? m.playerIds : [...m.playerIds, currentPlayer.id] } : m));
 
-    // Add to pot
-    setMatches(prev => prev.map(m => m.id === matchId ? { 
-      ...m, 
-      pot: m.pot + totalCost,
-      playerIds: m.playerIds.includes(currentPlayer.id) ? m.playerIds : [...m.playerIds, currentPlayer.id]
-    } : m));
-
-    // Generate cards
-    const newCards: PlayerCard[] = [];
-    for (let i = 0; i < cardCount; i++) {
-      const card: PlayerCard = {
-        id: generateCardId(),
+    const newMatchCards: MatchCard[] = playerCardIds.map(pCardId => {
+      const playerCard = playerCards.find(pc => pc.id === pCardId);
+      return {
+        id: generateId(),
+        playerCardId: pCardId,
         playerId: currentPlayer.id,
         matchId,
-        numbers: generateBingoCard(),
-        markedNumbers: new Set([0]), // FREE space
+        name: playerCard!.name,
+        numbers: playerCard!.numbers,
+        markedNumbers: new Set([0]),
       };
-      newCards.push(card);
-    }
+    });
 
-    setPlayerCards(prev => [...prev, ...newCards]);
-    return newCards;
-  }, [currentPlayer, matches]);
+    setMatchCards(prev => [...prev, ...newMatchCards]);
+    return newMatchCards;
+  }, [currentPlayer, matches, playerCards]);
 
-  const getMatchCards = useCallback((matchId: string) => {
-    return playerCards.filter(c => c.matchId === matchId);
-  }, [playerCards]);
-
-  const getPlayerMatchCards = useCallback((matchId: string, playerId: string) => {
-    return playerCards.filter(c => c.matchId === matchId && c.playerId === playerId);
-  }, [playerCards]);
+  const getMatchCards = useCallback((matchId: string) => matchCards.filter(c => c.matchId === matchId), [matchCards]);
+  const getPlayerMatchCards = useCallback((matchId: string, playerId: string) => matchCards.filter(c => c.matchId === matchId && c.playerId === playerId), [matchCards]);
 
   return (
     <GameContext.Provider value={{
-      isAdmin,
-      adminLogin,
-      adminLogout,
-      createMatch,
-      openMatch,
-      startMatch,
-      callNumber,
-      finishMatch,
-      deleteMatch,
-      currentPlayer,
-      registerPlayer,
-      logoutPlayer,
-      buyCredits,
-      joinMatch,
-      matches,
-      players,
-      playerCards,
-      getMatchCards,
-      getPlayerMatchCards,
+      isAdmin, adminLogin, adminLogout, createMatch, openMatch, startMatch, callNumber, finishMatch, deleteMatch,
+      currentPlayer, registerPlayer, logoutPlayer, buyCredits, createPlayerCard, joinMatch,
+      matches, players, playerCards, matchCards, getMatchCards, getPlayerMatchCards,
     }}>
       {children}
     </GameContext.Provider>

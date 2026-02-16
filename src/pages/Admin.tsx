@@ -243,7 +243,6 @@ const Admin = () => {
                     </div>
                   </div>
 
-                  {/* Number caller for in_progress matches */}
                   {match.status === 'in_progress' && (
                     <div className="border-t border-border pt-4 mt-2">
                       <div className="flex gap-2 mb-3">

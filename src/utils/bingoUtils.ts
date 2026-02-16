@@ -128,3 +128,46 @@ export const gameTypeLabels: Record<GameType, string> = {
   vertical: 'Linha Vertical',
   diagonal: 'Diagonal',
 };
+
+export const BINGO_RANGES = [
+  { col: 'B', min: 1, max: 15 },
+  { col: 'I', min: 16, max: 30 },
+  { col: 'N', min: 31, max: 45 },
+  { col: 'G', min: 46, max: 60 },
+  { col: 'O', min: 61, max: 75 },
+];
+
+export const validateCardGrid = (grid: number[][]): string | null => {
+  if (grid.length !== 5 || grid.some(row => row.length !== 5)) {
+    return "A grade deve ser 5x5.";
+  }
+
+  const allNumbers = new Set<number>();
+
+  for (let col = 0; col < 5; col++) {
+    const colNumbers = new Set<number>();
+    const range = BINGO_RANGES[col];
+
+    for (let row = 0; row < 5; row++) {
+      if (row === 2 && col === 2) {
+        if (grid[row][col] !== 0) return "O centro deve ser um espaço livre (0).";
+        continue;
+      }
+
+      const num = grid[row][col];
+      if (isNaN(num) || num < range.min || num > range.max) {
+        return `Número na coluna ${range.col} está fora do intervalo (${range.min}-${range.max}).`;
+      }
+      if (colNumbers.has(num)) {
+        return `Número duplicado ${num} na coluna ${range.col}.`;
+      }
+      if (allNumbers.has(num) && num !== 0) {
+        return `Número duplicado ${num} na cartela.`;
+      }
+      colNumbers.add(num);
+      allNumbers.add(num);
+    }
+  }
+
+  return null;
+};
