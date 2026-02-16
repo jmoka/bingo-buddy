@@ -19,7 +19,7 @@ const Lobby = () => {
   const { toast } = useToast();
   const { 
     currentPlayer, registerPlayer, logoutPlayer, buyCredits, createPlayerCard,
-    matches, joinMatch, getPlayerMatchCards, playerCards, buyCardUses,
+    matches, joinMatch, getPlayerMatchCards, playerCards, buyCardUses, gameSettings,
   } = useGame();
 
   const [playerName, setPlayerName] = useState('');
@@ -80,11 +80,10 @@ const Lobby = () => {
   };
 
   const handleBuyUses = (cardId: string) => {
-    const cost = 5;
-    if (buyCardUses(cardId, 1)) {
-      toast({ title: 'Cartela Recarregada!', description: 'Você comprou mais um uso para sua cartela.' });
+    if (buyCardUses(cardId)) {
+      toast({ title: 'Cartela Recarregada!', description: `Você comprou mais ${gameSettings.usesPerRecharge} uso(s) para sua cartela.` });
     } else {
-      toast({ title: 'Créditos insuficientes', description: `Você precisa de ${cost} créditos para recarregar.`, variant: 'destructive' });
+      toast({ title: 'Créditos insuficientes', description: `Você precisa de ${gameSettings.cardRechargeCost} créditos para recarregar.`, variant: 'destructive' });
     }
   };
 
@@ -164,7 +163,7 @@ const Lobby = () => {
                 </div>
                 <DialogFooter>
                   <DialogClose asChild><Button variant="ghost">Cancelar</Button></DialogClose>
-                  <Button onClick={handleCreateCard} disabled={!newCardName.trim() || !isNewCardValid}>Salvar (10 créditos)</Button>
+                  <Button onClick={handleCreateCard} disabled={!newCardName.trim() || !isNewCardValid}>Salvar ({gameSettings.newCardCost} créditos)</Button>
                 </DialogFooter>
               </DialogContent>
             </Dialog>
@@ -184,7 +183,7 @@ const Lobby = () => {
                       </div>
                       {card.usesLeft === 0 && (
                         <Button size="sm" variant="outline" onClick={() => handleBuyUses(card.id)}>
-                          Recarregar (5 <Coins className="w-3 h-3 ml-1" />)
+                          Recarregar ({gameSettings.cardRechargeCost} <Coins className="w-3 h-3 ml-1" />)
                         </Button>
                       )}
                     </div>

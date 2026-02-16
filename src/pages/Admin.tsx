@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useGame } from '@/contexts/GameContext';
 import { Button } from '@/components/ui/button';
@@ -9,9 +9,10 @@ import { PrizeType, Match, MatchStatus } from '@/types/match';
 import { gameTypeLabels } from '@/utils/bingoUtils';
 import { 
   Plus, LogOut, Play, DoorOpen, Trash2, Trophy, Users, 
-  Clock, Coins, Hash, ArrowLeft, StopCircle 
+  Clock, Coins, Hash, ArrowLeft, StopCircle, Settings, Save
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { useToast } from '@/hooks/use-toast';
 
 const statusLabels: Record<MatchStatus, string> = {
   waiting: 'Aguardando',
@@ -29,14 +30,15 @@ const statusColors: Record<MatchStatus, string> = {
 
 const Admin = () => {
   const navigate = useNavigate();
+  const { toast } = useToast();
   const { 
     isAdmin, adminLogout, matches, players, createMatch, 
     openMatch, startMatch, finishMatch, deleteMatch, callNumber,
-    getMatchCards,
+    getMatchCards, gameSettings, updateGameSettings,
   } = useGame();
 
   const [showCreate, setShowCreate] = useState(false);
-  const [form, setForm] = useState({
+  const [matchForm, setMatchForm] = useState({
     name: '',
     gameType: 'full' as GameType,
     maxCardsPerPlayer: 3,
@@ -46,29 +48,39 @@ const Admin = () => {
     prizeName: '',
     startTime: '',
   });
+  const [settingsForm, setSettingsForm] = useState(gameSettings);
   const [callerInput, setCallerInput] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    setSettingsForm(gameSettings);
+  }, [gameSettings]);
 
   if (!isAdmin) {
     navigate('/admin/login');
     return null;
   }
 
-  const handleCreate = () => {
-    if (!form.name.trim() || !form.startTime) return;
+  const handleCreateMatch = () => {
+    if (!matchForm.name.trim() || !matchForm.startTime) return;
     createMatch({
-      name: form.name,
-      gameType: form.gameType,
-      maxCardsPerPlayer: form.maxCardsPerPlayer,
-      cardPrice: form.cardPrice,
+      name: matchForm.name,
+      gameType: matchForm.gameType,
+      maxCardsPerPlayer: matchForm.maxCardsPerPlayer,
+      cardPrice: matchForm.cardPrice,
       prize: {
-        type: form.prizeType,
-        value: form.prizeValue,
-        productName: form.prizeType === 'product' ? form.prizeName : undefined,
+        type: matchForm.prizeType,
+        value: matchForm.prizeValue,
+        productName: matchForm.prizeType === 'product' ? matchForm.prizeName : undefined,
       },
-      startTime: new Date(form.startTime).toISOString(),
+      startTime: new Date(matchForm.startTime).toISOString(),
     });
     setShowCreate(false);
-    setForm({ name: '', gameType: 'full', maxCardsPerPlayer: 3, cardPrice: 10, prizeType: 'percentage', prizeValue: 70, prizeName: '', startTime: '' });
+    setMatchForm({ name: '', gameType: 'full', maxCardsPerPlayer: 3, cardPrice: 10, prizeType: 'percentage', prizeValue: 70, prizeName: '', startTime: '' });
+  };
+
+  const handleSaveSettings = () => {
+    updateGameSettings(settingsForm);
+    toast({ title: 'Configurações salvas!', description: 'Os novos valores já estão em vigor.' });
   };
 
   const handleCallNumber = (matchId: string) => {
@@ -110,14 +122,38 @@ const Admin = () => {
       </header>
 
       <main className="container max-w-6xl mx-auto py-8 px-4">
+        {/* General Settings */}
+        <div className="card-container mb-8">
+          <h2 className="font-heading text-xl font-bold text-foreground mb-4 flex items-center gap-2">
+            <Settings className="w-5 h-5" /> Configurações Gerais
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <label className="text-sm font-medium text-foreground mb-1 block">Custo/Nova Cartela</label>
+              <Input type="number" min={0} value={settingsForm.newCardCost} onChange={e => setSettingsForm(prev => ({ ...prev, newCardCost: +e.target.value }))} className="bg-secondary border-0" />
+            </div>
+            <div>
+              <label className="text-sm font-medium text-foreground mb-1 block">Custo/Recarga de Uso</label>
+              <Input type="number" min={0} value={settingsForm.cardRechargeCost} onChange={e => setSettingsForm(prev => ({ ...prev, cardRechargeCost: +e.target.value }))} className="bg-secondary border-0" />
+            </div>
+            <div>
+              <label className="text-sm font-medium text-foreground mb-1 block">Usos por Recarga</label>
+              <Input type="number" min={1} value={settingsForm.usesPerRecharge} onChange={e => setSettingsForm(prev => ({ ...prev, usesPerRecharge: +e.target.value }))} className="bg-secondary border-0" />
+            </div>
+          </div>
+          <Button className="mt-4 gradient-primary shadow-button" onClick={handleSaveSettings}>
+            <Save className="w-4 h-4 mr-2" /> Salvar Configurações
+          </Button>
+        </div>
+
+        {/* Matches */}
         <div className="flex items-center justify-between mb-6">
           <h2 className="font-heading text-xl font-bold text-foreground">
             Partidas ({matches.length})
           </h2>
-
           <Dialog open={showCreate} onOpenChange={setShowCreate}>
             <DialogTrigger asChild>
-              <Button className="gradient-primary shadow-button">
+              <Button>
                 <Plus className="w-4 h-4 mr-2" />
                 Nova Partida
               </Button>
@@ -127,11 +163,11 @@ const Admin = () => {
                 <DialogTitle className="font-heading">Criar Partida</DialogTitle>
               </DialogHeader>
               <div className="space-y-4">
-                <Input placeholder="Nome da partida" value={form.name} onChange={e => setForm(prev => ({ ...prev, name: e.target.value }))} className="bg-secondary border-0" />
+                <Input placeholder="Nome da partida" value={matchForm.name} onChange={e => setMatchForm(prev => ({ ...prev, name: e.target.value }))} className="bg-secondary border-0" />
                 
                 <div>
                   <label className="text-sm font-medium text-foreground mb-1 block">Tipo de Jogo</label>
-                  <Select value={form.gameType} onValueChange={(v: GameType) => setForm(prev => ({ ...prev, gameType: v }))}>
+                  <Select value={matchForm.gameType} onValueChange={(v: GameType) => setMatchForm(prev => ({ ...prev, gameType: v }))}>
                     <SelectTrigger className="bg-secondary border-0"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       {(['full', 'horizontal', 'vertical', 'diagonal'] as GameType[]).map(t => (
@@ -144,17 +180,17 @@ const Admin = () => {
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="text-sm font-medium text-foreground mb-1 block">Máx. Cartelas/Jogador</label>
-                    <Input type="number" min={1} max={10} value={form.maxCardsPerPlayer} onChange={e => setForm(prev => ({ ...prev, maxCardsPerPlayer: +e.target.value }))} className="bg-secondary border-0" />
+                    <Input type="number" min={1} max={10} value={matchForm.maxCardsPerPlayer} onChange={e => setMatchForm(prev => ({ ...prev, maxCardsPerPlayer: +e.target.value }))} className="bg-secondary border-0" />
                   </div>
                   <div>
                     <label className="text-sm font-medium text-foreground mb-1 block">Preço/Cartela</label>
-                    <Input type="number" min={1} value={form.cardPrice} onChange={e => setForm(prev => ({ ...prev, cardPrice: +e.target.value }))} className="bg-secondary border-0" />
+                    <Input type="number" min={1} value={matchForm.cardPrice} onChange={e => setMatchForm(prev => ({ ...prev, cardPrice: +e.target.value }))} className="bg-secondary border-0" />
                   </div>
                 </div>
 
                 <div>
                   <label className="text-sm font-medium text-foreground mb-1 block">Tipo de Prêmio</label>
-                  <Select value={form.prizeType} onValueChange={(v: PrizeType) => setForm(prev => ({ ...prev, prizeType: v }))}>
+                  <Select value={matchForm.prizeType} onValueChange={(v: PrizeType) => setMatchForm(prev => ({ ...prev, prizeType: v }))}>
                     <SelectTrigger className="bg-secondary border-0"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="percentage">% do Pote</SelectItem>
@@ -164,25 +200,25 @@ const Admin = () => {
                   </Select>
                 </div>
 
-                {form.prizeType === 'product' && (
-                  <Input placeholder="Nome do produto" value={form.prizeName} onChange={e => setForm(prev => ({ ...prev, prizeName: e.target.value }))} className="bg-secondary border-0" />
+                {matchForm.prizeType === 'product' && (
+                  <Input placeholder="Nome do produto" value={matchForm.prizeName} onChange={e => setMatchForm(prev => ({ ...prev, prizeName: e.target.value }))} className="bg-secondary border-0" />
                 )}
 
-                {form.prizeType !== 'product' && (
+                {matchForm.prizeType !== 'product' && (
                   <div>
                     <label className="text-sm font-medium text-foreground mb-1 block">
-                      {form.prizeType === 'percentage' ? 'Porcentagem (%)' : 'Valor (créditos)'}
+                      {matchForm.prizeType === 'percentage' ? 'Porcentagem (%)' : 'Valor (créditos)'}
                     </label>
-                    <Input type="number" min={1} value={form.prizeValue} onChange={e => setForm(prev => ({ ...prev, prizeValue: +e.target.value }))} className="bg-secondary border-0" />
+                    <Input type="number" min={1} value={matchForm.prizeValue} onChange={e => setMatchForm(prev => ({ ...prev, prizeValue: +e.target.value }))} className="bg-secondary border-0" />
                   </div>
                 )}
 
                 <div>
                   <label className="text-sm font-medium text-foreground mb-1 block">Horário de Início</label>
-                  <Input type="datetime-local" value={form.startTime} onChange={e => setForm(prev => ({ ...prev, startTime: e.target.value }))} className="bg-secondary border-0" />
+                  <Input type="datetime-local" value={matchForm.startTime} onChange={e => setMatchForm(prev => ({ ...prev, startTime: e.target.value }))} className="bg-secondary border-0" />
                 </div>
 
-                <Button className="w-full gradient-primary shadow-button" onClick={handleCreate} disabled={!form.name.trim() || !form.startTime}>
+                <Button className="w-full gradient-primary shadow-button" onClick={handleCreateMatch} disabled={!matchForm.name.trim() || !matchForm.startTime}>
                   <Plus className="w-4 h-4 mr-2" />
                   Criar Partida
                 </Button>

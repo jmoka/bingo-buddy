@@ -3,6 +3,12 @@ import { Match, Player, PlayerCard, MatchCard, MatchStatus } from '@/types/match
 import { GameType } from '@/types/bingo';
 import { generateCardId } from '@/utils/bingoUtils';
 
+interface GameSettings {
+  newCardCost: number;
+  cardRechargeCost: number;
+  usesPerRecharge: number;
+}
+
 interface GameContextType {
   // Admin
   isAdmin: boolean;
@@ -14,6 +20,7 @@ interface GameContextType {
   callNumber: (matchId: string, num: number) => void;
   finishMatch: (matchId: string) => void;
   deleteMatch: (matchId: string) => void;
+  updateGameSettings: (settings: GameSettings) => void;
 
   // Player
   currentPlayer: Player | null;
@@ -22,13 +29,14 @@ interface GameContextType {
   buyCredits: (amount: number) => void;
   createPlayerCard: (options: { name: string, numbers: number[][] }) => PlayerCard | null;
   joinMatch: (matchId: string, playerCardIds: string[]) => MatchCard[];
-  buyCardUses: (playerCardId: string, amount: number) => boolean;
+  buyCardUses: (playerCardId: string) => boolean;
   
   // Data
   matches: Match[];
   players: Player[];
   playerCards: PlayerCard[]; // Owned cards
   matchCards: MatchCard[]; // Cards in matches
+  gameSettings: GameSettings;
   getMatchCards: (matchId: string) => MatchCard[];
   getPlayerMatchCards: (matchId: string, playerId: string) => MatchCard[];
 }
@@ -43,6 +51,13 @@ const STORAGE_KEYS = {
   matchCards: 'bingo_match_cards',
   currentPlayer: 'bingo_current_player',
   isAdmin: 'bingo_is_admin',
+  gameSettings: 'bingo_game_settings',
+};
+
+const DEFAULT_SETTINGS: GameSettings = {
+  newCardCost: 10,
+  cardRechargeCost: 5,
+  usesPerRecharge: 1,
 };
 
 function generateId(): string {
@@ -96,12 +111,17 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [matchCards, setMatchCards] = useState<MatchCard[]>(() => deserializeMatchCards(localStorage.getItem(STORAGE_KEYS.matchCards) || '[]'));
   const [currentPlayer, setCurrentPlayer] = useState<Player | null>(() => JSON.parse(localStorage.getItem(STORAGE_KEYS.currentPlayer) || 'null'));
   const [isAdmin, setIsAdmin] = useState<boolean>(() => localStorage.getItem(STORAGE_KEYS.isAdmin) === 'true');
+  const [gameSettings, setGameSettings] = useState<GameSettings>(() => {
+    const stored = localStorage.getItem(STORAGE_KEYS.gameSettings);
+    return stored ? JSON.parse(stored) : DEFAULT_SETTINGS;
+  });
 
   useEffect(() => { localStorage.setItem(STORAGE_KEYS.matches, JSON.stringify(matches)); }, [matches]);
   useEffect(() => { localStorage.setItem(STORAGE_KEYS.players, JSON.stringify(players)); }, [players]);
   useEffect(() => { localStorage.setItem(STORAGE_KEYS.playerCards, JSON.stringify(playerCards)); }, [playerCards]);
   useEffect(() => { localStorage.setItem(STORAGE_KEYS.matchCards, serializeMatchCards(matchCards)); }, [matchCards]);
   useEffect(() => { localStorage.setItem(STORAGE_KEYS.isAdmin, String(isAdmin)); }, [isAdmin]);
+  useEffect(() => { localStorage.setItem(STORAGE_KEYS.gameSettings, JSON.stringify(gameSettings)); }, [gameSettings]);
   useEffect(() => {
     if (currentPlayer) localStorage.setItem(STORAGE_KEYS.currentPlayer, JSON.stringify(currentPlayer));
     else localStorage.removeItem(STORAGE_KEYS.currentPlayer);
@@ -118,6 +138,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const adminLogin = useCallback((password: string) => { if (password === ADMIN_PASSWORD) { setIsAdmin(true); return true; } return false; }, []);
   const adminLogout = useCallback(() => setIsAdmin(false), []);
+  const updateGameSettings = useCallback((settings: GameSettings) => setGameSettings(settings), []);
 
   const createMatch = useCallback((data: Omit<Match, 'id' | 'status' | 'playerIds' | 'calledNumbers' | 'pot' | 'createdAt'>): Match => {
     const match: Match = { ...data, id: generateId(), status: 'waiting', playerIds: [], calledNumbers: [], pot: 0, createdAt: new Date().toISOString() };
@@ -160,15 +181,14 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const createPlayerCard = useCallback((options: { name: string, numbers: number[][] }): PlayerCard | null => {
     if (!currentPlayer) return null;
-    const cardCost = 10; // Fixed price for a new card template
-    if (currentPlayer.credits < cardCost) return null;
+    if (currentPlayer.credits < gameSettings.newCardCost) return null;
 
     const newCard: PlayerCard = { id: generateCardId(), playerId: currentPlayer.id, name: options.name, numbers: options.numbers, usesLeft: 1 };
     
     setPlayerCards(prev => [...prev, newCard]);
-    setPlayers(prev => prev.map(p => p.id === currentPlayer.id ? { ...p, credits: p.credits - cardCost, ownedCardIds: [...p.ownedCardIds, newCard.id] } : p));
+    setPlayers(prev => prev.map(p => p.id === currentPlayer.id ? { ...p, credits: p.credits - gameSettings.newCardCost, ownedCardIds: [...p.ownedCardIds, newCard.id] } : p));
     return newCard;
-  }, [currentPlayer]);
+  }, [currentPlayer, gameSettings.newCardCost]);
 
   const joinMatch = useCallback((matchId: string, playerCardIds: string[]): MatchCard[] => {
     if (!currentPlayer || playerCardIds.length === 0) return [];
@@ -211,27 +231,24 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return newMatchCards;
   }, [currentPlayer, matches, playerCards]);
 
-  const buyCardUses = useCallback((playerCardId: string, amount: number): boolean => {
+  const buyCardUses = useCallback((playerCardId: string): boolean => {
     if (!currentPlayer) return false;
-    const costPerUse = 5;
-    const totalCost = costPerUse * amount;
+    if (currentPlayer.credits < gameSettings.cardRechargeCost) return false;
 
-    if (currentPlayer.credits < totalCost) return false;
-
-    setPlayers(prev => prev.map(p => p.id === currentPlayer.id ? { ...p, credits: p.credits - totalCost } : p));
-    setPlayerCards(prev => prev.map(pc => pc.id === playerCardId ? { ...pc, usesLeft: pc.usesLeft + amount } : pc));
+    setPlayers(prev => prev.map(p => p.id === currentPlayer.id ? { ...p, credits: p.credits - gameSettings.cardRechargeCost } : p));
+    setPlayerCards(prev => prev.map(pc => pc.id === playerCardId ? { ...pc, usesLeft: pc.usesLeft + gameSettings.usesPerRecharge } : pc));
     
     return true;
-  }, [currentPlayer]);
+  }, [currentPlayer, gameSettings]);
 
   const getMatchCards = useCallback((matchId: string) => matchCards.filter(c => c.matchId === matchId), [matchCards]);
   const getPlayerMatchCards = useCallback((matchId: string, playerId: string) => matchCards.filter(c => c.matchId === matchId && c.playerId === playerId), [matchCards]);
 
   return (
     <GameContext.Provider value={{
-      isAdmin, adminLogin, adminLogout, createMatch, openMatch, startMatch, callNumber, finishMatch, deleteMatch,
+      isAdmin, adminLogin, adminLogout, createMatch, openMatch, startMatch, callNumber, finishMatch, deleteMatch, updateGameSettings,
       currentPlayer, registerPlayer, logoutPlayer, buyCredits, createPlayerCard, joinMatch, buyCardUses,
-      matches, players, playerCards, matchCards, getMatchCards, getPlayerMatchCards,
+      matches, players, playerCards, matchCards, gameSettings, getMatchCards, getPlayerMatchCards,
     }}>
       {children}
     </GameContext.Provider>
