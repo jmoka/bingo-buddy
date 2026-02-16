@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useGame, generateBingoCard } from '@/contexts/GameContext';
+import { useGame } from '@/contexts/GameContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Match } from '@/types/match';
@@ -29,8 +29,7 @@ const Lobby = () => {
   // State for creating a new card
   const [isCreateCardOpen, setCreateCardOpen] = useState(false);
   const [newCardName, setNewCardName] = useState('');
-  const [newCardNumbers, setNewCardNumbers] = useState<number[][]>(generateBingoCard());
-  const [isNewCardValid, setNewCardValid] = useState(true);
+  const [newCardNumbers, setNewCardNumbers] = useState<number[][] | null>(null);
 
   // State for joining a match
   const [isJoinDialogOpen, setJoinDialogOpen] = useState(false);
@@ -50,12 +49,13 @@ const Lobby = () => {
   };
 
   const handleCreateCard = () => {
-    if (!newCardName.trim() || !isNewCardValid) return;
+    if (!newCardName.trim() || !newCardNumbers) return;
     const card = createPlayerCard({ name: newCardName, numbers: newCardNumbers });
     if (card) {
       toast({ title: 'Cartela criada!', description: `A cartela "${card.name}" foi adicionada à sua coleção.` });
       setCreateCardOpen(false);
       setNewCardName('');
+      setNewCardNumbers(null);
     } else {
       toast({ title: 'Erro', description: 'Créditos insuficientes para criar a cartela.', variant: 'destructive' });
     }
@@ -153,17 +153,23 @@ const Lobby = () => {
         <div className="mb-8">
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-heading text-xl font-bold text-foreground flex items-center gap-2"><Ticket className="w-5 h-5 text-primary" /> Minhas Cartelas ({myOwnedCards.length})</h2>
-            <Dialog open={isCreateCardOpen} onOpenChange={setCreateCardOpen}>
+            <Dialog open={isCreateCardOpen} onOpenChange={(isOpen) => {
+              setCreateCardOpen(isOpen);
+              if (!isOpen) {
+                setNewCardName('');
+                setNewCardNumbers(null);
+              }
+            }}>
               <DialogTrigger asChild><Button className="gradient-primary shadow-button"><Plus className="w-4 h-4 mr-2" />Criar Cartela</Button></DialogTrigger>
               <DialogContent className="max-w-md">
                 <DialogHeader><DialogTitle className="font-heading">Criar Nova Cartela</DialogTitle></DialogHeader>
-                <div className="space-y-4">
+                <div className="space-y-4 pt-4">
                   <Input placeholder="Nome da cartela (ex: Sorte Pura)" value={newCardName} onChange={e => setNewCardName(e.target.value)} className="bg-secondary border-0" />
-                  <CardEditor onNumbersChange={(nums, isValid) => { setNewCardNumbers(nums); setNewCardValid(isValid); }} />
+                  <CardEditor onCardChange={setNewCardNumbers} />
                 </div>
                 <DialogFooter>
                   <DialogClose asChild><Button variant="ghost">Cancelar</Button></DialogClose>
-                  <Button onClick={handleCreateCard} disabled={!newCardName.trim() || !isNewCardValid}>Salvar ({gameSettings.newCardCost} créditos)</Button>
+                  <Button onClick={handleCreateCard} disabled={!newCardName.trim() || !newCardNumbers}>Salvar ({gameSettings.newCardCost} créditos)</Button>
                 </DialogFooter>
               </DialogContent>
             </Dialog>
