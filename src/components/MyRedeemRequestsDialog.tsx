@@ -42,7 +42,7 @@ export const MyRedeemRequestsDialog = ({ children }: MyRedeemRequestsDialogProps
   };
 
   const renderList = (requests: RedeemRequest[]) => {
-    if (requests.length === 0) {
+    if (!requests || requests.length === 0) {
       return (
         <div className="text-center py-12">
           <Info className="w-12 h-12 text-muted-foreground mx-auto mb-3 opacity-20" />
