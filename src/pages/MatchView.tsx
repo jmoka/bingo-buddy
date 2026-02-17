@@ -8,11 +8,12 @@ import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { playNotificationSound } from '@/utils/soundUtils';
 import { Footer } from '@/components/Footer';
+import { WinnerDisplay } from '@/components/WinnerDisplay';
 
 const MatchView = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { matches, currentPlayer, getPlayerMatchCards } = useGame();
+  const { matches, currentPlayer, getPlayerMatchCards, matchCards } = useGame();
   const [lastCalledNumber, setLastCalledNumber] = useState<number | null>(null);
   const [now, setNow] = useState(Date.now());
 
@@ -35,8 +36,19 @@ const MatchView = () => {
     if (currentNumbers.length > prevNumbers.length) {
       const newNumber = currentNumbers[currentNumbers.length - 1];
       setLastCalledNumber(newNumber);
-      toast.info(`Número sorteado: ${newNumber}!`, {
-        description: 'Confira sua cartela.',
+      
+      if (match.status !== 'finished') {
+        toast.info(`Número sorteado: ${newNumber}!`, {
+          description: 'Confira sua cartela.',
+        });
+        playNotificationSound();
+      }
+    }
+    
+    if (match.status === 'finished' && prevCalledNumbersRef.current.length < currentNumbers.length) {
+      toast.success('BINGO! Temos um vencedor!', {
+        description: `Parabéns a ${match.winners.map(w => w.playerName).join(', ')}!`,
+        duration: 10000,
       });
       playNotificationSound();
     }
@@ -86,7 +98,9 @@ const MatchView = () => {
       </header>
 
       <main className="container max-w-6xl mx-auto py-6 px-4 flex-grow">
-        {match.isAutoCalling && (
+        <WinnerDisplay match={match} allMatchCards={matchCards} />
+
+        {match.status !== 'finished' && match.isAutoCalling && (
           <div className="card-container mb-6 bg-accent/10 text-accent text-center p-4">
             <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2">
               <p className="font-medium text-sm flex items-center gap-2">
@@ -147,13 +161,6 @@ const MatchView = () => {
             </div>
           ))}
         </div>
-
-        {match.status === 'finished' && (
-          <div className="card-container text-center mt-6 bg-success/10 border-2 border-success">
-            <Trophy className="w-12 h-12 text-success mx-auto mb-2" />
-            <h3 className="font-heading text-xl font-bold text-success">Partida Finalizada!</h3>
-          </div>
-        )}
       </main>
       <Footer />
     </div>

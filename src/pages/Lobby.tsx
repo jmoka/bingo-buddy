@@ -216,14 +216,20 @@ const Lobby = () => {
           <div className="card-container text-center py-12"><p className="text-muted-foreground">Nenhuma partida disponível no momento.</p></div>
         ) : (
           <div className="space-y-4">
-            {matches.filter(m => m.status !== 'finished').map(match => {
+            {matches.map(match => {
               const myMatchCards = getPlayerMatchCards(match.id, currentPlayer.id);
               const alreadyJoined = myMatchCards.length > 0;
               const canJoin = (match.status === 'open' || match.status === 'waiting') && myOwnedCards.some(c => c.usesLeft > 0);
               const countdown = match.nextAutoCallTimestamp ? Math.max(0, Math.round((match.nextAutoCallTimestamp - now) / 1000)) : null;
 
               return (
-                <div key={match.id} className={`card-container ${match.status === 'in_progress' ? 'ring-2 ring-accent' : ''}`}>
+                <div key={match.id} className={`card-container relative ${match.status === 'in_progress' ? 'ring-2 ring-accent' : ''}`}>
+                  {match.status === 'finished' && match.winners.length > 0 && (
+                    <div className="absolute top-2 right-2 flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-full bg-success/10 text-success">
+                      <Trophy className="w-3 h-3" />
+                      <span>Vencedor: {match.winners[0].playerName}</span>
+                    </div>
+                  )}
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
                       <h3 className="font-heading font-bold text-lg text-foreground">{match.name}</h3>

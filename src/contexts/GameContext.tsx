@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
-import { Match, Player, PlayerCard, MatchCard, MatchStatus } from '@/types/match';
-import { GameType } from '@/types/bingo';
-import { generateCardId } from '@/utils/bingoUtils';
+import { Match, Player, PlayerCard, MatchCard, MatchStatus, Winner } from '@/types/match';
+import { BingoCard, GameType, WinResult } from '@/types/bingo';
+import { generateCardId, checkWin } from '@/utils/bingoUtils';
 
 interface GameSettings {
   newCardCost: number;
@@ -15,7 +15,7 @@ interface GameContextType {
   isAdmin: boolean;
   adminLogin: (password: string) => boolean;
   adminLogout: () => void;
-  createMatch: (match: Omit<Match, 'id' | 'status' | 'playerIds' | 'calledNumbers' | 'pot' | 'createdAt' | 'isAutoCalling' | 'nextAutoCallTimestamp' | 'winnerId'>) => Match;
+  createMatch: (match: Omit<Match, 'id' | 'status' | 'playerIds' | 'calledNumbers' | 'pot' | 'createdAt' | 'isAutoCalling' | 'nextAutoCallTimestamp' | 'winners'>) => Match;
   openMatch: (matchId: string) => void;
   startMatch: (matchId: string) => void;
   callNumber: (matchId: string, num: number) => void;
@@ -167,8 +167,8 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const adminLogout = useCallback(() => setIsAdmin(false), []);
   const updateGameSettings = useCallback((settings: GameSettings) => setGameSettings(settings), []);
 
-  const createMatch = useCallback((data: Omit<Match, 'id' | 'status' | 'playerIds' | 'calledNumbers' | 'pot' | 'createdAt' | 'isAutoCalling' | 'nextAutoCallTimestamp' | 'winnerId'>): Match => {
-    const match: Match = { ...data, id: generateId(), status: 'waiting', playerIds: [], calledNumbers: [], pot: 0, createdAt: new Date().toISOString(), isAutoCalling: false };
+  const createMatch = useCallback((data: Omit<Match, 'id' | 'status' | 'playerIds' | 'calledNumbers' | 'pot' | 'createdAt' | 'isAutoCalling' | 'nextAutoCallTimestamp' | 'winners'>): Match => {
+    const match: Match = { ...data, id: generateId(), status: 'waiting', playerIds: [], calledNumbers: [], pot: 0, createdAt: new Date().toISOString(), isAutoCalling: false, winners: [] };
     setMatches(prev => [...prev, match]);
     return match;
   }, []);
@@ -194,23 +194,77 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [gameSettings.autoCallIntervalSeconds]);
   
   const callNumber = useCallback((matchId: string, num: number) => {
-    setMatches(prev => prev.map(m => {
-      if (m.id === matchId && !m.calledNumbers.includes(num)) {
-        return { 
-          ...m, 
-          calledNumbers: [...m.calledNumbers, num],
-          nextAutoCallTimestamp: m.isAutoCalling ? Date.now() + gameSettings.autoCallIntervalSeconds * 1000 : m.nextAutoCallTimestamp,
-        };
-      }
-      return m;
-    }));
-    setMatchCards(prev => prev.map(card => {
+    const match = matches.find(m => m.id === matchId);
+    if (!match || match.status !== 'in_progress' || match.calledNumbers.includes(num)) {
+      return;
+    }
+
+    const newCalledNumbers = [...match.calledNumbers, num];
+    const newMatchCards = matchCards.map(card => {
       if (card.matchId !== matchId) return card;
       const newMarked = new Set(card.markedNumbers);
       if (card.numbers.flat().includes(num)) newMarked.add(num);
       return { ...card, markedNumbers: newMarked };
-    }));
-  }, [gameSettings.autoCallIntervalSeconds]);
+    });
+
+    const cardsInMatch = newMatchCards.filter(c => c.matchId === matchId);
+    const foundWinners: { card: MatchCard, result: WinResult }[] = [];
+    
+    for (const card of cardsInMatch) {
+      const winResult = checkWin(card as unknown as BingoCard, match.gameType);
+      if (winResult) {
+        foundWinners.push({ card, result: winResult });
+      }
+    }
+
+    if (foundWinners.length === 0) {
+      setMatches(prev => prev.map(m => m.id === matchId ? {
+        ...m,
+        calledNumbers: newCalledNumbers,
+        nextAutoCallTimestamp: m.isAutoCalling ? Date.now() + gameSettings.autoCallIntervalSeconds * 1000 : m.nextAutoCallTimestamp,
+      } : m));
+      setMatchCards(newMatchCards);
+      return;
+    }
+
+    const winnerData: Winner[] = foundWinners.map(fw => {
+      const player = players.find(p => p.id === fw.card.playerId);
+      return {
+        playerId: fw.card.playerId,
+        playerName: player?.name || 'Desconhecido',
+        cardId: fw.card.id,
+        cardName: fw.card.name,
+      };
+    });
+
+    let totalPrize = 0;
+    if (match.prize.type === 'percentage') {
+      totalPrize = Math.floor(match.pot * (match.prize.value / 100));
+    } else if (match.prize.type === 'fixed') {
+      totalPrize = match.prize.value;
+    }
+    const prizePerWinner = totalPrize > 0 ? Math.floor(totalPrize / winnerData.length) : 0;
+
+    const newPlayers = prizePerWinner > 0 ? players.map(p => {
+      if (winnerData.some(w => w.playerId === p.id)) {
+        return { ...p, credits: p.credits + prizePerWinner };
+      }
+      return p;
+    }) : players;
+
+    const newMatches = matches.map(m => m.id === matchId ? {
+      ...m,
+      calledNumbers: newCalledNumbers,
+      status: 'finished',
+      isAutoCalling: false,
+      nextAutoCallTimestamp: undefined,
+      winners: winnerData,
+    } : m);
+
+    setPlayers(newPlayers);
+    setMatches(newMatches);
+    setMatchCards(newMatchCards);
+  }, [matches, matchCards, players, gameSettings.autoCallIntervalSeconds]);
 
   const deleteMatch = useCallback((matchId: string) => {
     setMatches(prev => prev.filter(m => m.id !== matchId));

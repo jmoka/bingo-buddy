@@ -9,6 +9,13 @@ export interface Prize {
   productName?: string; // if type is 'product'
 }
 
+export interface Winner {
+  playerId: string;
+  playerName: string;
+  cardId: string;
+  cardName: string;
+}
+
 export interface Match {
   id: string;
   name: string;
@@ -24,7 +31,7 @@ export interface Match {
   createdAt: string;
   isAutoCalling?: boolean;
   nextAutoCallTimestamp?: number;
-  winnerId?: string;
+  winners: Winner[];
 }
 
 export interface Player {
