@@ -5,12 +5,19 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useNavigate } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
+import Avatar from '@/components/Avatar'
+import { Label } from '@/components/ui/label'
+import { toast } from 'sonner'
 
 export default function Account() {
   const { session, profile, signOut } = useAuth()
   const navigate = useNavigate()
   const [loading, setLoading] = useState(true)
   const [fullName, setFullName] = useState<string | null>(null)
+  const [cpf, setCpf] = useState<string | null>(null)
+  const [whatsapp, setWhatsapp] = useState<string | null>(null)
+  const [address, setAddress] = useState<string | null>(null)
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
   
   useEffect(() => {
     if (!session) {
@@ -21,6 +28,10 @@ export default function Account() {
   useEffect(() => {
     if (profile) {
       setFullName(profile.full_name)
+      setCpf(profile.cpf || null)
+      setWhatsapp(profile.whatsapp || null)
+      setAddress(profile.address || null)
+      setAvatarUrl(profile.avatar_url)
       setLoading(false)
     }
   }, [profile])
@@ -32,16 +43,22 @@ export default function Account() {
     setLoading(true)
     const { user } = session
 
-    const { error } = await supabase.from('perfis').upsert({
+    const updates = {
       id: user.id,
       full_name: fullName,
+      cpf,
+      whatsapp,
+      address,
+      avatar_url: avatarUrl,
       updated_at: new Date(),
-    })
+    }
+
+    const { error } = await supabase.from('perfis').upsert(updates)
 
     if (error) {
-      alert(error.message)
+      toast.error(error.message)
     } else {
-      alert('Perfil atualizado com sucesso!')
+      toast.success('Perfil atualizado com sucesso!')
     }
     setLoading(false)
   }
@@ -50,20 +67,54 @@ export default function Account() {
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
-      <div className="card-container max-w-sm w-full">
-        <h1 className="font-heading text-2xl font-bold text-foreground mb-4">Meu Perfil</h1>
+      <div className="card-container max-w-md w-full">
+        <h1 className="font-heading text-2xl font-bold text-foreground mb-6 text-center">Meu Perfil</h1>
         <form onSubmit={updateProfile} className="space-y-4">
+          <Avatar
+            url={avatarUrl}
+            size={150}
+            onUpload={(url) => {
+              setAvatarUrl(url)
+            }}
+          />
           <div>
-            <label htmlFor="email" className="text-sm font-medium">Email</label>
+            <Label htmlFor="email">Email</Label>
             <Input id="email" type="text" value={session.user.email} disabled />
           </div>
           <div>
-            <label htmlFor="fullName" className="text-sm font-medium">Nome Completo</label>
+            <Label htmlFor="fullName">Nome Completo</Label>
             <Input
               id="fullName"
               type="text"
               value={fullName || ''}
               onChange={(e) => setFullName(e.target.value)}
+            />
+          </div>
+          <div>
+            <Label htmlFor="cpf">CPF</Label>
+            <Input
+              id="cpf"
+              type="text"
+              value={cpf || ''}
+              onChange={(e) => setCpf(e.target.value)}
+            />
+          </div>
+          <div>
+            <Label htmlFor="whatsapp">WhatsApp</Label>
+            <Input
+              id="whatsapp"
+              type="text"
+              value={whatsapp || ''}
+              onChange={(e) => setWhatsapp(e.target.value)}
+            />
+          </div>
+          <div>
+            <Label htmlFor="address">Endereço</Label>
+            <Input
+              id="address"
+              type="text"
+              value={address || ''}
+              onChange={(e) => setAddress(e.target.value)}
             />
           </div>
           <div>
