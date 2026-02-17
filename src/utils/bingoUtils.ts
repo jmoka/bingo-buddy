@@ -1,4 +1,5 @@
 import { BingoCard, GameType, WinResult } from '@/types/bingo';
+import { MatchCard } from '@/types/match';
 
 export const generateBingoCard = (): number[][] => {
   const grid: number[][] = Array(5).fill(0).map(() => Array(5).fill(0));
@@ -130,6 +131,67 @@ export const checkWin = (card: BingoCard, gameType: GameType): WinResult | null 
 
   return null;
 };
+
+export const calculateNumbersToWin = (card: MatchCard, gameType: GameType): number => {
+  const { numbers, marked_numbers } = card;
+
+  if (gameType === 'full') {
+    const totalNumbersOnCard = 24; // 25 cells - 1 free space
+    return totalNumbersOnCard - marked_numbers.size;
+  }
+
+  let minNeeded = Infinity;
+
+  if (gameType === 'horizontal') {
+    for (let r = 0; r < 5; r++) {
+      let neededInRow = 0;
+      for (let c = 0; c < 5; c++) {
+        if (r === 2 && c === 2) continue; // Skip free space
+        if (!marked_numbers.has(numbers[r][c])) {
+          neededInRow++;
+        }
+      }
+      minNeeded = Math.min(minNeeded, neededInRow);
+    }
+    return minNeeded;
+  }
+
+  if (gameType === 'vertical') {
+    for (let c = 0; c < 5; c++) {
+      let neededInCol = 0;
+      for (let r = 0; r < 5; r++) {
+        if (r === 2 && c === 2) continue; // Skip free space
+        if (!marked_numbers.has(numbers[r][c])) {
+          neededInCol++;
+        }
+      }
+      minNeeded = Math.min(minNeeded, neededInCol);
+    }
+    return minNeeded;
+  }
+
+  if (gameType === 'diagonal') {
+    let neededMain = 0;
+    for (let i = 0; i < 5; i++) {
+      if (i === 2) continue; // Skip free space
+      if (!marked_numbers.has(numbers[i][i])) {
+        neededMain++;
+      }
+    }
+
+    let neededAnti = 0;
+    for (let i = 0; i < 5; i++) {
+      if (i === 2) continue; // Skip free space
+      if (!marked_numbers.has(numbers[i][4 - i])) {
+        neededAnti++;
+      }
+    }
+    return Math.min(neededMain, neededAnti);
+  }
+
+  return Infinity;
+};
+
 
 export const parseCardNumbers = (input: string): number[][] | null => {
   const lines = input.trim().split('\n');

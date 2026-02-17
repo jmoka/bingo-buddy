@@ -10,6 +10,7 @@ import { playNotificationSound } from '@/utils/soundUtils';
 import { Footer } from '@/components/Footer';
 import { WinnerDisplay } from '@/components/WinnerDisplay';
 import { useAuth } from '@/contexts/AuthContext';
+import { MatchStats } from '@/components/MatchStats';
 
 const MatchView = () => {
   const { id } = useParams<{ id: string }>();
@@ -21,6 +22,7 @@ const MatchView = () => {
 
   const match = matches.find(m => m.id === id);
   const myCards = profile && id ? getPlayerMatchCards(id, profile.id) : [];
+  const allCardsForThisMatch = matchCards.filter(c => c.match_id === id);
 
   const prevCalledNumbersRef = useRef<number[]>(match ? match.called_numbers : []);
 
@@ -69,7 +71,7 @@ const MatchView = () => {
     );
   }
 
-  const playersInMatchCount = new Set(matchCards.filter(mc => mc.match_id === match.id).map(mc => mc.player_id)).size;
+  const playersInMatchCount = new Set(allCardsForThisMatch.map(mc => mc.player_id)).size;
   const lastCalled = match.called_numbers.length > 0 ? match.called_numbers[match.called_numbers.length - 1] : null;
   const countdown = match.next_auto_call_timestamp ? Math.max(0, Math.round((new Date(match.next_auto_call_timestamp).getTime() - now) / 1000)) : null;
 
@@ -101,7 +103,11 @@ const MatchView = () => {
       </header>
 
       <main className="container max-w-6xl mx-auto py-6 px-4 flex-grow">
-        <WinnerDisplay match={match} allMatchCards={matchCards} />
+        <WinnerDisplay match={match} allMatchCards={allCardsForThisMatch} />
+
+        {match.status !== 'finished' && (
+          <MatchStats match={match} allMatchCards={allCardsForThisMatch} />
+        )}
 
         {match.status !== 'finished' && match.is_auto_calling && (
           <div className="card-container mb-6 bg-accent/10 text-accent text-center p-4">
