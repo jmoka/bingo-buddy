@@ -11,7 +11,7 @@ import { PrizeType, MatchStatus } from '@/types/match';
 import { gameTypeLabels } from '@/utils/bingoUtils';
 import { 
   Plus, LogOut, Play, DoorOpen, Trash2, Trophy, Users, 
-  Hash, ArrowLeft, StopCircle, Settings, Save, Bot, Shuffle, ArrowRight, Webhook, Key, Send, Loader2, CreditCard, Banknote
+  Hash, ArrowLeft, StopCircle, Settings, Save, Bot, Shuffle, ArrowRight, Webhook, Key, Send, Loader2, CreditCard, Banknote, Check
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
@@ -76,6 +76,8 @@ const Admin = () => {
   const [callerInput, setCallerInput] = useState<Record<string, string>>({});
   const [now, setNow] = useState(Date.now());
   const [isTestingN8n, setIsTestingN8n] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [justSaved, setJustSaved] = useState(false);
   const processingRef = useRef(new Set());
 
   useEffect(() => {
@@ -158,8 +160,9 @@ const Admin = () => {
     setCurrentSettings(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleSaveSettings = () => {
-    updateGameSettings({
+  const handleSaveSettings = async () => {
+    setIsSaving(true);
+    await updateGameSettings({
       ...currentSettings,
       custo_nova_cartela: parseInt(currentSettings.custo_nova_cartela as any, 10),
       custo_recarga_cartela: parseInt(currentSettings.custo_recarga_cartela as any, 10),
@@ -167,6 +170,11 @@ const Admin = () => {
       intervalo_sorteio_auto_seg: parseInt(currentSettings.intervalo_sorteio_auto_seg as any, 10),
       valor_por_credito: parseFloat(currentSettings.valor_por_credito as any),
     });
+    setIsSaving(false);
+    setJustSaved(true);
+    setTimeout(() => {
+      setJustSaved(false);
+    }, 2000);
   };
 
   const handleTestN8n = async () => {
@@ -294,7 +302,24 @@ const Admin = () => {
                 </div>
               </div>
               <div className="mt-8 flex justify-end">
-                <Button onClick={handleSaveSettings} className="gradient-primary"><Save className="w-4 h-4 mr-2" /> Salvar</Button>
+                <Button onClick={handleSaveSettings} className="gradient-primary" disabled={isSaving || justSaved}>
+                  {isSaving ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Salvando...
+                    </>
+                  ) : justSaved ? (
+                    <span className="flex items-center animate-saved">
+                      <Check className="w-4 h-4 mr-2" />
+                      Salvo!
+                    </span>
+                  ) : (
+                    <>
+                      <Save className="w-4 h-4 mr-2" />
+                      Salvar
+                    </>
+                  )}
+                </Button>
               </div>
             </div>
           </TabsContent>
