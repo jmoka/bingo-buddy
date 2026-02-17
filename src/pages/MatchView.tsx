@@ -20,7 +20,7 @@ const MatchView = () => {
   const match = matches.find(m => m.id === id);
   const myCards = currentPlayer && id ? getPlayerMatchCards(id, currentPlayer.id) : [];
 
-  const prevCalledNumbersRef = useRef<number[]>(match ? match.calledNumbers : []);
+  const prevCalledNumbersRef = useRef<number[]>(match ? match.called_numbers : []);
 
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 1000);
@@ -31,7 +31,7 @@ const MatchView = () => {
     if (!match) return;
 
     const prevNumbers = prevCalledNumbersRef.current;
-    const currentNumbers = match.calledNumbers;
+    const currentNumbers = match.called_numbers;
 
     if (currentNumbers.length > prevNumbers.length) {
       const newNumber = currentNumbers[currentNumbers.length - 1];
@@ -67,8 +67,8 @@ const MatchView = () => {
     );
   }
 
-  const lastCalled = match.calledNumbers.length > 0 ? match.calledNumbers[match.calledNumbers.length - 1] : null;
-  const countdown = match.nextAutoCallTimestamp ? Math.max(0, Math.round((match.nextAutoCallTimestamp - now) / 1000)) : null;
+  const lastCalled = match.called_numbers.length > 0 ? match.called_numbers[match.called_numbers.length - 1] : null;
+  const countdown = match.next_auto_call_timestamp ? Math.max(0, Math.round((match.next_auto_call_timestamp - now) / 1000)) : null;
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -82,7 +82,7 @@ const MatchView = () => {
               <div>
                 <h1 className="font-heading text-xl font-bold text-primary-foreground">{match.name}</h1>
                 <div className="flex gap-3 text-primary-foreground/70 text-xs">
-                  <span>{gameTypeLabels[match.gameType]}</span>
+                  <span>{gameTypeLabels[match.game_type]}</span>
                   <span className="flex items-center gap-1"><Users className="w-3 h-3" />{match.playerIds.length}</span>
                   <span className="flex items-center gap-1"><Coins className="w-3 h-3" />Pote: {match.pot}</span>
                 </div>
@@ -100,7 +100,7 @@ const MatchView = () => {
       <main className="container max-w-6xl mx-auto py-6 px-4 flex-grow">
         <WinnerDisplay match={match} allMatchCards={matchCards} />
 
-        {match.status !== 'finished' && match.isAutoCalling && (
+        {match.status !== 'finished' && match.is_auto_calling && (
           <div className="card-container mb-6 bg-accent/10 text-accent text-center p-4">
             <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2">
               <p className="font-medium text-sm flex items-center gap-2">
@@ -120,14 +120,14 @@ const MatchView = () => {
         )}
 
         <div className="card-container mb-6">
-          <p className="text-sm text-muted-foreground mb-2">Números sorteados ({match.calledNumbers.length})</p>
+          <p className="text-sm text-muted-foreground mb-2">Números sorteados ({match.called_numbers.length})</p>
           <div className="flex flex-wrap gap-1.5">
-            {match.calledNumbers.map(num => (
+            {match.called_numbers.map(num => (
               <span key={num} className="w-8 h-8 rounded-full bg-primary text-primary-foreground text-sm font-medium flex items-center justify-center">
                 {num}
               </span>
             ))}
-            {match.calledNumbers.length === 0 && (
+            {match.called_numbers.length === 0 && (
               <span className="text-sm text-muted-foreground italic">Aguardando sorteio...</span>
             )}
           </div>
@@ -151,7 +151,7 @@ const MatchView = () => {
                     <BingoCell
                       key={`${rowIndex}-${colIndex}`}
                       number={num}
-                      isMarked={card.markedNumbers.has(num)}
+                      isMarked={card.marked_numbers.has(num)}
                       isFreeSpace={rowIndex === 2 && colIndex === 2}
                       isNewlyMarked={num === lastCalledNumber}
                     />

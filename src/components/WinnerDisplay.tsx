@@ -29,7 +29,7 @@ export const WinnerDisplay = ({ match, allMatchCards }: WinnerDisplayProps) => {
                 {winner.playerName}
               </p>
               <p className="text-sm text-muted-foreground mb-3">
-                com a cartela "{winner.cardName}" ({gameTypeLabels[match.gameType]})
+                com a cartela "{winner.cardName}" ({gameTypeLabels[match.game_type]})
               </p>
               {card && (
                 <div className="max-w-xs mx-auto">
@@ -43,7 +43,7 @@ export const WinnerDisplay = ({ match, allMatchCards }: WinnerDisplayProps) => {
                       <BingoCell
                         key={`${card.id}-${i}`}
                         number={num}
-                        isMarked={card.markedNumbers.has(num)}
+                        isMarked={card.marked_numbers.has(num)}
                         isFreeSpace={i === 12}
                       />
                     ))}

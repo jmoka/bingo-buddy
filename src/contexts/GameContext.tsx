@@ -78,7 +78,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     queryFn: async () => {
       const { data, error } = await supabase.from('match_cards').select('*');
       if (error) throw error;
-      return data.map(c => ({ ...c, markedNumbers: new Set(c.marked_numbers || []) })) as MatchCard[];
+      return data.map(c => ({ ...c, marked_numbers: new Set(c.marked_numbers || []) })) as MatchCard[];
     },
   });
 
@@ -116,7 +116,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const toggleAutoCall = async (matchId: string) => {
     const match = matches.find(m => m.id === matchId);
     if (!match) return;
-    const isEnabling = !match.isAutoCalling;
+    const isEnabling = !match.is_auto_calling;
     const { error } = await supabase.from('matches').update({
       is_auto_calling: isEnabling,
       next_auto_call_timestamp: isEnabling ? new Date(Date.now() + gameSettings.autoCallIntervalSeconds * 1000).toISOString() : null,
@@ -126,13 +126,13 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const callNumber = async (matchId: string, num: number) => {
     const match = matches.find(m => m.id === matchId);
-    if (!match || match.calledNumbers.includes(num)) return;
+    if (!match || match.called_numbers.includes(num)) return;
 
-    const newCalledNumbers = [...match.calledNumbers, num];
+    const newCalledNumbers = [...match.called_numbers, num];
     const { error: updateError } = await supabase.from('matches').update({ called_numbers: newCalledNumbers }).eq('id', matchId);
     if (updateError) { toast.error(updateError.message); return; }
 
-    const cardsInMatch = matchCards.filter(c => c.matchId === matchId);
+    const cardsInMatch = matchCards.filter(c => c.match_id === matchId);
     const foundWinners: { card: MatchCard, result: WinResult }[] = [];
 
     for (const card of cardsInMatch) {
@@ -140,16 +140,16 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
         id: card.id,
         name: card.name,
         numbers: card.numbers,
-        markedNumbers: new Set([...(card.markedNumbers || []), num]),
+        markedNumbers: new Set([...(card.marked_numbers || []), num]),
       };
-      const winResult = checkWin(tempBingoCard, match.gameType);
+      const winResult = checkWin(tempBingoCard, match.game_type);
       if (winResult) foundWinners.push({ card, result: winResult });
     }
 
     if (foundWinners.length > 0) {
       const winnerData: Winner[] = foundWinners.map(fw => ({
-        playerId: fw.card.playerId,
-        playerName: players?.find(p => p.id === fw.card.playerId)?.full_name || 'Desconhecido',
+        playerId: fw.card.player_id,
+        playerName: players?.find(p => p.id === fw.card.player_id)?.full_name || 'Desconhecido',
         cardId: fw.card.id,
         cardName: fw.card.name,
       }));
@@ -184,7 +184,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const match = matches.find(m => m.id === matchId);
     if (!match) { toast.error("Partida não encontrada"); return null; }
 
-    const totalCost = playerCardIds.length * match.cardPrice;
+    const totalCost = playerCardIds.length * match.card_price;
     if (profile.credits < totalCost) { toast.error("Créditos insuficientes!"); return null; }
 
     const { error: creditError } = await supabase.from('profiles').update({ credits: profile.credits - totalCost }).eq('id', user.id);
@@ -230,8 +230,8 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return true;
   };
 
-  const getMatchCards = (matchId: string) => matchCards.filter(c => c.matchId === matchId);
-  const getPlayerMatchCards = (matchId: string, playerId: string) => matchCards.filter(c => c.matchId === matchId && c.playerId === playerId);
+  const getMatchCards = (matchId: string) => matchCards.filter(c => c.match_id === matchId);
+  const getPlayerMatchCards = (matchId: string, playerId: string) => matchCards.filter(c => c.match_id === matchId && c.player_id === playerId);
 
   return (
     <GameContext.Provider value={{

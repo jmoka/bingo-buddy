@@ -97,14 +97,21 @@ const Admin = () => {
 
   const handleCreateMatch = () => {
     if (!matchForm.name.trim() || !matchForm.startTime) return;
+
+    const prizePayload: any = {
+      type: matchForm.prizeType,
+      value: matchForm.prizeValue,
+    };
+    if (matchForm.prizeType === 'product') {
+      prizePayload.productName = matchForm.prizeName;
+    }
+
     createMatch({
       name: matchForm.name,
       game_type: matchForm.gameType,
       max_cards_per_player: matchForm.maxCardsPerPlayer,
       card_price: matchForm.cardPrice,
-      prize_type: matchForm.prizeType,
-      prize_value: matchForm.prizeValue,
-      prize_product_name: matchForm.prizeType === 'product' ? matchForm.prizeName : undefined,
+      prize: prizePayload,
       start_time: new Date(matchForm.startTime).toISOString(),
     });
     setShowCreate(false);
@@ -133,7 +140,7 @@ const Admin = () => {
   const getPrizeDisplay = (match: Match) => {
     if (match.prize.type === 'product') return `🎁 ${match.prize.productName}`;
     if (match.prize.type === 'fixed') return `💰 ${match.prize.value} créditos`;
-    return `📊 ${match.prize.value}% do pote (${Math.floor(match.pot * match.prize.value / 100)} créditos)`;
+    return `📊 ${match.prize.value}% do pote (${Math.floor(match.pot * (match.prize.value || 0) / 100)} créditos)`;
   };
 
   return (
@@ -164,16 +171,35 @@ const Admin = () => {
             <DialogTrigger asChild><Button><Plus className="w-4 h-4 mr-2" />Nova Partida</Button></DialogTrigger>
             <DialogContent className="max-w-md">
               <DialogHeader><DialogTitle className="font-heading">Criar Partida</DialogTitle></DialogHeader>
-              <div className="space-y-4">
+              <div className="space-y-3 pt-4">
                 <Input placeholder="Nome da partida" value={matchForm.name} onChange={e => setMatchForm(p => ({ ...p, name: e.target.value }))} />
+                <Input type="datetime-local" value={matchForm.startTime} onChange={e => setMatchForm(p => ({ ...p, startTime: e.target.value }))} />
                 <Select value={matchForm.gameType} onValueChange={(v: GameType) => setMatchForm(p => ({ ...p, gameType: v }))}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder="Tipo de Jogo" /></SelectTrigger>
                   <SelectContent>{Object.entries(gameTypeLabels).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}</SelectContent>
                 </Select>
-                <Input type="number" placeholder="Máx. Cartelas/Jogador" value={matchForm.maxCardsPerPlayer} onChange={e => setMatchForm(p => ({ ...p, maxCardsPerPlayer: +e.target.value }))} />
-                <Input type="number" placeholder="Preço/Cartela" value={matchForm.cardPrice} onChange={e => setMatchForm(p => ({ ...p, cardPrice: +e.target.value }))} />
-                <Input type="datetime-local" value={matchForm.startTime} onChange={e => setMatchForm(p => ({ ...p, startTime: e.target.value }))} />
-                <Button className="w-full" onClick={handleCreateMatch}>Criar</Button>
+                <div className="grid grid-cols-2 gap-3">
+                  <Input type="number" placeholder="Preço/Cartela" value={matchForm.cardPrice} onChange={e => setMatchForm(p => ({ ...p, cardPrice: +e.target.value }))} />
+                  <Input type="number" placeholder="Máx. Cartelas" value={matchForm.maxCardsPerPlayer} onChange={e => setMatchForm(p => ({ ...p, maxCardsPerPlayer: +e.target.value }))} />
+                </div>
+                
+                <h4 className="font-semibold pt-2 text-sm text-muted-foreground">Prêmio</h4>
+                <Select value={matchForm.prizeType} onValueChange={(v: PrizeType) => setMatchForm(p => ({ ...p, prizeType: v }))}>
+                  <SelectTrigger><SelectValue placeholder="Tipo de Prêmio" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="percentage">Porcentagem do Pote</SelectItem>
+                    <SelectItem value="fixed">Valor Fixo</SelectItem>
+                    <SelectItem value="product">Produto</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                {matchForm.prizeType === 'product' ? (
+                  <Input placeholder="Nome do Produto" value={matchForm.prizeName} onChange={e => setMatchForm(p => ({ ...p, prizeName: e.target.value }))} />
+                ) : (
+                  <Input type="number" placeholder={matchForm.prizeType === 'percentage' ? 'Porcentagem (ex: 70)' : 'Créditos (ex: 500)'} value={matchForm.prizeValue} onChange={e => setMatchForm(p => ({ ...p, prizeValue: +e.target.value }))} />
+                )}
+
+                <Button className="w-full !mt-6" onClick={handleCreateMatch}>Criar</Button>
               </div>
             </DialogContent>
           </Dialog>
@@ -193,7 +219,7 @@ const Admin = () => {
                       <h3 className="font-heading font-bold text-lg text-foreground">{match.name}</h3>
                       <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${statusColors[match.status]}`}>{statusLabels[match.status]}</span>
                     </div>
-                    <div className="flex flex-wrap gap-3 text-sm text-muted-foreground">
+                    <div className="flex flex-wrap gap-x-3 gap-y-1 text-sm text-muted-foreground">
                       <span className="flex items-center gap-1"><Trophy className="w-3.5 h-3.5" />{gameTypeLabels[match.gameType]}</span>
                       <span className="flex items-center gap-1"><Users className="w-3.5 h-3.5" />{playersInMatchCount} jogadores</span>
                       <span className="flex items-center gap-1"><Hash className="w-3.5 h-3.5" />{matchCardsCount} cartelas</span>

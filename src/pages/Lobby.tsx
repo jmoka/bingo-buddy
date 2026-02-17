@@ -42,7 +42,7 @@ const Lobby = () => {
     }
   }, [session, navigate]);
 
-  const myOwnedCards = profile ? playerCards.filter(c => c.playerId === profile.id) : [];
+  const myOwnedCards = profile ? playerCards.filter(c => c.player_id === profile.id) : [];
 
   useEffect(() => {
     const interval = setInterval(() => setNow(Date.now()), 1000);
@@ -103,7 +103,7 @@ const Lobby = () => {
     const orderA = statusOrder[a.status];
     const orderB = statusOrder[b.status];
     if (orderA !== orderB) return orderA - orderB;
-    return new Date(b.startTime).getTime() - new Date(a.startTime).getTime();
+    return new Date(b.start_time).getTime() - new Date(a.start_time).getTime();
   });
 
   if (!profile) {
@@ -178,15 +178,15 @@ const Lobby = () => {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {myOwnedCards.map(card => (
-                <div key={card.id} className={`card-container p-3 transition-opacity ${card.usesLeft === 0 ? 'opacity-60' : ''}`}>
+                <div key={card.id} className={`card-container p-3 transition-opacity ${card.uses_left === 0 ? 'opacity-60' : ''}`}>
                   <div className="flex justify-between items-start mb-2">
                     <h3 className="font-heading font-semibold text-foreground">{card.name}</h3>
                     <div className="flex items-center gap-2">
-                      <div className={`flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-full ${card.usesLeft > 0 ? 'bg-success/10 text-success' : 'bg-destructive/10 text-destructive'}`}>
-                        {card.usesLeft > 0 ? <Zap className="w-3 h-3" /> : <ZapOff className="w-3 h-3" />}
-                        <span>{card.usesLeft} uso(s)</span>
+                      <div className={`flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-full ${card.uses_left > 0 ? 'bg-success/10 text-success' : 'bg-destructive/10 text-destructive'}`}>
+                        {card.uses_left > 0 ? <Zap className="w-3 h-3" /> : <ZapOff className="w-3 h-3" />}
+                        <span>{card.uses_left} uso(s)</span>
                       </div>
-                      {card.usesLeft === 0 && (
+                      {card.uses_left === 0 && (
                         <Button size="sm" variant="outline" onClick={() => handleBuyUses(card.id)}>
                           Recarregar <Coins className="w-3 h-3 ml-1" />
                         </Button>
@@ -208,11 +208,11 @@ const Lobby = () => {
         ) : (
           <div className="space-y-4">
             {sortedMatches.map(match => {
-              const playersInMatchCount = new Set(matchCards.filter(mc => mc.matchId === match.id).map(mc => mc.playerId)).size;
+              const playersInMatchCount = new Set(matchCards.filter(mc => mc.match_id === match.id).map(mc => mc.player_id)).size;
               const myMatchCards = getPlayerMatchCards(match.id, profile.id);
               const alreadyJoined = myMatchCards.length > 0;
-              const canJoin = (match.status === 'open' || match.status === 'waiting') && myOwnedCards.some(c => c.usesLeft > 0);
-              const countdown = match.nextAutoCallTimestamp ? Math.max(0, Math.round((match.nextAutoCallTimestamp - now) / 1000)) : null;
+              const canJoin = (match.status === 'open' || match.status === 'waiting') && myOwnedCards.some(c => c.uses_left > 0);
+              const countdown = match.next_auto_call_timestamp ? Math.max(0, Math.round((match.next_auto_call_timestamp - now) / 1000)) : null;
 
               if (match.status === 'finished') {
                 return (
@@ -221,7 +221,7 @@ const Lobby = () => {
                       <div>
                         <h3 className="font-heading font-bold text-lg text-foreground line-through">{match.name}</h3>
                         <div className="flex flex-wrap gap-x-3 gap-y-1 text-sm text-muted-foreground mt-1">
-                          <span className="flex items-center gap-1"><Trophy className="w-3.5 h-3.5" />{gameTypeLabels[match.gameType]}</span>
+                          <span className="flex items-center gap-1"><Trophy className="w-3.5 h-3.5" />{gameTypeLabels[match.game_type]}</span>
                           <span className="flex items-center gap-1"><Users className="w-3.5 h-3.5" />{playersInMatchCount}</span>
                           <span className="flex items-center gap-1"><Coins className="w-3.5 h-3.5" />Pote: {match.pot}</span>
                         </div>
@@ -248,10 +248,10 @@ const Lobby = () => {
                     <div>
                       <h3 className="font-heading font-bold text-lg text-foreground">{match.name}</h3>
                       <div className="flex flex-wrap gap-x-3 gap-y-1 text-sm text-muted-foreground mt-1">
-                        <span className="flex items-center gap-1"><Trophy className="w-3.5 h-3.5" />{gameTypeLabels[match.gameType]}</span>
+                        <span className="flex items-center gap-1"><Trophy className="w-3.5 h-3.5" />{gameTypeLabels[match.game_type]}</span>
                         <span className="flex items-center gap-1"><Users className="w-3.5 h-3.5" />{playersInMatchCount}</span>
                         <span className="flex items-center gap-1"><Coins className="w-3.5 h-3.5" />Pote: {match.pot}</span>
-                        {match.status === 'waiting' && <span className="flex items-center gap-1"><Timer className="w-3.5 h-3.5" />{getCountdown(match.startTime)}</span>}
+                        {match.status === 'waiting' && <span className="flex items-center gap-1"><Timer className="w-3.5 h-3.5" />{getCountdown(match.start_time)}</span>}
                       </div>
                     </div>
                     <div className="flex flex-col items-end">
@@ -264,13 +264,13 @@ const Lobby = () => {
                           Entrar na Partida
                         </Button>
                       ) : null}
-                      <span className="text-xs text-muted-foreground mt-1">{match.cardPrice} créditos por cartela</span>
+                      <span className="text-xs text-muted-foreground mt-1">{match.card_price} créditos por cartela</span>
                     </div>
                   </div>
 
                   {match.status === 'in_progress' && (
                     <div className="mt-3 border-t border-border pt-3 space-y-3">
-                      {match.isAutoCalling && countdown !== null && (
+                      {match.is_auto_calling && countdown !== null && (
                         <div className="flex items-center gap-2 text-sm text-accent">
                           <Bot className="w-4 h-4" />
                           <span className="font-medium">Sorteio automático:</span>
@@ -279,17 +279,17 @@ const Lobby = () => {
                           </span>
                         </div>
                       )}
-                      {match.calledNumbers.length > 0 && (
+                      {match.called_numbers.length > 0 && (
                         <div>
                           <p className="text-xs text-muted-foreground font-medium mb-2">
-                            Números Sorteados ({match.calledNumbers.length} total)
+                            Números Sorteados ({match.called_numbers.length} total)
                           </p>
                           <div className="flex flex-wrap gap-1.5">
-                            {match.calledNumbers.map((num, index) => (
+                            {match.called_numbers.map((num, index) => (
                               <span 
                                 key={num} 
                                 className={`w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold
-                                  ${index === match.calledNumbers.length - 1 ? 'bg-accent text-accent-foreground animate-bounce-in' : 'bg-secondary text-secondary-foreground'}`}
+                                  ${index === match.called_numbers.length - 1 ? 'bg-accent text-accent-foreground animate-bounce-in' : 'bg-secondary text-secondary-foreground'}`}
                               >
                                 {num}
                               </span>
@@ -312,7 +312,7 @@ const Lobby = () => {
           <div className="max-h-[60vh] overflow-y-auto p-1 space-y-3">
             {myOwnedCards.map(card => {
               const isSelected = cardsToJoin.has(card.id);
-              const isDisabled = card.usesLeft === 0;
+              const isDisabled = card.uses_left === 0;
               return (
                 <div 
                   key={card.id} 
@@ -333,7 +333,7 @@ const Lobby = () => {
           </div>
           <DialogFooter>
             <div className="w-full flex justify-between items-center">
-              <span className="font-heading font-semibold text-lg">Total: {cardsToJoin.size * (selectedMatch?.cardPrice || 0)} créditos</span>
+              <span className="font-heading font-semibold text-lg">Total: {cardsToJoin.size * (selectedMatch?.card_price || 0)} créditos</span>
               <Button onClick={handleJoinMatch} disabled={cardsToJoin.size === 0}>
                 Confirmar e Pagar
               </Button>

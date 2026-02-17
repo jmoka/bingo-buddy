@@ -5,7 +5,7 @@ export type PrizeType = 'product' | 'fixed' | 'percentage';
 
 export interface Prize {
   type: PrizeType;
-  value: number; // fixed amount or percentage
+  value: number | null; // fixed amount or percentage
   productName?: string; // if type is 'product'
 }
 
@@ -19,36 +19,36 @@ export interface Winner {
 export interface Match {
   id: string;
   name: string;
-  gameType: GameType;
-  maxCardsPerPlayer: number;
-  cardPrice: number; // cost per card in credits TO JOIN
+  game_type: GameType;
+  max_cards_per_player: number;
+  card_price: number; // cost per card in credits TO JOIN
   prize: Prize;
-  startTime: string; // ISO date string
+  start_time: string; // ISO date string
   status: MatchStatus;
-  calledNumbers: number[];
+  called_numbers: number[];
   pot: number; // total credits bet
-  createdAt: string;
-  isAutoCalling?: boolean;
-  nextAutoCallTimestamp?: number;
+  created_at: string;
+  is_auto_calling?: boolean;
+  next_auto_call_timestamp?: number;
   winners: Winner[];
 }
 
 // A card template owned by a player
 export interface PlayerCard {
   id: string;
-  playerId: string;
+  player_id: string;
   name: string;
   numbers: number[][];
-  usesLeft: number;
+  uses_left: number;
 }
 
 // An instance of a card used in a match
 export interface MatchCard {
   id: string;
-  playerCardId: string; // link to the template
-  playerId: string;
-  matchId: string;
+  player_card_id: string; // link to the template
+  player_id: string;
+  match_id: string;
   name: string; // copied from PlayerCard
   numbers: number[][]; // copied from PlayerCard
-  markedNumbers: Set<number>;
+  marked_numbers: Set<number>;
 }
