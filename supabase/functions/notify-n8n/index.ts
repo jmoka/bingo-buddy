@@ -23,15 +23,22 @@ serve(async (req) => {
 
     // Pega o usuário que está enviando a notificação para incluir nos dados
     const authHeader = req.headers.get('Authorization')
-    if (!authHeader) throw new Error("Token de autorização não encontrado.");
+    if (!authHeader) {
+      console.error('[notify-n8n] Erro: Token de autorização não encontrado.');
+      throw new Error("Token de autorização não encontrado.");
+    }
     
     const userSupabaseClient = createClient(
         Deno.env.get('SUPABASE_URL') ?? '',
         Deno.env.get('SUPABASE_ANON_KEY') ?? '',
         { global: { headers: { Authorization: authHeader } } }
     )
-    const { data: { user } } = await userSupabaseClient.auth.getUser();
-    if (!user) throw new Error("Usuário inválido.");
+    const { data: userData, error: userError } = await userSupabaseClient.auth.getUser();
+    if (userError || !userData.user) {
+      console.error('[notify-n8n] Erro de autenticação do usuário:', userError?.message || 'Usuário não encontrado.');
+      throw new Error("Usuário inválido ou token expirado.");
+    }
+    const user = userData.user;
 
     // Busca as configurações do n8n no banco de dados
     const { data: settings, error: settingsError } = await supabaseAdmin
@@ -39,7 +46,10 @@ serve(async (req) => {
       .select('n8n_test_url, n8n_prod_url, n8n_env')
       .single();
 
-    if (settingsError) throw new Error(`Erro ao buscar configurações: ${settingsError.message}`);
+    if (settingsError) {
+      console.error('[notify-n8n] Erro ao buscar configurações:', settingsError.message);
+      throw new Error(`Erro ao buscar configurações: ${settingsError.message}`);
+    }
 
     // Decide qual URL usar com base no ambiente selecionado
     const webhookUrl = settings.n8n_env === 'production' 
@@ -74,6 +84,8 @@ serve(async (req) => {
     });
 
     if (!response.ok) {
+      const responseBody = await response.text();
+      console.error(`[notify-n8n] O webhook do n8n respondeu com o status: ${response.status}. Body: ${responseBody}`);
       throw new Error(`O webhook do n8n respondeu com o status: ${response.status}`);
     }
     
