@@ -37,6 +37,7 @@ import { RedeemRequestDialog } from '@/components/RedeemRequestDialog';
 import { MyRedeemRequestsDialog } from '@/components/MyRedeemRequestsDialog';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const Lobby = () => {
   const navigate = useNavigate();
@@ -71,6 +72,8 @@ const Lobby = () => {
 
   const myOwnedCards = profile ? playerCards.filter(c => c.player_id === profile.id) : [];
   const activeCards = myOwnedCards.filter(c => !c.is_archived);
+  const realCards = activeCards.filter(c => c.credit_type === 'real');
+  const fakeCards = activeCards.filter(c => c.credit_type === 'fake');
 
   useEffect(() => {
     const interval = setInterval(() => setNow(Date.now()), 1000);
@@ -159,6 +162,71 @@ const Lobby = () => {
   const pendingRedeemsCount = safeRedeemRequests.filter(r => r.status === 'pending').length;
   const rejectedRedeemsCount = safeRedeemRequests.filter(r => r.status === 'rejected').length;
 
+  const renderCardList = (cards: PlayerCard[]) => {
+    if (cards.length === 0) {
+      return (
+        <div className="card-container text-center py-8">
+          <p className="text-sm text-muted-foreground">Você não tem cartelas nesta categoria.</p>
+        </div>
+      );
+    }
+
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {cards.map(card => {
+          const activeMatchCard = matchCards.find(mc => mc.player_card_id === card.id && activeMatchIds.has(mc.match_id));
+          const matchForCard = activeMatchCard ? matches.find(m => m.id === activeMatchCard.match_id) : null;
+          const markedNumbers = activeMatchCard ? activeMatchCard.marked_numbers : new Set<number>();
+          const winCount = wins.filter(w => w.player_card_id === card.id).length;
+          return (
+            <div key={card.id} className={`card-container p-3 transition-opacity ${card.uses_left === 0 ? 'opacity-60' : ''}`}>
+              <div className="flex justify-between items-start mb-2">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-heading font-semibold text-sm md:text-base text-foreground">{card.name}</h3>
+                    {card.credit_type === 'fake' ? (
+                      <Badge variant="outline" className="border-amber-500/50 text-amber-600">Brincar</Badge>
+                    ) : (
+                      <Badge variant="outline" className="border-primary/50 text-primary">Real</Badge>
+                    )}
+                    {winCount > 0 && <div className="flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-amber-400/20 text-amber-600"><Trophy className="w-3 h-3" /><span>{winCount}x</span></div>}
+                  </div>
+                  <p className="text-[10px] text-muted-foreground font-mono">ID: ...{card.id.slice(-6).toUpperCase()}</p>
+                </div>
+                <div className="flex items-center gap-1">
+                  <div className={`flex items-center gap-1 text-[10px] font-medium px-2 py-1 rounded-full ${card.uses_left > 0 ? 'bg-success/10 text-success' : 'bg-destructive/10 text-destructive'}`}>
+                    {card.uses_left > 0 ? <Zap className="w-3 h-3" /> : <ZapOff className="w-3 h-3" />}
+                    <span>{card.uses_left} uso(s)</span>
+                  </div>
+                  {card.uses_left === 0 && <Button size="sm" variant="outline" className="h-7 text-[10px]" onClick={() => setRechargeCard(card)}>Recarregar <Coins className="w-3 h-3 ml-1" /></Button>}
+                  <Button size="icon" variant="ghost" className="text-muted-foreground h-7 w-7" onClick={() => toggleArchivePlayerCard(card.id, true)}><Archive className="w-3.5 h-3.5" /></Button>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild><Button size="icon" variant="ghost" disabled={winCount > 0} className="text-destructive/70 h-7 w-7"><Trash2 className="w-3.5 h-3.5" /></Button></AlertDialogTrigger>
+                    <AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Você tem certeza?</AlertDialogTitle><AlertDialogDescription>Esta ação não pode ser desfeita. Isso excluirá permanentemente a cartela "{card.name}".</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={() => deletePlayerCard(card.id)}>Excluir</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
+                  </AlertDialog>
+                </div>
+              </div>
+              {matchForCard && (
+                <div className="mb-2 p-2 rounded-lg bg-accent/10 text-accent text-xs font-semibold flex items-center gap-2">
+                  <Tv className="w-4 h-4" />
+                  <div className="flex flex-col">
+                    <span>Em jogo na partida:</span>
+                    <span className="font-bold">{matchForCard.name}</span>
+                  </div>
+                </div>
+              )}
+              <div className="grid grid-cols-5 gap-1">
+                {card.numbers.flat().map((num, i) => (
+                  <BingoCell key={i} number={num} isMarked={markedNumbers.has(num)} isFreeSpace={i === 12} />
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <header className="gradient-hero py-4 px-4">
@@ -232,9 +300,16 @@ const Lobby = () => {
         </div>
 
         <div className="mb-8">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="font-heading text-lg md:text-xl font-bold text-foreground flex items-center gap-2"><Ticket className="w-5 h-5 text-primary" /> Minhas Cartelas ({activeCards.length})</h2>
-            <Dialog open={isCreateCardOpen} onOpenChange={setCreateCardOpen}>
+          <Tabs defaultValue="real">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-4">
+                <h2 className="font-heading text-lg md:text-xl font-bold text-foreground flex items-center gap-2"><Ticket className="w-5 h-5 text-primary" /> Minhas Cartelas</h2>
+                <TabsList>
+                  <TabsTrigger value="real">Reais ({realCards.length})</TabsTrigger>
+                  <TabsTrigger value="fake">De Brincar ({fakeCards.length})</TabsTrigger>
+                </TabsList>
+              </div>
+              <Dialog open={isCreateCardOpen} onOpenChange={setCreateCardOpen}>
                 <DialogTrigger asChild><Button size="sm" className="gradient-primary shadow-button h-8 md:h-9 text-xs md:text-sm"><Plus className="w-4 h-4 mr-2" />Criar Cartela</Button></DialogTrigger>
                 <DialogContent className="max-w-xl">
                     <DialogHeader>
@@ -266,64 +341,15 @@ const Lobby = () => {
                     <Button onClick={handleCreateCard} disabled={!newCardName.trim() || !newCardNumbers}>Salvar</Button>
                     </DialogFooter>
                 </DialogContent>
-            </Dialog>
-          </div>
-          {activeCards.length === 0 ? (
-            <div className="card-container text-center py-8"><p className="text-sm text-muted-foreground">Você não tem cartelas ativas. Crie uma para começar!</p></div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {activeCards.map(card => {
-                const activeMatchCard = matchCards.find(mc => mc.player_card_id === card.id && activeMatchIds.has(mc.match_id));
-                const matchForCard = activeMatchCard ? matches.find(m => m.id === activeMatchCard.match_id) : null;
-                const markedNumbers = activeMatchCard ? activeMatchCard.marked_numbers : new Set<number>();
-                const winCount = wins.filter(w => w.player_card_id === card.id).length;
-                return (
-                  <div key={card.id} className={`card-container p-3 transition-opacity ${card.uses_left === 0 ? 'opacity-60' : ''}`}>
-                    <div className="flex justify-between items-start mb-2">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <h3 className="font-heading font-semibold text-sm md:text-base text-foreground">{card.name}</h3>
-                          {card.credit_type === 'fake' ? (
-                            <Badge variant="outline" className="border-amber-500/50 text-amber-600">Brincar</Badge>
-                          ) : (
-                            <Badge variant="outline" className="border-primary/50 text-primary">Real</Badge>
-                          )}
-                          {winCount > 0 && <div className="flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-amber-400/20 text-amber-600"><Trophy className="w-3 h-3" /><span>{winCount}x</span></div>}
-                        </div>
-                        <p className="text-[10px] text-muted-foreground font-mono">ID: ...{card.id.slice(-6).toUpperCase()}</p>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <div className={`flex items-center gap-1 text-[10px] font-medium px-2 py-1 rounded-full ${card.uses_left > 0 ? 'bg-success/10 text-success' : 'bg-destructive/10 text-destructive'}`}>
-                          {card.uses_left > 0 ? <Zap className="w-3 h-3" /> : <ZapOff className="w-3 h-3" />}
-                          <span>{card.uses_left} uso(s)</span>
-                        </div>
-                        {card.uses_left === 0 && <Button size="sm" variant="outline" className="h-7 text-[10px]" onClick={() => setRechargeCard(card)}>Recarregar <Coins className="w-3 h-3 ml-1" /></Button>}
-                        <Button size="icon" variant="ghost" className="text-muted-foreground h-7 w-7" onClick={() => toggleArchivePlayerCard(card.id, true)}><Archive className="w-3.5 h-3.5" /></Button>
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild><Button size="icon" variant="ghost" disabled={winCount > 0} className="text-destructive/70 h-7 w-7"><Trash2 className="w-3.5 h-3.5" /></Button></AlertDialogTrigger>
-                          <AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Você tem certeza?</AlertDialogTitle><AlertDialogDescription>Esta ação não pode ser desfeita. Isso excluirá permanentemente a cartela "{card.name}".</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={() => deletePlayerCard(card.id)}>Excluir</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
-                        </AlertDialog>
-                      </div>
-                    </div>
-                    {matchForCard && (
-                      <div className="mb-2 p-2 rounded-lg bg-accent/10 text-accent text-xs font-semibold flex items-center gap-2">
-                        <Tv className="w-4 h-4" />
-                        <div className="flex flex-col">
-                          <span>Em jogo na partida:</span>
-                          <span className="font-bold">{matchForCard.name}</span>
-                        </div>
-                      </div>
-                    )}
-                    <div className="grid grid-cols-5 gap-1">
-                      {card.numbers.flat().map((num, i) => (
-                        <BingoCell key={i} number={num} isMarked={markedNumbers.has(num)} isFreeSpace={i === 12} />
-                      ))}
-                    </div>
-                  </div>
-                );
-              })}
+              </Dialog>
             </div>
-          )}
+            <TabsContent value="real">
+              {renderCardList(realCards)}
+            </TabsContent>
+            <TabsContent value="fake">
+              {renderCardList(fakeCards)}
+            </TabsContent>
+          </Tabs>
         </div>
 
         <h2 className="font-heading text-lg md:text-xl font-bold text-foreground mb-4 flex items-center gap-2"><DoorOpen className="w-5 h-5 text-accent" /> Partidas</h2>
