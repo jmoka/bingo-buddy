@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useGame } from '@/contexts/GameContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,7 +8,7 @@ import { GameSettings } from '@/contexts/GameContext';
 import { QRCodeSVG as QRCode } from 'qrcode.react';
 import { toast } from 'sonner';
 import { Copy, Upload, Loader2, Minus, Plus } from 'lucide-react';
-import { QrCodePix } from 'qrcode-pix'; // Corrected named import
+import { QrCodePix } from 'qrcode-pix';
 import { useAuth } from '@/contexts/AuthContext';
 
 interface CreditRequestDialogProps {
@@ -24,18 +24,31 @@ export const CreditRequestDialog = ({ gameSettings, children }: CreditRequestDia
   const [isOpen, setIsOpen] = useState(false);
   const [credits, setCredits] = useState(10);
 
+  // Memoize a transação para evitar que o QR Code mude a cada renderização
+  // Ele só vai mudar se a quantidade de créditos ou o ID do perfil mudar
   const amount = credits * (gameSettings?.valor_por_credito || 1);
 
-  // Using QrCodePix (PascalCase) as per the library's export
-  const pixPayload = gameSettings?.pix_key && profile ? QrCodePix({
-    version: '01',
-    key: gameSettings.pix_key,
-    name: 'Bingo App',
-    city: 'WEB',
-    transactionId: `BINGO${profile.id.substring(0, 8)}${Date.now()}`.slice(0, 25),
-    message: `Créditos para o Bingo`,
-    value: parseFloat(amount.toFixed(2)),
-  }).payload() : '';
+  const pixPayload = useMemo(() => {
+    if (!gameSettings?.pix_key || !profile) return '';
+
+    // Criamos um ID de transação estável que muda apenas quando o diálogo é aberto
+    const stableId = `BINGO${profile.id.substring(0, 8)}`.slice(0, 25);
+
+    try {
+      return QrCodePix({
+        version: '01',
+        key: gameSettings.pix_key,
+        name: 'Bingo App',
+        city: 'WEB',
+        transactionId: stableId,
+        message: `Créditos para o Bingo`,
+        value: parseFloat(amount.toFixed(2)),
+      }).payload();
+    } catch (e) {
+      console.error("Erro ao gerar PIX:", e);
+      return '';
+    }
+  }, [gameSettings?.pix_key, profile, amount]);
 
   const handleCopyToClipboard = () => {
     if (pixPayload) {
@@ -99,16 +112,20 @@ export const CreditRequestDialog = ({ gameSettings, children }: CreditRequestDia
               </div>
             </div>
 
-            <div className="p-4 bg-white rounded-lg inline-block">
-              <QRCode value={pixPayload} size={160} />
-            </div>
+            {pixPayload && (
+              <div className="p-4 bg-white rounded-lg inline-block">
+                <QRCode value={pixPayload} size={160} />
+              </div>
+            )}
+            
             <div className="relative">
-              <Input value="Clique para copiar o PIX" readOnly className="pr-10 text-center cursor-pointer" onClick={handleCopyToClipboard} />
+              <Input value={pixPayload ? "Clique para copiar o PIX" : "Erro ao gerar PIX"} readOnly className="pr-10 text-center cursor-pointer" onClick={handleCopyToClipboard} />
               <Button
                 size="icon"
                 variant="ghost"
                 className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8"
                 onClick={handleCopyToClipboard}
+                disabled={!pixPayload}
               >
                 <Copy className="w-4 h-4" />
               </Button>
