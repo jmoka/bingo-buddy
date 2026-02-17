@@ -251,4 +251,27 @@
   .shadow-button {
     box-shadow: var(--shadow-button);
   }
+
+  .print-hide {
+    @apply print:hidden;
+  }
+
+  .break-inside-avoid {
+    break-inside: avoid;
+  }
+}
+
+@media print {
+  body {
+    background-color: white;
+  }
+  .print-container {
+    padding: 0;
+    background-color: white;
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1rem;
+  }
 }

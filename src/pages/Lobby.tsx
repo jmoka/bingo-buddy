@@ -7,7 +7,7 @@ import { Match } from '@/types/match';
 import { gameTypeLabels } from '@/utils/bingoUtils';
 import { 
   LogIn, LogOut, Coins, Plus, Trophy, Users, Settings, Wallet, 
-  CreditCard, Timer, DoorOpen, Ticket, Check, Zap, ZapOff, Tv
+  CreditCard, Timer, DoorOpen, Ticket, Check, Zap, ZapOff, Tv, Printer
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
@@ -154,26 +154,32 @@ const Lobby = () => {
         <div className="mb-8">
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-heading text-xl font-bold text-foreground flex items-center gap-2"><Ticket className="w-5 h-5 text-primary" /> Minhas Cartelas ({myOwnedCards.length})</h2>
-            <Dialog open={isCreateCardOpen} onOpenChange={(isOpen) => {
-              setCreateCardOpen(isOpen);
-              if (!isOpen) {
-                setNewCardName('');
-                setNewCardNumbers(null);
-              }
-            }}>
-              <DialogTrigger asChild><Button className="gradient-primary shadow-button"><Plus className="w-4 h-4 mr-2" />Criar Cartela</Button></DialogTrigger>
-              <DialogContent className="max-w-xl">
-                <DialogHeader><DialogTitle className="font-heading">Criar Nova Cartela</DialogTitle></DialogHeader>
-                <div className="space-y-4 pt-4">
-                  <Input placeholder="Nome da cartela (ex: Sorte Pura)" value={newCardName} onChange={e => setNewCardName(e.target.value)} className="bg-secondary border-0" />
-                  <CardCreator onCardChange={setNewCardNumbers} />
-                </div>
-                <DialogFooter>
-                  <DialogClose asChild><Button variant="ghost">Cancelar</Button></DialogClose>
-                  <Button onClick={handleCreateCard} disabled={!newCardName.trim() || !newCardNumbers}>Salvar ({gameSettings.newCardCost} créditos)</Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={() => navigate('/print')} disabled={myOwnedCards.length === 0}>
+                <Printer className="w-4 h-4 mr-2" />
+                Imprimir
+              </Button>
+              <Dialog open={isCreateCardOpen} onOpenChange={(isOpen) => {
+                setCreateCardOpen(isOpen);
+                if (!isOpen) {
+                  setNewCardName('');
+                  setNewCardNumbers(null);
+                }
+              }}>
+                <DialogTrigger asChild><Button size="sm" className="gradient-primary shadow-button"><Plus className="w-4 h-4 mr-2" />Criar Cartela</Button></DialogTrigger>
+                <DialogContent className="max-w-xl">
+                  <DialogHeader><DialogTitle className="font-heading">Criar Nova Cartela</DialogTitle></DialogHeader>
+                  <div className="space-y-4 pt-4">
+                    <Input placeholder="Nome da cartela (ex: Sorte Pura)" value={newCardName} onChange={e => setNewCardName(e.target.value)} className="bg-secondary border-0" />
+                    <CardCreator onCardChange={setNewCardNumbers} />
+                  </div>
+                  <DialogFooter>
+                    <DialogClose asChild><Button variant="ghost">Cancelar</Button></DialogClose>
+                    <Button onClick={handleCreateCard} disabled={!newCardName.trim() || !newCardNumbers}>Salvar ({gameSettings.newCardCost} créditos)</Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            </div>
           </div>
           {myOwnedCards.length === 0 ? (
             <div className="card-container text-center py-8"><p className="text-muted-foreground">Você ainda não tem cartelas. Crie uma!</p></div>
