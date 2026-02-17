@@ -135,26 +135,26 @@ export const MyCreditRequestsDialog = ({ children }: MyCreditRequestsDialogProps
         <Tabs defaultValue="pending" className="flex-grow flex flex-col overflow-hidden">
           <div className="px-6">
             <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="pending" className="relative">
+              <TabsTrigger value="pending" className="flex items-center gap-2">
                 Pendentes
                 {pending.length > 0 && (
-                  <span className="ml-1.5 px-1.5 py-0.5 rounded-full bg-amber-500 text-[10px] font-bold text-white min-w-[1.2rem] text-center">
+                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-amber-500 text-[10px] font-bold text-white">
                     {pending.length}
                   </span>
                 )}
               </TabsTrigger>
-              <TabsTrigger value="approved" className="relative">
+              <TabsTrigger value="approved" className="flex items-center gap-2">
                 Aprovadas
                 {approved.length > 0 && (
-                  <span className="ml-1.5 px-1.5 py-0.5 rounded-full bg-success text-[10px] font-bold text-white min-w-[1.2rem] text-center">
+                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-success text-[10px] font-bold text-white">
                     {approved.length}
                   </span>
                 )}
               </TabsTrigger>
-              <TabsTrigger value="rejected" className="relative">
+              <TabsTrigger value="rejected" className="flex items-center gap-2">
                 Rejeitadas
                 {rejected.length > 0 && (
-                  <span className="ml-1.5 px-1.5 py-0.5 rounded-full bg-destructive text-[10px] font-bold text-white min-w-[1.2rem] text-center">
+                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-[10px] font-bold text-white">
                     {rejected.length}
                   </span>
                 )}
