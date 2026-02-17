@@ -25,20 +25,12 @@ export interface Match {
   prize: Prize;
   startTime: string; // ISO date string
   status: MatchStatus;
-  playerIds: string[];
   calledNumbers: number[];
   pot: number; // total credits bet
   createdAt: string;
   isAutoCalling?: boolean;
   nextAutoCallTimestamp?: number;
   winners: Winner[];
-}
-
-export interface Player {
-  id: string;
-  name: string;
-  credits: number;
-  ownedCardIds: string[]; // IDs of PlayerCard
 }
 
 // A card template owned by a player

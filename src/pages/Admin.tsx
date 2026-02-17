@@ -37,9 +37,9 @@ const Admin = () => {
   const { toast } = useToast();
   const { session, profile, signOut } = useAuth();
   const { 
-    matches, players, createMatch, 
+    matches, players, createMatch, matchCards,
     openMatch, startMatch, finishMatch, deleteMatch, callNumber,
-    toggleAutoCall, getMatchCards, gameSettings, updateGameSettings,
+    toggleAutoCall, getMatchCards
   } = useGame();
 
   const [showCreate, setShowCreate] = useState(false);
@@ -53,7 +53,7 @@ const Admin = () => {
     prizeName: '',
     startTime: '',
   });
-  const [settingsForm, setSettingsForm] = useState(gameSettings);
+  const [settingsForm, setSettingsForm] = useState({ newCardCost: 10, cardRechargeCost: 5, usesPerRecharge: 1, autoCallIntervalSeconds: 120 });
   const [callerInput, setCallerInput] = useState<Record<string, string>>({});
   const [now, setNow] = useState(Date.now());
   const processingRef = useRef(new Set());
@@ -65,20 +65,14 @@ const Admin = () => {
   }, [session, profile, navigate]);
 
   useEffect(() => {
-    setSettingsForm(gameSettings);
-  }, [gameSettings]);
-
-  // Effect for re-rendering to update countdowns
-  useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(timer);
   }, []);
 
-  // Effect for auto-calling numbers
   useEffect(() => {
     matches.forEach(match => {
-      if (match.isAutoCalling && match.status === 'in_progress' && match.nextAutoCallTimestamp && now >= match.nextAutoCallTimestamp) {
-        if (processingRef.current.has(match.id)) return; // Already processing this call
+      if (match.isAutoCalling && match.status === 'in_progress' && match.nextAutoCallTimestamp && now >= new Date(match.nextAutoCallTimestamp).getTime()) {
+        if (processingRef.current.has(match.id)) return;
 
         processingRef.current.add(match.id);
 
@@ -87,43 +81,33 @@ const Admin = () => {
 
         if (availableNumbers.length > 0) {
           const randomIndex = Math.floor(Math.random() * availableNumbers.length);
-          const newNumber = availableNumbers[randomIndex];
-          callNumber(match.id, newNumber);
+          callNumber(match.id, availableNumbers[randomIndex]);
         } else {
-          toggleAutoCall(match.id); // No more numbers, stop auto-calling
+          toggleAutoCall(match.id);
         }
 
-        // Prevent race conditions
         setTimeout(() => processingRef.current.delete(match.id), 500);
       }
     });
   }, [now, matches, callNumber, toggleAutoCall]);
 
   if (!profile || profile.role !== 'admin') {
-    return null; // or a loading/access denied page
+    return null;
   }
 
   const handleCreateMatch = () => {
     if (!matchForm.name.trim() || !matchForm.startTime) return;
     createMatch({
       name: matchForm.name,
-      gameType: matchForm.gameType,
-      maxCardsPerPlayer: matchForm.maxCardsPerPlayer,
-      cardPrice: matchForm.cardPrice,
-      prize: {
-        type: matchForm.prizeType,
-        value: matchForm.prizeValue,
-        productName: matchForm.prizeType === 'product' ? matchForm.prizeName : undefined,
-      },
-      startTime: new Date(matchForm.startTime).toISOString(),
+      game_type: matchForm.gameType,
+      max_cards_per_player: matchForm.maxCardsPerPlayer,
+      card_price: matchForm.cardPrice,
+      prize_type: matchForm.prizeType,
+      prize_value: matchForm.prizeValue,
+      prize_product_name: matchForm.prizeType === 'product' ? matchForm.prizeName : undefined,
+      start_time: new Date(matchForm.startTime).toISOString(),
     });
     setShowCreate(false);
-    setMatchForm({ name: '', gameType: 'full', maxCardsPerPlayer: 3, cardPrice: 10, prizeType: 'percentage', prizeValue: 70, prizeName: '', startTime: '' });
-  };
-
-  const handleSaveSettings = () => {
-    updateGameSettings(settingsForm);
-    toast({ title: 'Configurações salvas!', description: 'Os novos valores já estão em vigor.' });
   };
 
   const handleCallNumber = (matchId: string) => {
@@ -137,14 +121,10 @@ const Admin = () => {
   const handleRandomCall = (matchId: string) => {
     const match = matches.find(m => m.id === matchId);
     if (!match) return;
-
-    const allNumbers = Array.from({ length: 75 }, (_, i) => i + 1);
-    const availableNumbers = allNumbers.filter(num => !match.calledNumbers.includes(num));
-
+    const availableNumbers = Array.from({ length: 75 }, (_, i) => i + 1).filter(num => !match.calledNumbers.includes(num));
     if (availableNumbers.length > 0) {
       const randomIndex = Math.floor(Math.random() * availableNumbers.length);
-      const randomNumber = availableNumbers[randomIndex];
-      callNumber(match.id, randomNumber);
+      callNumber(match.id, availableNumbers[randomIndex]);
     } else {
       toast({ title: 'Todos os números já foram sorteados!', variant: 'destructive' });
     }
@@ -164,238 +144,93 @@ const Admin = () => {
             <Button variant="ghost" size="icon" className="text-primary-foreground" onClick={() => navigate('/')}>
               <ArrowLeft className="w-5 h-5" />
             </Button>
-            <h1 className="font-heading text-2xl md:text-3xl font-bold text-primary-foreground">
-              Painel Admin
-            </h1>
+            <h1 className="font-heading text-2xl md:text-3xl font-bold text-primary-foreground">Painel Admin</h1>
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-primary-foreground/70 text-sm hidden sm:block">
-              {players.length} jogadores
-            </span>
-            <Button variant="ghost" size="sm" className="text-primary-foreground" onClick={() => { signOut(); navigate('/'); }}>
-              <LogOut className="w-4 h-4 mr-1" />
-              Sair
-            </Button>
+            <span className="text-primary-foreground/70 text-sm hidden sm:block">{players.length} jogadores</span>
+            <Button variant="ghost" size="sm" className="text-primary-foreground" onClick={signOut}><LogOut className="w-4 h-4 mr-1" />Sair</Button>
           </div>
         </div>
       </header>
 
       <main className="container max-w-6xl mx-auto py-8 px-4 flex-grow">
-        {/* General Settings */}
         <div className="card-container mb-8">
-          <h2 className="font-heading text-xl font-bold text-foreground mb-4 flex items-center gap-2">
-            <Settings className="w-5 h-5" /> Configurações Gerais
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div>
-              <label className="text-sm font-medium text-foreground mb-1 block">Custo/Nova Cartela</label>
-              <Input type="number" min={0} value={settingsForm.newCardCost} onChange={e => setSettingsForm(prev => ({ ...prev, newCardCost: +e.target.value }))} className="bg-secondary border-0" />
-            </div>
-            <div>
-              <label className="text-sm font-medium text-foreground mb-1 block">Custo/Recarga de Uso</label>
-              <Input type="number" min={0} value={settingsForm.cardRechargeCost} onChange={e => setSettingsForm(prev => ({ ...prev, cardRechargeCost: +e.target.value }))} className="bg-secondary border-0" />
-            </div>
-            <div>
-              <label className="text-sm font-medium text-foreground mb-1 block">Usos por Recarga</label>
-              <Input type="number" min={1} value={settingsForm.usesPerRecharge} onChange={e => setSettingsForm(prev => ({ ...prev, usesPerRecharge: +e.target.value }))} className="bg-secondary border-0" />
-            </div>
-            <div>
-              <label className="text-sm font-medium text-foreground mb-1 block">Intervalo Sorteio (s)</label>
-              <Input type="number" min={5} value={settingsForm.autoCallIntervalSeconds} onChange={e => setSettingsForm(prev => ({ ...prev, autoCallIntervalSeconds: +e.target.value }))} className="bg-secondary border-0" />
-            </div>
-          </div>
-          <Button className="mt-4 gradient-primary shadow-button" onClick={handleSaveSettings}>
-            <Save className="w-4 h-4 mr-2" /> Salvar Configurações
-          </Button>
+          <h2 className="font-heading text-xl font-bold text-foreground mb-4 flex items-center gap-2"><Settings className="w-5 h-5" /> Configurações Gerais (Em breve)</h2>
         </div>
 
-        {/* Matches */}
         <div className="flex items-center justify-between mb-6">
-          <h2 className="font-heading text-xl font-bold text-foreground">
-            Partidas ({matches.length})
-          </h2>
+          <h2 className="font-heading text-xl font-bold text-foreground">Partidas ({matches.length})</h2>
           <Dialog open={showCreate} onOpenChange={setShowCreate}>
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="w-4 h-4 mr-2" />
-                Nova Partida
-              </Button>
-            </DialogTrigger>
+            <DialogTrigger asChild><Button><Plus className="w-4 h-4 mr-2" />Nova Partida</Button></DialogTrigger>
             <DialogContent className="max-w-md">
-              <DialogHeader>
-                <DialogTitle className="font-heading">Criar Partida</DialogTitle>
-              </DialogHeader>
+              <DialogHeader><DialogTitle className="font-heading">Criar Partida</DialogTitle></DialogHeader>
               <div className="space-y-4">
-                <Input placeholder="Nome da partida" value={matchForm.name} onChange={e => setMatchForm(prev => ({ ...prev, name: e.target.value }))} className="bg-secondary border-0" />
-                
-                <div>
-                  <label className="text-sm font-medium text-foreground mb-1 block">Tipo de Jogo</label>
-                  <Select value={matchForm.gameType} onValueChange={(v: GameType) => setMatchForm(prev => ({ ...prev, gameType: v }))}>
-                    <SelectTrigger className="bg-secondary border-0"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {(['full', 'horizontal', 'vertical', 'diagonal'] as GameType[]).map(t => (
-                        <SelectItem key={t} value={t}>{gameTypeLabels[t]}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-sm font-medium text-foreground mb-1 block">Máx. Cartelas/Jogador</label>
-                    <Input type="number" min={1} max={10} value={matchForm.maxCardsPerPlayer} onChange={e => setMatchForm(prev => ({ ...prev, maxCardsPerPlayer: +e.target.value }))} className="bg-secondary border-0" />
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-foreground mb-1 block">Preço/Cartela</label>
-                    <Input type="number" min={1} value={matchForm.cardPrice} onChange={e => setMatchForm(prev => ({ ...prev, cardPrice: +e.target.value }))} className="bg-secondary border-0" />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="text-sm font-medium text-foreground mb-1 block">Tipo de Prêmio</label>
-                  <Select value={matchForm.prizeType} onValueChange={(v: PrizeType) => setMatchForm(prev => ({ ...prev, prizeType: v }))}>
-                    <SelectTrigger className="bg-secondary border-0"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="percentage">% do Pote</SelectItem>
-                      <SelectItem value="fixed">Valor Fixo</SelectItem>
-                      <SelectItem value="product">Produto</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {matchForm.prizeType === 'product' && (
-                  <Input placeholder="Nome do produto" value={matchForm.prizeName} onChange={e => setMatchForm(prev => ({ ...prev, prizeName: e.target.value }))} className="bg-secondary border-0" />
-                )}
-
-                {matchForm.prizeType !== 'product' && (
-                  <div>
-                    <label className="text-sm font-medium text-foreground mb-1 block">
-                      {matchForm.prizeType === 'percentage' ? 'Porcentagem (%)' : 'Valor (créditos)'}
-                    </label>
-                    <Input type="number" min={1} value={matchForm.prizeValue} onChange={e => setMatchForm(prev => ({ ...prev, prizeValue: +e.target.value }))} className="bg-secondary border-0" />
-                  </div>
-                )}
-
-                <div>
-                  <label className="text-sm font-medium text-foreground mb-1 block">Horário de Início</label>
-                  <Input type="datetime-local" value={matchForm.startTime} onChange={e => setMatchForm(prev => ({ ...prev, startTime: e.target.value }))} className="bg-secondary border-0" />
-                </div>
-
-                <Button className="w-full gradient-primary shadow-button" onClick={handleCreateMatch} disabled={!matchForm.name.trim() || !matchForm.startTime}>
-                  <Plus className="w-4 h-4 mr-2" />
-                  Criar Partida
-                </Button>
+                <Input placeholder="Nome da partida" value={matchForm.name} onChange={e => setMatchForm(p => ({ ...p, name: e.target.value }))} />
+                <Select value={matchForm.gameType} onValueChange={(v: GameType) => setMatchForm(p => ({ ...p, gameType: v }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>{Object.entries(gameTypeLabels).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}</SelectContent>
+                </Select>
+                <Input type="number" placeholder="Máx. Cartelas/Jogador" value={matchForm.maxCardsPerPlayer} onChange={e => setMatchForm(p => ({ ...p, maxCardsPerPlayer: +e.target.value }))} />
+                <Input type="number" placeholder="Preço/Cartela" value={matchForm.cardPrice} onChange={e => setMatchForm(p => ({ ...p, cardPrice: +e.target.value }))} />
+                <Input type="datetime-local" value={matchForm.startTime} onChange={e => setMatchForm(p => ({ ...p, startTime: e.target.value }))} />
+                <Button className="w-full" onClick={handleCreateMatch}>Criar</Button>
               </div>
             </DialogContent>
           </Dialog>
         </div>
 
-        {matches.length === 0 ? (
-          <div className="card-container text-center py-12">
-            <p className="text-muted-foreground">Nenhuma partida criada.</p>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {matches.map(match => {
-              const matchCards = getMatchCards(match.id);
-              const countdown = match.nextAutoCallTimestamp ? Math.round((match.nextAutoCallTimestamp - now) / 1000) : 0;
+        <div className="space-y-4">
+          {matches.map(match => {
+            const matchCardsCount = matchCards.filter(mc => mc.matchId === match.id).length;
+            const playersInMatchCount = new Set(matchCards.filter(mc => mc.matchId === match.id).map(mc => mc.playerId)).size;
+            const countdown = match.nextAutoCallTimestamp ? Math.round((new Date(match.nextAutoCallTimestamp).getTime() - now) / 1000) : 0;
 
-              return (
-                <div key={match.id} className="card-container">
-                  <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
-                    <div>
-                      <div className="flex items-center gap-2 mb-1">
-                        <h3 className="font-heading font-bold text-lg text-foreground">{match.name}</h3>
-                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${statusColors[match.status]}`}>
-                          {statusLabels[match.status]}
-                        </span>
-                      </div>
-                      <div className="flex flex-wrap gap-3 text-sm text-muted-foreground">
-                        <span className="flex items-center gap-1"><Trophy className="w-3.5 h-3.5" />{gameTypeLabels[match.gameType]}</span>
-                        <span className="flex items-center gap-1"><Users className="w-3.5 h-3.5" />{match.playerIds.length} jogadores</span>
-                        <span className="flex items-center gap-1"><Hash className="w-3.5 h-3.5" />{matchCards.length} cartelas</span>
-                        <span className="flex items-center gap-1"><Coins className="w-3.5 h-3.5" />Pote: {match.pot}</span>
-                        <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5" />{new Date(match.startTime).toLocaleString('pt-BR')}</span>
-                      </div>
-                      <p className="text-sm text-foreground mt-1">{getPrizeDisplay(match)}</p>
+            return (
+              <div key={match.id} className="card-container">
+                <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <h3 className="font-heading font-bold text-lg text-foreground">{match.name}</h3>
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${statusColors[match.status]}`}>{statusLabels[match.status]}</span>
                     </div>
-
-                    <div className="flex gap-2 flex-wrap">
-                      {match.status === 'waiting' && (
-                        <Button size="sm" className="gradient-primary" onClick={() => openMatch(match.id)}>
-                          <DoorOpen className="w-4 h-4 mr-1" />Abrir
-                        </Button>
-                      )}
-                      {match.status === 'open' && (
-                        <Button size="sm" className="gradient-accent" onClick={() => startMatch(match.id)}>
-                          <Play className="w-4 h-4 mr-1" />Iniciar
-                        </Button>
-                      )}
-                      {match.status === 'in_progress' && (
-                        <Button size="sm" variant="outline" onClick={() => finishMatch(match.id)}>
-                          <StopCircle className="w-4 h-4 mr-1" />Finalizar
-                        </Button>
-                      )}
-                      {(match.status === 'waiting' || match.status === 'finished') && (
-                        <Button size="sm" variant="destructive" onClick={() => deleteMatch(match.id)}>
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      )}
+                    <div className="flex flex-wrap gap-3 text-sm text-muted-foreground">
+                      <span className="flex items-center gap-1"><Trophy className="w-3.5 h-3.5" />{gameTypeLabels[match.gameType]}</span>
+                      <span className="flex items-center gap-1"><Users className="w-3.5 h-3.5" />{playersInMatchCount} jogadores</span>
+                      <span className="flex items-center gap-1"><Hash className="w-3.5 h-3.5" />{matchCardsCount} cartelas</span>
+                      <span className="flex items-center gap-1"><Coins className="w-3.5 h-3.5" />Pote: {match.pot}</span>
                     </div>
                   </div>
-
-                  {match.status === 'in_progress' && (
-                    <div className="border-t border-border pt-4 mt-2">
-                      <div className="flex flex-wrap gap-4 items-center">
-                        <div className="flex gap-2">
-                          <Input
-                            type="number"
-                            min={1}
-                            max={75}
-                            placeholder="Número (1-75)"
-                            value={callerInput[match.id] || ''}
-                            onChange={e => setCallerInput(prev => ({ ...prev, [match.id]: e.target.value }))}
-                            onKeyDown={e => e.key === 'Enter' && handleCallNumber(match.id)}
-                            className="bg-secondary border-0 text-center font-semibold w-32"
-                          />
-                          <Button onClick={() => handleCallNumber(match.id)} className="gradient-accent">
-                            Marcar
-                          </Button>
-                          <Button variant="outline" size="icon" onClick={() => handleRandomCall(match.id)} title="Sortear número aleatório">
-                            <Shuffle className="w-4 h-4" />
-                          </Button>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <Switch
-                            id={`auto-call-${match.id}`}
-                            checked={!!match.isAutoCalling}
-                            onCheckedChange={() => toggleAutoCall(match.id)}
-                          />
-                          <Label htmlFor={`auto-call-${match.id}`} className="flex items-center gap-1">
-                            <Bot className="w-4 h-4" /> Sorteio Automático
-                            {match.isAutoCalling && countdown > 0 && (
-                              <span className="ml-2 text-xs font-mono text-muted-foreground">(Próximo em {countdown}s)</span>
-                            )}
-                          </Label>
-                        </div>
+                  <div className="flex gap-2 flex-wrap">
+                    {match.status === 'waiting' && <Button size="sm" onClick={() => openMatch(match.id)}><DoorOpen className="w-4 h-4 mr-1" />Abrir</Button>}
+                    {match.status === 'open' && <Button size="sm" onClick={() => startMatch(match.id)}><Play className="w-4 h-4 mr-1" />Iniciar</Button>}
+                    {match.status === 'in_progress' && <Button size="sm" variant="outline" onClick={() => finishMatch(match.id)}><StopCircle className="w-4 h-4 mr-1" />Finalizar</Button>}
+                    {(match.status === 'waiting' || match.status === 'finished') && <Button size="sm" variant="destructive" onClick={() => deleteMatch(match.id)}><Trash2 className="w-4 h-4" /></Button>}
+                  </div>
+                </div>
+                {match.status === 'in_progress' && (
+                  <div className="border-t border-border pt-4 mt-2">
+                    <div className="flex flex-wrap gap-4 items-center">
+                      <div className="flex gap-2">
+                        <Input type="number" placeholder="Número" value={callerInput[match.id] || ''} onChange={e => setCallerInput(p => ({ ...p, [match.id]: e.target.value }))} onKeyDown={e => e.key === 'Enter' && handleCallNumber(match.id)} className="w-24" />
+                        <Button onClick={() => handleCallNumber(match.id)}>Marcar</Button>
+                        <Button variant="outline" size="icon" onClick={() => handleRandomCall(match.id)}><Shuffle className="w-4 h-4" /></Button>
                       </div>
-                      <div className="flex flex-wrap gap-1.5 mt-3">
-                        {match.calledNumbers.map(num => (
-                          <span key={num} className="w-8 h-8 rounded-full bg-primary text-primary-foreground text-sm font-medium flex items-center justify-center">
-                            {num}
-                          </span>
-                        ))}
-                        {match.calledNumbers.length === 0 && (
-                          <span className="text-sm text-muted-foreground italic">Nenhum número sorteado</span>
-                        )}
+                      <div className="flex items-center space-x-2">
+                        <Switch id={`auto-call-${match.id}`} checked={!!match.isAutoCalling} onCheckedChange={() => toggleAutoCall(match.id)} />
+                        <Label htmlFor={`auto-call-${match.id}`} className="flex items-center gap-1">
+                          <Bot className="w-4 h-4" /> Sorteio Automático {match.isAutoCalling && countdown > 0 && `(${countdown}s)`}
+                        </Label>
                       </div>
                     </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        )}
+                    <div className="flex flex-wrap gap-1.5 mt-3">
+                      {match.calledNumbers.map(num => <span key={num} className="w-8 h-8 rounded-full bg-primary text-primary-foreground text-sm font-medium flex items-center justify-center">{num}</span>)}
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
       </main>
       <Footer />
     </div>

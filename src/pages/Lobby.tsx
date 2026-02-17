@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Match, MatchStatus } from '@/types/match';
 import { gameTypeLabels } from '@/utils/bingoUtils';
 import { 
-  LogIn, LogOut, Coins, Plus, Trophy, Users, Settings, Wallet, 
+  LogOut, Coins, Plus, Trophy, Users, Settings, Wallet, 
   CreditCard, Timer, DoorOpen, Ticket, Zap, ZapOff, Tv, Printer, Bot, User as UserIcon
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from '@/components/ui/dialog';
@@ -21,19 +21,17 @@ const Lobby = () => {
   const { toast } = useToast();
   const { session, profile, signOut } = useAuth();
   const { 
-    currentPlayer, registerPlayer,
-    matches, joinMatch, getPlayerMatchCards, playerCards, buyCardUses, gameSettings, buyCredits
+    matches, joinMatch, getPlayerMatchCards, playerCards, 
+    buyCardUses, buyCredits, createPlayerCard, matchCards
   } = useGame();
 
   const [buyAmount, setBuyAmount] = useState(50);
   const [now, setNow] = useState(Date.now());
 
-  // State for creating a new card
   const [isCreateCardOpen, setCreateCardOpen] = useState(false);
   const [newCardName, setNewCardName] = useState('');
   const [newCardNumbers, setNewCardNumbers] = useState<number[][] | null>(null);
 
-  // State for joining a match
   const [isJoinDialogOpen, setJoinDialogOpen] = useState(false);
   const [selectedMatch, setSelectedMatch] = useState<Match | null>(null);
   const [cardsToJoin, setCardsToJoin] = useState<Set<string>>(new Set());
@@ -41,29 +39,24 @@ const Lobby = () => {
   useEffect(() => {
     if (!session) {
       navigate('/login');
-    } else if (profile && !currentPlayer) {
-      // Bridge to the old GameContext: register the player if they are not already in the local state.
-      registerPlayer(profile.full_name || session.user.email || 'Jogador');
     }
-  }, [session, profile, currentPlayer, navigate, registerPlayer]);
+  }, [session, navigate]);
 
-  const myOwnedCards = playerCards.filter(c => c.playerId === currentPlayer?.id);
+  const myOwnedCards = profile ? playerCards.filter(c => c.playerId === profile.id) : [];
 
   useEffect(() => {
     const interval = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(interval);
   }, []);
 
-  const handleCreateCard = () => {
+  const handleCreateCard = async () => {
     if (!newCardName.trim() || !newCardNumbers) return;
-    const card = createPlayerCard({ name: newCardName, numbers: newCardNumbers });
+    const card = await createPlayerCard({ name: newCardName, numbers: newCardNumbers });
     if (card) {
       toast({ title: 'Cartela criada!', description: `A cartela "${card.name}" foi adicionada à sua coleção.` });
       setCreateCardOpen(false);
       setNewCardName('');
       setNewCardNumbers(null);
-    } else {
-      toast({ title: 'Erro', description: 'Créditos insuficientes para criar a cartela.', variant: 'destructive' });
     }
   };
 
@@ -73,23 +66,20 @@ const Lobby = () => {
     setJoinDialogOpen(true);
   };
 
-  const handleJoinMatch = () => {
+  const handleJoinMatch = async () => {
     if (!selectedMatch || cardsToJoin.size === 0) return;
     const cardIds = Array.from(cardsToJoin);
-    const newMatchCards = joinMatch(selectedMatch.id, cardIds);
-    if (newMatchCards.length > 0) {
+    const newMatchCards = await joinMatch(selectedMatch.id, cardIds);
+    if (newMatchCards && newMatchCards.length > 0) {
       toast({ title: '🎉 Você entrou na partida!', description: `${newMatchCards.length} cartela(s) inscrita(s).` });
       setJoinDialogOpen(false);
-    } else {
-      toast({ title: 'Erro ao entrar', description: 'Verifique seus créditos, o status da partida ou os usos das cartelas.', variant: 'destructive' });
     }
   };
 
-  const handleBuyUses = (cardId: string) => {
-    if (buyCardUses(cardId)) {
-      toast({ title: 'Cartela Recarregada!', description: `Você comprou mais ${gameSettings.usesPerRecharge} uso(s) para sua cartela.` });
-    } else {
-      toast({ title: 'Créditos insuficientes', description: `Você precisa de ${gameSettings.cardRechargeCost} créditos para recarregar.`, variant: 'destructive' });
+  const handleBuyUses = async (cardId: string) => {
+    const success = await buyCardUses(cardId);
+    if (success) {
+      toast({ title: 'Cartela Recarregada!', description: `Você comprou mais usos para sua cartela.` });
     }
   };
 
@@ -112,13 +102,11 @@ const Lobby = () => {
   const sortedMatches = [...matches].sort((a, b) => {
     const orderA = statusOrder[a.status];
     const orderB = statusOrder[b.status];
-    if (orderA !== orderB) {
-      return orderA - orderB;
-    }
+    if (orderA !== orderB) return orderA - orderB;
     return new Date(b.startTime).getTime() - new Date(a.startTime).getTime();
   });
 
-  if (!currentPlayer || !profile) {
+  if (!profile) {
     return null; // or a loading spinner
   }
 
@@ -133,7 +121,7 @@ const Lobby = () => {
           <div className="flex items-center gap-1 sm:gap-3">
             <div className="flex items-center gap-2 bg-primary-foreground/10 rounded-full px-4 py-2">
               <Wallet className="w-4 h-4 text-primary-foreground" />
-              <span className="font-heading font-bold text-primary-foreground">{currentPlayer.credits}</span>
+              <span className="font-heading font-bold text-primary-foreground">{profile.credits}</span>
             </div>
             <Dialog>
               <DialogTrigger asChild><Button size="sm" variant="ghost" className="text-primary-foreground"><CreditCard className="w-4 h-4 mr-1" />Comprar</Button></DialogTrigger>
@@ -161,7 +149,6 @@ const Lobby = () => {
             </Button>
           </div>
         )}
-        {/* My Cards */}
         <div className="mb-8">
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-heading text-xl font-bold text-foreground flex items-center gap-2"><Ticket className="w-5 h-5 text-primary" /> Minhas Cartelas ({myOwnedCards.length})</h2>
@@ -170,13 +157,7 @@ const Lobby = () => {
                 <Printer className="w-4 h-4 mr-2" />
                 Imprimir
               </Button>
-              <Dialog open={isCreateCardOpen} onOpenChange={(isOpen) => {
-                setCreateCardOpen(isOpen);
-                if (!isOpen) {
-                  setNewCardName('');
-                  setNewCardNumbers(null);
-                }
-              }}>
+              <Dialog open={isCreateCardOpen} onOpenChange={setCreateCardOpen}>
                 <DialogTrigger asChild><Button size="sm" className="gradient-primary shadow-button"><Plus className="w-4 h-4 mr-2" />Criar Cartela</Button></DialogTrigger>
                 <DialogContent className="max-w-xl">
                   <DialogHeader><DialogTitle className="font-heading">Criar Nova Cartela</DialogTitle></DialogHeader>
@@ -186,7 +167,7 @@ const Lobby = () => {
                   </div>
                   <DialogFooter>
                     <DialogClose asChild><Button variant="ghost">Cancelar</Button></DialogClose>
-                    <Button onClick={handleCreateCard} disabled={!newCardName.trim() || !newCardNumbers}>Salvar ({gameSettings.newCardCost} créditos)</Button>
+                    <Button onClick={handleCreateCard} disabled={!newCardName.trim() || !newCardNumbers}>Salvar</Button>
                   </DialogFooter>
                 </DialogContent>
               </Dialog>
@@ -207,7 +188,7 @@ const Lobby = () => {
                       </div>
                       {card.usesLeft === 0 && (
                         <Button size="sm" variant="outline" onClick={() => handleBuyUses(card.id)}>
-                          Recarregar ({gameSettings.cardRechargeCost} <Coins className="w-3 h-3 ml-1" />)
+                          Recarregar <Coins className="w-3 h-3 ml-1" />
                         </Button>
                       )}
                     </div>
@@ -221,13 +202,18 @@ const Lobby = () => {
           )}
         </div>
 
-        {/* Matches */}
         <h2 className="font-heading text-xl font-bold text-foreground mb-4 flex items-center gap-2"><DoorOpen className="w-5 h-5 text-accent" /> Partidas</h2>
         {matches.length === 0 ? (
           <div className="card-container text-center py-12"><p className="text-muted-foreground">Nenhuma partida criada no momento.</p></div>
         ) : (
           <div className="space-y-4">
             {sortedMatches.map(match => {
+              const playersInMatchCount = new Set(matchCards.filter(mc => mc.matchId === match.id).map(mc => mc.playerId)).size;
+              const myMatchCards = getPlayerMatchCards(match.id, profile.id);
+              const alreadyJoined = myMatchCards.length > 0;
+              const canJoin = (match.status === 'open' || match.status === 'waiting') && myOwnedCards.some(c => c.usesLeft > 0);
+              const countdown = match.nextAutoCallTimestamp ? Math.max(0, Math.round((match.nextAutoCallTimestamp - now) / 1000)) : null;
+
               if (match.status === 'finished') {
                 return (
                   <div key={match.id} className="card-container opacity-70">
@@ -236,7 +222,7 @@ const Lobby = () => {
                         <h3 className="font-heading font-bold text-lg text-foreground line-through">{match.name}</h3>
                         <div className="flex flex-wrap gap-x-3 gap-y-1 text-sm text-muted-foreground mt-1">
                           <span className="flex items-center gap-1"><Trophy className="w-3.5 h-3.5" />{gameTypeLabels[match.gameType]}</span>
-                          <span className="flex items-center gap-1"><Users className="w-3.5 h-3.5" />{match.playerIds.length}</span>
+                          <span className="flex items-center gap-1"><Users className="w-3.5 h-3.5" />{playersInMatchCount}</span>
                           <span className="flex items-center gap-1"><Coins className="w-3.5 h-3.5" />Pote: {match.pot}</span>
                         </div>
                       </div>
@@ -256,11 +242,6 @@ const Lobby = () => {
                 );
               }
 
-              const myMatchCards = getPlayerMatchCards(match.id, currentPlayer.id);
-              const alreadyJoined = myMatchCards.length > 0;
-              const canJoin = (match.status === 'open' || match.status === 'waiting') && myOwnedCards.some(c => c.usesLeft > 0);
-              const countdown = match.nextAutoCallTimestamp ? Math.max(0, Math.round((match.nextAutoCallTimestamp - now) / 1000)) : null;
-
               return (
                 <div key={match.id} className={`card-container relative ${match.status === 'in_progress' ? 'ring-2 ring-accent' : ''}`}>
                   <div className="flex flex-wrap items-start justify-between gap-3">
@@ -268,7 +249,7 @@ const Lobby = () => {
                       <h3 className="font-heading font-bold text-lg text-foreground">{match.name}</h3>
                       <div className="flex flex-wrap gap-x-3 gap-y-1 text-sm text-muted-foreground mt-1">
                         <span className="flex items-center gap-1"><Trophy className="w-3.5 h-3.5" />{gameTypeLabels[match.gameType]}</span>
-                        <span className="flex items-center gap-1"><Users className="w-3.5 h-3.5" />{match.playerIds.length}</span>
+                        <span className="flex items-center gap-1"><Users className="w-3.5 h-3.5" />{playersInMatchCount}</span>
                         <span className="flex items-center gap-1"><Coins className="w-3.5 h-3.5" />Pote: {match.pot}</span>
                         {match.status === 'waiting' && <span className="flex items-center gap-1"><Timer className="w-3.5 h-3.5" />{getCountdown(match.startTime)}</span>}
                       </div>
@@ -325,7 +306,6 @@ const Lobby = () => {
         )}
       </main>
 
-      {/* Join Match Dialog */}
       <Dialog open={isJoinDialogOpen} onOpenChange={setJoinDialogOpen}>
         <DialogContent className="max-w-2xl">
           <DialogHeader><DialogTitle className="font-heading">Entrar na Partida: {selectedMatch?.name}</DialogTitle></DialogHeader>

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useCallback, useEffect } from 'react';
+import React, { createContext, useContext, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './AuthContext';
@@ -6,6 +6,7 @@ import { Match, PlayerCard, MatchCard, Winner, MatchStatus } from '@/types/match
 import { BingoCard, GameType, WinResult } from '@/types/bingo';
 import { checkWin } from '@/utils/bingoUtils';
 import { toast } from 'sonner';
+import { Profile } from './AuthContext';
 
 // This can be moved to a settings table in the future
 const gameSettings = {
@@ -17,10 +18,11 @@ const gameSettings = {
 
 interface GameContextType {
   matches: Match[];
+  players: Profile[];
   playerCards: PlayerCard[];
   matchCards: MatchCard[];
   isLoading: boolean;
-  createMatch: (data: Omit<Match, 'id' | 'status' | 'playerIds' | 'calledNumbers' | 'pot' | 'createdAt' | 'isAutoCalling' | 'nextAutoCallTimestamp' | 'winners'>) => Promise<void>;
+  createMatch: (data: any) => Promise<void>;
   openMatch: (matchId: string) => Promise<void>;
   startMatch: (matchId: string) => Promise<void>;
   callNumber: (matchId: string, num: number) => Promise<void>;
@@ -50,6 +52,16 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     },
   });
 
+  const { data: players = [] } = useQuery({
+    queryKey: ['players'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('profiles').select('*');
+      if (error) throw error;
+      return data as Profile[];
+    },
+    enabled: !!profile && profile.role === 'admin',
+  });
+
   const { data: playerCards = [], isLoading: l2 } = useQuery({
     queryKey: ['playerCards', user?.id],
     queryFn: async () => {
@@ -66,18 +78,18 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     queryFn: async () => {
       const { data, error } = await supabase.from('match_cards').select('*');
       if (error) throw error;
-      return data.map(c => ({ ...c, markedNumbers: new Set(c.marked_numbers || [0]) })) as MatchCard[];
+      return data.map(c => ({ ...c, markedNumbers: new Set(c.marked_numbers || []) })) as MatchCard[];
     },
   });
 
   useEffect(() => {
     const channel = supabase.channel('public-db-changes')
-      .on('postgres_changes', { event: '*', schema: 'public' }, (payload) => {
-        console.log('Realtime event:', payload);
+      .on('postgres_changes', { event: '*', schema: 'public' }, () => {
         queryClient.invalidateQueries({ queryKey: ['matches'] });
         queryClient.invalidateQueries({ queryKey: ['playerCards'] });
         queryClient.invalidateQueries({ queryKey: ['matchCards'] });
         queryClient.invalidateQueries({ queryKey: ['profile'] });
+        queryClient.invalidateQueries({ queryKey: ['players'] });
       }).subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [queryClient]);
@@ -104,7 +116,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const toggleAutoCall = async (matchId: string) => {
     const match = matches.find(m => m.id === matchId);
     if (!match) return;
-    const isEnabling = !match.is_auto_calling;
+    const isEnabling = !match.isAutoCalling;
     const { error } = await supabase.from('matches').update({
       is_auto_calling: isEnabling,
       next_auto_call_timestamp: isEnabling ? new Date(Date.now() + gameSettings.autoCallIntervalSeconds * 1000).toISOString() : null,
@@ -114,9 +126,9 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const callNumber = async (matchId: string, num: number) => {
     const match = matches.find(m => m.id === matchId);
-    if (!match || match.called_numbers.includes(num)) return;
+    if (!match || match.calledNumbers.includes(num)) return;
 
-    const newCalledNumbers = [...match.called_numbers, num];
+    const newCalledNumbers = [...match.calledNumbers, num];
     const { error: updateError } = await supabase.from('matches').update({ called_numbers: newCalledNumbers }).eq('id', matchId);
     if (updateError) { toast.error(updateError.message); return; }
 
@@ -130,15 +142,14 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
         numbers: card.numbers,
         markedNumbers: new Set([...(card.markedNumbers || []), num]),
       };
-      const winResult = checkWin(tempBingoCard, match.game_type);
+      const winResult = checkWin(tempBingoCard, match.gameType);
       if (winResult) foundWinners.push({ card, result: winResult });
     }
 
     if (foundWinners.length > 0) {
-      const { data: profiles } = await supabase.from('profiles').select('*');
       const winnerData: Winner[] = foundWinners.map(fw => ({
         playerId: fw.card.playerId,
-        playerName: profiles?.find(p => p.id === fw.card.playerId)?.full_name || 'Desconhecido',
+        playerName: players?.find(p => p.id === fw.card.playerId)?.full_name || 'Desconhecido',
         cardId: fw.card.id,
         cardName: fw.card.name,
       }));
@@ -176,7 +187,6 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const totalCost = playerCardIds.length * match.cardPrice;
     if (profile.credits < totalCost) { toast.error("Créditos insuficientes!"); return null; }
 
-    // This should be an Edge Function for atomicity, but doing it client-side for now.
     const { error: creditError } = await supabase.from('profiles').update({ credits: profile.credits - totalCost }).eq('id', user.id);
     if (creditError) { toast.error(creditError.message); return null; }
 
@@ -193,7 +203,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
         player_card_id: cardId,
         name: card?.name,
         numbers: card?.numbers,
-        marked_numbers: [0],
+        marked_numbers: [],
       };
     });
 
@@ -225,7 +235,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   return (
     <GameContext.Provider value={{
-      matches, playerCards, matchCards, isLoading: l1 || l2 || l3,
+      matches, players, playerCards, matchCards, isLoading: l1 || l2 || l3,
       createMatch, openMatch, startMatch, callNumber, finishMatch, deleteMatch, toggleAutoCall,
       createPlayerCard, joinMatch, buyCardUses, buyCredits,
       getMatchCards, getPlayerMatchCards,
