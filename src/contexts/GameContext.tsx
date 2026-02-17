@@ -350,6 +350,18 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const toggleArchivePlayerCard = async (cardId: string, archive: boolean) => {
+    if (archive) {
+      const activeMatchCards = matchCards.filter(mc => 
+        mc.player_card_id === cardId && 
+        matches.some(m => m.id === mc.match_id && (m.status === 'in_progress' || m.status === 'open'))
+      );
+
+      if (activeMatchCards.length > 0) {
+        toast.error("Não é possível arquivar uma cartela que está em uma partida ativa ou com inscrições abertas.");
+        return;
+      }
+    }
+
     const { error } = await supabase
       .from('cartelas_jogador')
       .update({ is_archived: archive })
