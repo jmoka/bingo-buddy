@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
-import { CardEditor } from '@/components/CardEditor';
+import { CardCreator } from '@/components/CardCreator';
 import { BingoCell } from '@/components/BingoCell';
 
 const Lobby = () => {
@@ -161,11 +161,11 @@ const Lobby = () => {
               }
             }}>
               <DialogTrigger asChild><Button className="gradient-primary shadow-button"><Plus className="w-4 h-4 mr-2" />Criar Cartela</Button></DialogTrigger>
-              <DialogContent className="max-w-md">
+              <DialogContent className="max-w-xl">
                 <DialogHeader><DialogTitle className="font-heading">Criar Nova Cartela</DialogTitle></DialogHeader>
                 <div className="space-y-4 pt-4">
                   <Input placeholder="Nome da cartela (ex: Sorte Pura)" value={newCardName} onChange={e => setNewCardName(e.target.value)} className="bg-secondary border-0" />
-                  <CardEditor onCardChange={setNewCardNumbers} />
+                  <CardCreator onCardChange={setNewCardNumbers} />
                 </div>
                 <DialogFooter>
                   <DialogClose asChild><Button variant="ghost">Cancelar</Button></DialogClose>
