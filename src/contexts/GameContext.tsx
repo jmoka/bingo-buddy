@@ -228,6 +228,9 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
         message: `Nova solicitação: ${creditsRequested} créditos. Valor pago: R$ ${amountPaid.toFixed(2)}`
     });
 
+    queryClient.invalidateQueries({ queryKey: ['creditRequests'] });
+    queryClient.invalidateQueries({ queryKey: ['rawCreditRequests'] });
+
     await supabase.functions.invoke('notify-n8n', { body: { event: 'CREDIT_REQUEST', data: { requestId: newRequest.id, creditsRequested, amountPaid, userEmail: user.email } } });
     return true;
   };
@@ -250,6 +253,9 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     await supabase.from('mensagens_solicitacao').insert({ credit_request_id: requestId, sender_id: user.id, message: message || "Reenvio de comprovante." });
+
+    queryClient.invalidateQueries({ queryKey: ['creditRequests'] });
+    queryClient.invalidateQueries({ queryKey: ['rawCreditRequests'] });
 
     await supabase.functions.invoke('notify-n8n', { body: { event: 'CREDIT_RESUBMISSION', data: { requestId, userEmail: user.email, message } } });
     return true;
@@ -277,6 +283,12 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
             message: notes
         });
     }
+
+    // Invalidar caches para atualizar a UI do admin e do jogador instantaneamente
+    queryClient.invalidateQueries({ queryKey: ['rawCreditRequests'] });
+    queryClient.invalidateQueries({ queryKey: ['creditRequests'] });
+    queryClient.invalidateQueries({ queryKey: ['profile'] });
+    queryClient.invalidateQueries({ queryKey: ['players'] });
     
     return true;
   };
@@ -285,10 +297,16 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await supabase.from('solicitacoes_credito').update({
       status: 'pending', notes: 'Solicitação reaberta pelo administrador.', resolved_at: null, resolved_by: null, credits_granted: null,
     }).eq('id', requestId);
+    queryClient.invalidateQueries({ queryKey: ['rawCreditRequests'] });
+    queryClient.invalidateQueries({ queryKey: ['creditRequests'] });
     toast.success('Solicitação reaberta');
   };
 
-  const deleteCreditRequest = async (requestId: string) => { await supabase.from('solicitacoes_credito').delete().eq('id', requestId); };
+  const deleteCreditRequest = async (requestId: string) => { 
+    await supabase.from('solicitacoes_credito').delete().eq('id', requestId); 
+    queryClient.invalidateQueries({ queryKey: ['rawCreditRequests'] });
+    queryClient.invalidateQueries({ queryKey: ['creditRequests'] });
+  };
 
   const updatePlayerCredits = async (playerId: string, amount: number) => {
     const { data: p } = await supabase.from('perfis').select('credits').eq('id', playerId).single();
@@ -299,6 +317,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!user || !profile || !gameSettings || profile.credits < gameSettings.custo_nova_cartela) return null;
     await supabase.from('perfis').update({ credits: profile.credits - gameSettings.custo_nova_cartela }).eq('id', user.id);
     const { data } = await supabase.from('cartelas_jogador').insert({ player_id: user.id, ...options, uses_left: 1 }).select().single();
+    queryClient.invalidateQueries({ queryKey: ['profile'] });
     return data as PlayerCard;
   };
 
@@ -307,6 +326,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const joinMatch = async (matchId: string, playerCardIds: string[]): Promise<MatchCard[] | null> => {
     const { data } = await supabase.functions.invoke('join-match', { body: { matchId, playerCardIds } });
+    queryClient.invalidateQueries({ queryKey: ['profile'] });
     return data as MatchCard[];
   };
 
@@ -315,6 +335,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await supabase.from('perfis').update({ credits: profile.credits - gameSettings.custo_recarga_cartela }).eq('id', profile.id);
     const card = playerCards.find(c => c.id === playerCardId);
     if (card) await supabase.from('cartelas_jogador').update({ uses_left: card.uses_left + gameSettings.usos_por_recarga }).eq('id', playerCardId);
+    queryClient.invalidateQueries({ queryKey: ['profile'] });
     return true;
   };
 
