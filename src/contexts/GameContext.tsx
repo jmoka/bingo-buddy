@@ -7,6 +7,7 @@ interface GameSettings {
   newCardCost: number;
   cardRechargeCost: number;
   usesPerRecharge: number;
+  autoCallIntervalSeconds: number;
 }
 
 interface GameContextType {
@@ -58,6 +59,7 @@ const DEFAULT_SETTINGS: GameSettings = {
   newCardCost: 10,
   cardRechargeCost: 5,
   usesPerRecharge: 1,
+  autoCallIntervalSeconds: 120,
 };
 
 function generateId(): string {
@@ -113,7 +115,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isAdmin, setIsAdmin] = useState<boolean>(() => localStorage.getItem(STORAGE_KEYS.isAdmin) === 'true');
   const [gameSettings, setGameSettings] = useState<GameSettings>(() => {
     const stored = localStorage.getItem(STORAGE_KEYS.gameSettings);
-    return stored ? JSON.parse(stored) : DEFAULT_SETTINGS;
+    return stored ? { ...DEFAULT_SETTINGS, ...JSON.parse(stored) } : DEFAULT_SETTINGS;
   });
 
   useEffect(() => { localStorage.setItem(STORAGE_KEYS.matches, JSON.stringify(matches)); }, [matches]);

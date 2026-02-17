@@ -9,10 +9,12 @@ import { PrizeType, Match, MatchStatus } from '@/types/match';
 import { gameTypeLabels } from '@/utils/bingoUtils';
 import { 
   Plus, LogOut, Play, DoorOpen, Trash2, Trophy, Users, 
-  Clock, Coins, Hash, ArrowLeft, StopCircle, Settings, Save
+  Clock, Coins, Hash, ArrowLeft, StopCircle, Settings, Save, Bot
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 
 const statusLabels: Record<MatchStatus, string> = {
   waiting: 'Aguardando',
@@ -50,10 +52,45 @@ const Admin = () => {
   });
   const [settingsForm, setSettingsForm] = useState(gameSettings);
   const [callerInput, setCallerInput] = useState<Record<string, string>>({});
+  const [autoCallEnabled, setAutoCallEnabled] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     setSettingsForm(gameSettings);
   }, [gameSettings]);
+
+  // Auto-call logic
+  useEffect(() => {
+    const intervals = new Map<string, NodeJS.Timeout>();
+
+    autoCallEnabled.forEach(matchId => {
+      const match = matches.find(m => m.id === matchId);
+
+      if (match && match.status === 'in_progress') {
+        const intervalId = setInterval(() => {
+          const availableNumbers = Array.from({ length: 75 }, (_, i) => i + 1)
+            .filter(num => !match.calledNumbers.includes(num));
+
+          if (availableNumbers.length > 0) {
+            const randomIndex = Math.floor(Math.random() * availableNumbers.length);
+            const newNumber = availableNumbers[randomIndex];
+            callNumber(match.id, newNumber);
+          } else {
+            // All numbers called, stop this interval
+            setAutoCallEnabled(prev => {
+              const next = new Set(prev);
+              next.delete(match.id);
+              return next;
+            });
+          }
+        }, gameSettings.autoCallIntervalSeconds * 1000);
+        intervals.set(matchId, intervalId);
+      }
+    });
+
+    return () => {
+      intervals.forEach(intervalId => clearInterval(intervalId));
+    };
+  }, [autoCallEnabled, matches, gameSettings.autoCallIntervalSeconds, callNumber]);
 
   if (!isAdmin) {
     navigate('/admin/login');
@@ -89,6 +126,18 @@ const Admin = () => {
       callNumber(matchId, num);
       setCallerInput(prev => ({ ...prev, [matchId]: '' }));
     }
+  };
+
+  const toggleAutoCall = (matchId: string) => {
+    setAutoCallEnabled(prev => {
+      const next = new Set(prev);
+      if (next.has(matchId)) {
+        next.delete(matchId);
+      } else {
+        next.add(matchId);
+      }
+      return next;
+    });
   };
 
   const getPrizeDisplay = (match: Match) => {
@@ -127,7 +176,7 @@ const Admin = () => {
           <h2 className="font-heading text-xl font-bold text-foreground mb-4 flex items-center gap-2">
             <Settings className="w-5 h-5" /> Configurações Gerais
           </h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div>
               <label className="text-sm font-medium text-foreground mb-1 block">Custo/Nova Cartela</label>
               <Input type="number" min={0} value={settingsForm.newCardCost} onChange={e => setSettingsForm(prev => ({ ...prev, newCardCost: +e.target.value }))} className="bg-secondary border-0" />
@@ -139,6 +188,10 @@ const Admin = () => {
             <div>
               <label className="text-sm font-medium text-foreground mb-1 block">Usos por Recarga</label>
               <Input type="number" min={1} value={settingsForm.usesPerRecharge} onChange={e => setSettingsForm(prev => ({ ...prev, usesPerRecharge: +e.target.value }))} className="bg-secondary border-0" />
+            </div>
+            <div>
+              <label className="text-sm font-medium text-foreground mb-1 block">Intervalo Sorteio (s)</label>
+              <Input type="number" min={5} value={settingsForm.autoCallIntervalSeconds} onChange={e => setSettingsForm(prev => ({ ...prev, autoCallIntervalSeconds: +e.target.value }))} className="bg-secondary border-0" />
             </div>
           </div>
           <Button className="mt-4 gradient-primary shadow-button" onClick={handleSaveSettings}>
@@ -281,22 +334,34 @@ const Admin = () => {
 
                   {match.status === 'in_progress' && (
                     <div className="border-t border-border pt-4 mt-2">
-                      <div className="flex gap-2 mb-3">
-                        <Input
-                          type="number"
-                          min={1}
-                          max={75}
-                          placeholder="Número (1-75)"
-                          value={callerInput[match.id] || ''}
-                          onChange={e => setCallerInput(prev => ({ ...prev, [match.id]: e.target.value }))}
-                          onKeyDown={e => e.key === 'Enter' && handleCallNumber(match.id)}
-                          className="bg-secondary border-0 text-center font-semibold w-40"
-                        />
-                        <Button onClick={() => handleCallNumber(match.id)} className="gradient-accent">
-                          Sortear
-                        </Button>
+                      <div className="flex flex-wrap gap-4 items-center">
+                        <div className="flex gap-2">
+                          <Input
+                            type="number"
+                            min={1}
+                            max={75}
+                            placeholder="Número (1-75)"
+                            value={callerInput[match.id] || ''}
+                            onChange={e => setCallerInput(prev => ({ ...prev, [match.id]: e.target.value }))}
+                            onKeyDown={e => e.key === 'Enter' && handleCallNumber(match.id)}
+                            className="bg-secondary border-0 text-center font-semibold w-40"
+                          />
+                          <Button onClick={() => handleCallNumber(match.id)} className="gradient-accent">
+                            Sortear
+                          </Button>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Switch
+                            id={`auto-call-${match.id}`}
+                            checked={autoCallEnabled.has(match.id)}
+                            onCheckedChange={() => toggleAutoCall(match.id)}
+                          />
+                          <Label htmlFor={`auto-call-${match.id}`} className="flex items-center gap-1">
+                            <Bot className="w-4 h-4" /> Sorteio Automático
+                          </Label>
+                        </div>
                       </div>
-                      <div className="flex flex-wrap gap-1.5">
+                      <div className="flex flex-wrap gap-1.5 mt-3">
                         {match.calledNumbers.map(num => (
                           <span key={num} className="w-8 h-8 rounded-full bg-primary text-primary-foreground text-sm font-medium flex items-center justify-center">
                             {num}
