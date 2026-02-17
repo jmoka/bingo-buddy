@@ -266,7 +266,7 @@ const Lobby = () => {
               const playersInMatchCount = new Set(matchCards.filter(mc => mc.match_id === match.id).map(mc => mc.player_id)).size;
               const myMatchCards = getPlayerMatchCards(match.id, profile.id);
               const alreadyJoined = myMatchCards.length > 0;
-              const canJoin = (match.status === 'open' || match.status === 'waiting') && myOwnedCards.some(c => c.uses_left > 0);
+              const canJoin = match.status === 'open' || match.status === 'waiting';
               const countdown = match.next_auto_call_timestamp ? Math.max(0, Math.round((new Date(match.next_auto_call_timestamp).getTime() - now) / 1000)) : null;
 
               if (match.status === 'finished') {
@@ -370,26 +370,33 @@ const Lobby = () => {
         <DialogContent className="max-w-2xl">
           <DialogHeader><DialogTitle className="font-heading">Entrar na Partida: {selectedMatch?.name}</DialogTitle></DialogHeader>
           <div className="max-h-[60vh] overflow-y-auto p-1 space-y-3">
-            {myOwnedCards.map(card => {
-              const isSelected = cardsToJoin.has(card.id);
-              const isDisabled = card.uses_left === 0;
-              return (
-                <div 
-                  key={card.id} 
-                  onClick={() => !isDisabled && setCardsToJoin(prev => {
-                    const next = new Set(prev);
-                    if (isSelected) next.delete(card.id); else next.add(card.id);
-                    return next;
-                  })} 
-                  className={`p-3 rounded-lg border-2 ${isDisabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'} ${isSelected ? 'border-primary bg-primary/5' : 'border-transparent bg-secondary'}`}
-                >
-                  <div className="flex justify-between items-center">
-                    <h3 className="font-heading font-semibold">{card.name}</h3>
-                    {isDisabled && <span className="text-xs text-destructive font-medium">Sem usos</span>}
+            {myOwnedCards.length > 0 ? (
+              myOwnedCards.map(card => {
+                const isSelected = cardsToJoin.has(card.id);
+                const isDisabled = card.uses_left === 0;
+                return (
+                  <div 
+                    key={card.id} 
+                    onClick={() => !isDisabled && setCardsToJoin(prev => {
+                      const next = new Set(prev);
+                      if (isSelected) next.delete(card.id); else next.add(card.id);
+                      return next;
+                    })} 
+                    className={`p-3 rounded-lg border-2 ${isDisabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'} ${isSelected ? 'border-primary bg-primary/5' : 'border-transparent bg-secondary'}`}
+                  >
+                    <div className="flex justify-between items-center">
+                      <h3 className="font-heading font-semibold">{card.name}</h3>
+                      {isDisabled && <span className="text-xs text-destructive font-medium">Sem usos</span>}
+                    </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })
+            ) : (
+              <div className="text-center py-10">
+                <p className="text-muted-foreground font-medium">Você não tem nenhuma cartela.</p>
+                <p className="text-sm text-muted-foreground mt-1">Crie uma nova cartela para poder entrar na partida.</p>
+              </div>
+            )}
           </div>
           <DialogFooter>
             <div className="w-full flex justify-between items-center">
