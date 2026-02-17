@@ -100,7 +100,8 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     queryKey: ['playerCards', user?.id],
     queryFn: async () => {
       if (!user) return [];
-      const { data, error } = await supabase.from('cartelas_jogador').select('*').eq('player_id', user.id);
+      // Deixando o RLS do Supabase fazer todo o trabalho de filtragem
+      const { data, error } = await supabase.from('cartelas_jogador').select('*');
       if (error) throw error;
       return data as PlayerCard[];
     },
