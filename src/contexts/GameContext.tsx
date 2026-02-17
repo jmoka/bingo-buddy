@@ -515,6 +515,10 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const createPlayerCard = async (options: { name: string; numbers: number[][]; creditType: CreditType; }) => {
+    if (!user) {
+      toast.error("Você precisa estar logado para criar uma cartela.");
+      return null;
+    }
     try {
       const { name, numbers, creditType } = options;
       
@@ -525,21 +529,22 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
 
       if (error) {
-        console.error("RPC Error:", error);
-        toast.error('Erro ao criar cartela', { description: error.message });
+        console.error("RPC Error:", JSON.stringify(error, null, 2));
+        toast.error('Erro ao criar cartela', { 
+          description: `Mensagem: ${error.message}. Por favor, tente novamente ou contate o suporte.`
+        });
         return null;
       }
 
-      // Sucesso
-      if (user) {
-        queryClient.invalidateQueries({ queryKey: ['profile'] });
-        queryClient.invalidateQueries({ queryKey: ['playerCards', user.id] });
-      }
+      toast.success("Cartela criada com sucesso!");
+      queryClient.invalidateQueries({ queryKey: ['profile'] });
+      queryClient.invalidateQueries({ queryKey: ['playerCards', user.id] });
+      
       return data as PlayerCard;
 
     } catch (err: any) {
       console.error("Client Error:", err);
-      toast.error('Erro inesperado', { description: err.message });
+      toast.error('Erro inesperado no aplicativo', { description: err.message });
       return null;
     }
   };
