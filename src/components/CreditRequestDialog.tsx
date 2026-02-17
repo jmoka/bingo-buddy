@@ -7,8 +7,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { GameSettings } from '@/contexts/GameContext';
 import { QRCodeSVG as QRCode } from 'qrcode.react';
 import { toast } from 'sonner';
-import { Copy, Upload, Loader2, Minus, Plus, Coins } from 'lucide-react';
-import qrCodePix from 'qrcode-pix';
+import { Copy, Upload, Loader2, Minus, Plus } from 'lucide-react';
+import { qrCodePix } from 'qrcode-pix';
 import { useAuth } from '@/contexts/AuthContext';
 
 interface CreditRequestDialogProps {
