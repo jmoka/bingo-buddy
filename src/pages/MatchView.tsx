@@ -11,8 +11,9 @@ import { playNotificationSound } from '@/utils/soundUtils';
 const MatchView = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { matches, currentPlayer, getPlayerMatchCards } = useGame();
+  const { matches, currentPlayer, getPlayerMatchCards, gameSettings } = useGame();
   const [lastCalledNumber, setLastCalledNumber] = useState<number | null>(null);
+  const [countdown, setCountdown] = useState<number | null>(null);
 
   const match = matches.find(m => m.id === id);
   const myCards = currentPlayer && id ? getPlayerMatchCards(id, currentPlayer.id) : [];
@@ -36,6 +37,30 @@ const MatchView = () => {
 
     prevCalledNumbersRef.current = currentNumbers;
   }, [match]);
+
+  // Countdown tick logic
+  useEffect(() => {
+    let interval: NodeJS.Timeout | undefined;
+
+    if (match?.isAutoCalling && match.status === 'in_progress') {
+      interval = setInterval(() => {
+        setCountdown(prev => (prev !== null && prev > 0 ? prev - 1 : 0));
+      }, 1000);
+    } else {
+      setCountdown(null);
+    }
+
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [match?.isAutoCalling, match?.status]);
+
+  // Reset countdown when a new number is called or auto-call starts
+  useEffect(() => {
+    if (match?.isAutoCalling && match.status === 'in_progress') {
+      setCountdown(gameSettings.autoCallIntervalSeconds);
+    }
+  }, [match?.calledNumbers.length, match?.isAutoCalling, match?.status, gameSettings.autoCallIntervalSeconds]);
 
   if (!match) {
     return (
@@ -79,11 +104,21 @@ const MatchView = () => {
 
       <main className="container max-w-6xl mx-auto py-6 px-4">
         {match.isAutoCalling && (
-          <div className="card-container mb-6 bg-accent/10 text-accent text-center">
-            <p className="font-medium text-sm flex items-center justify-center gap-2">
-              <Bot className="w-4 h-4" />
-              Sorteio automático ativado. Aguardando próximo número...
-            </p>
+          <div className="card-container mb-6 bg-accent/10 text-accent text-center p-4">
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-4">
+              <p className="font-medium text-sm flex items-center gap-2">
+                <Bot className="w-4 h-4" />
+                Sorteio automático ativado!
+              </p>
+              {countdown !== null && (
+                <div className="flex items-center gap-2">
+                  <span className="text-sm">Próximo número em:</span>
+                  <span className="font-bold font-mono text-lg bg-accent text-accent-foreground rounded-md px-2 py-1">
+                    {countdown}s
+                  </span>
+                </div>
+              )}
+            </div>
           </div>
         )}
 
