@@ -63,7 +63,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const isAdmin = profile?.role === 'admin';
 
-  // Configurações
+  // 1. Configurações
   const { data: gameSettings } = useQuery({
     queryKey: ['gameSettings'],
     queryFn: async () => {
@@ -73,7 +73,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   });
 
-  // Partidas
+  // 2. Partidas
   const { data: matches = [] } = useQuery({
     queryKey: ['matches'],
     queryFn: async () => {
@@ -83,7 +83,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     },
   });
 
-  // Cartelas do Jogador
+  // 3. Cartelas do Jogador
   const { data: playerCards = [] } = useQuery({
     queryKey: ['playerCards', user?.id],
     queryFn: async () => {
@@ -95,7 +95,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     enabled: !!user,
   });
 
-  // Cartelas em Partida
+  // 4. Cartelas em Partida
   const { data: matchCards = [] } = useQuery({
     queryKey: ['matchCards'],
     queryFn: async () => {
@@ -105,7 +105,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     },
   });
 
-  // Vitórias
+  // 5. Vitórias
   const { data: wins = [] } = useQuery({
     queryKey: ['wins', user?.id],
     queryFn: async () => {
@@ -116,7 +116,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     enabled: !!user,
   });
 
-  // Solicitações do Jogador
+  // 6. Solicitações do Jogador Logado
   const { data: creditRequests = [] } = useQuery({
     queryKey: ['creditRequests', user?.id],
     queryFn: async () => {
@@ -127,11 +127,13 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     enabled: !!user,
   });
 
-  // Dados Administrativos
+  // 7. Dados Administrativos (Só carregam se for admin)
   const { data: players = [] } = useQuery({
     queryKey: ['players', isAdmin],
     queryFn: async () => {
+      if (!isAdmin) return [];
       const { data, error } = await supabase.from('perfis').select('*');
+      if (error) throw error;
       return data as Profile[];
     },
     enabled: isAdmin,
@@ -140,7 +142,9 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const { data: allPlayerCards = [] } = useQuery({
     queryKey: ['allPlayerCards', isAdmin],
     queryFn: async () => {
+      if (!isAdmin) return [];
       const { data, error } = await supabase.from('cartelas_jogador').select('*');
+      if (error) throw error;
       return data as PlayerCard[];
     },
     enabled: isAdmin,
@@ -149,42 +153,50 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const { data: allWins = [] } = useQuery({
     queryKey: ['allWins', isAdmin],
     queryFn: async () => {
+      if (!isAdmin) return [];
       const { data, error } = await supabase.from('vitorias').select('*');
+      if (error) throw error;
       return data as Win[];
     },
     enabled: isAdmin,
   });
 
+  // Busca de solicitações para o Admin (Mesclando com perfis manualmente para evitar erros de Join)
   const { data: allCreditRequests = [], isLoading: isLoadingRequests } = useQuery({
     queryKey: ['allCreditRequests', isAdmin],
     queryFn: async () => {
-      // Simplificamos a consulta removendo o join complexo para garantir que os dados básicos apareçam
-      const { data, error } = await supabase
+      if (!isAdmin) return [];
+
+      // Busca solicitações
+      const { data: requestsData, error: requestsError } = await supabase
         .from('solicitacoes_credito')
-        .select(`
-          *,
-          perfis(full_name, avatar_url)
-        `)
+        .select('*')
         .order('requested_at', { ascending: false });
       
-      if (error) {
-        console.error("Erro na busca de solicitações:", error);
-        // Fallback: Tenta buscar sem o join de perfis
-        const { data: basicData, error: basicError } = await supabase
-          .from('solicitacoes_credito')
-          .select('*')
-          .order('requested_at', { ascending: false });
-        
-        if (basicError) throw basicError;
-        return basicData as any[];
+      if (requestsError) throw requestsError;
+
+      // Busca perfis de todos os jogadores para mesclar (Admin tem permissão RLS para ler perfis)
+      const playerIds = Array.from(new Set(requestsData.map(r => r.player_id)));
+      const { data: profilesData, error: profilesError } = await supabase
+        .from('perfis')
+        .select('id, full_name, avatar_url')
+        .in('id', playerIds);
+
+      if (profilesError) {
+        console.error("Erro ao buscar perfis para solicitações:", profilesError);
+        return requestsData.map(req => ({ ...req, perfis: null }));
       }
-      return data as any[];
+
+      // Mescla os dados
+      return requestsData.map(req => ({
+        ...req,
+        perfis: profilesData.find(p => p.id === req.player_id) || null
+      })) as any[];
     },
     enabled: isAdmin,
-    staleTime: 1000 * 30, // 30 segundos de cache
   });
 
-  // Real-time
+  // Escuta mudanças em tempo real para invalidar o cache
   useEffect(() => {
     const channel = supabase.channel('schema-db-changes')
       .on('postgres_changes', { event: '*', schema: 'public' }, () => {
@@ -238,15 +250,20 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const resolveCreditRequest = async (requestId: string, status: 'approved' | 'rejected', creditsGranted?: number, notes?: string): Promise<boolean> => {
+    if (!profile || profile.role !== 'admin' || !user) return false;
+    
     const request = allCreditRequests.find(r => r.id === requestId);
     if (!request) return false;
+
     if (status === 'approved' && creditsGranted !== undefined) {
       await updatePlayerCredits(request.player_id, creditsGranted);
     }
+    
     await supabase.from('solicitacoes_credito').update({
       status, credits_granted: status === 'approved' ? creditsGranted : null,
-      resolved_at: new Date().toISOString(), resolved_by: user?.id, notes: notes || null,
+      resolved_at: new Date().toISOString(), resolved_by: user.id, notes: notes || null,
     }).eq('id', requestId);
+    
     return true;
   };
 
