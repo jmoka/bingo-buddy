@@ -3,7 +3,7 @@ import { Button } from './ui/button';
 import { Textarea } from './ui/textarea';
 import { generateBingoCard } from '@/contexts/GameContext';
 import { BINGO_RANGES } from '@/utils/bingoUtils';
-import { AlertCircle, Dices, Info } from 'lucide-react';
+import { AlertCircle, Dices, Info, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
@@ -114,6 +114,10 @@ export const CardCreator = ({ onCardChange }: CardCreatorProps) => {
     setSelectedNumbers(numbers);
   };
 
+  const handleClear = () => {
+    setSelectedNumbers(new Set());
+  };
+
   return (
     <div className="space-y-4">
         <Tabs defaultValue="manual" className="w-full">
@@ -145,6 +149,10 @@ export const CardCreator = ({ onCardChange }: CardCreatorProps) => {
                     rows={3}
                     className="bg-secondary border-0 font-mono text-sm"
                 />
+                <Button type="button" variant="outline" className="w-full" onClick={handleClear}>
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    Limpar Seleção
+                </Button>
             </TabsContent>
             <TabsContent value="auto" className="mt-4 space-y-4 text-center">
                  <div className="grid grid-cols-10 gap-1">
