@@ -530,6 +530,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const { data } = await supabase.from('cartelas_jogador').insert({ player_id: user.id, ...cardData, credit_type: creditType, uses_left: 1 }).select().single();
     queryClient.invalidateQueries({ queryKey: ['profile'] });
+    queryClient.invalidateQueries({ queryKey: ['playerCards', user?.id] });
     return data as PlayerCard;
   };
 
