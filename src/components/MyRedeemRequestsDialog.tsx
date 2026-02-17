@@ -6,10 +6,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { ScrollArea } from './ui/scroll-area';
-import { Coins, Calendar, Info, CheckCircle2, AlertCircle, Clock, Banknote, Download } from 'lucide-react';
+import { Coins, Calendar, Info, CheckCircle2, AlertCircle, Clock, Banknote, Download, RefreshCw } from 'lucide-react';
 import { RedeemRequest } from '@/types/match';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { RedeemResubmissionDialog } from './RedeemResubmissionDialog';
 
 interface MyRedeemRequestsDialogProps {
   children: React.ReactNode;
@@ -91,6 +92,17 @@ export const MyRedeemRequestsDialog = ({ children }: MyRedeemRequestsDialogProps
                 <div className={`p-3 rounded-lg text-xs flex gap-2 border ${req.status === 'rejected' ? 'bg-destructive/5 text-destructive border-destructive/10' : 'bg-success/5 text-success border-success/10'}`}>
                   <Info className="w-4 h-4 shrink-0" />
                   <span><strong>Nota do Admin:</strong> {req.notes}</span>
+                </div>
+              )}
+
+              {req.status === 'rejected' && (
+                <div className="mt-3 border-t pt-3">
+                  <RedeemResubmissionDialog request={req}>
+                    <Button variant="outline" size="sm" className="w-full">
+                      <RefreshCw className="w-4 h-4 mr-2" />
+                      Responder / Pedir Nova Revisão
+                    </Button>
+                  </RedeemResubmissionDialog>
                 </div>
               )}
             </div>

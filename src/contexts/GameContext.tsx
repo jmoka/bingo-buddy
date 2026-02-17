@@ -372,9 +372,19 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const { error } = await supabase.from('solicitacoes_resgate').update({
         status: 'pending', resubmission_notes: message, resolved_at: null, resolved_by: null, notes: null
     }).eq('id', requestId);
-    if (error) return false;
+
+    if (error) {
+        toast.error('Falha ao reenviar solicitação.', { description: error.message });
+        return false;
+    }
+
     await supabase.from('mensagens_resgate').insert({ redeem_request_id: requestId, sender_id: user.id, message });
+    
     queryClient.invalidateQueries({ queryKey: ['redeemRequests'] });
+    queryClient.invalidateQueries({ queryKey: ['rawRedeemRequests'] });
+
+    await supabase.functions.invoke('notify-n8n', { body: { event: 'REDEEM_RESUBMISSION', data: { requestId, userEmail: user.email, message } } });
+    
     return true;
   };
 
