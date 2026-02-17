@@ -226,11 +226,21 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const createMatch = async (data: any) => {
     const { error } = await supabase.from('partidas').insert([{ ...data, status: 'waiting' }]);
-    if (error) toast.error(error.message);
+    if (error) {
+      toast.error(error.message);
+    } else {
+      toast.success('Partida criada com sucesso!');
+      queryClient.invalidateQueries({ queryKey: ['matches'] });
+    }
   };
 
   const updateMatchStatus = async (matchId: string, status: MatchStatus) => {
-    await supabase.from('partidas').update({ status }).eq('id', matchId);
+    const { error } = await supabase.from('partidas').update({ status }).eq('id', matchId);
+    if (error) {
+      toast.error(error.message);
+    } else {
+      queryClient.invalidateQueries({ queryKey: ['matches'] });
+    }
   };
 
   const openMatch = (matchId: string) => updateMatchStatus(matchId, 'open');
@@ -252,7 +262,16 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const finishMatch = (matchId: string) => updateMatchStatus(matchId, 'finished');
-  const deleteMatch = async (matchId: string) => { await supabase.from('partidas').delete().eq('id', matchId); };
+  
+  const deleteMatch = async (matchId: string) => {
+    const { error } = await supabase.from('partidas').delete().eq('id', matchId);
+    if (error) {
+      toast.error(error.message);
+    } else {
+      toast.success('Partida excluída.');
+      queryClient.invalidateQueries({ queryKey: ['matches'] });
+    }
+  };
 
   const toggleAutoCall = async (matchId: string) => {
     const match = matches.find(m => m.id === matchId);
