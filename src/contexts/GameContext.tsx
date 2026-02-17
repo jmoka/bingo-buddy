@@ -520,15 +520,37 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const cost = gameSettings.custo_nova_cartela;
     const { creditType, ...cardData } = options;
 
+    // Debit credits first
     if (creditType === 'real') {
       if (profile.credits < cost) { toast.error('Créditos reais insuficientes.'); return null; }
-      await supabase.from('perfis').update({ credits: profile.credits - cost }).eq('id', user.id);
+      const { error: creditError } = await supabase.from('perfis').update({ credits: profile.credits - cost }).eq('id', user.id);
+      if (creditError) {
+        toast.error('Erro ao debitar créditos.', { description: creditError.message });
+        return null;
+      }
     } else {
       if (profile.fake_credits < cost) { toast.error('Créditos de brincar insuficientes.'); return null; }
-      await supabase.from('perfis').update({ fake_credits: profile.fake_credits - cost }).eq('id', user.id);
+      const { error: creditError } = await supabase.from('perfis').update({ fake_credits: profile.fake_credits - cost }).eq('id', user.id);
+      if (creditError) {
+        toast.error('Erro ao debitar créditos de brincar.', { description: creditError.message });
+        return null;
+      }
     }
 
-    const { data } = await supabase.from('cartelas_jogador').insert({ player_id: user.id, ...cardData, credit_type: creditType, uses_left: 1 }).select().single();
+    // Then insert the card
+    const { data, error: insertError } = await supabase.from('cartelas_jogador').insert({ player_id: user.id, ...cardData, credit_type: creditType, uses_left: 1 }).select().single();
+    
+    if (insertError) {
+      toast.error('Erro ao criar a cartela.', { description: insertError.message });
+      // Rollback credit deduction
+      if (creditType === 'real') {
+        await supabase.from('perfis').update({ credits: profile.credits }).eq('id', user.id);
+      } else {
+        await supabase.from('perfis').update({ fake_credits: profile.fake_credits }).eq('id', user.id);
+      }
+      return null;
+    }
+
     queryClient.invalidateQueries({ queryKey: ['profile'] });
     queryClient.invalidateQueries({ queryKey: ['playerCards', user?.id] });
     return data as PlayerCard;
