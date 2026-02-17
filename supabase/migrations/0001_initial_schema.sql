@@ -1,14 +1,22 @@
--- Drop existing objects in reverse order of dependency to avoid errors
-drop table if exists public.cartelas_partida;
-drop table if exists public.cartelas_jogador;
-drop table if exists public.partidas;
-drop trigger if exists on_auth_user_created on auth.users;
-drop function if exists public.handle_new_user;
-drop table if exists public.perfis;
-drop function if exists public.is_admin;
-drop type if exists public.user_role;
-drop type if exists public.prize_type;
-drop type if exists public.match_status;
+-- Drop existing objects with CASCADE to handle dependencies and both old/new names
+DROP TABLE IF EXISTS public.match_cards CASCADE;
+DROP TABLE IF EXISTS public.player_cards CASCADE;
+DROP TABLE IF EXISTS public.matches CASCADE;
+DROP TABLE IF EXISTS public.cartelas_partida CASCADE;
+DROP TABLE IF EXISTS public.cartelas_jogador CASCADE;
+DROP TABLE IF EXISTS public.partidas CASCADE;
+DROP TABLE IF EXISTS public.profiles CASCADE;
+DROP TABLE IF EXISTS public.perfis CASCADE;
+
+-- Drop trigger and functions
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+DROP FUNCTION IF EXISTS public.handle_new_user() CASCADE;
+DROP FUNCTION IF EXISTS public.is_admin() CASCADE;
+
+-- Drop types
+DROP TYPE IF EXISTS public.user_role CASCADE;
+DROP TYPE IF EXISTS public.prize_type CASCADE;
+DROP TYPE IF EXISTS public.match_status CASCADE;
 
 -- Recreate everything with Portuguese names and new admin logic
 
