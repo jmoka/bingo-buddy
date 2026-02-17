@@ -15,6 +15,7 @@ import { useToast } from '@/hooks/use-toast';
 import { CardCreator } from '@/components/CardCreator';
 import { BingoCell } from '@/components/BingoCell';
 import { Footer } from '@/components/Footer';
+import { Badge } from '@/components/ui/badge';
 
 const Lobby = () => {
   const navigate = useNavigate();
@@ -246,8 +247,13 @@ const Lobby = () => {
                 <div key={match.id} className={`card-container relative ${match.status === 'in_progress' ? 'ring-2 ring-accent' : ''}`}>
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
-                      <h3 className="font-heading font-bold text-lg text-foreground">{match.name}</h3>
-                      <div className="flex flex-wrap gap-x-3 gap-y-1 text-sm text-muted-foreground mt-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <h3 className="font-heading font-bold text-lg text-foreground">{match.name}</h3>
+                        {match.status === 'in_progress' && (
+                          <Badge variant="destructive" className="animate-pulse">AO VIVO</Badge>
+                        )}
+                      </div>
+                      <div className="flex flex-wrap gap-x-3 gap-y-1 text-sm text-muted-foreground">
                         <span className="flex items-center gap-1"><Trophy className="w-3.5 h-3.5" />{gameTypeLabels[match.game_type]}</span>
                         <span className="flex items-center gap-1"><Users className="w-3.5 h-3.5" />{playersInMatchCount}</span>
                         <span className="flex items-center gap-1"><Coins className="w-3.5 h-3.5" />Pote: {match.pot}</span>
