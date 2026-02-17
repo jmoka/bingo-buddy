@@ -7,18 +7,24 @@ import { ArrowLeft, Coins, Trophy, Users, Bot } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { playNotificationSound } from '@/utils/soundUtils';
+import { Footer } from '@/components/Footer';
 
 const MatchView = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { matches, currentPlayer, getPlayerMatchCards, gameSettings } = useGame();
+  const { matches, currentPlayer, getPlayerMatchCards } = useGame();
   const [lastCalledNumber, setLastCalledNumber] = useState<number | null>(null);
-  const [countdown, setCountdown] = useState<number | null>(null);
+  const [now, setNow] = useState(Date.now());
 
   const match = matches.find(m => m.id === id);
   const myCards = currentPlayer && id ? getPlayerMatchCards(id, currentPlayer.id) : [];
 
   const prevCalledNumbersRef = useRef<number[]>(match ? match.calledNumbers : []);
+
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     if (!match) return;
@@ -38,30 +44,6 @@ const MatchView = () => {
     prevCalledNumbersRef.current = currentNumbers;
   }, [match]);
 
-  // Countdown tick logic
-  useEffect(() => {
-    let interval: NodeJS.Timeout | undefined;
-
-    if (match?.isAutoCalling && match.status === 'in_progress') {
-      interval = setInterval(() => {
-        setCountdown(prev => (prev !== null && prev > 0 ? prev - 1 : 0));
-      }, 1000);
-    } else {
-      setCountdown(null);
-    }
-
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-  }, [match?.isAutoCalling, match?.status]);
-
-  // Reset countdown when a new number is called or auto-call starts
-  useEffect(() => {
-    if (match?.isAutoCalling && match.status === 'in_progress') {
-      setCountdown(gameSettings.autoCallIntervalSeconds);
-    }
-  }, [match?.calledNumbers.length, match?.isAutoCalling, match?.status, gameSettings.autoCallIntervalSeconds]);
-
   if (!match) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -74,9 +56,10 @@ const MatchView = () => {
   }
 
   const lastCalled = match.calledNumbers.length > 0 ? match.calledNumbers[match.calledNumbers.length - 1] : null;
+  const countdown = match.nextAutoCallTimestamp ? Math.max(0, Math.round((match.nextAutoCallTimestamp - now) / 1000)) : null;
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background flex flex-col">
       <header className="gradient-hero py-4 px-4">
         <div className="container max-w-6xl mx-auto">
           <div className="flex items-center justify-between">
@@ -102,10 +85,10 @@ const MatchView = () => {
         </div>
       </header>
 
-      <main className="container max-w-6xl mx-auto py-6 px-4">
+      <main className="container max-w-6xl mx-auto py-6 px-4 flex-grow">
         {match.isAutoCalling && (
           <div className="card-container mb-6 bg-accent/10 text-accent text-center p-4">
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-4">
+            <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2">
               <p className="font-medium text-sm flex items-center gap-2">
                 <Bot className="w-4 h-4" />
                 Sorteio automático ativado!
@@ -172,6 +155,7 @@ const MatchView = () => {
           </div>
         )}
       </main>
+      <Footer />
     </div>
   );
 };

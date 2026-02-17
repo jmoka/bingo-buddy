@@ -15,7 +15,7 @@ interface GameContextType {
   isAdmin: boolean;
   adminLogin: (password: string) => boolean;
   adminLogout: () => void;
-  createMatch: (match: Omit<Match, 'id' | 'status' | 'playerIds' | 'calledNumbers' | 'pot' | 'createdAt' | 'isAutoCalling'>) => Match;
+  createMatch: (match: Omit<Match, 'id' | 'status' | 'playerIds' | 'calledNumbers' | 'pot' | 'createdAt' | 'isAutoCalling' | 'nextAutoCallTimestamp' | 'winnerId'>) => Match;
   openMatch: (matchId: string) => void;
   startMatch: (matchId: string) => void;
   callNumber: (matchId: string, num: number) => void;
@@ -167,7 +167,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const adminLogout = useCallback(() => setIsAdmin(false), []);
   const updateGameSettings = useCallback((settings: GameSettings) => setGameSettings(settings), []);
 
-  const createMatch = useCallback((data: Omit<Match, 'id' | 'status' | 'playerIds' | 'calledNumbers' | 'pot' | 'createdAt' | 'isAutoCalling'>): Match => {
+  const createMatch = useCallback((data: Omit<Match, 'id' | 'status' | 'playerIds' | 'calledNumbers' | 'pot' | 'createdAt' | 'isAutoCalling' | 'nextAutoCallTimestamp' | 'winnerId'>): Match => {
     const match: Match = { ...data, id: generateId(), status: 'waiting', playerIds: [], calledNumbers: [], pot: 0, createdAt: new Date().toISOString(), isAutoCalling: false };
     setMatches(prev => [...prev, match]);
     return match;
@@ -176,22 +176,41 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const openMatch = useCallback((matchId: string) => setMatches(prev => prev.map(m => m.id === matchId ? { ...m, status: 'open' as MatchStatus } : m)), []);
   const startMatch = useCallback((matchId: string) => setMatches(prev => prev.map(m => m.id === matchId ? { ...m, status: 'in_progress' as MatchStatus } : m)), []);
   const finishMatch = useCallback((matchId: string) => {
-    setMatches(prev => prev.map(m => m.id === matchId ? { ...m, status: 'finished' as MatchStatus, isAutoCalling: false } : m));
+    setMatches(prev => prev.map(m => m.id === matchId ? { ...m, status: 'finished' as MatchStatus, isAutoCalling: false, nextAutoCallTimestamp: undefined } : m));
   }, []);
 
   const toggleAutoCall = useCallback((matchId: string) => {
-    setMatches(prev => prev.map(m => m.id === matchId ? { ...m, isAutoCalling: !m.isAutoCalling } : m));
-  }, []);
+    setMatches(prev => prev.map(m => {
+      if (m.id === matchId) {
+        const isEnabling = !m.isAutoCalling;
+        return { 
+          ...m, 
+          isAutoCalling: isEnabling,
+          nextAutoCallTimestamp: isEnabling ? Date.now() + gameSettings.autoCallIntervalSeconds * 1000 : undefined,
+        };
+      }
+      return m;
+    }));
+  }, [gameSettings.autoCallIntervalSeconds]);
   
   const callNumber = useCallback((matchId: string, num: number) => {
-    setMatches(prev => prev.map(m => m.id === matchId && !m.calledNumbers.includes(num) ? { ...m, calledNumbers: [...m.calledNumbers, num] } : m));
+    setMatches(prev => prev.map(m => {
+      if (m.id === matchId && !m.calledNumbers.includes(num)) {
+        return { 
+          ...m, 
+          calledNumbers: [...m.calledNumbers, num],
+          nextAutoCallTimestamp: m.isAutoCalling ? Date.now() + gameSettings.autoCallIntervalSeconds * 1000 : m.nextAutoCallTimestamp,
+        };
+      }
+      return m;
+    }));
     setMatchCards(prev => prev.map(card => {
       if (card.matchId !== matchId) return card;
       const newMarked = new Set(card.markedNumbers);
       if (card.numbers.flat().includes(num)) newMarked.add(num);
       return { ...card, markedNumbers: newMarked };
     }));
-  }, []);
+  }, [gameSettings.autoCallIntervalSeconds]);
 
   const deleteMatch = useCallback((matchId: string) => {
     setMatches(prev => prev.filter(m => m.id !== matchId));

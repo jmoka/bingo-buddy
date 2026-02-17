@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useGame } from '@/contexts/GameContext';
 import { Button } from '@/components/ui/button';
@@ -15,6 +15,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { useToast } from '@/hooks/use-toast';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
+import { Footer } from '@/components/Footer';
 
 const statusLabels: Record<MatchStatus, string> = {
   waiting: 'Aguardando',
@@ -52,56 +53,43 @@ const Admin = () => {
   });
   const [settingsForm, setSettingsForm] = useState(gameSettings);
   const [callerInput, setCallerInput] = useState<Record<string, string>>({});
-  const [countdown, setCountdown] = useState<Record<string, number>>({});
+  const [now, setNow] = useState(Date.now());
+  const processingRef = useRef(new Set());
 
   useEffect(() => {
     setSettingsForm(gameSettings);
   }, [gameSettings]);
 
-  // Auto-call and countdown logic
+  // Effect for re-rendering to update countdowns
   useEffect(() => {
-    const intervals = new Map<string, NodeJS.Timeout>();
-    const countdownIntervals = new Map<string, NodeJS.Timeout>();
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
 
+  // Effect for auto-calling numbers
+  useEffect(() => {
     matches.forEach(match => {
-      if (match.isAutoCalling && match.status === 'in_progress') {
-        // Main auto-call interval
-        const intervalId = setInterval(() => {
-          const availableNumbers = Array.from({ length: 75 }, (_, i) => i + 1)
-            .filter(num => !match.calledNumbers.includes(num));
+      if (match.isAutoCalling && match.status === 'in_progress' && match.nextAutoCallTimestamp && now >= match.nextAutoCallTimestamp) {
+        if (processingRef.current.has(match.id)) return; // Already processing this call
 
-          if (availableNumbers.length > 0) {
-            const randomIndex = Math.floor(Math.random() * availableNumbers.length);
-            const newNumber = availableNumbers[randomIndex];
-            callNumber(match.id, newNumber);
-          } else {
-            toggleAutoCall(match.id);
-          }
-        }, gameSettings.autoCallIntervalSeconds * 1000);
-        intervals.set(match.id, intervalId);
+        processingRef.current.add(match.id);
 
-        // Countdown interval
-        if (!countdown[match.id]) {
-          setCountdown(prev => ({ ...prev, [match.id]: gameSettings.autoCallIntervalSeconds }));
+        const availableNumbers = Array.from({ length: 75 }, (_, i) => i + 1)
+          .filter(num => !match.calledNumbers.includes(num));
+
+        if (availableNumbers.length > 0) {
+          const randomIndex = Math.floor(Math.random() * availableNumbers.length);
+          const newNumber = availableNumbers[randomIndex];
+          callNumber(match.id, newNumber);
+        } else {
+          toggleAutoCall(match.id); // No more numbers, stop auto-calling
         }
-        const countdownId = setInterval(() => {
-          setCountdown(prev => {
-            const current = prev[match.id] || 0;
-            if (current <= 1) {
-              return { ...prev, [match.id]: gameSettings.autoCallIntervalSeconds };
-            }
-            return { ...prev, [match.id]: current - 1 };
-          });
-        }, 1000);
-        countdownIntervals.set(match.id, countdownId);
+
+        // Prevent race conditions
+        setTimeout(() => processingRef.current.delete(match.id), 500);
       }
     });
-
-    return () => {
-      intervals.forEach(id => clearInterval(id));
-      countdownIntervals.forEach(id => clearInterval(id));
-    };
-  }, [matches, gameSettings.autoCallIntervalSeconds, callNumber, toggleAutoCall, countdown]);
+  }, [now, matches, callNumber, toggleAutoCall]);
 
   if (!isAdmin) {
     navigate('/admin/login');
@@ -146,7 +134,7 @@ const Admin = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background flex flex-col">
       <header className="gradient-hero py-6 px-4">
         <div className="container max-w-6xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -169,7 +157,7 @@ const Admin = () => {
         </div>
       </header>
 
-      <main className="container max-w-6xl mx-auto py-8 px-4">
+      <main className="container max-w-6xl mx-auto py-8 px-4 flex-grow">
         {/* General Settings */}
         <div className="card-container mb-8">
           <h2 className="font-heading text-xl font-bold text-foreground mb-4 flex items-center gap-2">
@@ -287,6 +275,8 @@ const Admin = () => {
           <div className="space-y-4">
             {matches.map(match => {
               const matchCards = getMatchCards(match.id);
+              const countdown = match.nextAutoCallTimestamp ? Math.round((match.nextAutoCallTimestamp - now) / 1000) : 0;
+
               return (
                 <div key={match.id} className="card-container">
                   <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
@@ -357,8 +347,8 @@ const Admin = () => {
                           />
                           <Label htmlFor={`auto-call-${match.id}`} className="flex items-center gap-1">
                             <Bot className="w-4 h-4" /> Sorteio Automático
-                            {match.isAutoCalling && countdown[match.id] && (
-                              <span className="ml-2 text-xs font-mono text-muted-foreground">(Próximo em {countdown[match.id]}s)</span>
+                            {match.isAutoCalling && countdown > 0 && (
+                              <span className="ml-2 text-xs font-mono text-muted-foreground">(Próximo em {countdown}s)</span>
                             )}
                           </Label>
                         </div>
@@ -381,6 +371,7 @@ const Admin = () => {
           </div>
         )}
       </main>
+      <Footer />
     </div>
   );
 };

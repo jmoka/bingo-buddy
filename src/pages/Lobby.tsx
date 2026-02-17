@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { useToast } from '@/hooks/use-toast';
 import { CardCreator } from '@/components/CardCreator';
 import { BingoCell } from '@/components/BingoCell';
+import { Footer } from '@/components/Footer';
 
 const Lobby = () => {
   const navigate = useNavigate();
@@ -119,7 +120,7 @@ const Lobby = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background flex flex-col">
       <header className="gradient-hero py-6 px-4">
         <div className="container max-w-6xl mx-auto flex items-center justify-between">
           <div>
@@ -148,7 +149,7 @@ const Lobby = () => {
         </div>
       </header>
 
-      <main className="container max-w-6xl mx-auto py-8 px-4">
+      <main className="container max-w-6xl mx-auto py-8 px-4 flex-grow">
         {/* My Cards */}
         <div className="mb-8">
           <div className="flex items-center justify-between mb-4">
@@ -282,6 +283,7 @@ const Lobby = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <Footer />
     </div>
   );
 };
