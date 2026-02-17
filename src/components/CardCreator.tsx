@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Button } from './ui/button';
 import { Textarea } from './ui/textarea';
 import { generateBingoCard } from '@/utils/bingoUtils';
-import { AlertCircle, Info, Trash2 } from 'lucide-react';
+import { AlertCircle, Info, Trash2, Shuffle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
@@ -98,7 +98,7 @@ export const CardCreator = ({ onCardChange }: CardCreatorProps) => {
         <Tabs defaultValue="manual" className="w-full">
             <TabsList className="grid w-full grid-cols-2">
                 <TabsTrigger value="manual">Manual</TabsTrigger>
-                <TabsTrigger value="auto" onClick={handleRandomize}>Aleatório</TabsTrigger>
+                <TabsTrigger value="auto">Aleatório</TabsTrigger>
             </TabsList>
             <TabsContent value="manual" className="mt-4 space-y-4">
                 <div className="grid grid-cols-10 gap-1">
@@ -151,6 +151,10 @@ export const CardCreator = ({ onCardChange }: CardCreatorProps) => {
                     rows={3}
                     className="bg-secondary border-0 font-mono text-sm"
                 />
+                <Button type="button" variant="outline" className="w-full" onClick={handleRandomize}>
+                    <Shuffle className="w-4 h-4 mr-2" />
+                    Gerar Cartela Aleatória
+                </Button>
             </TabsContent>
         </Tabs>
 
