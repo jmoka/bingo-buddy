@@ -266,7 +266,20 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
 
     if (notifyError) {
-      toast.error(`Erro ao notificar o admin: ${notifyError.message}`);
+      let detailedError = notifyError.message;
+      // Check if context exists and has a json method (for FunctionsHttpError)
+      if ('context' in notifyError && typeof notifyError.context.json === 'function') {
+        try {
+          const errorJson = await notifyError.context.json();
+          if (errorJson.error) {
+            detailedError = errorJson.error;
+          }
+        } catch (e) {
+          // Ignore if parsing fails, stick with the original message
+          console.error("Failed to parse edge function error response:", e);
+        }
+      }
+      toast.error(`Erro ao notificar o admin: ${detailedError}`);
       return false;
     }
 
