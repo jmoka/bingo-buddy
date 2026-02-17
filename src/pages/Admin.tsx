@@ -185,23 +185,9 @@ const Admin = () => {
   const handleTestN8n = async () => {
     setIsTestingN8n(true);
 
-    const { data: { session } } = await supabase.auth.getSession();
-
-    if (!session) {
-      toast({
-        title: 'Falha na Autenticação',
-        description: 'Sua sessão expirou. Por favor, faça login novamente.',
-        variant: 'destructive',
-      });
-      setIsTestingN8n(false);
-      return;
-    }
-
-    const { data, error } = await supabase.functions.invoke('test-n8n', {
-      headers: {
-        'Authorization': `Bearer ${session.access_token}`,
-      }
-    });
+    // O cliente supabase injeta o token de autenticação automaticamente.
+    // Não é necessário fazer getSession() ou passar o header manualmente.
+    const { data, error } = await supabase.functions.invoke('test-n8n');
 
     if (error) {
       let detailedError = error.message;
