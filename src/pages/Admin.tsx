@@ -61,6 +61,7 @@ const Admin = () => {
     custo_recarga_cartela: 5,
     usos_por_recarga: 1,
     intervalo_sorteio_auto_seg: 120,
+    valor_por_credito: 1.00,
     n8n_test_url: '',
     n8n_prod_url: '',
     n8n_env: 'test',
@@ -85,6 +86,7 @@ const Admin = () => {
         custo_recarga_cartela: gameSettings.custo_recarga_cartela,
         usos_por_recarga: gameSettings.usos_por_recarga,
         intervalo_sorteio_auto_seg: gameSettings.intervalo_sorteio_auto_seg,
+        valor_por_credito: gameSettings.valor_por_credito || 1.00,
         n8n_test_url: gameSettings.n8n_test_url || '',
         n8n_prod_url: gameSettings.n8n_prod_url || '',
         n8n_env: gameSettings.n8n_env || 'test',
@@ -179,6 +181,7 @@ const Admin = () => {
       custo_recarga_cartela: parseInt(currentSettings.custo_recarga_cartela as any, 10),
       usos_por_recarga: parseInt(currentSettings.usos_por_recarga as any, 10),
       intervalo_sorteio_auto_seg: parseInt(currentSettings.intervalo_sorteio_auto_seg as any, 10),
+      valor_por_credito: parseFloat(currentSettings.valor_por_credito as any),
     });
   };
 
@@ -246,6 +249,10 @@ const Admin = () => {
             <div className="mt-6 pt-4 border-t">
               <h3 className="font-heading text-lg font-bold text-foreground mb-4 flex items-center gap-2"><Key className="w-5 h-5" /> Solicitação de Créditos (PIX)</h3>
               <div className="space-y-4">
+                <div>
+                  <Label htmlFor="valor_por_credito">Valor por Crédito (R$)</Label>
+                  <Input id="valor_por_credito" name="valor_por_credito" type="number" step="0.01" value={currentSettings.valor_por_credito} onChange={handleSettingsChange} />
+                </div>
                 <div>
                   <Label htmlFor="pix_key">Chave PIX</Label>
                   <Input id="pix_key" name="pix_key" type="text" placeholder="Sua chave PIX (e.g., CPF, email, telefone)" value={currentSettings.pix_key} onChange={handleSettingsChange} />

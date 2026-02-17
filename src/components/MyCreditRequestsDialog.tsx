@@ -32,16 +32,19 @@ export const MyCreditRequestsDialog = ({ children }: MyCreditRequestsDialogProps
               <p className="text-center text-muted-foreground py-8">Você ainda não fez nenhuma solicitação.</p>
             ) : (
               creditRequests.map(req => (
-                <div key={req.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+                <div key={req.id} className="flex items-start justify-between p-3 rounded-lg bg-muted/50">
                   <div>
-                    <p className="font-semibold" title={format(new Date(req.requested_at), "dd/MM/yy 'às' HH:mm", { locale: ptBR })}>
+                    <p className="font-semibold">
+                      {req.credits_requested ? `${req.credits_requested} créditos` : `Solicitação`}
+                    </p>
+                    <p className="text-xs text-muted-foreground" title={format(new Date(req.requested_at), "dd/MM/yy 'às' HH:mm", { locale: ptBR })}>
                       {formatDistanceToNow(new Date(req.requested_at), { addSuffix: true, locale: ptBR })}
                     </p>
                     {req.status === 'approved' && req.credits_granted && (
-                      <p className="text-sm text-success">+{req.credits_granted} créditos</p>
+                      <p className="text-sm text-success font-medium mt-1">+{req.credits_granted} créditos recebidos</p>
                     )}
-                    {req.status === 'rejected' && (
-                      <p className="text-sm text-destructive">Rejeitada</p>
+                     {req.status === 'rejected' && (
+                      <p className="text-sm text-destructive mt-1">Rejeitada</p>
                     )}
                   </div>
                   <Badge className={statusConfig[req.status].color}>{statusConfig[req.status].label}</Badge>

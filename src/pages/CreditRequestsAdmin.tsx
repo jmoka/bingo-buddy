@@ -42,7 +42,7 @@ const CreditRequestsAdmin = () => {
   const handleOpenDialog = (request: CreditRequest, type: 'approve' | 'reject') => {
     setSelectedRequest(request);
     setActionType(type);
-    setCreditsToGrant(0);
+    setCreditsToGrant(request.credits_requested || 0);
     setRejectionNotes('');
     setIsResolveDialogOpen(true);
   };
@@ -103,6 +103,7 @@ const CreditRequestsAdmin = () => {
                   <TableRow>
                     <TableHead>Jogador</TableHead>
                     <TableHead>Data</TableHead>
+                    <TableHead>Valor Solicitado</TableHead>
                     <TableHead className="text-center">Comprovante</TableHead>
                     <TableHead className="text-right">Ações</TableHead>
                   </TableRow>
@@ -118,6 +119,10 @@ const CreditRequestsAdmin = () => {
                       </TableCell>
                       <TableCell title={format(new Date(req.requested_at), "dd/MM/yy 'às' HH:mm", { locale: ptBR })}>
                         {formatDistanceToNow(new Date(req.requested_at), { addSuffix: true, locale: ptBR })}
+                      </TableCell>
+                      <TableCell>
+                        <div className="font-medium">{req.credits_requested} créditos</div>
+                        <div className="text-xs text-muted-foreground">R$ {req.amount_paid?.toFixed(2).replace('.', ',')}</div>
                       </TableCell>
                       <TableCell className="text-center">
                         <Button variant="outline" size="sm" onClick={() => handleDownloadReceipt(req.receipt_url)}>

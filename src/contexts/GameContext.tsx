@@ -19,6 +19,7 @@ export interface GameSettings {
   n8n_env?: 'test' | 'production';
   pix_key?: string;
   credit_request_text?: string;
+  valor_por_credito: number;
 }
 
 interface GameContextType {
@@ -46,7 +47,7 @@ interface GameContextType {
   toggleArchivePlayerCard: (cardId: string, archive: boolean) => Promise<void>;
   joinMatch: (matchId: string, playerCardIds: string[]) => Promise<MatchCard[] | null>;
   buyCardUses: (playerCardId: string) => Promise<boolean>;
-  requestCredits: (file: File) => Promise<boolean>;
+  requestCredits: (file: File, creditsRequested: number, amountPaid: number) => Promise<boolean>;
   resolveCreditRequest: (requestId: string, status: 'approved' | 'rejected', creditsGranted?: number, notes?: string) => Promise<boolean>;
   updatePlayerCredits: (playerId: string, amount: number) => Promise<void>;
   getMatchCards: (matchId: string) => MatchCard[];
@@ -161,6 +162,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
           custo_recarga_cartela: 5,
           usos_por_recarga: 1,
           intervalo_sorteio_auto_seg: 120,
+          valor_por_credito: 1,
         } as GameSettings;
       }
       return data as GameSettings;
@@ -249,7 +251,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const requestCredits = async (file: File): Promise<boolean> => {
+  const requestCredits = async (file: File, creditsRequested: number, amountPaid: number): Promise<boolean> => {
     if (!user || !profile) {
       toast.error("Você precisa estar logado para solicitar créditos.");
       return false;
@@ -270,7 +272,13 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const { data: newRequest, error: insertError } = await supabase
       .from('solicitacoes_credito')
-      .insert({ player_id: user.id, receipt_url: filePath, status: 'pending' })
+      .insert({ 
+        player_id: user.id, 
+        receipt_url: filePath, 
+        status: 'pending',
+        credits_requested: creditsRequested,
+        amount_paid: amountPaid,
+      })
       .select()
       .single();
 
@@ -288,6 +296,8 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
           userName: profile.full_name || 'Não definido',
           userEmail: user.email,
           userId: user.id,
+          creditsRequested,
+          amountPaid,
         }
       }
     });

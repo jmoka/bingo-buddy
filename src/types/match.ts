@@ -72,6 +72,8 @@ export interface CreditRequest {
   status: 'pending' | 'approved' | 'rejected';
   receipt_url: string;
   credits_granted: number | null;
+  credits_requested: number | null;
+  amount_paid: number | null;
   requested_at: string;
   resolved_at: string | null;
   resolved_by: string | null;

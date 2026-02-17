@@ -7,7 +7,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { GameSettings } from '@/contexts/GameContext';
 import { QRCodeSVG as QRCode } from 'qrcode.react';
 import { toast } from 'sonner';
-import { Copy, Upload, Loader2 } from 'lucide-react';
+import { Copy, Upload, Loader2, Minus, Plus, Coins } from 'lucide-react';
+import { qrCodePix } from 'qrcode-pix';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface CreditRequestDialogProps {
   gameSettings: GameSettings | undefined;
@@ -16,14 +18,28 @@ interface CreditRequestDialogProps {
 
 export const CreditRequestDialog = ({ gameSettings, children }: CreditRequestDialogProps) => {
   const { requestCredits } = useGame();
+  const { profile } = useAuth();
   const [file, setFile] = useState<File | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
+  const [credits, setCredits] = useState(10);
+
+  const amount = credits * (gameSettings?.valor_por_credito || 1);
+
+  const pixPayload = gameSettings?.pix_key && profile ? qrCodePix({
+    version: '01',
+    key: gameSettings.pix_key,
+    name: 'Bingo App',
+    city: 'WEB',
+    transactionId: `BINGO${profile.id.substring(0, 8)}${Date.now()}`.slice(0, 25),
+    message: `Créditos para o Bingo`,
+    value: parseFloat(amount.toFixed(2)),
+  }).payload() : '';
 
   const handleCopyToClipboard = () => {
-    if (gameSettings?.pix_key) {
-      navigator.clipboard.writeText(gameSettings.pix_key);
-      toast.success('Chave PIX copiada!');
+    if (pixPayload) {
+      navigator.clipboard.writeText(pixPayload);
+      toast.success('PIX Copia e Cola copiado!');
     }
   };
 
@@ -34,7 +50,7 @@ export const CreditRequestDialog = ({ gameSettings, children }: CreditRequestDia
     }
     setIsLoading(true);
     try {
-      const success = await requestCredits(file);
+      const success = await requestCredits(file, credits, amount);
       if (success) {
         toast.success('Solicitação enviada!', {
           description: 'O administrador foi notificado. Aguarde a liberação dos seus créditos.',
@@ -57,13 +73,36 @@ export const CreditRequestDialog = ({ gameSettings, children }: CreditRequestDia
         {gameSettings?.pix_key ? (
           <div className="space-y-4 pt-4 text-center">
             <p className="text-sm text-muted-foreground whitespace-pre-wrap">
-              {gameSettings.credit_request_text || 'Faça um PIX para a chave abaixo e anexe o comprovante para receber seus créditos.'}
+              {gameSettings.credit_request_text || 'Escolha a quantidade de créditos, faça o PIX e anexe o comprovante.'}
             </p>
-            <div className="p-4 bg-muted rounded-lg inline-block">
-              <QRCode value={gameSettings.pix_key} size={160} />
+            
+            <div className="p-4 bg-muted rounded-lg space-y-3">
+              <Label htmlFor="credits-input">Quantidade de Créditos</Label>
+              <div className="flex items-center justify-center gap-2">
+                <Button size="icon" variant="outline" onClick={() => setCredits(c => Math.max(1, c - 10))}>
+                  <Minus className="w-4 h-4" />
+                </Button>
+                <Input
+                  id="credits-input"
+                  type="number"
+                  className="w-24 text-center text-lg font-bold"
+                  value={credits}
+                  onChange={(e) => setCredits(parseInt(e.target.value, 10) || 1)}
+                />
+                <Button size="icon" variant="outline" onClick={() => setCredits(c => c + 10)}>
+                  <Plus className="w-4 h-4" />
+                </Button>
+              </div>
+              <div className="font-heading text-2xl font-bold text-primary">
+                Total: R$ {amount.toFixed(2).replace('.', ',')}
+              </div>
+            </div>
+
+            <div className="p-4 bg-white rounded-lg inline-block">
+              <QRCode value={pixPayload} size={160} />
             </div>
             <div className="relative">
-              <Input value={gameSettings.pix_key} readOnly className="pr-10 text-center font-mono" />
+              <Input value="Clique para copiar o PIX" readOnly className="pr-10 text-center cursor-pointer" onClick={handleCopyToClipboard} />
               <Button
                 size="icon"
                 variant="ghost"
