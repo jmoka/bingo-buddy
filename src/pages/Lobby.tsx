@@ -274,6 +274,7 @@ const Lobby = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {activeCards.map(card => {
                 const activeMatchCard = matchCards.find(mc => mc.player_card_id === card.id && activeMatchIds.has(mc.match_id));
+                const matchForCard = activeMatchCard ? matches.find(m => m.id === activeMatchCard.match_id) : null;
                 const markedNumbers = activeMatchCard ? activeMatchCard.marked_numbers : new Set<number>();
                 const winCount = wins.filter(w => w.player_card_id === card.id).length;
                 return (
@@ -304,6 +305,15 @@ const Lobby = () => {
                         </AlertDialog>
                       </div>
                     </div>
+                    {matchForCard && (
+                      <div className="mb-2 p-2 rounded-lg bg-accent/10 text-accent text-xs font-semibold flex items-center gap-2">
+                        <Tv className="w-4 h-4" />
+                        <div className="flex flex-col">
+                          <span>Em jogo na partida:</span>
+                          <span className="font-bold">{matchForCard.name}</span>
+                        </div>
+                      </div>
+                    )}
                     <div className="grid grid-cols-5 gap-1">
                       {card.numbers.flat().map((num, i) => (
                         <BingoCell key={i} number={num} isMarked={markedNumbers.has(num)} isFreeSpace={i === 12} />
