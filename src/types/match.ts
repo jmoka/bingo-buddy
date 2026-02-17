@@ -2,6 +2,7 @@ import { GameType } from './bingo';
 
 export type MatchStatus = 'waiting' | 'open' | 'in_progress' | 'finished';
 export type PrizeType = 'product' | 'fixed' | 'percentage';
+export type CreditType = 'real' | 'fake';
 
 export interface Prize {
   type: PrizeType;
@@ -42,6 +43,7 @@ export interface PlayerCard {
   numbers: number[][];
   uses_left: number;
   is_archived: boolean;
+  credit_type: CreditType;
 }
 
 export interface MatchCard {

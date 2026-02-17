@@ -4,12 +4,12 @@ import { useGame } from '@/contexts/GameContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Match, MatchStatus } from '@/types/match';
+import { Match, MatchStatus, CreditType } from '@/types/match';
 import { gameTypeLabels } from '@/utils/bingoUtils';
 import { 
   LogOut, Coins, Plus, Trophy, Users, Settings, Wallet, 
   CreditCard, Timer, DoorOpen, Ticket, Zap, ZapOff, Tv, Printer, Bot, User as UserIcon,
-  Volume2, VolumeX, Trash2, Archive, ArchiveRestore, History, Banknote
+  Volume2, VolumeX, Trash2, Archive, ArchiveRestore, History, Banknote, RefreshCw, Star
 } from 'lucide-react';
 import { 
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose, DialogDescription
@@ -31,12 +31,12 @@ import { BingoCell } from '@/components/BingoCell';
 import { Footer } from '@/components/Footer';
 import { Badge } from '@/components/ui/badge';
 import { playNotificationSound } from '@/utils/soundUtils';
-import { format } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
 import { CreditRequestDialog } from '@/components/CreditRequestDialog';
 import { MyCreditRequestsDialog } from '@/components/MyCreditRequestsDialog';
 import { RedeemRequestDialog } from '@/components/RedeemRequestDialog';
 import { MyRedeemRequestsDialog } from '@/components/MyRedeemRequestsDialog';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Label } from '@/components/ui/label';
 
 const Lobby = () => {
   const navigate = useNavigate();
@@ -45,17 +45,17 @@ const Lobby = () => {
     matches, joinMatch, getPlayerMatchCards, playerCards, 
     buyCardUses, createPlayerCard, deletePlayerCard,
     toggleArchivePlayerCard, matchCards, gameSettings, wins,
-    redeemRequests
+    redeemRequests, renewFakeCredits
   } = useGame();
 
   const [now, setNow] = useState(Date.now());
   const [isSoundOn, setIsSoundOn] = useState(true);
-  const [showArchived, setShowArchived] = useState(false);
   const prevMatchesRef = useRef<Match[]>([]);
 
   const [isCreateCardOpen, setCreateCardOpen] = useState(false);
   const [newCardName, setNewCardName] = useState('');
   const [newCardNumbers, setNewCardNumbers] = useState<number[][] | null>(null);
+  const [newCardCreditType, setNewCardCreditType] = useState<CreditType>('real');
 
   const [isJoinDialogOpen, setJoinDialogOpen] = useState(false);
   const [selectedMatch, setSelectedMatch] = useState<Match | null>(null);
@@ -69,7 +69,6 @@ const Lobby = () => {
 
   const myOwnedCards = profile ? playerCards.filter(c => c.player_id === profile.id) : [];
   const activeCards = myOwnedCards.filter(c => !c.is_archived);
-  const archivedCards = myOwnedCards.filter(c => c.is_archived);
 
   useEffect(() => {
     const interval = setInterval(() => setNow(Date.now()), 1000);
@@ -110,7 +109,7 @@ const Lobby = () => {
 
   const handleCreateCard = async () => {
     if (!newCardName.trim() || !newCardNumbers) return;
-    const card = await createPlayerCard({ name: newCardName, numbers: newCardNumbers });
+    const card = await createPlayerCard({ name: newCardName, numbers: newCardNumbers, creditType: newCardCreditType });
     if (card) {
       toast.success('Cartela criada!', { description: `A cartela "${card.name}" foi adicionada à sua coleção.` });
       setCreateCardOpen(false);
@@ -135,20 +134,11 @@ const Lobby = () => {
     }
   };
 
-  const handleBuyUses = async (cardId: string) => {
-    const success = await buyCardUses(cardId);
+  const handleBuyUses = async (cardId: string, creditType: CreditType) => {
+    const success = await buyCardUses(cardId, creditType);
     if (success) {
       toast.success('Cartela Recarregada!', { description: `Você comprou mais usos para sua cartela.` });
     }
-  };
-
-  const getCountdown = (startTime: string) => {
-    const diff = new Date(startTime).getTime() - now;
-    if (diff <= 0) return 'Iniciando...';
-    const h = Math.floor(diff / 3600000);
-    const m = Math.floor((diff % 3600000) / 60000);
-    const s = Math.floor((diff % 60000) / 1000);
-    return `${h > 0 ? `${h}h ` : ''}${m > 0 ? `${m}m ` : ''}${s}s`;
   };
 
   const sortedMatches = [...matches].sort((a, b) => {
@@ -175,9 +165,16 @@ const Lobby = () => {
             <p className="text-primary-foreground/70 text-[10px] md:text-xs">Olá, {profile.full_name || 'Jogador'}!</p>
           </div>
           <div className="flex items-center gap-1 sm:gap-2">
-            <div className="flex items-center gap-1 bg-primary-foreground/10 rounded-full px-3 py-1.5 md:px-4 md:py-2">
-              <Wallet className="w-3.5 h-3.5 text-primary-foreground" />
-              <span className="font-heading font-bold text-sm md:text-base text-primary-foreground">{profile.credits}</span>
+            <div className="flex items-center gap-2 bg-primary-foreground/10 rounded-full px-3 py-1.5 md:px-4 md:py-2">
+              <div className="flex items-center gap-1" title="Créditos Reais">
+                <Wallet className="w-3.5 h-3.5 text-primary-foreground" />
+                <span className="font-heading font-bold text-sm md:text-base text-primary-foreground">{profile.credits}</span>
+              </div>
+              <div className="border-l border-primary-foreground/20 h-4"></div>
+              <div className="flex items-center gap-1" title="Créditos de Brincar">
+                <Star className="w-3.5 h-3.5 text-amber-300" />
+                <span className="font-heading font-bold text-sm md:text-base text-primary-foreground">{profile.fake_credits}</span>
+              </div>
             </div>
             
             <div className="flex items-center gap-1">
@@ -186,12 +183,6 @@ const Lobby = () => {
                     <Plus className="w-3.5 h-3.5 mr-1" />Créditos
                 </Button>
                 </CreditRequestDialog>
-                
-                <RedeemRequestDialog>
-                    <Button size="sm" variant="ghost" className="text-primary-foreground h-8 px-2 md:h-9 md:px-3 text-xs md:text-sm">
-                        <Banknote className="w-3.5 h-3.5 mr-1" />Resgatar
-                    </Button>
-                </RedeemRequestDialog>
             </div>
 
             <Button size="icon" variant="ghost" className="text-primary-foreground h-8 w-8" onClick={() => navigate('/account')}><UserIcon className="w-4 h-4" /></Button>
@@ -232,6 +223,9 @@ const Lobby = () => {
              <Button variant="outline" size="sm" className="rounded-full bg-card whitespace-nowrap text-xs md:text-sm" onClick={() => navigate('/print')} disabled={myOwnedCards.length === 0}>
                 <Printer className="w-4 h-4 mr-2" /> Imprimir Cartelas
             </Button>
+            <Button variant="outline" size="sm" className="rounded-full bg-card whitespace-nowrap text-xs md:text-sm" onClick={renewFakeCredits}>
+                <RefreshCw className="w-4 h-4 mr-2" /> Renovar Brincar
+            </Button>
         </div>
 
         <div className="mb-8">
@@ -242,11 +236,27 @@ const Lobby = () => {
                 <DialogContent className="max-w-xl">
                     <DialogHeader>
                     <DialogTitle className="font-heading">Criar Nova Cartela</DialogTitle>
-                    <DialogDescription>Escolha os números manualmente ou gere uma cartela aleatória.</DialogDescription>
+                    <DialogDescription>Escolha os números e o tipo de crédito para usar.</DialogDescription>
                     </DialogHeader>
                     <div className="space-y-4 pt-4">
-                    <Input placeholder="Nome da cartela (ex: Sorte Pura)" value={newCardName} onChange={e => setNewCardName(e.target.value)} className="bg-secondary border-0" />
-                    <CardCreator onCardChange={setNewCardNumbers} />
+                      <RadioGroup value={newCardCreditType} onValueChange={(v: CreditType) => setNewCardCreditType(v)} className="grid grid-cols-2 gap-4">
+                        <div>
+                          <RadioGroupItem value="real" id="real" className="peer sr-only" />
+                          <Label htmlFor="real" className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary">
+                            Créditos Reais
+                            <span className="font-bold text-lg">{profile.credits}</span>
+                          </Label>
+                        </div>
+                        <div>
+                          <RadioGroupItem value="fake" id="fake" className="peer sr-only" />
+                          <Label htmlFor="fake" className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary">
+                            De Brincar
+                            <span className="font-bold text-lg">{profile.fake_credits}</span>
+                          </Label>
+                        </div>
+                      </RadioGroup>
+                      <Input placeholder="Nome da cartela (ex: Sorte Pura)" value={newCardName} onChange={e => setNewCardName(e.target.value)} className="bg-secondary border-0" />
+                      <CardCreator onCardChange={setNewCardNumbers} />
                     </div>
                     <DialogFooter>
                     <DialogClose asChild><Button variant="ghost">Cancelar</Button></DialogClose>
@@ -255,8 +265,8 @@ const Lobby = () => {
                 </DialogContent>
             </Dialog>
           </div>
-          {activeCards.length === 0 && !showArchived ? (
-            <div className="card-container text-center py-8"><p className="text-sm text-muted-foreground">Você não tem cartelas ativas. Crie uma ou restaure uma arquivada.</p></div>
+          {activeCards.length === 0 ? (
+            <div className="card-container text-center py-8"><p className="text-sm text-muted-foreground">Você não tem cartelas ativas. Crie uma para começar!</p></div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {activeCards.map(card => {
@@ -269,6 +279,11 @@ const Lobby = () => {
                       <div>
                         <div className="flex items-center gap-2">
                           <h3 className="font-heading font-semibold text-sm md:text-base text-foreground">{card.name}</h3>
+                          {card.credit_type === 'fake' ? (
+                            <Badge variant="outline" className="border-amber-500/50 text-amber-600">Brincar</Badge>
+                          ) : (
+                            <Badge variant="outline" className="border-primary/50 text-primary">Real</Badge>
+                          )}
                           {winCount > 0 && <div className="flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-amber-400/20 text-amber-600"><Trophy className="w-3 h-3" /><span>{winCount}x</span></div>}
                         </div>
                         <p className="text-[10px] text-muted-foreground font-mono">ID: ...{card.id.slice(-6).toUpperCase()}</p>
@@ -278,7 +293,7 @@ const Lobby = () => {
                           {card.uses_left > 0 ? <Zap className="w-3 h-3" /> : <ZapOff className="w-3 h-3" />}
                           <span>{card.uses_left} uso(s)</span>
                         </div>
-                        {card.uses_left === 0 && <Button size="sm" variant="outline" className="h-7 text-[10px]" onClick={() => handleBuyUses(card.id)}>Recarregar <Coins className="w-3 h-3 ml-1" /></Button>}
+                        {card.uses_left === 0 && <Button size="sm" variant="outline" className="h-7 text-[10px]" onClick={() => handleBuyUses(card.id, card.credit_type)}>Recarregar <Coins className="w-3 h-3 ml-1" /></Button>}
                         <Button size="icon" variant="ghost" className="text-muted-foreground h-7 w-7" onClick={() => toggleArchivePlayerCard(card.id, true)}><Archive className="w-3.5 h-3.5" /></Button>
                         <AlertDialog>
                           <AlertDialogTrigger asChild><Button size="icon" variant="ghost" disabled={winCount > 0} className="text-destructive/70 h-7 w-7"><Trash2 className="w-3.5 h-3.5" /></Button></AlertDialogTrigger>
@@ -328,7 +343,7 @@ const Lobby = () => {
                       </div>
                       <div className="flex flex-col items-end">
                         {alreadyJoined ? (
-                          <Button size="sm" className="bg-success/10 text-success hover:bg-success/20 h-8 text-xs" onClick={() => navigate(`/match/${match.id}`)}><Tv className="w-3.5 h-3.5 mr-2" /> Acompanhar</Button>
+                          <Button size="sm" className="bg-success/10 text-success hover:bg-success/20 h-8 text-xs" onClick={() => navigate(`/match/${match.id}`)}><Tv className="w-3.h-3.5 mr-2" /> Acompanhar</Button>
                         ) : match.status === 'open' ? (
                           <Button size="sm" className="gradient-accent shadow-button h-8 text-xs" onClick={() => openJoinDialog(match)}>Entrar na Partida</Button>
                         ) : (
