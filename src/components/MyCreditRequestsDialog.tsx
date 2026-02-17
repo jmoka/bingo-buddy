@@ -138,13 +138,27 @@ export const MyCreditRequestsDialog = ({ children }: MyCreditRequestsDialogProps
               <TabsTrigger value="pending" className="relative">
                 Pendentes
                 {pending.length > 0 && (
-                  <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-amber-500 text-[10px] font-bold text-white">
+                  <span className="ml-1.5 px-1.5 py-0.5 rounded-full bg-amber-500 text-[10px] font-bold text-white min-w-[1.2rem] text-center">
                     {pending.length}
                   </span>
                 )}
               </TabsTrigger>
-              <TabsTrigger value="approved">Aprovadas</TabsTrigger>
-              <TabsTrigger value="rejected">Rejeitadas</TabsTrigger>
+              <TabsTrigger value="approved" className="relative">
+                Aprovadas
+                {approved.length > 0 && (
+                  <span className="ml-1.5 px-1.5 py-0.5 rounded-full bg-success text-[10px] font-bold text-white min-w-[1.2rem] text-center">
+                    {approved.length}
+                  </span>
+                )}
+              </TabsTrigger>
+              <TabsTrigger value="rejected" className="relative">
+                Rejeitadas
+                {rejected.length > 0 && (
+                  <span className="ml-1.5 px-1.5 py-0.5 rounded-full bg-destructive text-[10px] font-bold text-white min-w-[1.2rem] text-center">
+                    {rejected.length}
+                  </span>
+                )}
+              </TabsTrigger>
             </TabsList>
           </div>
 
