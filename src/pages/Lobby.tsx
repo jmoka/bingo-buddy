@@ -7,7 +7,7 @@ import { Match } from '@/types/match';
 import { gameTypeLabels } from '@/utils/bingoUtils';
 import { 
   LogIn, LogOut, Coins, Plus, Trophy, Users, Settings, Wallet, 
-  CreditCard, Timer, DoorOpen, Ticket, Check, Zap, ZapOff, Tv, Printer
+  CreditCard, Timer, DoorOpen, Ticket, Check, Zap, ZapOff, Tv, Printer, Bot
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
@@ -220,6 +220,7 @@ const Lobby = () => {
               const myMatchCards = getPlayerMatchCards(match.id, currentPlayer.id);
               const alreadyJoined = myMatchCards.length > 0;
               const canJoin = (match.status === 'open' || match.status === 'waiting') && myOwnedCards.some(c => c.usesLeft > 0);
+              const countdown = match.nextAutoCallTimestamp ? Math.max(0, Math.round((match.nextAutoCallTimestamp - now) / 1000)) : null;
 
               return (
                 <div key={match.id} className={`card-container ${match.status === 'in_progress' ? 'ring-2 ring-accent' : ''}`}>
@@ -247,24 +248,35 @@ const Lobby = () => {
                     </div>
                   </div>
 
-                  {match.status === 'in_progress' && match.calledNumbers.length > 0 && (
-                    <div className="mt-3 border-t border-border pt-3">
-                      <div className="flex items-center justify-between">
-                        <p className="text-xs text-muted-foreground font-medium">
-                          Últimos Sorteados ({match.calledNumbers.length} total)
-                        </p>
-                        <div className="flex flex-wrap gap-1.5 justify-end">
-                          {match.calledNumbers.slice(-5).reverse().map((num, index) => (
-                            <span 
-                              key={num} 
-                              className={`w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold
-                                ${index === 0 ? 'bg-accent text-accent-foreground' : 'bg-secondary text-secondary-foreground'}`}
-                            >
-                              {num}
-                            </span>
-                          ))}
+                  {match.status === 'in_progress' && (
+                    <div className="mt-3 border-t border-border pt-3 space-y-3">
+                      {match.isAutoCalling && countdown !== null && (
+                        <div className="flex items-center gap-2 text-sm text-accent">
+                          <Bot className="w-4 h-4" />
+                          <span className="font-medium">Sorteio automático:</span>
+                          <span className="font-bold font-mono bg-accent/10 rounded px-2 py-1 text-xs">
+                            Próximo em {countdown}s
+                          </span>
                         </div>
-                      </div>
+                      )}
+                      {match.calledNumbers.length > 0 && (
+                        <div>
+                          <p className="text-xs text-muted-foreground font-medium mb-2">
+                            Números Sorteados ({match.calledNumbers.length} total)
+                          </p>
+                          <div className="flex flex-wrap gap-1.5">
+                            {match.calledNumbers.map((num, index) => (
+                              <span 
+                                key={num} 
+                                className={`w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold
+                                  ${index === match.calledNumbers.length - 1 ? 'bg-accent text-accent-foreground animate-bounce-in' : 'bg-secondary text-secondary-foreground'}`}
+                              >
+                                {num}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
