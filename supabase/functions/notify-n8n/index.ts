@@ -56,6 +56,8 @@ serve(async (req) => {
       ? settings.n8n_prod_url 
       : settings.n8n_test_url;
 
+    console.log(`[notify-n8n] Usando n8n_env: '${settings.n8n_env}'. URL de destino: ${webhookUrl}`);
+
     if (!webhookUrl) {
       console.warn(`[notify-n8n] URL do webhook para o ambiente '${settings.n8n_env}' não está configurada. Abortando.`);
       // Retorna sucesso para não quebrar o fluxo do app, mas não envia nada.
@@ -64,8 +66,6 @@ serve(async (req) => {
         status: 200,
       });
     }
-
-    console.log(`[notify-n8n] Enviando evento '${event}' para a URL: ${webhookUrl}`);
 
     // Monta o payload final para enviar ao n8n
     const payload = {

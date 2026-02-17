@@ -46,31 +46,10 @@ serve(async (req) => {
       })
     }
 
-    // Busca as configurações do n8n
-    const { data: settings, error: settingsError } = await supabaseAdmin
-      .from('configuracoes')
-      .select('n8n_test_url, n8n_prod_url, n8n_env')
-      .single();
+    // URL Harcoded para teste isolado
+    const webhookUrl = "https://jota-empresas-n8n.ubjifz.easypanel.host/webhook-test/f556ca05-3714-4756-b03a-33746edd9ae8";
 
-    if (settingsError) {
-      console.error('[test-n8n] Erro ao buscar configurações:', settingsError.message);
-      throw new Error(`Erro ao buscar configurações: ${settingsError.message}`);
-    }
-
-    const webhookUrl = settings.n8n_env === 'production' 
-      ? settings.n8n_prod_url 
-      : settings.n8n_test_url;
-
-    if (!webhookUrl) {
-      const errorMessage = `A URL do webhook para o ambiente '${settings.n8n_env}' não está configurada.`;
-      console.warn(`[test-n8n] ${errorMessage}`);
-      return new Response(JSON.stringify({ error: errorMessage }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 400,
-      });
-    }
-
-    console.log(`[test-n8n] Enviando evento de teste para a URL: ${webhookUrl}`);
+    console.log(`[test-n8n] Enviando evento de teste para a URL (hardcoded): ${webhookUrl}`);
 
     const payload = {
       event: 'CONNECTION_TEST',
@@ -97,9 +76,9 @@ serve(async (req) => {
       throw new Error(`O webhook do n8n respondeu com o status: ${response.status}`);
     }
     
-    console.log(`[test-n8n] Evento de teste enviado com sucesso para o ambiente '${settings.n8n_env}'.`);
+    console.log(`[test-n8n] Evento de teste enviado com sucesso para a URL hardcoded.`);
 
-    return new Response(JSON.stringify({ success: true, message: `Notificação de teste enviada para o ambiente '${settings.n8n_env}' com sucesso!` }), {
+    return new Response(JSON.stringify({ success: true, message: `Notificação de teste enviada para a URL hardcoded com sucesso!` }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
     })
