@@ -2,9 +2,7 @@ import React, { createContext, useContext, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './AuthContext';
-import { Match, PlayerCard, MatchCard, Winner, MatchStatus } from '@/types/match';
-import { BingoCard, GameType, WinResult } from '@/types/bingo';
-import { checkWin } from '@/utils/bingoUtils';
+import { Match, PlayerCard, MatchCard, Win, MatchStatus } from '@/types/match';
 import { toast } from 'sonner';
 import { Profile } from './AuthContext';
 
@@ -24,6 +22,8 @@ interface GameContextType {
   playerCards: PlayerCard[];
   allPlayerCards: PlayerCard[];
   matchCards: MatchCard[];
+  wins: Win[];
+  allWins: Win[];
   gameSettings: GameSettings | undefined;
   isLoading: boolean;
   createMatch: (data: any) => Promise<void>;
@@ -99,6 +99,27 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     },
   });
 
+  const { data: wins = [], isLoading: l5 } = useQuery({
+    queryKey: ['wins', user?.id],
+    queryFn: async () => {
+      if (!user) return [];
+      const { data, error } = await supabase.from('vitorias').select('*').eq('player_id', user.id);
+      if (error) throw error;
+      return data as Win[];
+    },
+    enabled: !!user,
+  });
+
+  const { data: allWins = [] } = useQuery({
+    queryKey: ['allWins'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('vitorias').select('*');
+      if (error) throw error;
+      return data as Win[];
+    },
+    enabled: !!profile && profile.role === 'admin',
+  });
+
   const { data: gameSettings, isLoading: l4 } = useQuery({
     queryKey: ['gameSettings'],
     queryFn: async () => {
@@ -126,6 +147,8 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
         queryClient.invalidateQueries({ queryKey: ['matchCards'] });
         queryClient.invalidateQueries({ queryKey: ['profile'] });
         queryClient.invalidateQueries({ queryKey: ['players'] });
+        queryClient.invalidateQueries({ queryKey: ['wins'] });
+        queryClient.invalidateQueries({ queryKey: ['allWins'] });
         if (payload.table === 'configuracoes') {
           queryClient.invalidateQueries({ queryKey: ['gameSettings'] });
         }
@@ -381,7 +404,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   return (
     <GameContext.Provider value={{
-      matches, players, playerCards, allPlayerCards, matchCards, gameSettings, isLoading: l1 || l2 || l3 || l4,
+      matches, players, playerCards, allPlayerCards, matchCards, wins, allWins, gameSettings, isLoading: l1 || l2 || l3 || l4 || l5,
       createMatch, openMatch, startMatch, callNumber, finishMatch, deleteMatch, toggleAutoCall,
       updateGameSettings, createPlayerCard, deletePlayerCard, joinMatch, buyCardUses, buyCredits,
       updatePlayerCredits, getMatchCards, getPlayerMatchCards,

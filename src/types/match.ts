@@ -11,7 +11,7 @@ export interface Prize {
 
 export interface Winner {
   playerId: string;
-  playerName: string;
+  playerName:string;
   cardId: string;
   cardName: string;
 }
@@ -51,4 +51,15 @@ export interface MatchCard {
   name: string; // copied from PlayerCard
   numbers: number[][]; // copied from PlayerCard
   marked_numbers: Set<number>;
+}
+
+// A record of a win
+export interface Win {
+  id: string;
+  match_id: string;
+  player_id: string;
+  player_card_id: string;
+  match_card_id: string;
+  prize_details: Prize;
+  won_at: string;
 }

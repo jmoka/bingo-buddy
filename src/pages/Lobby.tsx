@@ -40,7 +40,7 @@ const Lobby = () => {
   const { 
     matches, joinMatch, getPlayerMatchCards, playerCards, 
     buyCardUses, buyCredits, createPlayerCard, deletePlayerCard,
-    matchCards, gameSettings
+    matchCards, gameSettings, wins
   } = useGame();
 
   const [buyAmount, setBuyAmount] = useState(50);
@@ -254,12 +254,21 @@ const Lobby = () => {
                   mc.player_card_id === card.id && activeMatchIds.has(mc.match_id)
                 );
                 const markedNumbers = activeMatchCard ? activeMatchCard.marked_numbers : new Set<number>();
+                const winCount = wins.filter(w => w.player_card_id === card.id).length;
 
                 return (
                   <div key={card.id} className={`card-container p-3 transition-opacity ${card.uses_left === 0 ? 'opacity-60' : ''}`}>
                     <div className="flex justify-between items-start mb-2">
                       <div>
-                        <h3 className="font-heading font-semibold text-foreground">{card.name}</h3>
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-heading font-semibold text-foreground">{card.name}</h3>
+                          {winCount > 0 && (
+                            <div className="flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-amber-400/20 text-amber-600">
+                              <Trophy className="w-3 h-3" />
+                              <span>{winCount}x</span>
+                            </div>
+                          )}
+                        </div>
                         <p className="text-xs text-muted-foreground font-mono">ID: ...{card.id.slice(-6).toUpperCase()}</p>
                       </div>
                       <div className="flex items-center gap-1">

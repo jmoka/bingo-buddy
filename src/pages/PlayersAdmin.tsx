@@ -23,15 +23,25 @@ import {
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Coins, Edit, Zap, ZapOff } from 'lucide-react';
+import { ArrowLeft, Coins, Edit, Zap, ZapOff, Trophy } from 'lucide-react';
 import { Footer } from '@/components/Footer';
 import PlayerAvatar from '@/components/PlayerAvatar';
 import { Profile } from '@/contexts/AuthContext';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
+import { Prize } from '@/types/match';
+
+const formatPrize = (prize: Prize) => {
+  if (prize.type === 'product') return prize.productName || 'Produto';
+  if (prize.type === 'fixed') return `${prize.value} créditos`;
+  if (prize.type === 'percentage') return `${prize.value}% do pote`;
+  return 'N/A';
+};
 
 const PlayersAdmin = () => {
   const navigate = useNavigate();
   const { profile } = useAuth();
-  const { players, allPlayerCards, updatePlayerCredits } = useGame();
+  const { players, allPlayerCards, updatePlayerCredits, allWins, matches } = useGame();
   const [selectedPlayer, setSelectedPlayer] = useState<Profile | null>(null);
   const [creditAmount, setCreditAmount] = useState(0);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -54,6 +64,7 @@ const PlayersAdmin = () => {
   };
 
   const selectedPlayerCards = selectedPlayer ? allPlayerCards.filter(c => c.player_id === selectedPlayer.id) : [];
+  const selectedPlayerWins = selectedPlayer ? allWins.filter(w => w.player_id === selectedPlayer.id) : [];
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -111,7 +122,7 @@ const PlayersAdmin = () => {
       </main>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-3xl">
           <DialogHeader>
             <DialogTitle>Gerenciar: {selectedPlayer?.full_name}</DialogTitle>
             <DialogDescription>
@@ -126,9 +137,10 @@ const PlayersAdmin = () => {
           </div>
 
           <Tabs defaultValue="credits" className="w-full">
-            <TabsList className="grid w-full grid-cols-2">
+            <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="credits">Gerenciar Créditos</TabsTrigger>
               <TabsTrigger value="cards">Cartelas ({selectedPlayerCards.length})</TabsTrigger>
+              <TabsTrigger value="wins">Vitórias ({selectedPlayerWins.length})</TabsTrigger>
             </TabsList>
             <TabsContent value="credits">
               <div className="py-4 space-y-4">
@@ -188,6 +200,37 @@ const PlayersAdmin = () => {
                 </Table>
                 {selectedPlayerCards.length === 0 && (
                   <p className="text-center text-sm text-muted-foreground py-8">Este jogador não possui cartelas.</p>
+                )}
+              </div>
+            </TabsContent>
+            <TabsContent value="wins">
+              <div className="max-h-64 overflow-y-auto mt-4">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Partida</TableHead>
+                      <TableHead>Cartela</TableHead>
+                      <TableHead>Prêmio</TableHead>
+                      <TableHead>Data</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {selectedPlayerWins.map(win => {
+                      const match = matches.find(m => m.id === win.match_id);
+                      const card = allPlayerCards.find(c => c.id === win.player_card_id);
+                      return (
+                        <TableRow key={win.id}>
+                          <TableCell>{match?.name || 'Partida Excluída'}</TableCell>
+                          <TableCell>{card?.name || 'Cartela Excluída'}</TableCell>
+                          <TableCell>{formatPrize(win.prize_details)}</TableCell>
+                          <TableCell>{format(new Date(win.won_at), "dd/MM/yy 'às' HH:mm", { locale: ptBR })}</TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+                {selectedPlayerWins.length === 0 && (
+                  <p className="text-center text-sm text-muted-foreground py-8">Este jogador ainda não venceu.</p>
                 )}
               </div>
             </TabsContent>

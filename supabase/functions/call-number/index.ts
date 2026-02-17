@@ -101,6 +101,21 @@ serve(async (req) => {
         cardName: fw.card.name,
       }));
 
+      // Create win records
+      const winRecords = foundWinners.map(fw => ({
+        match_id: match.id,
+        player_id: fw.card.player_id,
+        player_card_id: fw.card.player_card_id,
+        match_card_id: fw.card.id,
+        prize_details: match.prize,
+      }));
+
+      const { error: winInsertError } = await supabaseAdmin.from('vitorias').insert(winRecords);
+      if (winInsertError) {
+        console.error('[call-number] Error inserting win records:', winInsertError);
+        // Continue anyway, but log the error
+      }
+
       matchUpdatePayload = {
         ...matchUpdatePayload,
         status: 'finished',
