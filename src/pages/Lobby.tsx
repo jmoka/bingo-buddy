@@ -69,10 +69,9 @@ const Lobby = () => {
     }
   }, [session, navigate]);
 
-  // Filtramos apenas pelo player_id, removendo o filtro de is_archived que não existe no banco
-  const myOwnedCards = profile ? playerCards.filter(c => c.player_id === profile.id) : [];
-  const realCards = myOwnedCards.filter(c => c.credit_type === 'real');
-  const fakeCards = myOwnedCards.filter(c => c.credit_type === 'fake');
+  // Usamos diretamente o que vem do context, que já está filtrado por user.id
+  const realCards = playerCards.filter(c => c.credit_type === 'real');
+  const fakeCards = playerCards.filter(c => c.credit_type === 'fake');
 
   useEffect(() => {
     if (!profile || matches.length === 0) return;
@@ -110,7 +109,7 @@ const Lobby = () => {
     if (!newCardName.trim() || !newCardNumbers) return;
     const card = await createPlayerCard({ name: newCardName, numbers: newCardNumbers, creditType: newCardCreditType });
     if (card) {
-      toast.success('Cartela criada!', { description: `A cartela "${card.name}" foi adicionada à sua coleção.` });
+      toast.success('Cartela criada!', { description: `A cartela "${card.name}" foi adicionada.` });
       setCreateCardOpen(false);
       setNewCardName('');
       setNewCardNumbers(null);
@@ -136,7 +135,7 @@ const Lobby = () => {
   const handleBuyUses = async (cardId: string, creditType: CreditType) => {
     const success = await buyCardUses(cardId, creditType);
     if (success) {
-      toast.success('Cartela Recarregada!', { description: `Você comprou mais usos para sua cartela.` });
+      toast.success('Cartela Recarregada!');
       setRechargeCard(null);
     }
   };
@@ -195,7 +194,7 @@ const Lobby = () => {
                   {card.uses_left === 0 && <Button size="sm" variant="outline" className="h-7 text-[10px]" onClick={() => setRechargeCard(card)}>Recarregar <Coins className="w-3 h-3 ml-1" /></Button>}
                   <AlertDialog>
                     <AlertDialogTrigger asChild><Button size="icon" variant="ghost" disabled={winCount > 0} className="text-destructive/70 h-7 w-7"><Trash2 className="w-3.5 h-3.5" /></Button></AlertDialogTrigger>
-                    <AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Você tem certeza?</AlertDialogTitle><AlertDialogDescription>Esta ação não pode ser desfeita. Isso excluirá permanentemente a cartela "{card.name}".</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={() => deletePlayerCard(card.id)}>Excluir</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
+                    <AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Você tem certeza?</AlertDialogTitle><AlertDialogDescription>Deseja excluir permanentemente a cartela "{card.name}"?</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={() => deletePlayerCard(card.id)}>Excluir</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
                   </AlertDialog>
                 </div>
               </div>
@@ -284,7 +283,7 @@ const Lobby = () => {
                     )}
                 </Button>
             </MyRedeemRequestsDialog>
-             <Button variant="outline" size="sm" className="rounded-full bg-card whitespace-nowrap text-xs md:text-sm" onClick={() => navigate('/print')} disabled={myOwnedCards.length === 0}>
+             <Button variant="outline" size="sm" className="rounded-full bg-card whitespace-nowrap text-xs md:text-sm" onClick={() => navigate('/print')} disabled={playerCards.length === 0}>
                 <Printer className="w-4 h-4 mr-2" /> Imprimir Cartelas
             </Button>
             <Button variant="outline" size="sm" className="rounded-full bg-card whitespace-nowrap text-xs md:text-sm" onClick={renewFakeCredits}>
@@ -307,7 +306,7 @@ const Lobby = () => {
                 <DialogContent className="max-w-xl">
                     <DialogHeader>
                     <DialogTitle className="font-heading">Criar Nova Cartela</DialogTitle>
-                    <DialogDescription>Escolha os números e o tipo de crédito para usar.</DialogDescription>
+                    <DialogDescription>Escolha os números e o tipo de crédito.</DialogDescription>
                     </DialogHeader>
                     <div className="space-y-4 pt-4">
                       <RadioGroup value={newCardCreditType} onValueChange={(v: CreditType) => setNewCardCreditType(v)} className="grid grid-cols-2 gap-4">
@@ -326,7 +325,7 @@ const Lobby = () => {
                           </Label>
                         </div>
                       </RadioGroup>
-                      <Input placeholder="Nome da cartela (ex: Sorte Pura)" value={newCardName} onChange={e => setNewCardName(e.target.value)} className="bg-secondary border-0" />
+                      <Input placeholder="Nome da cartela" value={newCardName} onChange={e => setNewCardName(e.target.value)} className="bg-secondary border-0" />
                       <CardCreator onCardChange={setNewCardNumbers} />
                     </div>
                     <DialogFooter>
@@ -395,7 +394,7 @@ const Lobby = () => {
         <DialogContent className="max-w-2xl">
           <DialogHeader><DialogTitle className="font-heading">Entrar na Partida</DialogTitle><DialogDescription>Selecione as cartelas que deseja usar.</DialogDescription></DialogHeader>
           <div className="max-h-[60vh] overflow-y-auto p-1 space-y-3">
-            {profile && myOwnedCards.filter(card => !new Set(getPlayerMatchCards(selectedMatch?.id || '', profile.id).map(c => c.player_card_id)).has(card.id)).map(card => {
+            {profile && playerCards.filter(card => !new Set(getPlayerMatchCards(selectedMatch?.id || '', profile.id).map(c => c.player_card_id)).has(card.id)).map(card => {
                 const isSelected = cardsToJoin.has(card.id);
                 const isDisabled = card.uses_left === 0;
                 return (
@@ -414,7 +413,7 @@ const Lobby = () => {
             <AlertDialogHeader>
                 <AlertDialogTitle>Recarregar Cartela "{rechargeCard?.name}"</AlertDialogTitle>
                 <AlertDialogDescription>
-                    A recarga custará {gameSettings?.custo_recarga_cartela} créditos. Escolha qual saldo usar para a recarga.
+                    A recarga custará {gameSettings?.custo_recarga_cartela} créditos.
                 </AlertDialogDescription>
             </AlertDialogHeader>
             <div className="grid grid-cols-2 gap-4 my-4">

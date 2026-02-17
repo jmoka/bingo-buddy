@@ -520,14 +520,12 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const cost = gameSettings.custo_nova_cartela;
     const { name, numbers, creditType } = options;
 
-    // 1. Verificação de Créditos
     const currentCredits = creditType === 'real' ? profile.credits : profile.fake_credits;
     if (currentCredits < cost) {
       toast.error(`Saldo de ${creditType === 'real' ? 'reais' : 'brincar'} insuficiente.`);
       return null;
     }
 
-    // 2. Débito de Créditos
     const creditColumn = creditType === 'real' ? 'credits' : 'fake_credits';
     const { error: debitError } = await supabase
       .from('perfis')
@@ -535,13 +533,11 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       .eq('id', user.id);
 
     if (debitError) {
-      console.error('[createPlayerCard] Erro ao debitar créditos:', debitError.message);
       toast.error('Erro ao processar pagamento da cartela.');
       return null;
     }
 
-    // 3. Inserção da Cartela
-    // NOTA: Removido 'is_archived' pois não existe na tabela Columns fornecida
+    // Inserimos APENAS as colunas que existem no seu banco
     const { data, error: insertError } = await supabase
       .from('cartelas_jogador')
       .insert({
@@ -555,19 +551,13 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       .single();
     
     if (insertError) {
-      console.error('[createPlayerCard] Erro ao salvar cartela:', insertError.message);
-      toast.error('Erro ao salvar cartela no banco de dados. Estornando créditos...');
-      
-      // Estorno Automático
-      await supabase
-        .from('perfis')
-        .update({ [creditColumn]: currentCredits })
-        .eq('id', user.id);
-        
+      console.error('[createPlayerCard] Erro:', insertError);
+      toast.error('Erro ao salvar cartela no banco.');
+      // Estorno
+      await supabase.from('perfis').update({ [creditColumn]: currentCredits }).eq('id', user.id);
       return null;
     }
 
-    // 4. Sucesso e Atualização
     queryClient.invalidateQueries({ queryKey: ['profile'] });
     queryClient.invalidateQueries({ queryKey: ['playerCards', user.id] });
     return data as PlayerCard;
@@ -575,9 +565,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const deletePlayerCard = async (cardId: string) => { await supabase.from('cartelas_jogador').delete().eq('id', cardId); };
   const toggleArchivePlayerCard = async (cardId: string, archive: boolean) => { 
-    // Como a coluna não existe no banco, esta função apenas silencia ou você pode adicionar a coluna se desejar.
-    // Por enquanto, vou apenas evitar o erro.
-    console.warn("Ação de arquivamento ignorada: coluna 'is_archived' não existe no banco.");
+      console.warn("Funcionalidade de arquivamento removida por falta de suporte no banco.");
   };
 
   const joinMatch = async (matchId: string, playerCardIds: string[]) => {
@@ -629,9 +617,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
           description: `${data.cards_deleted} cartelas duplicadas removidas. ${data.credits_refunded} créditos estornados.`,
       });
     } else {
-      toast.info('Nenhuma duplicata encontrada.', {
-        description: 'A partida já estava correta.'
-      });
+      toast.info('Nenhuma duplicata encontrada.');
     }
     queryClient.invalidateQueries();
   };
