@@ -18,13 +18,15 @@ import { BingoCell } from '@/components/BingoCell';
 import { Footer } from '@/components/Footer';
 import { Badge } from '@/components/ui/badge';
 import { playNotificationSound } from '@/utils/soundUtils';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 
 const Lobby = () => {
   const navigate = useNavigate();
   const { session, profile, signOut } = useAuth();
   const { 
     matches, joinMatch, getPlayerMatchCards, playerCards, 
-    buyCardUses, buyCredits, createPlayerCard, matchCards
+    buyCardUses, buyCredits, createPlayerCard, matchCards, gameSettings
   } = useGame();
 
   const [buyAmount, setBuyAmount] = useState(50);
@@ -121,7 +123,7 @@ const Lobby = () => {
 
   const getCountdown = (startTime: string) => {
     const diff = new Date(startTime).getTime() - now;
-    if (diff <= 0) return 'Já iniciou!';
+    if (diff <= 0) return 'Iniciando...';
     const h = Math.floor(diff / 3600000);
     const m = Math.floor((diff % 3600000) / 60000);
     const s = Math.floor((diff % 60000) / 1000);
@@ -147,6 +149,21 @@ const Lobby = () => {
   }
 
   const activeMatchIds = new Set(matches.filter(m => m.status === 'in_progress').map(m => m.id));
+
+  const renderMatchStatusBadge = (match: Match) => {
+    switch (match.status) {
+      case 'waiting':
+        return <Badge variant="outline">Aguardando Abertura</Badge>;
+      case 'open':
+        return <Badge variant="secondary" className="text-primary">Inscrições Abertas</Badge>;
+      case 'in_progress':
+        return <Badge variant="destructive" className="animate-pulse">AO VIVO</Badge>;
+      case 'finished':
+        return <Badge variant="outline">Finalizada</Badge>;
+      default:
+        return null;
+    }
+  };
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -266,8 +283,7 @@ const Lobby = () => {
               const playersInMatchCount = new Set(matchCards.filter(mc => mc.match_id === match.id).map(mc => mc.player_id)).size;
               const myMatchCards = getPlayerMatchCards(match.id, profile.id);
               const alreadyJoined = myMatchCards.length > 0;
-              const canJoin = match.status === 'open' || match.status === 'waiting';
-              const countdown = match.next_auto_call_timestamp ? Math.max(0, Math.round((new Date(match.next_auto_call_timestamp).getTime() - now) / 1000)) : null;
+              const canJoin = match.status === 'open';
 
               if (match.status === 'finished') {
                 return (
@@ -281,6 +297,7 @@ const Lobby = () => {
                           <span className="flex items-center gap-1"><Coins className="w-3.5 h-3.5" />Pote: {match.pot}</span>
                         </div>
                       </div>
+                      {renderMatchStatusBadge(match)}
                     </div>
                     <div className="mt-3 border-t border-border pt-3 text-center">
                       <h4 className="font-heading font-bold text-success text-lg flex items-center justify-center gap-2">
@@ -303,57 +320,61 @@ const Lobby = () => {
                     <div>
                       <div className="flex items-center gap-2 mb-1">
                         <h3 className="font-heading font-bold text-lg text-foreground">{match.name}</h3>
-                        {match.status === 'in_progress' && (
-                          <Badge variant="destructive" className="animate-pulse">AO VIVO</Badge>
-                        )}
+                        {renderMatchStatusBadge(match)}
                       </div>
                       <div className="flex flex-wrap gap-x-3 gap-y-1 text-sm text-muted-foreground">
                         <span className="flex items-center gap-1"><Trophy className="w-3.5 h-3.5" />{gameTypeLabels[match.game_type]}</span>
                         <span className="flex items-center gap-1"><Users className="w-3.5 h-3.5" />{playersInMatchCount}</span>
                         <span className="flex items-center gap-1"><Coins className="w-3.5 h-3.5" />Pote: {match.pot}</span>
-                        {match.status === 'waiting' && <span className="flex items-center gap-1"><Timer className="w-3.5 h-3.5" />{getCountdown(match.start_time)}</span>}
+                        <span className="flex items-center gap-1">
+                          {match.is_auto_calling ? <Bot className="w-3.5 h-3.5" /> : <Tv className="w-3.5 h-3.5" />}
+                          Sorteio {match.is_auto_calling ? 'Automático' : 'Manual'}
+                        </span>
+                        {match.is_auto_calling && gameSettings && (
+                          <span className="flex items-center gap-1"><Timer className="w-3.5 h-3.5" />{gameSettings.intervalo_sorteio_auto_seg}s / núm.</span>
+                        )}
                       </div>
                     </div>
                     <div className="flex flex-col items-end">
                       {alreadyJoined ? (
                         <Button size="sm" className="bg-success/10 text-success hover:bg-success/20" onClick={() => navigate(`/match/${match.id}`)}>
-                          <Tv className="w-4 h-4 mr-2" /> Acompanhar ao vivo
+                          <Tv className="w-4 h-4 mr-2" /> Acompanhar
                         </Button>
                       ) : canJoin ? (
                         <Button size="sm" className="gradient-accent shadow-button" onClick={() => openJoinDialog(match)}>
                           Entrar na Partida
                         </Button>
-                      ) : null}
+                      ) : (
+                        <Button size="sm" disabled>
+                          {match.status === 'waiting' ? 'Aguardando Abertura' : 'Inscrições Encerradas'}
+                        </Button>
+                      )}
                       <span className="text-xs text-muted-foreground mt-1">{match.card_price} créditos por cartela</span>
                     </div>
                   </div>
 
+                  {match.status === 'open' && (
+                    <div className="mt-3 border-t border-border pt-3 text-center">
+                      <p className="text-sm font-medium text-foreground">
+                        A partida inicia em <span className="font-bold font-mono text-accent">{getCountdown(match.start_time)}</span>
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {format(new Date(match.start_time), "dd 'de' MMMM 'às' HH:mm", { locale: ptBR })}
+                      </p>
+                    </div>
+                  )}
+
                   {match.status === 'in_progress' && (
                     <div className="mt-3 border-t border-border pt-3 space-y-3">
-                      {match.is_auto_calling && countdown !== null && (
-                        <div className="flex items-center gap-2 text-sm text-accent">
-                          <Bot className="w-4 h-4" />
-                          <span className="font-medium">Sorteio automático:</span>
-                          <span className="font-bold font-mono bg-accent/10 rounded px-2 py-1 text-xs">
-                            Próximo em {countdown}s
-                          </span>
-                        </div>
-                      )}
                       {match.called_numbers.length > 0 && (
                         <div>
                           <p className="text-xs text-muted-foreground font-medium mb-2">
-                            Números Sorteados ({match.called_numbers.length} total)
+                            Último número sorteado:
                           </p>
                           <div className="flex flex-wrap gap-1.5">
-                            {match.called_numbers.map((num, index) => (
-                              <span 
-                                key={num} 
-                                className={`w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold
-                                  ${index === match.called_numbers.length - 1 ? 'bg-accent text-accent-foreground animate-bounce-in' : 'bg-secondary text-secondary-foreground'}`}
-                              >
-                                {num}
+                              <span className="w-8 h-8 rounded-full flex items-center justify-center text-lg font-bold bg-accent text-accent-foreground animate-bounce-in">
+                                {match.called_numbers[match.called_numbers.length - 1]}
                               </span>
-                            ))}
                           </div>
                         </div>
                       )}
