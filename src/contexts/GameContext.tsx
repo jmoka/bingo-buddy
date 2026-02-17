@@ -171,79 +171,13 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const match = matches.find(m => m.id === matchId);
     if (!match || match.called_numbers.includes(num)) return;
 
-    // 1. Find all player cards in this match that have the new number and update them
-    const cardsToUpdate = matchCards.filter(c =>
-        c.match_id === matchId &&
-        c.numbers.flat().includes(num) &&
-        !c.marked_numbers.has(num)
-    );
+    const { error } = await supabase.functions.invoke('call-number', {
+      body: { matchId, num },
+    });
 
-    if (cardsToUpdate.length > 0) {
-        const updatePromises = cardsToUpdate.map(card => {
-            const newMarkedNumbers = Array.from(card.marked_numbers);
-            newMarkedNumbers.push(num);
-            return supabase
-                .from('cartelas_partida')
-                .update({ marked_numbers: newMarkedNumbers })
-                .eq('id', card.id);
-        });
-        await Promise.all(updatePromises);
+    if (error) {
+      toast.error(`Erro ao sortear número: ${error.message}`);
     }
-
-    // 2. Invalidate and refetch card data to check for winners with the latest state
-    await queryClient.invalidateQueries({ queryKey: ['matchCards'] });
-    const freshMatchCards = await queryClient.fetchQuery<MatchCard[]>({ queryKey: ['matchCards'] });
-
-    // 3. Check for winners
-    const cardsInMatch = freshMatchCards.filter(c => c.match_id === matchId);
-    const foundWinners: { card: MatchCard, result: WinResult }[] = [];
-
-    for (const card of cardsInMatch) {
-        const tempBingoCard: BingoCard = {
-            id: card.id,
-            name: card.name,
-            numbers: card.numbers,
-            markedNumbers: card.marked_numbers,
-        };
-        const winResult = checkWin(tempBingoCard, match.game_type);
-        if (winResult) {
-            foundWinners.push({ card, result: winResult });
-        }
-    }
-
-    // 4. Prepare a single update payload for the match
-    const newCalledNumbers = [...match.called_numbers, num];
-    let matchUpdatePayload: Partial<Match> = { called_numbers: newCalledNumbers };
-
-    if (foundWinners.length > 0 && match.status !== 'finished') {
-        const winnerData: Winner[] = foundWinners.map(fw => ({
-            playerId: fw.card.player_id,
-            playerName: players?.find(p => p.id === fw.card.player_id)?.full_name || 'Desconhecido',
-            cardId: fw.card.id,
-            cardName: fw.card.name,
-        }));
-
-        matchUpdatePayload = {
-            ...matchUpdatePayload,
-            status: 'finished',
-            winners: winnerData,
-            is_auto_calling: false
-        };
-        toast.success('BINGO! Temos um vencedor!');
-    }
-
-    // 5. Update the match with new numbers and potential winners
-    const { error: updateMatchError } = await supabase
-        .from('partidas')
-        .update(matchUpdatePayload)
-        .eq('id', matchId);
-
-    if (updateMatchError) {
-        toast.error(updateMatchError.message);
-    }
-
-    // 6. Final invalidation to ensure all clients get the latest match state
-    queryClient.invalidateQueries({ queryKey: ['matches'] });
   };
 
   const buyCredits = async (amount: number) => {
