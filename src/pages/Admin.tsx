@@ -56,6 +56,7 @@ const Admin = () => {
     prizeName: '',
     startTime: '',
   });
+  
   const [currentSettings, setCurrentSettings] = useState({
     custo_nova_cartela: 10,
     custo_recarga_cartela: 5,
@@ -64,10 +65,11 @@ const Admin = () => {
     valor_por_credito: 1.00,
     n8n_test_url: '',
     n8n_prod_url: '',
-    n8n_env: 'test',
+    n8n_env: 'test' as 'test' | 'production',
     pix_key: '',
     credit_request_text: '',
   });
+
   const [callerInput, setCallerInput] = useState<Record<string, string>>({});
   const [now, setNow] = useState(Date.now());
   const [isTestingN8n, setIsTestingN8n] = useState(false);
@@ -79,6 +81,7 @@ const Admin = () => {
     }
   }, [session, profile, navigate]);
 
+  // Atualiza o formulário quando as configurações são carregadas do banco
   useEffect(() => {
     if (gameSettings) {
       setCurrentSettings({
@@ -89,7 +92,7 @@ const Admin = () => {
         valor_por_credito: gameSettings.valor_por_credito || 1.00,
         n8n_test_url: gameSettings.n8n_test_url || '',
         n8n_prod_url: gameSettings.n8n_prod_url || '',
-        n8n_env: gameSettings.n8n_env || 'test',
+        n8n_env: (gameSettings.n8n_env as 'test' | 'production') || 'test',
         pix_key: gameSettings.pix_key || '',
         credit_request_text: gameSettings.credit_request_text || '',
       });
@@ -176,12 +179,16 @@ const Admin = () => {
 
   const handleSaveSettings = () => {
     updateGameSettings({
-      ...currentSettings,
       custo_nova_cartela: parseInt(currentSettings.custo_nova_cartela as any, 10),
       custo_recarga_cartela: parseInt(currentSettings.custo_recarga_cartela as any, 10),
       usos_por_recarga: parseInt(currentSettings.usos_por_recarga as any, 10),
       intervalo_sorteio_auto_seg: parseInt(currentSettings.intervalo_sorteio_auto_seg as any, 10),
       valor_por_credito: parseFloat(currentSettings.valor_por_credito as any),
+      pix_key: currentSettings.pix_key,
+      credit_request_text: currentSettings.credit_request_text,
+      n8n_test_url: currentSettings.n8n_test_url,
+      n8n_prod_url: currentSettings.n8n_prod_url,
+      n8n_env: currentSettings.n8n_env,
     });
   };
 
@@ -279,7 +286,7 @@ const Admin = () => {
                   <Label>Ambiente Ativo</Label>
                   <RadioGroup
                     value={currentSettings.n8n_env}
-                    onValueChange={(value) => setCurrentSettings(prev => ({ ...prev, n8n_env: value }))}
+                    onValueChange={(value: 'test' | 'production') => setCurrentSettings(prev => ({ ...prev, n8n_env: value }))}
                     className="flex items-center gap-4 mt-2"
                   >
                     <div className="flex items-center space-x-2">

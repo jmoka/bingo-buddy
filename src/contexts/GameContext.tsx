@@ -167,7 +167,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
       return data as GameSettings;
     },
-    staleTime: 1000 * 60 * 5, // 5 minutes
+    staleTime: 0, // Carregar sempre dados frescos para evitar confusão no admin
   });
 
   useEffect(() => {
@@ -311,7 +311,6 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
         } catch (e) { console.error("Failed to parse edge function error response:", e); }
       }
       toast.error(`Erro ao notificar o admin: ${detailedError}`);
-      // Don't block user if notification fails
     }
 
     return true;
