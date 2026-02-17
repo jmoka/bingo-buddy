@@ -211,11 +211,12 @@
   @keyframes flash-animation {
     0% { transform: scale(1); }
     50% { transform: scale(1.25); background: hsl(var(--accent)); box-shadow: 0 0 20px hsl(var(--accent) / 0.5); }
-    100% { transform: scale(1); }
+    100% { transform: scale(0.95); background: var(--gradient-accent); box-shadow: var(--shadow-accent); }
   }
 
   .animate-flash {
     animation: flash-animation 0.7s ease-out;
+    animation-fill-mode: forwards;
   }
 }
 
