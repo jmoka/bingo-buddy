@@ -8,19 +8,22 @@ import { checkWin } from '@/utils/bingoUtils';
 import { toast } from 'sonner';
 import { Profile } from './AuthContext';
 
-// This can be moved to a settings table in the future
-const gameSettings = {
-  newCardCost: 10,
-  cardRechargeCost: 5,
-  usesPerRecharge: 1,
-  autoCallIntervalSeconds: 120,
-};
+interface GameSettings {
+  id: string;
+  singleton: boolean;
+  custo_nova_cartela: number;
+  custo_recarga_cartela: number;
+  usos_por_recarga: number;
+  intervalo_sorteio_auto_seg: number;
+  created_at: string;
+}
 
 interface GameContextType {
   matches: Match[];
   players: Profile[];
   playerCards: PlayerCard[];
   matchCards: MatchCard[];
+  gameSettings: GameSettings | undefined;
   isLoading: boolean;
   createMatch: (data: any) => Promise<void>;
   openMatch: (matchId: string) => Promise<void>;
@@ -29,6 +32,7 @@ interface GameContextType {
   finishMatch: (matchId: string) => Promise<void>;
   deleteMatch: (matchId: string) => Promise<void>;
   toggleAutoCall: (matchId: string) => Promise<void>;
+  updateGameSettings: (newSettings: Partial<GameSettings>) => Promise<void>;
   createPlayerCard: (options: { name: string; numbers: number[][]; }) => Promise<PlayerCard | null>;
   joinMatch: (matchId: string, playerCardIds: string[]) => Promise<MatchCard[] | null>;
   buyCardUses: (playerCardId: string) => Promise<boolean>;
@@ -82,14 +86,35 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     },
   });
 
+  const { data: gameSettings, isLoading: l4 } = useQuery({
+    queryKey: ['gameSettings'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('configuracoes').select('*').limit(1).single();
+      if (error) {
+        console.error("Error fetching settings, using defaults", error);
+        return {
+          custo_nova_cartela: 10,
+          custo_recarga_cartela: 5,
+          usos_por_recarga: 1,
+          intervalo_sorteio_auto_seg: 120,
+        } as GameSettings;
+      }
+      return data as GameSettings;
+    },
+    staleTime: 1000 * 60 * 5, // 5 minutes
+  });
+
   useEffect(() => {
     const channel = supabase.channel('public-db-changes')
-      .on('postgres_changes', { event: '*', schema: 'public' }, () => {
+      .on('postgres_changes', { event: '*', schema: 'public' }, (payload) => {
         queryClient.invalidateQueries({ queryKey: ['matches'] });
         queryClient.invalidateQueries({ queryKey: ['playerCards'] });
         queryClient.invalidateQueries({ queryKey: ['matchCards'] });
         queryClient.invalidateQueries({ queryKey: ['profile'] });
         queryClient.invalidateQueries({ queryKey: ['players'] });
+        if (payload.table === 'configuracoes') {
+          queryClient.invalidateQueries({ queryKey: ['gameSettings'] });
+        }
       }).subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [queryClient]);
@@ -115,11 +140,11 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const toggleAutoCall = async (matchId: string) => {
     const match = matches.find(m => m.id === matchId);
-    if (!match) return;
+    if (!match || !gameSettings) return;
     const isEnabling = !match.is_auto_calling;
     const { error } = await supabase.from('partidas').update({
       is_auto_calling: isEnabling,
-      next_auto_call_timestamp: isEnabling ? new Date(Date.now() + gameSettings.autoCallIntervalSeconds * 1000).toISOString() : null,
+      next_auto_call_timestamp: isEnabling ? new Date(Date.now() + gameSettings.intervalo_sorteio_auto_seg * 1000).toISOString() : null,
     }).eq('id', matchId);
     if (error) toast.error(error.message);
   };
@@ -166,11 +191,11 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const createPlayerCard = async (options: { name: string; numbers: number[][]; }): Promise<PlayerCard | null> => {
-    if (!user || !profile || profile.credits < gameSettings.newCardCost) {
+    if (!user || !profile || !gameSettings || profile.credits < gameSettings.custo_nova_cartela) {
       toast.error('Créditos insuficientes!');
       return null;
     }
-    const { error: creditError } = await supabase.from('perfis').update({ credits: profile.credits - gameSettings.newCardCost }).eq('id', user.id);
+    const { error: creditError } = await supabase.from('perfis').update({ credits: profile.credits - gameSettings.custo_nova_cartela }).eq('id', user.id);
     if (creditError) { toast.error(creditError.message); return null; }
 
     const newCard = { player_id: user.id, ...options, uses_left: 1 };
@@ -215,19 +240,29 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const buyCardUses = async (playerCardId: string): Promise<boolean> => {
-    if (!profile || profile.credits < gameSettings.cardRechargeCost) {
+    if (!profile || !gameSettings || profile.credits < gameSettings.custo_recarga_cartela) {
       toast.error('Créditos insuficientes!');
       return false;
     }
-    const { error: creditError } = await supabase.from('perfis').update({ credits: profile.credits - gameSettings.cardRechargeCost }).eq('id', profile.id);
+    const { error: creditError } = await supabase.from('perfis').update({ credits: profile.credits - gameSettings.custo_recarga_cartela }).eq('id', profile.id);
     if (creditError) { toast.error(creditError.message); return false; }
 
     const card = playerCards.find(c => c.id === playerCardId);
     if (card) {
-      const { error } = await supabase.from('cartelas_jogador').update({ uses_left: card.uses_left + gameSettings.usesPerRecharge }).eq('id', playerCardId);
+      const { error } = await supabase.from('cartelas_jogador').update({ uses_left: card.uses_left + gameSettings.usos_por_recarga }).eq('id', playerCardId);
       if (error) { toast.error(error.message); return false; }
     }
     return true;
+  };
+
+  const updateGameSettings = async (newSettings: Partial<GameSettings>) => {
+    const { error } = await supabase.from('configuracoes').update(newSettings).eq('singleton', true);
+    if (error) {
+        toast.error(error.message);
+    } else {
+        toast.success("Configurações salvas com sucesso!");
+        queryClient.invalidateQueries({ queryKey: ['gameSettings'] });
+    }
   };
 
   const getMatchCards = (matchId: string) => matchCards.filter(c => c.match_id === matchId);
@@ -235,9 +270,9 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   return (
     <GameContext.Provider value={{
-      matches, players, playerCards, matchCards, isLoading: l1 || l2 || l3,
+      matches, players, playerCards, matchCards, gameSettings, isLoading: l1 || l2 || l3 || l4,
       createMatch, openMatch, startMatch, callNumber, finishMatch, deleteMatch, toggleAutoCall,
-      createPlayerCard, joinMatch, buyCardUses, buyCredits,
+      updateGameSettings, createPlayerCard, joinMatch, buyCardUses, buyCredits,
       getMatchCards, getPlayerMatchCards,
     }}>
       {children}

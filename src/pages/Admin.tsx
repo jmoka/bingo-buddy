@@ -39,7 +39,7 @@ const Admin = () => {
   const { 
     matches, players, createMatch, matchCards,
     openMatch, startMatch, finishMatch, deleteMatch, callNumber,
-    toggleAutoCall, getMatchCards
+    toggleAutoCall, gameSettings, updateGameSettings
   } = useGame();
 
   const [showCreate, setShowCreate] = useState(false);
@@ -53,7 +53,12 @@ const Admin = () => {
     prizeName: '',
     startTime: '',
   });
-  const [settingsForm, setSettingsForm] = useState({ newCardCost: 10, cardRechargeCost: 5, usesPerRecharge: 1, autoCallIntervalSeconds: 120 });
+  const [currentSettings, setCurrentSettings] = useState({
+    custo_nova_cartela: 10,
+    custo_recarga_cartela: 5,
+    usos_por_recarga: 1,
+    intervalo_sorteio_auto_seg: 120,
+  });
   const [callerInput, setCallerInput] = useState<Record<string, string>>({});
   const [now, setNow] = useState(Date.now());
   const processingRef = useRef(new Set());
@@ -63,6 +68,17 @@ const Admin = () => {
       navigate('/');
     }
   }, [session, profile, navigate]);
+
+  useEffect(() => {
+    if (gameSettings) {
+      setCurrentSettings({
+        custo_nova_cartela: gameSettings.custo_nova_cartela,
+        custo_recarga_cartela: gameSettings.custo_recarga_cartela,
+        usos_por_recarga: gameSettings.usos_por_recarga,
+        intervalo_sorteio_auto_seg: gameSettings.intervalo_sorteio_auto_seg,
+      });
+    }
+  }, [gameSettings]);
 
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 1000);
@@ -143,6 +159,15 @@ const Admin = () => {
     return `📊 ${match.prize.value}% do pote (${Math.floor(match.pot * (match.prize.value || 0) / 100)} créditos)`;
   };
 
+  const handleSettingsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setCurrentSettings(prev => ({ ...prev, [name]: parseInt(value, 10) || 0 }));
+  };
+
+  const handleSaveSettings = () => {
+    updateGameSettings(currentSettings);
+  };
+
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <header className="gradient-hero py-6 px-4">
@@ -162,7 +187,28 @@ const Admin = () => {
 
       <main className="container max-w-6xl mx-auto py-8 px-4 flex-grow">
         <div className="card-container mb-8">
-          <h2 className="font-heading text-xl font-bold text-foreground mb-4 flex items-center gap-2"><Settings className="w-5 h-5" /> Configurações Gerais (Em breve)</h2>
+          <h2 className="font-heading text-xl font-bold text-foreground mb-4 flex items-center gap-2"><Settings className="w-5 h-5" /> Configurações Gerais</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div>
+              <Label htmlFor="custo_nova_cartela">Custo Nova Cartela</Label>
+              <Input id="custo_nova_cartela" name="custo_nova_cartela" type="number" value={currentSettings.custo_nova_cartela} onChange={handleSettingsChange} />
+            </div>
+            <div>
+              <Label htmlFor="custo_recarga_cartela">Custo Recarga</Label>
+              <Input id="custo_recarga_cartela" name="custo_recarga_cartela" type="number" value={currentSettings.custo_recarga_cartela} onChange={handleSettingsChange} />
+            </div>
+            <div>
+              <Label htmlFor="usos_por_recarga">Usos por Recarga</Label>
+              <Input id="usos_por_recarga" name="usos_por_recarga" type="number" value={currentSettings.usos_por_recarga} onChange={handleSettingsChange} />
+            </div>
+            <div>
+              <Label htmlFor="intervalo_sorteio_auto_seg">Intervalo Sorteio (s)</Label>
+              <Input id="intervalo_sorteio_auto_seg" name="intervalo_sorteio_auto_seg" type="number" value={currentSettings.intervalo_sorteio_auto_seg} onChange={handleSettingsChange} />
+            </div>
+          </div>
+          <div className="mt-4 flex justify-end">
+            <Button onClick={handleSaveSettings}><Save className="w-4 h-4 mr-2" /> Salvar Configurações</Button>
+          </div>
         </div>
 
         <div className="flex items-center justify-between mb-6">
