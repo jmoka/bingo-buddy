@@ -244,7 +244,13 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const resubmitCreditRequest = async (requestId: string, file: File, message: string): Promise<boolean> => {
     if (!user) return false;
     const fileName = `${user.id}/${Date.now()}.${file.name.split('.').pop()}`;
-    await supabase.storage.from('receipts').upload(fileName, file);
+    
+    const { error: uploadError } = await supabase.storage.from('receipts').upload(fileName, file);
+    if (uploadError) {
+      toast.error('Erro ao enviar comprovante.', { description: uploadError.message });
+      return false;
+    }
+
     const { error } = await supabase.from('solicitacoes_credito').update({
       status: 'pending',
       receipt_url: fileName,
@@ -254,7 +260,14 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       notes: null,
       credits_granted: null,
     }).eq('id', requestId);
-    if (error) return false;
+
+    if (error) {
+      toast.error('Falha ao reenviar solicitação.', { description: error.message });
+      // Clean up orphaned file
+      await supabase.storage.from('receipts').remove([fileName]);
+      return false;
+    }
+
     await supabase.functions.invoke('notify-n8n', { body: { event: 'CREDIT_RESUBMISSION', data: { requestId, userEmail: user.email, message } } });
     return true;
   };
