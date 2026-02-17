@@ -134,7 +134,13 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     queryKey: ['creditRequests', user?.id],
     queryFn: async () => {
       if (!user) return [];
-      const { data, error } = await supabase.from('solicitacoes_credito').select('*').eq('player_id', user.id).order('requested_at', { ascending: false });
+      // Explicitly select all columns to avoid missing new fields
+      const { data, error } = await supabase
+        .from('solicitacoes_credito')
+        .select('id, player_id, status, receipt_url, credits_granted, credits_requested, amount_paid, requested_at, resolved_at, resolved_by, notes')
+        .eq('player_id', user.id)
+        .order('requested_at', { ascending: false });
+      
       if (error) throw error;
       return data as CreditRequest[];
     },
@@ -144,7 +150,10 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const { data: allCreditRequests = [], isLoading: l7 } = useQuery({
     queryKey: ['allCreditRequests'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('solicitacoes_credito').select('*, perfis(full_name, avatar_url)').order('requested_at', { ascending: false });
+      const { data, error } = await supabase
+        .from('solicitacoes_credito')
+        .select('*, perfis(full_name, avatar_url)')
+        .order('requested_at', { ascending: false });
       if (error) throw error;
       return data as CreditRequest[];
     },
@@ -167,7 +176,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
       return data as GameSettings;
     },
-    staleTime: 0, // Carregar sempre dados frescos para evitar confusão no admin
+    staleTime: 0,
   });
 
   useEffect(() => {

@@ -69,7 +69,7 @@ export const MyCreditRequestsDialog = ({ children }: MyCreditRequestsDialogProps
                     <div className="flex items-center gap-2">
                       <Coins className="w-4 h-4 text-primary" />
                       <span className="text-lg font-bold font-heading">
-                        {(req.credits_requested ?? 0)} cr.
+                        {(Number(req.credits_requested) || 0)} cr.
                       </span>
                     </div>
                     <span className="text-xs font-medium text-muted-foreground">
@@ -86,7 +86,7 @@ export const MyCreditRequestsDialog = ({ children }: MyCreditRequestsDialogProps
                       <div className="flex items-center gap-2">
                         <CheckCircle2 className="w-4 h-4 text-success" />
                         <span className="text-lg font-bold text-success font-heading">
-                          {(req.credits_granted ?? 0)} cr.
+                          {(Number(req.credits_granted) || 0)} cr.
                         </span>
                       </div>
                       <span className="text-xs font-medium text-success/70">
