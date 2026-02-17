@@ -46,10 +46,27 @@ serve(async (req) => {
       })
     }
 
-    // URL Harcoded para teste isolado
-    const webhookUrl = "https://jota-empresas-n8n.ubjifz.easypanel.host/webhook-test/f556ca05-3714-4756-b03a-33746edd9ae8";
+    // Busca as configurações do n8n no banco de dados
+    const { data: settings, error: settingsError } = await supabaseAdmin
+      .from('configuracoes')
+      .select('n8n_test_url, n8n_prod_url, n8n_env')
+      .single();
 
-    console.log(`[test-n8n] Enviando evento de teste para a URL (hardcoded): ${webhookUrl}`);
+    if (settingsError) {
+      console.error('[test-n8n] Erro ao buscar configurações:', settingsError.message);
+      throw new Error(`Erro ao buscar configurações: ${settingsError.message}`);
+    }
+
+    // Decide qual URL usar com base no ambiente selecionado
+    const webhookUrl = settings.n8n_env === 'production' 
+      ? settings.n8n_prod_url 
+      : settings.n8n_test_url;
+
+    console.log(`[test-n8n] Testando ambiente: '${settings.n8n_env}'. URL de destino: ${webhookUrl}`);
+
+    if (!webhookUrl) {
+      throw new Error(`A URL do webhook para o ambiente '${settings.n8n_env}' não está configurada.`);
+    }
 
     const payload = {
       event: 'CONNECTION_TEST',
@@ -76,9 +93,9 @@ serve(async (req) => {
       throw new Error(`O webhook do n8n respondeu com o status: ${response.status}`);
     }
     
-    console.log(`[test-n8n] Evento de teste enviado com sucesso para a URL hardcoded.`);
+    console.log(`[test-n8n] Evento de teste enviado com sucesso.`);
 
-    return new Response(JSON.stringify({ success: true, message: `Notificação de teste enviada para a URL hardcoded com sucesso!` }), {
+    return new Response(JSON.stringify({ success: true, message: `Notificação de teste enviada para o ambiente '${settings.n8n_env}' com sucesso!` }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
     })
