@@ -7,11 +7,11 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { GameType } from '@/types/bingo';
-import { PrizeType, MatchStatus } from '@/types/match';
+import { PrizeType, MatchStatus, Match } from '@/types/match';
 import { gameTypeLabels } from '@/utils/bingoUtils';
 import { 
   Plus, LogOut, Play, DoorOpen, Trash2, Trophy, Users, 
-  Hash, ArrowLeft, StopCircle, Settings, Save, Bot, Shuffle, ArrowRight, Webhook, Key, Send, Loader2, CreditCard, Banknote, Check
+  Hash, ArrowLeft, StopCircle, Settings, Save, Bot, Shuffle, ArrowRight, Webhook, Key, Send, Loader2, CreditCard, Banknote, Check, Edit
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
@@ -22,6 +22,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { supabase } from '@/integrations/supabase/client';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from '@/components/ui/badge';
+import { format } from 'date-fns';
 
 const statusLabels: Record<MatchStatus, string> = {
   waiting: 'Aguardando',
@@ -42,13 +43,14 @@ const Admin = () => {
   const { toast } = useToast();
   const { session, profile, signOut } = useAuth();
   const { 
-    matches, createMatch, matchCards,
+    matches, createMatch, updateMatch, matchCards,
     openMatch, startMatch, finishMatch, deleteMatch, callNumber,
     toggleAutoCall, gameSettings, updateGameSettings, allCreditRequests,
     allRedeemRequests
   } = useGame();
 
   const [showCreate, setShowCreate] = useState(false);
+  const [editingMatch, setEditingMatch] = useState<Match | null>(null);
   const [matchForm, setMatchForm] = useState({
     name: '',
     gameType: 'full' as GameType,
@@ -195,6 +197,58 @@ const Admin = () => {
     });
   };
 
+  const handleOpenEditDialog = (match: Match) => {
+    setEditingMatch(match);
+    setMatchForm({
+      name: match.name,
+      gameType: match.game_type,
+      maxCardsPerPlayer: match.max_cards_per_player,
+      cardPrice: match.card_price,
+      prizeType: match.prize.type,
+      prizeValue: match.prize.value || 0,
+      prizeName: match.prize.productName || '',
+      startTime: format(new Date(match.start_time), "yyyy-MM-dd'T'HH:mm"),
+      prizeImageFile: null,
+      min_players: match.min_players,
+    });
+  };
+
+  const handleUpdateMatch = async () => {
+    if (!editingMatch) return;
+
+    let prizeImageUrl = editingMatch.prize_image_url;
+
+    if (matchForm.prizeType === 'product' && matchForm.prizeImageFile) {
+      const file = matchForm.prizeImageFile;
+      const filePath = `public/${Date.now()}_${file.name.replace(/\s/g, '_')}`;
+      
+      const { error: uploadError } = await supabase.storage.from('prizes').upload(filePath, file);
+      if (uploadError) {
+          toast({ title: 'Erro no Upload', description: uploadError.message, variant: 'destructive' });
+          return;
+      }
+      const { data: { publicUrl } } = supabase.storage.from('prizes').getPublicUrl(filePath);
+      prizeImageUrl = publicUrl;
+    }
+
+    const prizePayload: any = { type: matchForm.prizeType, value: matchForm.prizeValue };
+    if (matchForm.prizeType === 'product') prizePayload.productName = matchForm.prizeName;
+    
+    const matchData = {
+        name: matchForm.name,
+        game_type: matchForm.gameType,
+        max_cards_per_player: matchForm.maxCardsPerPlayer,
+        card_price: matchForm.cardPrice,
+        prize: prizePayload,
+        start_time: new Date(matchForm.startTime).toISOString(),
+        prize_image_url: prizeImageUrl,
+        min_players: matchForm.min_players,
+    };
+
+    await updateMatch(editingMatch.id, matchData);
+    setEditingMatch(null);
+  };
+
   const handleCallNumber = (matchId: string) => {
     const num = parseInt(callerInput[matchId] || '', 10);
     if (num >= 1 && num <= 75) {
@@ -248,6 +302,86 @@ const Admin = () => {
   const pendingRequestsCount = (allCreditRequests || []).filter(r => r.status === 'pending').length;
   const pendingRedeemsCount = (allRedeemRequests || []).filter(r => r.status === 'pending').length;
 
+  const matchDialogContent = (
+    <div className="space-y-4 pt-4">
+      <div><Label>Nome</Label><Input value={matchForm.name} onChange={e => setMatchForm(p => ({ ...p, name: e.target.value }))} /></div>
+      <div><Label>Data/Hora Início</Label><Input type="datetime-local" value={matchForm.startTime} onChange={e => setMatchForm(p => ({ ...p, startTime: e.target.value }))} /></div>
+      <div><Label>Tipo de Jogo</Label><Select value={matchForm.gameType} onValueChange={(v: GameType) => setMatchForm(p => ({ ...p, gameType: v }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{Object.entries(gameTypeLabels).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}</SelectContent></Select></div>
+      <div className="grid grid-cols-2 gap-4">
+          <div><Label>Preço</Label><Input type="number" value={matchForm.cardPrice} onChange={e => setMatchForm(p => ({ ...p, cardPrice: +e.target.value }))} /></div>
+          <div><Label>Máx. Cartelas</Label><Input type="number" value={matchForm.maxCardsPerPlayer} onChange={e => setMatchForm(p => ({ ...p, maxCardsPerPlayer: +e.target.value }))} /></div>
+      </div>
+      <div>
+        <Label>Tipo de Prêmio</Label>
+        <RadioGroup
+            value={matchForm.prizeType}
+            onValueChange={(v: PrizeType) => setMatchForm(p => ({ ...p, prizeType: v }))}
+            className="grid grid-cols-3 gap-2 mt-2"
+        >
+            <div>
+            <RadioGroupItem value="percentage" id="percentage" className="peer sr-only" />
+            <Label htmlFor="percentage" className="flex text-xs items-center justify-center rounded-md border-2 border-muted bg-popover p-3 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary">
+                % do Pote
+            </Label>
+            </div>
+            <div>
+            <RadioGroupItem value="fixed" id="fixed" className="peer sr-only" />
+            <Label htmlFor="fixed" className="flex text-xs items-center justify-center rounded-md border-2 border-muted bg-popover p-3 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary">
+                Valor Fixo
+            </Label>
+            </div>
+            <div>
+            <RadioGroupItem value="product" id="product" className="peer sr-only" />
+            <Label htmlFor="product" className="flex text-xs items-center justify-center rounded-md border-2 border-muted bg-popover p-3 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary">
+                Produto
+            </Label>
+            </div>
+        </RadioGroup>
+      </div>
+
+      {matchForm.prizeType === 'percentage' && (
+      <div>
+          <Label>Porcentagem do Pote (%)</Label>
+          <Input type="number" value={matchForm.prizeValue} onChange={e => setMatchForm(p => ({ ...p, prizeValue: +e.target.value }))} />
+      </div>
+      )}
+      {matchForm.prizeType === 'fixed' && (
+      <div>
+          <Label>Valor Fixo (créditos)</Label>
+          <Input type="number" value={matchForm.prizeValue} onChange={e => setMatchForm(p => ({ ...p, prizeValue: +e.target.value }))} />
+      </div>
+      )}
+      {matchForm.prizeType === 'product' && (
+      <div className="space-y-4">
+          <div>
+              <Label>Nome do Produto</Label>
+              <Input value={matchForm.prizeName} onChange={e => setMatchForm(p => ({ ...p, prizeName: e.target.value }))} />
+          </div>
+          <div>
+              <Label>Valor do Produto (em créditos)</Label>
+              <Input type="number" value={matchForm.prizeValue} onChange={e => setMatchForm(p => ({ ...p, prizeValue: +e.target.value }))} />
+          </div>
+          <div>
+              <Label>Imagem do Produto</Label>
+              <Input 
+                  type="file" 
+                  accept="image/*" 
+                  className="file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20"
+                  onChange={e => setMatchForm(p => ({ ...p, prizeImageFile: e.target.files ? e.target.files[0] : null }))} 
+              />
+          </div>
+      </div>
+      )}
+        {(matchForm.prizeType === 'fixed' || matchForm.prizeType === 'product') && (
+        <div>
+          <Label>Mínimo de Jogadores</Label>
+          <Input type="number" value={matchForm.min_players} onChange={e => setMatchForm(p => ({ ...p, min_players: +e.target.value }))} />
+          <p className="text-[10px] text-muted-foreground mt-1">Calculado: {Math.ceil(matchForm.prizeValue / matchForm.cardPrice) || 1} jogadores para cobrir o prêmio.</p>
+        </div>
+      )}
+    </div>
+  );
+
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <header className="gradient-hero py-6 px-4">
@@ -285,84 +419,8 @@ const Admin = () => {
                 <DialogTrigger asChild><Button><Plus className="w-4 h-4 mr-2" />Nova Partida</Button></DialogTrigger>
                 <DialogContent className="max-w-md">
                   <DialogHeader><DialogTitle className="font-heading">Criar Partida</DialogTitle><DialogDescription>Preencha os detalhes da nova partida.</DialogDescription></DialogHeader>
-                  <div className="space-y-4 pt-4">
-                    <div><Label>Nome</Label><Input value={matchForm.name} onChange={e => setMatchForm(p => ({ ...p, name: e.target.value }))} /></div>
-                    <div><Label>Data/Hora Início</Label><Input type="datetime-local" value={matchForm.startTime} onChange={e => setMatchForm(p => ({ ...p, startTime: e.target.value }))} /></div>
-                    <div><Label>Tipo de Jogo</Label><Select value={matchForm.gameType} onValueChange={(v: GameType) => setMatchForm(p => ({ ...p, gameType: v }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{Object.entries(gameTypeLabels).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}</SelectContent></Select></div>
-                    <div className="grid grid-cols-2 gap-4">
-                        <div><Label>Preço</Label><Input type="number" value={matchForm.cardPrice} onChange={e => setMatchForm(p => ({ ...p, cardPrice: +e.target.value }))} /></div>
-                        <div><Label>Máx. Cartelas</Label><Input type="number" value={matchForm.maxCardsPerPlayer} onChange={e => setMatchForm(p => ({ ...p, maxCardsPerPlayer: +e.target.value }))} /></div>
-                    </div>
-                    <div>
-                      <Label>Tipo de Prêmio</Label>
-                      <RadioGroup
-                          value={matchForm.prizeType}
-                          onValueChange={(v: PrizeType) => setMatchForm(p => ({ ...p, prizeType: v }))}
-                          className="grid grid-cols-3 gap-2 mt-2"
-                      >
-                          <div>
-                          <RadioGroupItem value="percentage" id="percentage" className="peer sr-only" />
-                          <Label htmlFor="percentage" className="flex text-xs items-center justify-center rounded-md border-2 border-muted bg-popover p-3 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary">
-                              % do Pote
-                          </Label>
-                          </div>
-                          <div>
-                          <RadioGroupItem value="fixed" id="fixed" className="peer sr-only" />
-                          <Label htmlFor="fixed" className="flex text-xs items-center justify-center rounded-md border-2 border-muted bg-popover p-3 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary">
-                              Valor Fixo
-                          </Label>
-                          </div>
-                          <div>
-                          <RadioGroupItem value="product" id="product" className="peer sr-only" />
-                          <Label htmlFor="product" className="flex text-xs items-center justify-center rounded-md border-2 border-muted bg-popover p-3 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary">
-                              Produto
-                          </Label>
-                          </div>
-                      </RadioGroup>
-                    </div>
-
-                    {matchForm.prizeType === 'percentage' && (
-                    <div>
-                        <Label>Porcentagem do Pote (%)</Label>
-                        <Input type="number" value={matchForm.prizeValue} onChange={e => setMatchForm(p => ({ ...p, prizeValue: +e.target.value }))} />
-                    </div>
-                    )}
-                    {matchForm.prizeType === 'fixed' && (
-                    <div>
-                        <Label>Valor Fixo (créditos)</Label>
-                        <Input type="number" value={matchForm.prizeValue} onChange={e => setMatchForm(p => ({ ...p, prizeValue: +e.target.value }))} />
-                    </div>
-                    )}
-                    {matchForm.prizeType === 'product' && (
-                    <div className="space-y-4">
-                        <div>
-                            <Label>Nome do Produto</Label>
-                            <Input value={matchForm.prizeName} onChange={e => setMatchForm(p => ({ ...p, prizeName: e.target.value }))} />
-                        </div>
-                        <div>
-                            <Label>Valor do Produto (em créditos)</Label>
-                            <Input type="number" value={matchForm.prizeValue} onChange={e => setMatchForm(p => ({ ...p, prizeValue: +e.target.value }))} />
-                        </div>
-                        <div>
-                            <Label>Imagem do Produto</Label>
-                            <Input 
-                                type="file" 
-                                accept="image/*" 
-                                className="file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20"
-                                onChange={e => setMatchForm(p => ({ ...p, prizeImageFile: e.target.files ? e.target.files[0] : null }))} 
-                            />
-                        </div>
-                    </div>
-                    )}
-                     {(matchForm.prizeType === 'fixed' || matchForm.prizeType === 'product') && (
-                      <div>
-                        <Label>Mínimo de Jogadores</Label>
-                        <Input type="number" value={matchForm.min_players} onChange={e => setMatchForm(p => ({ ...p, min_players: +e.target.value }))} />
-                        <p className="text-[10px] text-muted-foreground mt-1">Calculado: {Math.ceil(matchForm.prizeValue / matchForm.cardPrice) || 1} jogadores para cobrir o prêmio.</p>
-                      </div>
-                    )}
-                    <Button className="w-full !mt-6" onClick={handleCreateMatch}>Criar Partida</Button>
-                  </div>
+                  {matchDialogContent}
+                  <Button className="w-full !mt-6" onClick={handleCreateMatch}>Criar Partida</Button>
                 </DialogContent>
               </Dialog>
             </div>
@@ -380,6 +438,7 @@ const Admin = () => {
                       <div className="text-sm text-muted-foreground flex gap-3"><span className="flex items-center gap-1"><Trophy className="w-3.5 h-3.5" />{gameTypeLabels[match.game_type]}</span></div>
                     </div>
                     <div className="flex gap-2">
+                      {match.status === 'waiting' && <Button size="sm" variant="outline" onClick={() => handleOpenEditDialog(match)}><Edit className="w-4 h-4 mr-2" />Editar</Button>}
                       {match.status === 'waiting' && <Button size="sm" onClick={() => openMatch(match.id)}>Abrir</Button>}
                       {match.status === 'open' && <Button size="sm" onClick={() => startMatch(match.id)} disabled={!canStart} title={!canStart ? `Requer ${match.min_players} jogadores` : ''}>Iniciar</Button>}
                       {match.status === 'in_progress' && <Button size="sm" variant="outline" onClick={() => finishMatch(match.id)}>Finalizar</Button>}
@@ -457,6 +516,15 @@ const Admin = () => {
           </TabsContent>
         </Tabs>
       </main>
+
+      <Dialog open={!!editingMatch} onOpenChange={(isOpen) => !isOpen && setEditingMatch(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle className="font-heading">Editar Partida</DialogTitle><DialogDescription>Ajuste os detalhes da partida.</DialogDescription></DialogHeader>
+          {matchDialogContent}
+          <Button className="w-full !mt-6" onClick={handleUpdateMatch}>Salvar Alterações</Button>
+        </DialogContent>
+      </Dialog>
+
       <Footer />
     </div>
   );

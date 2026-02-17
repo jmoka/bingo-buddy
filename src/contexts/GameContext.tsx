@@ -37,6 +37,7 @@ interface GameContextType {
   gameSettings: GameSettings | undefined;
   isLoading: boolean;
   createMatch: (data: any) => Promise<void>;
+  updateMatch: (matchId: string, data: Partial<Match>) => Promise<void>;
   openMatch: (matchId: string) => Promise<void>;
   startMatch: (matchId: string) => Promise<void>;
   callNumber: (matchId: string, num: number) => Promise<void>;
@@ -230,6 +231,16 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       toast.error(error.message);
     } else {
       toast.success('Partida criada com sucesso!');
+      queryClient.invalidateQueries({ queryKey: ['matches'] });
+    }
+  };
+
+  const updateMatch = async (matchId: string, data: Partial<Match>) => {
+    const { error } = await supabase.from('partidas').update(data).eq('id', matchId);
+    if (error) {
+      toast.error(error.message);
+    } else {
+      toast.success('Partida atualizada com sucesso!');
       queryClient.invalidateQueries({ queryKey: ['matches'] });
     }
   };
@@ -547,7 +558,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     <GameContext.Provider value={{
       matches, players, playerCards, allPlayerCards, matchCards, wins, allWins, creditRequests, allCreditRequests, 
       redeemRequests, allRedeemRequests, gameSettings, isLoading: isLoadingRequests || isLoadingRedeems || (isAdmin && isLoadingPlayers),
-      createMatch, openMatch, startMatch, callNumber, finishMatch, deleteMatch, toggleAutoCall,
+      createMatch, updateMatch, openMatch, startMatch, callNumber, finishMatch, deleteMatch, toggleAutoCall,
       updateGameSettings, createPlayerCard, deletePlayerCard, toggleArchivePlayerCard, joinMatch, buyCardUses,
       requestCredits, resubmitCreditRequest, resolveCreditRequest, unblockCreditRequest, deleteCreditRequest, 
       requestRedeem, resubmitRedeemRequest, resolveRedeemRequest, unblockRedeemRequest, deleteRedeemRequest, 
