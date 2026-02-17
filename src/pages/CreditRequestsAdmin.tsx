@@ -143,6 +143,14 @@ const CreditRequestsAdmin = () => {
                           <div className="flex flex-col">
                             <span className="font-medium">{req.perfis?.full_name || 'Usuário Desconhecido'}</span>
                             <span className="text-[10px] text-muted-foreground font-mono">ID: ...{req.player_id.slice(-6)}</span>
+                            {req.resubmission_notes && (
+                              <div className="mt-1.5 flex items-start gap-1 p-2 rounded bg-primary/5 border border-primary/10 max-w-[220px]">
+                                <MessageSquare className="w-3.5 h-3.5 text-primary shrink-0 mt-0.5" />
+                                <span className="text-[11px] text-primary italic leading-tight" title={req.resubmission_notes}>
+                                  {req.resubmission_notes}
+                                </span>
+                              </div>
+                            )}
                           </div>
                         </div>
                       </TableCell>
@@ -208,7 +216,15 @@ const CreditRequestsAdmin = () => {
                         <div className="text-sm font-bold">{req.credits_granted || 0} de {req.credits_requested}</div>
                       </TableCell>
                       <TableCell className="max-w-[200px] truncate text-xs italic text-muted-foreground">
-                        {req.notes || '-'}
+                        <div className="flex flex-col gap-1">
+                          {req.notes && <span>{req.notes}</span>}
+                          {req.resubmission_notes && (
+                            <span className="text-[10px] text-primary/70">
+                              User: {req.resubmission_notes}
+                            </span>
+                          )}
+                          {!req.notes && !req.resubmission_notes && '-'}
+                        </div>
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-1.5">
