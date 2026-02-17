@@ -87,13 +87,13 @@ const Admin = () => {
 
   useEffect(() => {
     matches.forEach(match => {
-      if (match.isAutoCalling && match.status === 'in_progress' && match.nextAutoCallTimestamp && now >= new Date(match.nextAutoCallTimestamp).getTime()) {
+      if (match.is_auto_calling && match.status === 'in_progress' && match.next_auto_call_timestamp && now >= new Date(match.next_auto_call_timestamp).getTime()) {
         if (processingRef.current.has(match.id)) return;
 
         processingRef.current.add(match.id);
 
         const availableNumbers = Array.from({ length: 75 }, (_, i) => i + 1)
-          .filter(num => !match.calledNumbers.includes(num));
+          .filter(num => !match.called_numbers.includes(num));
 
         if (availableNumbers.length > 0) {
           const randomIndex = Math.floor(Math.random() * availableNumbers.length);
@@ -144,7 +144,7 @@ const Admin = () => {
   const handleRandomCall = (matchId: string) => {
     const match = matches.find(m => m.id === matchId);
     if (!match) return;
-    const availableNumbers = Array.from({ length: 75 }, (_, i) => i + 1).filter(num => !match.calledNumbers.includes(num));
+    const availableNumbers = Array.from({ length: 75 }, (_, i) => i + 1).filter(num => !match.called_numbers.includes(num));
     if (availableNumbers.length > 0) {
       const randomIndex = Math.floor(Math.random() * availableNumbers.length);
       callNumber(match.id, availableNumbers[randomIndex]);
@@ -217,33 +217,59 @@ const Admin = () => {
             <DialogTrigger asChild><Button><Plus className="w-4 h-4 mr-2" />Nova Partida</Button></DialogTrigger>
             <DialogContent className="max-w-md">
               <DialogHeader><DialogTitle className="font-heading">Criar Partida</DialogTitle></DialogHeader>
-              <div className="space-y-3 pt-4">
-                <Input placeholder="Nome da partida" value={matchForm.name} onChange={e => setMatchForm(p => ({ ...p, name: e.target.value }))} />
-                <Input type="datetime-local" value={matchForm.startTime} onChange={e => setMatchForm(p => ({ ...p, startTime: e.target.value }))} />
-                <Select value={matchForm.gameType} onValueChange={(v: GameType) => setMatchForm(p => ({ ...p, gameType: v }))}>
-                  <SelectTrigger><SelectValue placeholder="Tipo de Jogo" /></SelectTrigger>
-                  <SelectContent>{Object.entries(gameTypeLabels).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}</SelectContent>
-                </Select>
-                <div className="grid grid-cols-2 gap-3">
-                  <Input type="number" placeholder="Preço/Cartela" value={matchForm.cardPrice} onChange={e => setMatchForm(p => ({ ...p, cardPrice: +e.target.value }))} />
-                  <Input type="number" placeholder="Máx. Cartelas" value={matchForm.maxCardsPerPlayer} onChange={e => setMatchForm(p => ({ ...p, maxCardsPerPlayer: +e.target.value }))} />
+              <div className="space-y-4 pt-4">
+                <div>
+                  <Label htmlFor="matchName">Nome da partida</Label>
+                  <Input id="matchName" placeholder="Ex: Bingo de Sexta" value={matchForm.name} onChange={e => setMatchForm(p => ({ ...p, name: e.target.value }))} />
+                </div>
+                <div>
+                  <Label htmlFor="startTime">Data e Hora de Início</Label>
+                  <Input id="startTime" type="datetime-local" value={matchForm.startTime} onChange={e => setMatchForm(p => ({ ...p, startTime: e.target.value }))} />
+                </div>
+                <div>
+                  <Label>Tipo de Jogo</Label>
+                  <Select value={matchForm.gameType} onValueChange={(v: GameType) => setMatchForm(p => ({ ...p, gameType: v }))}>
+                    <SelectTrigger><SelectValue placeholder="Tipo de Jogo" /></SelectTrigger>
+                    <SelectContent>{Object.entries(gameTypeLabels).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}</SelectContent>
+                  </Select>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="cardPrice">Preço/Cartela</Label>
+                    <Input id="cardPrice" type="number" placeholder="10" value={matchForm.cardPrice} onChange={e => setMatchForm(p => ({ ...p, cardPrice: +e.target.value }))} />
+                  </div>
+                  <div>
+                    <Label htmlFor="maxCards">Máx. Cartelas</Label>
+                    <Input id="maxCards" type="number" placeholder="3" value={matchForm.maxCardsPerPlayer} onChange={e => setMatchForm(p => ({ ...p, maxCardsPerPlayer: +e.target.value }))} />
+                  </div>
                 </div>
                 
-                <h4 className="font-semibold pt-2 text-sm text-muted-foreground">Prêmio</h4>
-                <Select value={matchForm.prizeType} onValueChange={(v: PrizeType) => setMatchForm(p => ({ ...p, prizeType: v }))}>
-                  <SelectTrigger><SelectValue placeholder="Tipo de Prêmio" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="percentage">Porcentagem do Pote</SelectItem>
-                    <SelectItem value="fixed">Valor Fixo</SelectItem>
-                    <SelectItem value="product">Produto</SelectItem>
-                  </SelectContent>
-                </Select>
+                <div className="space-y-2 pt-2">
+                  <h4 className="font-semibold text-sm text-muted-foreground">Prêmio</h4>
+                  <div>
+                    <Label>Tipo de Prêmio</Label>
+                    <Select value={matchForm.prizeType} onValueChange={(v: PrizeType) => setMatchForm(p => ({ ...p, prizeType: v }))}>
+                      <SelectTrigger><SelectValue placeholder="Tipo de Prêmio" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="percentage">Porcentagem do Pote</SelectItem>
+                        <SelectItem value="fixed">Valor Fixo</SelectItem>
+                        <SelectItem value="product">Produto</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-                {matchForm.prizeType === 'product' ? (
-                  <Input placeholder="Nome do Produto" value={matchForm.prizeName} onChange={e => setMatchForm(p => ({ ...p, prizeName: e.target.value }))} />
-                ) : (
-                  <Input type="number" placeholder={matchForm.prizeType === 'percentage' ? 'Porcentagem (ex: 70)' : 'Créditos (ex: 500)'} value={matchForm.prizeValue} onChange={e => setMatchForm(p => ({ ...p, prizeValue: +e.target.value }))} />
-                )}
+                  {matchForm.prizeType === 'product' ? (
+                    <div>
+                      <Label htmlFor="prizeName">Nome do Produto</Label>
+                      <Input id="prizeName" placeholder="Ex: Cesta de Café" value={matchForm.prizeName} onChange={e => setMatchForm(p => ({ ...p, prizeName: e.target.value }))} />
+                    </div>
+                  ) : (
+                    <div>
+                      <Label htmlFor="prizeValue">{matchForm.prizeType === 'percentage' ? 'Porcentagem (%)' : 'Créditos'}</Label>
+                      <Input id="prizeValue" type="number" placeholder={matchForm.prizeType === 'percentage' ? '70' : '500'} value={matchForm.prizeValue} onChange={e => setMatchForm(p => ({ ...p, prizeValue: +e.target.value }))} />
+                    </div>
+                  )}
+                </div>
 
                 <Button className="w-full !mt-6" onClick={handleCreateMatch}>Criar</Button>
               </div>
@@ -253,9 +279,9 @@ const Admin = () => {
 
         <div className="space-y-4">
           {matches.map(match => {
-            const matchCardsCount = matchCards.filter(mc => mc.matchId === match.id).length;
-            const playersInMatchCount = new Set(matchCards.filter(mc => mc.matchId === match.id).map(mc => mc.playerId)).size;
-            const countdown = match.nextAutoCallTimestamp ? Math.round((new Date(match.nextAutoCallTimestamp).getTime() - now) / 1000) : 0;
+            const matchCardsCount = matchCards.filter(mc => mc.match_id === match.id).length;
+            const playersInMatchCount = new Set(matchCards.filter(mc => mc.match_id === match.id).map(mc => mc.player_id)).size;
+            const countdown = match.next_auto_call_timestamp ? Math.round((new Date(match.next_auto_call_timestamp).getTime() - now) / 1000) : 0;
 
             return (
               <div key={match.id} className="card-container">
@@ -266,7 +292,7 @@ const Admin = () => {
                       <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${statusColors[match.status]}`}>{statusLabels[match.status]}</span>
                     </div>
                     <div className="flex flex-wrap gap-x-3 gap-y-1 text-sm text-muted-foreground">
-                      <span className="flex items-center gap-1"><Trophy className="w-3.5 h-3.5" />{gameTypeLabels[match.gameType]}</span>
+                      <span className="flex items-center gap-1"><Trophy className="w-3.5 h-3.5" />{gameTypeLabels[match.game_type]}</span>
                       <span className="flex items-center gap-1"><Users className="w-3.5 h-3.5" />{playersInMatchCount} jogadores</span>
                       <span className="flex items-center gap-1"><Hash className="w-3.5 h-3.5" />{matchCardsCount} cartelas</span>
                       <span className="flex items-center gap-1"><Coins className="w-3.5 h-3.5" />Pote: {match.pot}</span>
@@ -288,14 +314,14 @@ const Admin = () => {
                         <Button variant="outline" size="icon" onClick={() => handleRandomCall(match.id)}><Shuffle className="w-4 h-4" /></Button>
                       </div>
                       <div className="flex items-center space-x-2">
-                        <Switch id={`auto-call-${match.id}`} checked={!!match.isAutoCalling} onCheckedChange={() => toggleAutoCall(match.id)} />
+                        <Switch id={`auto-call-${match.id}`} checked={!!match.is_auto_calling} onCheckedChange={() => toggleAutoCall(match.id)} />
                         <Label htmlFor={`auto-call-${match.id}`} className="flex items-center gap-1">
-                          <Bot className="w-4 h-4" /> Sorteio Automático {match.isAutoCalling && countdown > 0 && `(${countdown}s)`}
+                          <Bot className="w-4 h-4" /> Sorteio Automático {match.is_auto_calling && countdown > 0 && `(${countdown}s)`}
                         </Label>
                       </div>
                     </div>
                     <div className="flex flex-wrap gap-1.5 mt-3">
-                      {match.calledNumbers.map(num => <span key={num} className="w-8 h-8 rounded-full bg-primary text-primary-foreground text-sm font-medium flex items-center justify-center">{num}</span>)}
+                      {match.called_numbers.map(num => <span key={num} className="w-8 h-8 rounded-full bg-primary text-primary-foreground text-sm font-medium flex items-center justify-center">{num}</span>)}
                     </div>
                   </div>
                 )}
