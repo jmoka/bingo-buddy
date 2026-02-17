@@ -34,6 +34,7 @@ interface GameContextType {
   toggleAutoCall: (matchId: string) => Promise<void>;
   updateGameSettings: (newSettings: Partial<GameSettings>) => Promise<void>;
   createPlayerCard: (options: { name: string; numbers: number[][]; }) => Promise<PlayerCard | null>;
+  deletePlayerCard: (cardId: string) => Promise<void>;
   joinMatch: (matchId: string, playerCardIds: string[]) => Promise<MatchCard[] | null>;
   buyCardUses: (playerCardId: string) => Promise<boolean>;
   buyCredits: (amount: number) => Promise<void>;
@@ -251,6 +252,26 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return data as PlayerCard;
   };
 
+  const deletePlayerCard = async (cardId: string) => {
+    const activeMatchCards = matchCards.filter(mc => 
+      mc.player_card_id === cardId && 
+      matches.some(m => m.id === mc.match_id && (m.status === 'in_progress' || m.status === 'open'))
+    );
+
+    if (activeMatchCards.length > 0) {
+      toast.error("Não é possível excluir uma cartela que está em uma partida ativa ou com inscrições abertas.");
+      return;
+    }
+
+    const { error } = await supabase.from('cartelas_jogador').delete().eq('id', cardId);
+    if (error) {
+      toast.error(error.message);
+    } else {
+      toast.success("Cartela excluída com sucesso.");
+      queryClient.invalidateQueries({ queryKey: ['playerCards'] });
+    }
+  };
+
   const joinMatch = async (matchId: string, playerCardIds: string[]): Promise<MatchCard[] | null> => {
     if (!user || !profile) return null;
 
@@ -312,7 +333,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     <GameContext.Provider value={{
       matches, players, playerCards, matchCards, gameSettings, isLoading: l1 || l2 || l3 || l4,
       createMatch, openMatch, startMatch, callNumber, finishMatch, deleteMatch, toggleAutoCall,
-      updateGameSettings, createPlayerCard, joinMatch, buyCardUses, buyCredits,
+      updateGameSettings, createPlayerCard, deletePlayerCard, joinMatch, buyCardUses, buyCredits,
       getMatchCards, getPlayerMatchCards,
     }}>
       {children}

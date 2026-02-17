@@ -9,9 +9,22 @@ import { gameTypeLabels } from '@/utils/bingoUtils';
 import { 
   LogOut, Coins, Plus, Trophy, Users, Settings, Wallet, 
   CreditCard, Timer, DoorOpen, Ticket, Zap, ZapOff, Tv, Printer, Bot, User as UserIcon,
-  Volume2, VolumeX
+  Volume2, VolumeX, Trash2
 } from 'lucide-react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from '@/components/ui/dialog';
+import { 
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose 
+} from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { toast } from 'sonner';
 import { CardCreator } from '@/components/CardCreator';
 import { BingoCell } from '@/components/BingoCell';
@@ -26,7 +39,8 @@ const Lobby = () => {
   const { session, profile, signOut } = useAuth();
   const { 
     matches, joinMatch, getPlayerMatchCards, playerCards, 
-    buyCardUses, buyCredits, createPlayerCard, matchCards, gameSettings
+    buyCardUses, buyCredits, createPlayerCard, deletePlayerCard,
+    matchCards, gameSettings
   } = useGame();
 
   const [buyAmount, setBuyAmount] = useState(50);
@@ -248,7 +262,7 @@ const Lobby = () => {
                         <h3 className="font-heading font-semibold text-foreground">{card.name}</h3>
                         <p className="text-xs text-muted-foreground font-mono">ID: ...{card.id.slice(-6).toUpperCase()}</p>
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1">
                         <div className={`flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-full ${card.uses_left > 0 ? 'bg-success/10 text-success' : 'bg-destructive/10 text-destructive'}`}>
                           {card.uses_left > 0 ? <Zap className="w-3 h-3" /> : <ZapOff className="w-3 h-3" />}
                           <span>{card.uses_left} uso(s)</span>
@@ -258,6 +272,30 @@ const Lobby = () => {
                             Recarregar <Coins className="w-3 h-3 ml-1" />
                           </Button>
                         )}
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button size="icon" variant="ghost" className="text-destructive/70 hover:text-destructive hover:bg-destructive/10 h-8 w-8">
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Esta ação não pode ser desfeita. Isso excluirá permanentemente a cartela "{card.name}".
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                              <AlertDialogAction
+                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                onClick={() => deletePlayerCard(card.id)}
+                              >
+                                Excluir
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
                       </div>
                     </div>
                     <div className="grid grid-cols-5 gap-1">
