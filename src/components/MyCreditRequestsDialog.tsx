@@ -1,6 +1,6 @@
 import { useGame } from '@/contexts/GameContext';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose, DialogDescription } from '@/components/ui/dialog';
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { format } from 'date-fns';
@@ -129,6 +129,7 @@ export const MyCreditRequestsDialog = ({ children }: MyCreditRequestsDialogProps
             <Coins className="w-6 h-6 text-primary" />
             Histórico de Créditos
           </DialogTitle>
+          <DialogDescription>Acompanhe o status de todas as suas solicitações de crédito.</DialogDescription>
         </DialogHeader>
 
         <Tabs defaultValue="pending" className="flex-grow flex flex-col overflow-hidden">

@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose, DialogDescription } from '@/components/ui/dialog';
 import { toast } from 'sonner';
 import { Loader2, Send, RefreshCw } from 'lucide-react';
 import { CreditRequest } from '@/types/match';
@@ -51,11 +51,11 @@ export const ResubmissionDialog = ({ request, children }: ResubmissionDialogProp
             <RefreshCw className="w-5 h-5 text-primary" />
             Pedir Nova Revisão
           </DialogTitle>
+          <DialogDescription>
+            Anexe um novo comprovante e, se desejar, envie uma mensagem para o administrador.
+          </DialogDescription>
         </DialogHeader>
         <div className="space-y-4 pt-4">
-          <p className="text-sm text-muted-foreground">
-            Anexe um novo comprovante e, se desejar, envie uma mensagem para o administrador.
-          </p>
           <div>
             <Label htmlFor="new-receipt">Novo Comprovante</Label>
             <Input

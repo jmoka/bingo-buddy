@@ -13,7 +13,7 @@ import {
   Plus, LogOut, Play, DoorOpen, Trash2, Trophy, Users, 
   Hash, ArrowLeft, StopCircle, Settings, Save, Bot, Shuffle, ArrowRight, Webhook, Key, Send, Loader2, CreditCard
 } from 'lucide-react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
@@ -219,7 +219,10 @@ const Admin = () => {
               <Dialog open={showCreate} onOpenChange={setShowCreate}>
                 <DialogTrigger asChild><Button><Plus className="w-4 h-4 mr-2" />Nova Partida</Button></DialogTrigger>
                 <DialogContent className="max-w-md">
-                  <DialogHeader><DialogTitle className="font-heading">Criar Partida</DialogTitle></DialogHeader>
+                  <DialogHeader>
+                    <DialogTitle className="font-heading">Criar Partida</DialogTitle>
+                    <DialogDescription>Preencha os detalhes para criar uma nova partida de bingo.</DialogDescription>
+                  </DialogHeader>
                   <div className="space-y-4 pt-4">
                     <div>
                       <Label htmlFor="matchName">Nome da partida</Label>

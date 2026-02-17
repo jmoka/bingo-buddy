@@ -3,7 +3,7 @@ import { useGame } from '@/contexts/GameContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose, DialogDescription } from '@/components/ui/dialog';
 import { GameSettings } from '@/contexts/GameContext';
 import { QRCodeSVG as QRCode } from 'qrcode.react';
 import { toast } from 'sonner';
@@ -81,13 +81,12 @@ export const CreditRequestDialog = ({ gameSettings, children }: CreditRequestDia
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle className="font-heading">Solicitar Créditos</DialogTitle>
+          <DialogDescription>
+            {gameSettings?.credit_request_text || 'Escolha a quantidade de créditos, faça o PIX e anexe o comprovante.'}
+          </DialogDescription>
         </DialogHeader>
         {gameSettings?.pix_key ? (
           <div className="space-y-4 pt-4 text-center">
-            <p className="text-sm text-muted-foreground whitespace-pre-wrap">
-              {gameSettings.credit_request_text || 'Escolha a quantidade de créditos, faça o PIX e anexe o comprovante.'}
-            </p>
-            
             <div className="p-4 bg-muted rounded-lg space-y-3">
               <Label htmlFor="credits-input">Quantidade de Créditos</Label>
               <div className="flex items-center justify-center gap-2">

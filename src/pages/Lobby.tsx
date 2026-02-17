@@ -12,7 +12,7 @@ import {
   Volume2, VolumeX, Trash2, Archive, ArchiveRestore, History
 } from 'lucide-react';
 import { 
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose 
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose, DialogDescription
 } from '@/components/ui/dialog';
 import {
   AlertDialog,
@@ -234,7 +234,10 @@ const Lobby = () => {
               <Dialog open={isCreateCardOpen} onOpenChange={setCreateCardOpen}>
                 <DialogTrigger asChild><Button size="sm" className="gradient-primary shadow-button"><Plus className="w-4 h-4 mr-2" />Criar Cartela</Button></DialogTrigger>
                 <DialogContent className="max-w-xl">
-                  <DialogHeader><DialogTitle className="font-heading">Criar Nova Cartela</DialogTitle></DialogHeader>
+                  <DialogHeader>
+                    <DialogTitle className="font-heading">Criar Nova Cartela</DialogTitle>
+                    <DialogDescription>Escolha os números manualmente ou gere uma cartela aleatória.</DialogDescription>
+                  </DialogHeader>
                   <div className="space-y-4 pt-4">
                     <Input placeholder="Nome da cartela (ex: Sorte Pura)" value={newCardName} onChange={e => setNewCardName(e.target.value)} className="bg-secondary border-0" />
                     <CardCreator onCardChange={setNewCardNumbers} />
@@ -474,7 +477,10 @@ const Lobby = () => {
 
       <Dialog open={isJoinDialogOpen} onOpenChange={setJoinDialogOpen}>
         <DialogContent className="max-w-2xl">
-          <DialogHeader><DialogTitle className="font-heading">Entrar na Partida: {selectedMatch?.name}</DialogTitle></DialogHeader>
+          <DialogHeader>
+            <DialogTitle className="font-heading">Entrar na Partida: {selectedMatch?.name}</DialogTitle>
+            <DialogDescription>Selecione as cartelas que deseja usar nesta partida.</DialogDescription>
+          </DialogHeader>
           <div className="max-h-[60vh] overflow-y-auto p-1 space-y-3">
             {(() => {
               if (!selectedMatch || !profile) return null;
