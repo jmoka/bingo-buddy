@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect } from 'react';
+import React, { createContext, useContext, useEffect, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './AuthContext';
@@ -128,7 +128,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
   });
 
   // 7. Dados Administrativos (Só carregam se for admin)
-  const { data: players = [] } = useQuery({
+  const { data: players = [], isLoading: isLoadingPlayers } = useQuery({
     queryKey: ['players', isAdmin],
     queryFn: async () => {
       if (!isAdmin) return [];
@@ -161,40 +161,30 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     enabled: isAdmin,
   });
 
-  // Busca de solicitações para o Admin (Mesclando com perfis manualmente para evitar erros de Join)
-  const { data: allCreditRequests = [], isLoading: isLoadingRequests } = useQuery({
-    queryKey: ['allCreditRequests', isAdmin],
+  const { data: rawCreditRequests = [], isLoading: isLoadingRequests } = useQuery({
+    queryKey: ['rawCreditRequests', isAdmin],
     queryFn: async () => {
       if (!isAdmin) return [];
-
-      // Busca solicitações
-      const { data: requestsData, error: requestsError } = await supabase
+      const { data, error } = await supabase
         .from('solicitacoes_credito')
         .select('*')
         .order('requested_at', { ascending: false });
-      
-      if (requestsError) throw requestsError;
-
-      // Busca perfis de todos os jogadores para mesclar (Admin tem permissão RLS para ler perfis)
-      const playerIds = Array.from(new Set(requestsData.map(r => r.player_id)));
-      const { data: profilesData, error: profilesError } = await supabase
-        .from('perfis')
-        .select('id, full_name, avatar_url')
-        .in('id', playerIds);
-
-      if (profilesError) {
-        console.error("Erro ao buscar perfis para solicitações:", profilesError);
-        return requestsData.map(req => ({ ...req, perfis: null }));
-      }
-
-      // Mescla os dados
-      return requestsData.map(req => ({
-        ...req,
-        perfis: profilesData.find(p => p.id === req.player_id) || null
-      })) as any[];
+      if (error) throw error;
+      return data;
     },
     enabled: isAdmin,
   });
+
+  const allCreditRequests = useMemo(() => {
+    if (!isAdmin || !rawCreditRequests || !players) {
+      return [];
+    }
+    const playersMap = new Map(players.map(p => [p.id, { full_name: p.full_name, avatar_url: p.avatar_url }]));
+    return rawCreditRequests.map(req => ({
+      ...req,
+      perfis: playersMap.get(req.player_id) || null
+    })) as CreditRequest[];
+  }, [isAdmin, rawCreditRequests, players]);
 
   // Escuta mudanças em tempo real para invalidar o cache
   useEffect(() => {
@@ -313,7 +303,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   return (
     <GameContext.Provider value={{
-      matches, players, playerCards, allPlayerCards, matchCards, wins, allWins, creditRequests, allCreditRequests, gameSettings, isLoading: isLoadingRequests,
+      matches, players, playerCards, allPlayerCards, matchCards, wins, allWins, creditRequests, allCreditRequests, gameSettings, isLoading: isLoadingRequests || (isAdmin && isLoadingPlayers),
       createMatch, openMatch, startMatch, callNumber, finishMatch, deleteMatch, toggleAutoCall,
       updateGameSettings, createPlayerCard, deletePlayerCard, toggleArchivePlayerCard, joinMatch, buyCardUses,
       requestCredits, resolveCreditRequest, deleteCreditRequest, updatePlayerCredits, getMatchCards, getPlayerMatchCards,
