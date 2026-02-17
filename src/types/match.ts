@@ -42,7 +42,7 @@ export interface PlayerCard {
   name: string;
   numbers: number[][];
   uses_left: number;
-  is_archived: boolean;
+  created_at: string;
   credit_type: CreditType;
 }
 
@@ -94,7 +94,6 @@ export interface CreditRequest {
   mensagens?: CreditRequestMessage[];
 }
 
-// Novos tipos para Resgate
 export interface RedeemRequestMessage {
   id: string;
   redeem_request_id: string;

@@ -8,8 +8,8 @@ import { Match, MatchStatus, CreditType, PlayerCard } from '@/types/match';
 import { gameTypeLabels } from '@/utils/bingoUtils';
 import { 
   LogOut, Coins, Plus, Trophy, Users, Settings, Wallet, 
-  CreditCard, Timer, DoorOpen, Ticket, Zap, ZapOff, Tv, Printer, Bot, User as UserIcon,
-  Volume2, VolumeX, Trash2, Archive, ArchiveRestore, History, Banknote, RefreshCw, Star
+  CreditCard, Timer, DoorOpen, Ticket, Zap, ZapOff, Tv, Printer, User as UserIcon,
+  RefreshCw, Star, Trash2, History, Banknote
 } from 'lucide-react';
 import { 
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose, DialogDescription
@@ -45,12 +45,11 @@ const Lobby = () => {
   const { 
     matches, joinMatch, getPlayerMatchCards, playerCards, 
     buyCardUses, createPlayerCard, deletePlayerCard,
-    toggleArchivePlayerCard, matchCards, gameSettings, wins,
+    matchCards, gameSettings, wins,
     redeemRequests, renewFakeCredits
   } = useGame();
 
-  const [now, setNow] = useState(Date.now());
-  const [isSoundOn, setIsSoundOn] = useState(true);
+  const [isSoundOn] = useState(true);
   const prevMatchesRef = useRef<Match[]>([]);
 
   const [isCreateCardOpen, setCreateCardOpen] = useState(false);
@@ -70,15 +69,10 @@ const Lobby = () => {
     }
   }, [session, navigate]);
 
+  // Filtramos apenas pelo player_id, removendo o filtro de is_archived que não existe no banco
   const myOwnedCards = profile ? playerCards.filter(c => c.player_id === profile.id) : [];
-  const activeCards = myOwnedCards.filter(c => !c.is_archived);
-  const realCards = activeCards.filter(c => c.credit_type === 'real');
-  const fakeCards = activeCards.filter(c => c.credit_type === 'fake');
-
-  useEffect(() => {
-    const interval = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(interval);
-  }, []);
+  const realCards = myOwnedCards.filter(c => c.credit_type === 'real');
+  const fakeCards = myOwnedCards.filter(c => c.credit_type === 'fake');
 
   useEffect(() => {
     if (!profile || matches.length === 0) return;
@@ -199,7 +193,6 @@ const Lobby = () => {
                     <span>{card.uses_left} uso(s)</span>
                   </div>
                   {card.uses_left === 0 && <Button size="sm" variant="outline" className="h-7 text-[10px]" onClick={() => setRechargeCard(card)}>Recarregar <Coins className="w-3 h-3 ml-1" /></Button>}
-                  <Button size="icon" variant="ghost" className="text-muted-foreground h-7 w-7" onClick={() => toggleArchivePlayerCard(card.id, true)}><Archive className="w-3.5 h-3.5" /></Button>
                   <AlertDialog>
                     <AlertDialogTrigger asChild><Button size="icon" variant="ghost" disabled={winCount > 0} className="text-destructive/70 h-7 w-7"><Trash2 className="w-3.5 h-3.5" /></Button></AlertDialogTrigger>
                     <AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Você tem certeza?</AlertDialogTitle><AlertDialogDescription>Esta ação não pode ser desfeita. Isso excluirá permanentemente a cartela "{card.name}".</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={() => deletePlayerCard(card.id)}>Excluir</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
@@ -402,7 +395,7 @@ const Lobby = () => {
         <DialogContent className="max-w-2xl">
           <DialogHeader><DialogTitle className="font-heading">Entrar na Partida</DialogTitle><DialogDescription>Selecione as cartelas que deseja usar.</DialogDescription></DialogHeader>
           <div className="max-h-[60vh] overflow-y-auto p-1 space-y-3">
-            {profile && activeCards.filter(card => !new Set(getPlayerMatchCards(selectedMatch?.id || '', profile.id).map(c => c.player_card_id)).has(card.id)).map(card => {
+            {profile && myOwnedCards.filter(card => !new Set(getPlayerMatchCards(selectedMatch?.id || '', profile.id).map(c => c.player_card_id)).has(card.id)).map(card => {
                 const isSelected = cardsToJoin.has(card.id);
                 const isDisabled = card.uses_left === 0;
                 return (
