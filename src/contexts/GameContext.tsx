@@ -1,360 +1,234 @@
-import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
-import { Match, Player, PlayerCard, MatchCard, MatchStatus, Winner } from '@/types/match';
+import React, { createContext, useContext, useCallback, useEffect } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from './AuthContext';
+import { Match, PlayerCard, MatchCard, Winner, MatchStatus } from '@/types/match';
 import { BingoCard, GameType, WinResult } from '@/types/bingo';
-import { generateCardId, checkWin } from '@/utils/bingoUtils';
+import { checkWin } from '@/utils/bingoUtils';
+import { toast } from 'sonner';
 
-interface GameSettings {
-  newCardCost: number;
-  cardRechargeCost: number;
-  usesPerRecharge: number;
-  autoCallIntervalSeconds: number;
-}
-
-interface GameContextType {
-  // Admin
-  isAdmin: boolean;
-  adminLogin: (password: string) => boolean;
-  adminLogout: () => void;
-  createMatch: (match: Omit<Match, 'id' | 'status' | 'playerIds' | 'calledNumbers' | 'pot' | 'createdAt' | 'isAutoCalling' | 'nextAutoCallTimestamp' | 'winners'>) => Match;
-  openMatch: (matchId: string) => void;
-  startMatch: (matchId: string) => void;
-  callNumber: (matchId: string, num: number) => void;
-  finishMatch: (matchId: string) => void;
-  deleteMatch: (matchId: string) => void;
-  toggleAutoCall: (matchId: string) => void;
-  updateGameSettings: (settings: GameSettings) => void;
-
-  // Player
-  currentPlayer: Player | null;
-  registerPlayer: (name: string) => void;
-  logoutPlayer: () => void;
-  buyCredits: (amount: number) => void;
-  createPlayerCard: (options: { name: string, numbers: number[][] }) => PlayerCard | null;
-  joinMatch: (matchId: string, playerCardIds: string[]) => MatchCard[];
-  buyCardUses: (playerCardId: string) => boolean;
-  
-  // Data
-  matches: Match[];
-  players: Player[];
-  playerCards: PlayerCard[]; // Owned cards
-  matchCards: MatchCard[]; // Cards in matches
-  gameSettings: GameSettings;
-  getMatchCards: (matchId: string) => MatchCard[];
-  getPlayerMatchCards: (matchId: string, playerId: string) => MatchCard[];
-}
-
-const GameContext = createContext<GameContextType | null>(null);
-
-const ADMIN_PASSWORD = 'admin123';
-const STORAGE_KEYS = {
-  matches: 'bingo_matches',
-  players: 'bingo_players',
-  playerCards: 'bingo_player_cards',
-  matchCards: 'bingo_match_cards',
-  currentPlayer: 'bingo_current_player',
-  isAdmin: 'bingo_is_admin',
-  gameSettings: 'bingo_game_settings',
-};
-
-const DEFAULT_SETTINGS: GameSettings = {
+// This can be moved to a settings table in the future
+const gameSettings = {
   newCardCost: 10,
   cardRechargeCost: 5,
   usesPerRecharge: 1,
   autoCallIntervalSeconds: 120,
 };
 
-function generateId(): string {
-  return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+interface GameContextType {
+  matches: Match[];
+  playerCards: PlayerCard[];
+  matchCards: MatchCard[];
+  isLoading: boolean;
+  createMatch: (data: Omit<Match, 'id' | 'status' | 'playerIds' | 'calledNumbers' | 'pot' | 'createdAt' | 'isAutoCalling' | 'nextAutoCallTimestamp' | 'winners'>) => Promise<void>;
+  openMatch: (matchId: string) => Promise<void>;
+  startMatch: (matchId: string) => Promise<void>;
+  callNumber: (matchId: string, num: number) => Promise<void>;
+  finishMatch: (matchId: string) => Promise<void>;
+  deleteMatch: (matchId: string) => Promise<void>;
+  toggleAutoCall: (matchId: string) => Promise<void>;
+  createPlayerCard: (options: { name: string; numbers: number[][]; }) => Promise<PlayerCard | null>;
+  joinMatch: (matchId: string, playerCardIds: string[]) => Promise<MatchCard[] | null>;
+  buyCardUses: (playerCardId: string) => Promise<boolean>;
+  buyCredits: (amount: number) => Promise<void>;
+  getMatchCards: (matchId: string) => MatchCard[];
+  getPlayerMatchCards: (matchId: string, playerId: string) => MatchCard[];
 }
 
-export function generateBingoCard(): number[][] {
-  const ranges = [
-    [1, 15], [16, 30], [31, 45], [46, 60], [61, 75]
-  ];
-  const card: number[][] = Array(5).fill(0).map(() => Array(5).fill(0));
-  
-  for (let col = 0; col < 5; col++) {
-    const [min, max] = ranges[col];
-    const columnNumbers = new Set<number>();
-    while (columnNumbers.size < 5) {
-      if (col === 2 && columnNumbers.size === 2) {
-        columnNumbers.add(0); // Free space
-      } else {
-        const num = Math.floor(Math.random() * (max - min + 1)) + min;
-        columnNumbers.add(num);
-      }
-    }
-    const sortedCol = Array.from(columnNumbers).sort((a, b) => a - b);
-    for (let row = 0; row < 5; row++) {
-      card[row][col] = sortedCol[row];
-    }
-  }
-  return card;
-}
-
-function serializeMatchCards(cards: MatchCard[]): string {
-  return JSON.stringify(cards.map(c => ({
-    ...c,
-    markedNumbers: Array.from(c.markedNumbers),
-  })));
-}
-
-function deserializeMatchCards(json: string): MatchCard[] {
-  const arr = JSON.parse(json);
-  return arr.map((c: any) => ({
-    ...c,
-    markedNumbers: new Set(c.markedNumbers),
-  }));
-}
+const GameContext = createContext<GameContextType | null>(null);
 
 export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [matches, setMatches] = useState<Match[]>(() => JSON.parse(localStorage.getItem(STORAGE_KEYS.matches) || '[]'));
-  const [players, setPlayers] = useState<Player[]>(() => JSON.parse(localStorage.getItem(STORAGE_KEYS.players) || '[]'));
-  const [playerCards, setPlayerCards] = useState<PlayerCard[]>(() => JSON.parse(localStorage.getItem(STORAGE_KEYS.playerCards) || '[]'));
-  const [matchCards, setMatchCards] = useState<MatchCard[]>(() => deserializeMatchCards(localStorage.getItem(STORAGE_KEYS.matchCards) || '[]'));
-  const [currentPlayer, setCurrentPlayer] = useState<Player | null>(() => JSON.parse(localStorage.getItem(STORAGE_KEYS.currentPlayer) || 'null'));
-  const [isAdmin, setIsAdmin] = useState<boolean>(() => localStorage.getItem(STORAGE_KEYS.isAdmin) === 'true');
-  const [gameSettings, setGameSettings] = useState<GameSettings>(() => {
-    const stored = localStorage.getItem(STORAGE_KEYS.gameSettings);
-    return stored ? { ...DEFAULT_SETTINGS, ...JSON.parse(stored) } : DEFAULT_SETTINGS;
+  const { user, profile } = useAuth();
+  const queryClient = useQueryClient();
+
+  const { data: matches = [], isLoading: l1 } = useQuery({
+    queryKey: ['matches'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('matches').select('*').order('start_time', { ascending: false });
+      if (error) throw error;
+      return data as Match[];
+    },
   });
 
-  useEffect(() => { localStorage.setItem(STORAGE_KEYS.matches, JSON.stringify(matches)); }, [matches]);
-  useEffect(() => { localStorage.setItem(STORAGE_KEYS.players, JSON.stringify(players)); }, [players]);
-  useEffect(() => { localStorage.setItem(STORAGE_KEYS.playerCards, JSON.stringify(playerCards)); }, [playerCards]);
-  useEffect(() => { localStorage.setItem(STORAGE_KEYS.matchCards, serializeMatchCards(matchCards)); }, [matchCards]);
-  useEffect(() => { localStorage.setItem(STORAGE_KEYS.isAdmin, String(isAdmin)); }, [isAdmin]);
-  useEffect(() => { localStorage.setItem(STORAGE_KEYS.gameSettings, JSON.stringify(gameSettings)); }, [gameSettings]);
-  useEffect(() => {
-    if (currentPlayer) localStorage.setItem(STORAGE_KEYS.currentPlayer, JSON.stringify(currentPlayer));
-    else localStorage.removeItem(STORAGE_KEYS.currentPlayer);
-  }, [currentPlayer]);
+  const { data: playerCards = [], isLoading: l2 } = useQuery({
+    queryKey: ['playerCards', user?.id],
+    queryFn: async () => {
+      if (!user) return [];
+      const { data, error } = await supabase.from('player_cards').select('*').eq('player_id', user.id);
+      if (error) throw error;
+      return data as PlayerCard[];
+    },
+    enabled: !!user,
+  });
+
+  const { data: matchCards = [], isLoading: l3 } = useQuery({
+    queryKey: ['matchCards'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('match_cards').select('*');
+      if (error) throw error;
+      return data.map(c => ({ ...c, markedNumbers: new Set(c.marked_numbers || [0]) })) as MatchCard[];
+    },
+  });
 
   useEffect(() => {
-    if (currentPlayer) {
-      const updated = players.find(p => p.id === currentPlayer.id);
-      if (updated && JSON.stringify(updated) !== JSON.stringify(currentPlayer)) {
-        setCurrentPlayer(updated);
-      }
-    }
-  }, [players, currentPlayer]);
+    const channel = supabase.channel('public-db-changes')
+      .on('postgres_changes', { event: '*', schema: 'public' }, (payload) => {
+        console.log('Realtime event:', payload);
+        queryClient.invalidateQueries({ queryKey: ['matches'] });
+        queryClient.invalidateQueries({ queryKey: ['playerCards'] });
+        queryClient.invalidateQueries({ queryKey: ['matchCards'] });
+        queryClient.invalidateQueries({ queryKey: ['profile'] });
+      }).subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [queryClient]);
 
-  // Sync state across tabs
-  useEffect(() => {
-    const handleStorageChange = (event: StorageEvent) => {
-      if (!event.newValue) return;
+  const createMatch = async (data: any) => {
+    const { error } = await supabase.from('matches').insert([{ ...data, status: 'waiting' }]);
+    if (error) toast.error(error.message);
+  };
 
-      switch (event.key) {
-        case STORAGE_KEYS.matches:
-          setMatches(JSON.parse(event.newValue));
-          break;
-        case STORAGE_KEYS.matchCards:
-          setMatchCards(deserializeMatchCards(event.newValue));
-          break;
-        case STORAGE_KEYS.players:
-          setPlayers(JSON.parse(event.newValue));
-          break;
-        default:
-          break;
-      }
-    };
+  const updateMatchStatus = async (matchId: string, status: MatchStatus) => {
+    const { error } = await supabase.from('matches').update({ status }).eq('id', matchId);
+    if (error) toast.error(error.message);
+  };
 
-    window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
-  }, []);
+  const openMatch = (matchId: string) => updateMatchStatus(matchId, 'open');
+  const startMatch = (matchId: string) => updateMatchStatus(matchId, 'in_progress');
+  const finishMatch = (matchId: string) => updateMatchStatus(matchId, 'finished');
 
-  const adminLogin = useCallback((password: string) => { if (password === ADMIN_PASSWORD) { setIsAdmin(true); return true; } return false; }, []);
-  const adminLogout = useCallback(() => setIsAdmin(false), []);
-  const updateGameSettings = useCallback((settings: GameSettings) => setGameSettings(settings), []);
+  const deleteMatch = async (matchId: string) => {
+    const { error } = await supabase.from('matches').delete().eq('id', matchId);
+    if (error) toast.error(error.message);
+  };
 
-  const createMatch = useCallback((data: Omit<Match, 'id' | 'status' | 'playerIds' | 'calledNumbers' | 'pot' | 'createdAt' | 'isAutoCalling' | 'nextAutoCallTimestamp' | 'winners'>): Match => {
-    const match: Match = { ...data, id: generateId(), status: 'waiting', playerIds: [], calledNumbers: [], pot: 0, createdAt: new Date().toISOString(), isAutoCalling: false, winners: [] };
-    setMatches(prev => [...prev, match]);
-    return match;
-  }, []);
-
-  const openMatch = useCallback((matchId: string) => setMatches(prev => prev.map(m => m.id === matchId ? { ...m, status: 'open' as MatchStatus } : m)), []);
-  const startMatch = useCallback((matchId: string) => setMatches(prev => prev.map(m => m.id === matchId ? { ...m, status: 'in_progress' as MatchStatus } : m)), []);
-  const finishMatch = useCallback((matchId: string) => {
-    setMatches(prev => prev.map(m => m.id === matchId ? { ...m, status: 'finished' as MatchStatus, isAutoCalling: false, nextAutoCallTimestamp: undefined } : m));
-  }, []);
-
-  const toggleAutoCall = useCallback((matchId: string) => {
-    setMatches(prev => prev.map(m => {
-      if (m.id === matchId) {
-        const isEnabling = !m.isAutoCalling;
-        return { 
-          ...m, 
-          isAutoCalling: isEnabling,
-          nextAutoCallTimestamp: isEnabling ? Date.now() + gameSettings.autoCallIntervalSeconds * 1000 : undefined,
-        };
-      }
-      return m;
-    }));
-  }, [gameSettings.autoCallIntervalSeconds]);
-  
-  const callNumber = useCallback((matchId: string, num: number) => {
+  const toggleAutoCall = async (matchId: string) => {
     const match = matches.find(m => m.id === matchId);
-    if (!match || match.status !== 'in_progress' || match.calledNumbers.includes(num)) {
-      return;
-    }
+    if (!match) return;
+    const isEnabling = !match.is_auto_calling;
+    const { error } = await supabase.from('matches').update({
+      is_auto_calling: isEnabling,
+      next_auto_call_timestamp: isEnabling ? new Date(Date.now() + gameSettings.autoCallIntervalSeconds * 1000).toISOString() : null,
+    }).eq('id', matchId);
+    if (error) toast.error(error.message);
+  };
 
-    const newCalledNumbers = [...match.calledNumbers, num];
-    const newMatchCards = matchCards.map(card => {
-      if (card.matchId !== matchId) return card;
-      const newMarked = new Set(card.markedNumbers);
-      if (card.numbers.flat().includes(num)) newMarked.add(num);
-      return { ...card, markedNumbers: newMarked };
-    });
+  const callNumber = async (matchId: string, num: number) => {
+    const match = matches.find(m => m.id === matchId);
+    if (!match || match.called_numbers.includes(num)) return;
 
-    const cardsInMatch = newMatchCards.filter(c => c.matchId === matchId);
+    const newCalledNumbers = [...match.called_numbers, num];
+    const { error: updateError } = await supabase.from('matches').update({ called_numbers: newCalledNumbers }).eq('id', matchId);
+    if (updateError) { toast.error(updateError.message); return; }
+
+    const cardsInMatch = matchCards.filter(c => c.matchId === matchId);
     const foundWinners: { card: MatchCard, result: WinResult }[] = [];
-    
+
     for (const card of cardsInMatch) {
-      const winResult = checkWin(card as unknown as BingoCard, match.gameType);
-      if (winResult) {
-        foundWinners.push({ card, result: winResult });
-      }
+      const tempBingoCard: BingoCard = {
+        id: card.id,
+        name: card.name,
+        numbers: card.numbers,
+        markedNumbers: new Set([...(card.markedNumbers || []), num]),
+      };
+      const winResult = checkWin(tempBingoCard, match.game_type);
+      if (winResult) foundWinners.push({ card, result: winResult });
     }
 
-    if (foundWinners.length === 0) {
-      setMatches(prev => prev.map(m => m.id === matchId ? {
-        ...m,
-        calledNumbers: newCalledNumbers,
-        nextAutoCallTimestamp: m.isAutoCalling ? Date.now() + gameSettings.autoCallIntervalSeconds * 1000 : m.nextAutoCallTimestamp,
-      } : m));
-      setMatchCards(newMatchCards);
-      return;
-    }
-
-    const winnerData: Winner[] = foundWinners.map(fw => {
-      const player = players.find(p => p.id === fw.card.playerId);
-      return {
+    if (foundWinners.length > 0) {
+      const { data: profiles } = await supabase.from('profiles').select('*');
+      const winnerData: Winner[] = foundWinners.map(fw => ({
         playerId: fw.card.playerId,
-        playerName: player?.name || 'Desconhecido',
+        playerName: profiles?.find(p => p.id === fw.card.playerId)?.full_name || 'Desconhecido',
         cardId: fw.card.id,
         cardName: fw.card.name,
-      };
-    });
+      }));
 
-    let totalPrize = 0;
-    if (match.prize.type === 'percentage') {
-      totalPrize = Math.floor(match.pot * (match.prize.value / 100));
-    } else if (match.prize.type === 'fixed') {
-      totalPrize = match.prize.value;
+      await supabase.from('matches').update({ status: 'finished', winners: winnerData, is_auto_calling: false }).eq('id', matchId);
+      toast.success('BINGO! Temos um vencedor!');
     }
-    const prizePerWinner = totalPrize > 0 ? Math.floor(totalPrize / winnerData.length) : 0;
+  };
 
-    const newPlayers = prizePerWinner > 0 ? players.map(p => {
-      if (winnerData.some(w => w.playerId === p.id)) {
-        return { ...p, credits: p.credits + prizePerWinner };
-      }
-      return p;
-    }) : players;
+  const buyCredits = async (amount: number) => {
+    if (!profile) return;
+    const { error } = await supabase.from('profiles').update({ credits: profile.credits + amount }).eq('id', profile.id);
+    if (error) toast.error(error.message);
+  };
 
-    const newMatches = matches.map(m => m.id === matchId ? {
-      ...m,
-      calledNumbers: newCalledNumbers,
-      status: 'finished',
-      isAutoCalling: false,
-      nextAutoCallTimestamp: undefined,
-      winners: winnerData,
-    } : m);
+  const createPlayerCard = async (options: { name: string; numbers: number[][]; }): Promise<PlayerCard | null> => {
+    if (!user || !profile || profile.credits < gameSettings.newCardCost) {
+      toast.error('Créditos insuficientes!');
+      return null;
+    }
+    const { error: creditError } = await supabase.from('profiles').update({ credits: profile.credits - gameSettings.newCardCost }).eq('id', user.id);
+    if (creditError) { toast.error(creditError.message); return null; }
 
-    setPlayers(newPlayers);
-    setMatches(newMatches);
-    setMatchCards(newMatchCards);
-  }, [matches, matchCards, players, gameSettings.autoCallIntervalSeconds]);
+    const newCard = { player_id: user.id, ...options, uses_left: 1 };
+    const { data, error } = await supabase.from('player_cards').insert(newCard).select().single();
+    if (error) { toast.error(error.message); return null; }
+    return data as PlayerCard;
+  };
 
-  const deleteMatch = useCallback((matchId: string) => {
-    setMatches(prev => prev.filter(m => m.id !== matchId));
-    setMatchCards(prev => prev.filter(c => c.matchId !== matchId));
-  }, []);
-
-  const registerPlayer = useCallback((name: string) => {
-    const existing = players.find(p => p.name.toLowerCase() === name.toLowerCase());
-    if (existing) { setCurrentPlayer(existing); return; }
-    const player: Player = { id: generateId(), name, credits: 100, ownedCardIds: [] };
-    setPlayers(prev => [...prev, player]);
-    setCurrentPlayer(player);
-  }, [players]);
-
-  const logoutPlayer = useCallback(() => setCurrentPlayer(null), []);
-  const buyCredits = useCallback((amount: number) => {
-    if (!currentPlayer) return;
-    setPlayers(prev => prev.map(p => p.id === currentPlayer.id ? { ...p, credits: p.credits + amount } : p));
-  }, [currentPlayer]);
-
-  const createPlayerCard = useCallback((options: { name: string, numbers: number[][] }): PlayerCard | null => {
-    if (!currentPlayer) return null;
-    if (currentPlayer.credits < gameSettings.newCardCost) return null;
-
-    const newCard: PlayerCard = { id: generateCardId(), playerId: currentPlayer.id, name: options.name, numbers: options.numbers, usesLeft: 1 };
-    
-    setPlayerCards(prev => [...prev, newCard]);
-    setPlayers(prev => prev.map(p => p.id === currentPlayer.id ? { ...p, credits: p.credits - gameSettings.newCardCost, ownedCardIds: [...p.ownedCardIds, newCard.id] } : p));
-    return newCard;
-  }, [currentPlayer, gameSettings.newCardCost]);
-
-  const joinMatch = useCallback((matchId: string, playerCardIds: string[]): MatchCard[] => {
-    if (!currentPlayer || playerCardIds.length === 0) return [];
+  const joinMatch = async (matchId: string, playerCardIds: string[]): Promise<MatchCard[] | null> => {
+    if (!user || !profile) return null;
     const match = matches.find(m => m.id === matchId);
-    if (!match || (match.status !== 'open' && match.status !== 'waiting')) return [];
-
-    const cardsToUse = playerCards.filter(pc => playerCardIds.includes(pc.id));
-    const allCardsAreValid = cardsToUse.every(c => c.usesLeft > 0 && c.playerId === currentPlayer.id);
-    if (cardsToUse.length !== playerCardIds.length || !allCardsAreValid) {
-      console.error("Algumas cartelas selecionadas são inválidas ou não tem usos restantes.");
-      return [];
-    }
+    if (!match) { toast.error("Partida não encontrada"); return null; }
 
     const totalCost = playerCardIds.length * match.cardPrice;
-    if (currentPlayer.credits < totalCost) return [];
+    if (profile.credits < totalCost) { toast.error("Créditos insuficientes!"); return null; }
 
-    setPlayers(prev => prev.map(p => p.id === currentPlayer.id ? { ...p, credits: p.credits - totalCost } : p));
-    setMatches(prev => prev.map(m => m.id === matchId ? { ...m, pot: m.pot + totalCost, playerIds: m.playerIds.includes(currentPlayer.id) ? m.playerIds : [...m.playerIds, currentPlayer.id] } : m));
-    
-    setPlayerCards(prev => prev.map(pc => {
-      if (playerCardIds.includes(pc.id)) {
-        return { ...pc, usesLeft: pc.usesLeft - 1 };
-      }
-      return pc;
-    }));
+    // This should be an Edge Function for atomicity, but doing it client-side for now.
+    const { error: creditError } = await supabase.from('profiles').update({ credits: profile.credits - totalCost }).eq('id', user.id);
+    if (creditError) { toast.error(creditError.message); return null; }
 
-    const newMatchCards: MatchCard[] = cardsToUse.map(playerCard => {
+    for (const cardId of playerCardIds) {
+      const card = playerCards.find(c => c.id === cardId);
+      if (card) await supabase.from('player_cards').update({ uses_left: card.uses_left - 1 }).eq('id', cardId);
+    }
+
+    const newMatchCards = playerCardIds.map(cardId => {
+      const card = playerCards.find(c => c.id === cardId);
       return {
-        id: generateId(),
-        playerCardId: playerCard.id,
-        playerId: currentPlayer.id,
-        matchId,
-        name: playerCard.name,
-        numbers: playerCard.numbers,
-        markedNumbers: new Set([0]),
+        player_id: user.id,
+        match_id: matchId,
+        player_card_id: cardId,
+        name: card?.name,
+        numbers: card?.numbers,
+        marked_numbers: [0],
       };
     });
 
-    setMatchCards(prev => [...prev, ...newMatchCards]);
-    return newMatchCards;
-  }, [currentPlayer, matches, playerCards]);
+    const { data, error } = await supabase.from('match_cards').insert(newMatchCards).select();
+    if (error) { toast.error(error.message); return null; }
 
-  const buyCardUses = useCallback((playerCardId: string): boolean => {
-    if (!currentPlayer) return false;
-    if (currentPlayer.credits < gameSettings.cardRechargeCost) return false;
+    await supabase.from('matches').update({ pot: match.pot + totalCost }).eq('id', matchId);
+    return data as MatchCard[];
+  };
 
-    setPlayers(prev => prev.map(p => p.id === currentPlayer.id ? { ...p, credits: p.credits - gameSettings.cardRechargeCost } : p));
-    setPlayerCards(prev => prev.map(pc => pc.id === playerCardId ? { ...pc, usesLeft: pc.usesLeft + gameSettings.usesPerRecharge } : pc));
-    
+  const buyCardUses = async (playerCardId: string): Promise<boolean> => {
+    if (!profile || profile.credits < gameSettings.cardRechargeCost) {
+      toast.error('Créditos insuficientes!');
+      return false;
+    }
+    const { error: creditError } = await supabase.from('profiles').update({ credits: profile.credits - gameSettings.cardRechargeCost }).eq('id', profile.id);
+    if (creditError) { toast.error(creditError.message); return false; }
+
+    const card = playerCards.find(c => c.id === playerCardId);
+    if (card) {
+      const { error } = await supabase.from('player_cards').update({ uses_left: card.uses_left + gameSettings.usesPerRecharge }).eq('id', playerCardId);
+      if (error) { toast.error(error.message); return false; }
+    }
     return true;
-  }, [currentPlayer, gameSettings]);
+  };
 
-  const getMatchCards = useCallback((matchId: string) => matchCards.filter(c => c.matchId === matchId), [matchCards]);
-  const getPlayerMatchCards = useCallback((matchId: string, playerId: string) => matchCards.filter(c => c.matchId === matchId && c.playerId === playerId), [matchCards]);
+  const getMatchCards = (matchId: string) => matchCards.filter(c => c.matchId === matchId);
+  const getPlayerMatchCards = (matchId: string, playerId: string) => matchCards.filter(c => c.matchId === matchId && c.playerId === playerId);
 
   return (
     <GameContext.Provider value={{
-      isAdmin, adminLogin, adminLogout, createMatch, openMatch, startMatch, callNumber, finishMatch, deleteMatch, toggleAutoCall, updateGameSettings,
-      currentPlayer, registerPlayer, logoutPlayer, buyCredits, createPlayerCard, joinMatch, buyCardUses,
-      matches, players, playerCards, matchCards, gameSettings, getMatchCards, getPlayerMatchCards,
+      matches, playerCards, matchCards, isLoading: l1 || l2 || l3,
+      createMatch, openMatch, startMatch, callNumber, finishMatch, deleteMatch, toggleAutoCall,
+      createPlayerCard, joinMatch, buyCardUses, buyCredits,
+      getMatchCards, getPlayerMatchCards,
     }}>
       {children}
     </GameContext.Provider>
