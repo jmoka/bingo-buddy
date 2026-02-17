@@ -11,7 +11,7 @@ import { PrizeType, Match, MatchStatus } from '@/types/match';
 import { gameTypeLabels } from '@/utils/bingoUtils';
 import { 
   Plus, LogOut, Play, DoorOpen, Trash2, Trophy, Users, 
-  Clock, Coins, Hash, ArrowLeft, StopCircle, Settings, Save, Bot, Shuffle, Ticket, ArrowRight, Webhook, Key, Send, Loader2
+  Clock, Coins, Hash, ArrowLeft, StopCircle, Settings, Save, Bot, Shuffle, Ticket, ArrowRight, Webhook, Key, Send, Loader2, CreditCard
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
@@ -42,7 +42,7 @@ const Admin = () => {
   const { 
     matches, players, createMatch, matchCards,
     openMatch, startMatch, finishMatch, deleteMatch, callNumber,
-    toggleAutoCall, gameSettings, updateGameSettings
+    toggleAutoCall, gameSettings, updateGameSettings, allCreditRequests
   } = useGame();
 
   const [showCreate, setShowCreate] = useState(false);
@@ -184,9 +184,6 @@ const Admin = () => {
 
   const handleTestN8n = async () => {
     setIsTestingN8n(true);
-
-    // O cliente supabase injeta o token de autenticação automaticamente.
-    // Não é necessário fazer getSession() ou passar o header manualmente.
     const { data, error } = await supabase.functions.invoke('test-n8n');
 
     if (error) {
@@ -194,26 +191,17 @@ const Admin = () => {
       if ('context' in error && typeof (error as any).context.json === 'function') {
         try {
           const errorJson = await (error as any).context.json();
-          if (errorJson.error) {
-            detailedError = errorJson.error;
-          }
-        } catch (e) {
-          console.error("Failed to parse edge function error response:", e);
-        }
+          if (errorJson.error) { detailedError = errorJson.error; }
+        } catch (e) { console.error("Failed to parse edge function error response:", e); }
       }
-      toast({
-        title: 'Falha no Teste',
-        description: detailedError,
-        variant: 'destructive',
-      });
+      toast({ title: 'Falha no Teste', description: detailedError, variant: 'destructive' });
     } else {
-      toast({
-        title: 'Sucesso!',
-        description: data.message || 'Notificação de teste enviada.',
-      });
+      toast({ title: 'Sucesso!', description: data.message || 'Notificação de teste enviada.' });
     }
     setIsTestingN8n(false);
   };
+
+  const pendingRequestsCount = allCreditRequests.filter(r => r.status === 'pending').length;
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -319,12 +307,24 @@ const Admin = () => {
             </div>
           </div>
 
-          <div className="card-container">
-            <h2 className="font-heading text-xl font-bold text-foreground mb-4 flex items-center gap-2"><Users className="w-5 h-5" /> Gerenciamento de Jogadores</h2>
-            <p className="text-muted-foreground mb-4">Acesse a página de gerenciamento para ver detalhes, cartelas e gerenciar os créditos de cada jogador.</p>
-            <Button className="w-full" onClick={() => navigate('/admin/players')}>
-              Gerenciar Jogadores <ArrowRight className="w-4 h-4 ml-2" />
-            </Button>
+          <div className="space-y-8">
+            <div className="card-container">
+              <h2 className="font-heading text-xl font-bold text-foreground mb-4 flex items-center gap-2"><Users className="w-5 h-5" /> Gerenciamento de Jogadores</h2>
+              <p className="text-muted-foreground mb-4">Acesse a página de gerenciamento para ver detalhes, cartelas e gerenciar os créditos de cada jogador.</p>
+              <Button className="w-full" onClick={() => navigate('/admin/players')}>
+                Gerenciar Jogadores <ArrowRight className="w-4 h-4 ml-2" />
+              </Button>
+            </div>
+            <div className="card-container">
+              <h2 className="font-heading text-xl font-bold text-foreground mb-4 flex items-center gap-2">
+                <CreditCard className="w-5 h-5" /> Solicitações de Crédito
+                {pendingRequestsCount > 0 && <Badge variant="destructive">{pendingRequestsCount}</Badge>}
+              </h2>
+              <p className="text-muted-foreground mb-4">Aprove ou rejeite as solicitações de crédito enviadas pelos jogadores.</p>
+              <Button className="w-full" onClick={() => navigate('/admin/credit-requests')}>
+                Ver Solicitações <ArrowRight className="w-4 h-4 ml-2" />
+              </Button>
+            </div>
           </div>
         </div>
 

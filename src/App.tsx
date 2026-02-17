@@ -13,6 +13,7 @@ import MatchView from "./pages/MatchView";
 import PrintView from "./pages/PrintView";
 import NotFound from "./pages/NotFound";
 import PlayersAdmin from "./pages/PlayersAdmin";
+import CreditRequestsAdmin from "./pages/CreditRequestsAdmin";
 
 const queryClient = new QueryClient();
 
@@ -30,6 +31,7 @@ const App = () => (
               <Route path="/account" element={<Account />} />
               <Route path="/admin" element={<Admin />} />
               <Route path="/admin/players" element={<PlayersAdmin />} />
+              <Route path="/admin/credit-requests" element={<CreditRequestsAdmin />} />
               <Route path="/match/:id" element={<MatchView />} />
               <Route path="/print" element={<PrintView />} />
               <Route path="*" element={<NotFound />} />

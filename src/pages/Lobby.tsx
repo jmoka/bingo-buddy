@@ -9,7 +9,7 @@ import { gameTypeLabels } from '@/utils/bingoUtils';
 import { 
   LogOut, Coins, Plus, Trophy, Users, Settings, Wallet, 
   CreditCard, Timer, DoorOpen, Ticket, Zap, ZapOff, Tv, Printer, Bot, User as UserIcon,
-  Volume2, VolumeX, Trash2, Archive, ArchiveRestore
+  Volume2, VolumeX, Trash2, Archive, ArchiveRestore, History
 } from 'lucide-react';
 import { 
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose 
@@ -34,6 +34,7 @@ import { playNotificationSound } from '@/utils/soundUtils';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { CreditRequestDialog } from '@/components/CreditRequestDialog';
+import { MyCreditRequestsDialog } from '@/components/MyCreditRequestsDialog';
 
 const Lobby = () => {
   const navigate = useNavigate();
@@ -190,11 +191,16 @@ const Lobby = () => {
             <h1 className="font-heading text-2xl font-bold text-primary-foreground">🎱 Bingo</h1>
             <p className="text-primary-foreground/70 text-sm">Olá, {profile.full_name || 'Jogador'}!</p>
           </div>
-          <div className="flex items-center gap-1 sm:gap-3">
+          <div className="flex items-center gap-1 sm:gap-2">
             <div className="flex items-center gap-2 bg-primary-foreground/10 rounded-full px-4 py-2">
               <Wallet className="w-4 h-4 text-primary-foreground" />
               <span className="font-heading font-bold text-primary-foreground">{profile.credits}</span>
             </div>
+            <MyCreditRequestsDialog>
+              <Button size="sm" variant="ghost" className="text-primary-foreground">
+                <History className="w-4 h-4 mr-1" />Histórico
+              </Button>
+            </MyCreditRequestsDialog>
             <CreditRequestDialog gameSettings={gameSettings}>
               <Button size="sm" variant="ghost" className="text-primary-foreground">
                 <CreditCard className="w-4 h-4 mr-1" />Solicitar

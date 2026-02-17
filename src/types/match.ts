@@ -45,7 +45,7 @@ export interface PlayerCard {
 
 // An instance of a card used in a match
 export interface MatchCard {
-  id: string;
+  id:string;
   player_card_id: string; // link to the template
   player_id: string;
   match_id: string;
@@ -63,4 +63,22 @@ export interface Win {
   match_card_id: string;
   prize_details: Prize;
   won_at: string;
+}
+
+// A credit request from a player
+export interface CreditRequest {
+  id: string;
+  player_id: string;
+  status: 'pending' | 'approved' | 'rejected';
+  receipt_url: string;
+  credits_granted: number | null;
+  requested_at: string;
+  resolved_at: string | null;
+  resolved_by: string | null;
+  notes: string | null;
+  // Joined data
+  perfis?: {
+    full_name: string;
+    avatar_url: string;
+  };
 }
