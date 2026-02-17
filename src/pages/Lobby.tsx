@@ -217,7 +217,7 @@ const Lobby = () => {
 
               return (
                 <div key={match.id} className={`card-container ${match.status === 'in_progress' ? 'ring-2 ring-accent' : ''}`}>
-                  <div className="flex flex-wrap items-start justify-between gap-3 mb-3">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
                       <h3 className="font-heading font-bold text-lg text-foreground">{match.name}</h3>
                       <div className="flex flex-wrap gap-x-3 gap-y-1 text-sm text-muted-foreground mt-1">
@@ -240,6 +240,27 @@ const Lobby = () => {
                       <span className="text-xs text-muted-foreground mt-1">{match.cardPrice} créditos por cartela</span>
                     </div>
                   </div>
+
+                  {match.status === 'in_progress' && match.calledNumbers.length > 0 && (
+                    <div className="mt-3 border-t border-border pt-3">
+                      <div className="flex items-center justify-between">
+                        <p className="text-xs text-muted-foreground font-medium">
+                          Últimos Sorteados ({match.calledNumbers.length} total)
+                        </p>
+                        <div className="flex flex-wrap gap-1.5 justify-end">
+                          {match.calledNumbers.slice(-5).reverse().map((num, index) => (
+                            <span 
+                              key={num} 
+                              className={`w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold
+                                ${index === 0 ? 'bg-accent text-accent-foreground' : 'bg-secondary text-secondary-foreground'}`}
+                            >
+                              {num}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               );
             })}
