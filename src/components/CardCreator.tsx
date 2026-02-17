@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Button } from './ui/button';
 import { Textarea } from './ui/textarea';
-import { generateBingoCard } from '@/contexts/GameContext';
+import { generateBingoCard } from '@/utils/bingoUtils';
 import { AlertCircle, Info, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";

@@ -1,5 +1,43 @@
 import { BingoCard, GameType, WinResult } from '@/types/bingo';
 
+export const generateBingoCard = (): number[][] => {
+  const grid: number[][] = Array(5).fill(0).map(() => Array(5).fill(0));
+
+  const ranges = [
+    { min: 1, max: 15, count: 5 },  // B
+    { min: 16, max: 30, count: 5 }, // I
+    { min: 31, max: 45, count: 4 }, // N (4 numbers + free space)
+    { min: 46, max: 60, count: 5 }, // G
+    { min: 61, max: 75, count: 5 }, // O
+  ];
+
+  const columns = ranges.map(range => {
+    const available = Array.from({ length: range.max - range.min + 1 }, (_, i) => i + range.min);
+    const columnNumbers: number[] = [];
+    for (let i = 0; i < range.count; i++) {
+      const randomIndex = Math.floor(Math.random() * available.length);
+      columnNumbers.push(available.splice(randomIndex, 1)[0]);
+    }
+    return columnNumbers;
+  });
+
+  for (let row = 0; row < 5; row++) {
+    grid[row][0] = columns[0][row];
+    grid[row][1] = columns[1][row];
+    if (row < 2) {
+      grid[row][2] = columns[2][row];
+    } else if (row > 2) {
+      grid[row][2] = columns[2][row - 1];
+    }
+    grid[row][3] = columns[3][row];
+    grid[row][4] = columns[4][row];
+  }
+
+  grid[2][2] = 0; // Free space
+
+  return grid;
+};
+
 export const generateCardId = (): string => {
   return `card-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 };
