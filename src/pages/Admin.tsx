@@ -58,6 +58,7 @@ const Admin = () => {
     prizeValue: 70,
     prizeName: '',
     startTime: '',
+    prizeImageFile: null as File | null,
   });
   
   const [currentSettings, setCurrentSettings] = useState({
@@ -127,12 +128,57 @@ const Admin = () => {
 
   if (!profile || profile.role !== 'admin') return null;
 
-  const handleCreateMatch = () => {
+  const handleCreateMatch = async () => {
     if (!matchForm.name.trim() || !matchForm.startTime) return;
+
+    let prizeImageUrl: string | undefined = undefined;
+
+    if (matchForm.prizeType === 'product' && matchForm.prizeImageFile) {
+        const file = matchForm.prizeImageFile;
+        const filePath = `public/${Date.now()}_${file.name.replace(/\s/g, '_')}`;
+        
+        const { error: uploadError } = await supabase.storage
+            .from('prizes')
+            .upload(filePath, file);
+
+        if (uploadError) {
+            toast({ title: 'Erro no Upload', description: uploadError.message, variant: 'destructive' });
+            return;
+        }
+
+        const { data: { publicUrl } } = supabase.storage
+            .from('prizes')
+            .getPublicUrl(filePath);
+        
+        prizeImageUrl = publicUrl;
+    }
+
     const prizePayload: any = { type: matchForm.prizeType, value: matchForm.prizeValue };
     if (matchForm.prizeType === 'product') prizePayload.productName = matchForm.prizeName;
-    createMatch({ ...matchForm, prize: prizePayload, start_time: new Date(matchForm.startTime).toISOString() });
+    
+    const matchData = {
+        name: matchForm.name,
+        game_type: matchForm.gameType,
+        max_cards_per_player: matchForm.maxCardsPerPlayer,
+        card_price: matchForm.cardPrice,
+        prize: prizePayload,
+        start_time: new Date(matchForm.startTime).toISOString(),
+        prize_image_url: prizeImageUrl,
+    };
+
+    await createMatch(matchData);
     setShowCreate(false);
+    setMatchForm({
+        name: '',
+        gameType: 'full' as GameType,
+        maxCardsPerPlayer: 3,
+        cardPrice: 10,
+        prizeType: 'percentage' as PrizeType,
+        prizeValue: 70,
+        prizeName: '',
+        startTime: '',
+        prizeImageFile: null,
+    });
   };
 
   const handleCallNumber = (matchId: string) => {
@@ -274,9 +320,20 @@ const Admin = () => {
                     </div>
                     )}
                     {matchForm.prizeType === 'product' && (
-                    <div>
-                        <Label>Nome do Produto</Label>
-                        <Input value={matchForm.prizeName} onChange={e => setMatchForm(p => ({ ...p, prizeName: e.target.value }))} />
+                    <div className="space-y-4">
+                        <div>
+                            <Label>Nome do Produto</Label>
+                            <Input value={matchForm.prizeName} onChange={e => setMatchForm(p => ({ ...p, prizeName: e.target.value }))} />
+                        </div>
+                        <div>
+                            <Label>Imagem do Produto</Label>
+                            <Input 
+                                type="file" 
+                                accept="image/*" 
+                                className="file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20"
+                                onChange={e => setMatchForm(p => ({ ...p, prizeImageFile: e.target.files ? e.target.files[0] : null }))} 
+                            />
+                        </div>
                     </div>
                     )}
                     <Button className="w-full !mt-6" onClick={handleCreateMatch}>Criar Partida</Button>

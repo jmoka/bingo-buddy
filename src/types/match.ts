@@ -23,6 +23,7 @@ export interface Match {
   max_cards_per_player: number;
   card_price: number;
   prize: Prize;
+  prize_image_url?: string;
   start_time: string;
   status: MatchStatus;
   called_numbers: number[];

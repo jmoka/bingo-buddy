@@ -38,7 +38,12 @@ export const MatchStats = ({ match, allMatchCards }: MatchStatsProps) => {
   }
 
   return (
-    <div className="card-container mb-6">
+    <div className="card-container mb-6 overflow-hidden">
+      {match.prize.type === 'product' && match.prize_image_url && (
+        <div className="mx-[-1rem] mt-[-1rem] mb-4">
+          <img src={match.prize_image_url} alt={match.prize.productName || 'Prêmio'} className="w-full h-40 object-cover" />
+        </div>
+      )}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-center">
         <div className="flex flex-col items-center justify-center p-4 rounded-lg bg-muted/50">
           <Ticket className="w-6 h-6 text-primary mb-1" />

@@ -305,31 +305,36 @@ const Lobby = () => {
               const myMatchCards = getPlayerMatchCards(match.id, profile.id);
               const alreadyJoined = myMatchCards.length > 0;
               return (
-                <div key={match.id} className={`card-container relative ${match.status === 'in_progress' ? 'ring-2 ring-accent' : ''} ${match.status === 'finished' ? 'opacity-70' : ''}`}>
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                      <div className="flex items-center gap-2 mb-1">
-                        <h3 className={`font-heading font-bold text-base md:text-lg text-foreground ${match.status === 'finished' ? 'line-through' : ''}`}>{match.name}</h3>
-                        {match.status === 'waiting' && <Badge variant="outline" className="text-[10px] h-5">Aguardando</Badge>}
-                        {match.status === 'open' && <Badge variant="secondary" className="text-primary text-[10px] h-5">Aberto</Badge>}
-                        {match.status === 'in_progress' && <Badge variant="destructive" className="animate-pulse text-[10px] h-5">AO VIVO</Badge>}
-                        {match.status === 'finished' && <Badge variant="outline" className="text-[10px] h-5">Finalizada</Badge>}
+                <div key={match.id} className={`card-container relative p-0 overflow-hidden ${match.status === 'in_progress' ? 'ring-2 ring-accent' : ''} ${match.status === 'finished' ? 'opacity-70' : ''}`}>
+                  {match.prize.type === 'product' && match.prize_image_url && (
+                    <img src={match.prize_image_url} alt={match.prize.productName || 'Prêmio'} className="w-full h-32 object-cover" />
+                  )}
+                  <div className="p-4">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <div className="flex items-center gap-2 mb-1">
+                          <h3 className={`font-heading font-bold text-base md:text-lg text-foreground ${match.status === 'finished' ? 'line-through' : ''}`}>{match.name}</h3>
+                          {match.status === 'waiting' && <Badge variant="outline" className="text-[10px] h-5">Aguardando</Badge>}
+                          {match.status === 'open' && <Badge variant="secondary" className="text-primary text-[10px] h-5">Aberto</Badge>}
+                          {match.status === 'in_progress' && <Badge variant="destructive" className="animate-pulse text-[10px] h-5">AO VIVO</Badge>}
+                          {match.status === 'finished' && <Badge variant="outline" className="text-[10px] h-5">Finalizada</Badge>}
+                        </div>
+                        <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                          <span className="flex items-center gap-1"><Trophy className="w-3.5 h-3.5" />{gameTypeLabels[match.game_type]}</span>
+                          <span className="flex items-center gap-1"><Users className="w-3.5 h-3.5" />{playersInMatchCount}</span>
+                          <span className="flex items-center gap-1"><Coins className="w-3.5 h-3.5" />Pote: {match.pot}</span>
+                        </div>
                       </div>
-                      <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
-                        <span className="flex items-center gap-1"><Trophy className="w-3.5 h-3.5" />{gameTypeLabels[match.game_type]}</span>
-                        <span className="flex items-center gap-1"><Users className="w-3.5 h-3.5" />{playersInMatchCount}</span>
-                        <span className="flex items-center gap-1"><Coins className="w-3.5 h-3.5" />Pote: {match.pot}</span>
+                      <div className="flex flex-col items-end">
+                        {alreadyJoined ? (
+                          <Button size="sm" className="bg-success/10 text-success hover:bg-success/20 h-8 text-xs" onClick={() => navigate(`/match/${match.id}`)}><Tv className="w-3.5 h-3.5 mr-2" /> Acompanhar</Button>
+                        ) : match.status === 'open' ? (
+                          <Button size="sm" className="gradient-accent shadow-button h-8 text-xs" onClick={() => openJoinDialog(match)}>Entrar na Partida</Button>
+                        ) : (
+                          <Button size="sm" disabled className="h-8 text-xs">{match.status === 'waiting' ? 'Aguardando' : 'Encerrada'}</Button>
+                        )}
+                        <span className="text-[10px] text-muted-foreground mt-1">{match.card_price} créditos por cartela</span>
                       </div>
-                    </div>
-                    <div className="flex flex-col items-end">
-                      {alreadyJoined ? (
-                        <Button size="sm" className="bg-success/10 text-success hover:bg-success/20 h-8 text-xs" onClick={() => navigate(`/match/${match.id}`)}><Tv className="w-3.5 h-3.5 mr-2" /> Acompanhar</Button>
-                      ) : match.status === 'open' ? (
-                        <Button size="sm" className="gradient-accent shadow-button h-8 text-xs" onClick={() => openJoinDialog(match)}>Entrar na Partida</Button>
-                      ) : (
-                        <Button size="sm" disabled className="h-8 text-xs">{match.status === 'waiting' ? 'Aguardando' : 'Encerrada'}</Button>
-                      )}
-                      <span className="text-[10px] text-muted-foreground mt-1">{match.card_price} créditos por cartela</span>
                     </div>
                   </div>
                 </div>
