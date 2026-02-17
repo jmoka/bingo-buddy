@@ -13,6 +13,9 @@ serve(async (req) => {
       throw new Error("matchId e playerCardIds são obrigatórios.");
     }
 
+    // Garante que não há IDs duplicados na solicitação
+    const uniquePlayerCardIds = [...new Set(playerCardIds)];
+
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -30,12 +33,12 @@ serve(async (req) => {
     const { data: { user }, error: userError } = await userSupabaseClient.auth.getUser()
     if (userError || !user) throw new Error("Usuário não encontrado ou token inválido.");
 
-    // Server-side validation to prevent duplicate card entries in the same match
+    // Validação no servidor para prevenir entradas duplicadas na mesma partida
     const { data: existingMatchCards, error: existingError } = await supabaseAdmin
       .from('cartelas_partida')
       .select('player_card_id')
       .eq('match_id', matchId)
-      .in('player_card_id', playerCardIds);
+      .in('player_card_id', uniquePlayerCardIds);
 
     if (existingError) {
       throw new Error(`Erro ao verificar cartelas existentes: ${existingError.message}`);
@@ -48,7 +51,7 @@ serve(async (req) => {
     const [matchRes, profileRes, playerCardsRes] = await Promise.all([
       supabaseAdmin.from('partidas').select('card_price, pot').eq('id', matchId).single(),
       supabaseAdmin.from('perfis').select('credits').eq('id', user.id).single(),
-      supabaseAdmin.from('cartelas_jogador').select('*').in('id', playerCardIds)
+      supabaseAdmin.from('cartelas_jogador').select('*').in('id', uniquePlayerCardIds)
     ]);
 
     if (matchRes.error) throw new Error(`Partida não encontrada: ${matchRes.error.message}`);
@@ -59,11 +62,11 @@ serve(async (req) => {
     const profile = profileRes.data;
     const playerCards = playerCardsRes.data;
 
-    const totalCost = playerCardIds.length * match.card_price;
+    const totalCost = uniquePlayerCardIds.length * match.card_price;
     if (profile.credits < totalCost) {
       throw new Error("Créditos insuficientes!");
     }
-    if (playerCards.length !== playerCardIds.length) {
+    if (playerCards.length !== uniquePlayerCardIds.length) {
       throw new Error("Uma ou mais cartelas não foram encontradas.");
     }
     for (const card of playerCards) {
