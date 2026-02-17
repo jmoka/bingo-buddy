@@ -2,7 +2,7 @@ import React, { createContext, useContext, useEffect, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './AuthContext';
-import { Match, PlayerCard, MatchCard, Win, MatchStatus, CreditRequest, CreditRequestMessage } from '@/types/match';
+import { Match, PlayerCard, MatchCard, Win, MatchStatus, CreditRequest, CreditRequestMessage, RedeemRequest, RedeemRequestMessage } from '@/types/match';
 import { toast } from 'sonner';
 import { Profile } from './AuthContext';
 
@@ -32,6 +32,8 @@ interface GameContextType {
   allWins: Win[];
   creditRequests: CreditRequest[];
   allCreditRequests: CreditRequest[];
+  redeemRequests: RedeemRequest[];
+  allRedeemRequests: RedeemRequest[];
   gameSettings: GameSettings | undefined;
   isLoading: boolean;
   createMatch: (data: any) => Promise<void>;
@@ -52,10 +54,16 @@ interface GameContextType {
   resolveCreditRequest: (requestId: string, status: 'approved' | 'rejected', creditsGranted?: number, notes?: string) => Promise<boolean>;
   unblockCreditRequest: (requestId: string) => Promise<void>;
   deleteCreditRequest: (requestId: string) => Promise<void>;
+  // Resgates
+  requestRedeem: (credits: number, amount: number, message?: string) => Promise<boolean>;
+  resubmitRedeemRequest: (requestId: string, message: string) => Promise<boolean>;
+  resolveRedeemRequest: (requestId: string, status: 'approved' | 'rejected', receiptFile?: File, notes?: string) => Promise<boolean>;
+  deleteRedeemRequest: (requestId: string) => Promise<void>;
   updatePlayerCredits: (playerId: string, amount: number) => Promise<void>;
   getMatchCards: (matchId: string) => MatchCard[];
   getPlayerMatchCards: (matchId: string, playerId: string) => MatchCard[];
   fetchRequestMessages: (requestId: string) => Promise<CreditRequestMessage[]>;
+  fetchRedeemMessages: (requestId: string) => Promise<RedeemRequestMessage[]>;
 }
 
 const GameContext = createContext<GameContextType | null>(null);
@@ -124,6 +132,16 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     enabled: !!user,
   });
 
+  const { data: redeemRequests = [] } = useQuery({
+    queryKey: ['redeemRequests', user?.id],
+    queryFn: async () => {
+      if (!user) return [];
+      const { data, error } = await supabase.from('solicitacoes_resgate').select('*').eq('player_id', user.id).order('requested_at', { ascending: false });
+      return data as RedeemRequest[];
+    },
+    enabled: !!user,
+  });
+
   const { data: players = [], isLoading: isLoadingPlayers } = useQuery({
     queryKey: ['players', isAdmin],
     queryFn: async () => {
@@ -134,6 +152,26 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     },
     enabled: isAdmin,
   });
+
+  const { data: rawRedeemRequests = [], isLoading: isLoadingRedeems } = useQuery({
+    queryKey: ['rawRedeemRequests', isAdmin],
+    queryFn: async () => {
+      if (!isAdmin) return [];
+      const { data, error } = await supabase.from('solicitacoes_resgate').select('*').order('requested_at', { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+    enabled: isAdmin,
+  });
+
+  const allRedeemRequests = useMemo(() => {
+    if (!isAdmin || !rawRedeemRequests || !players) return [];
+    const playersMap = new Map(players.map(p => [p.id, { full_name: p.full_name, avatar_url: p.avatar_url }]));
+    return rawRedeemRequests.map(req => ({
+      ...req,
+      perfis: playersMap.get(req.player_id) || null
+    })) as RedeemRequest[];
+  }, [isAdmin, rawRedeemRequests, players]);
 
   const { data: allPlayerCards = [] } = useQuery({
     queryKey: ['allPlayerCards', isAdmin],
@@ -284,13 +322,94 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
         });
     }
 
-    // Invalidar caches para atualizar a UI do admin e do jogador instantaneamente
     queryClient.invalidateQueries({ queryKey: ['rawCreditRequests'] });
     queryClient.invalidateQueries({ queryKey: ['creditRequests'] });
     queryClient.invalidateQueries({ queryKey: ['profile'] });
     queryClient.invalidateQueries({ queryKey: ['players'] });
     
     return true;
+  };
+
+  // Funções de Resgate
+  const requestRedeem = async (credits: number, amount: number, message?: string): Promise<boolean> => {
+    if (!user || !profile || profile.credits < credits) {
+        toast.error('Créditos insuficientes!');
+        return false;
+    }
+
+    // Debita imediatamente
+    await updatePlayerCredits(user.id, -credits);
+
+    const { data: newRequest, error } = await supabase.from('solicitacoes_resgate').insert({
+        player_id: user.id,
+        credits_requested: credits,
+        amount_to_receive: amount,
+        status: 'pending'
+    }).select().single();
+
+    if (error) {
+        // Estorna em caso de erro na criação da solicitação
+        await updatePlayerCredits(user.id, credits);
+        toast.error(error.message);
+        return false;
+    }
+
+    await supabase.from('mensagens_resgate').insert({
+        redeem_request_id: newRequest.id,
+        sender_id: user.id,
+        message: message || `Nova solicitação de resgate: ${credits} créditos. Valor a receber: R$ ${amount.toFixed(2)}`
+    });
+
+    queryClient.invalidateQueries({ queryKey: ['redeemRequests'] });
+    queryClient.invalidateQueries({ queryKey: ['profile'] });
+    
+    await supabase.functions.invoke('notify-n8n', { body: { event: 'REDEEM_REQUEST', data: { requestId: newRequest.id, credits, amount, userEmail: user.email } } });
+    return true;
+  };
+
+  const resubmitRedeemRequest = async (requestId: string, message: string): Promise<boolean> => {
+    if (!user) return false;
+    const { error } = await supabase.from('solicitacoes_resgate').update({
+        status: 'pending', resubmission_notes: message, resolved_at: null, resolved_by: null, notes: null
+    }).eq('id', requestId);
+    if (error) return false;
+    await supabase.from('mensagens_resgate').insert({ redeem_request_id: requestId, sender_id: user.id, message });
+    queryClient.invalidateQueries({ queryKey: ['redeemRequests'] });
+    return true;
+  };
+
+  const resolveRedeemRequest = async (requestId: string, status: 'approved' | 'rejected', receiptFile?: File, notes?: string): Promise<boolean> => {
+    if (!profile || profile.role !== 'admin' || !user) return false;
+    const request = allRedeemRequests.find(r => r.id === requestId);
+    if (!request) return false;
+
+    let receiptPath = null;
+    if (status === 'approved' && receiptFile) {
+        const fileName = `redeems/${requestId}/${Date.now()}.${receiptFile.name.split('.').pop()}`;
+        await supabase.storage.from('receipts').upload(fileName, receiptFile);
+        receiptPath = fileName;
+    }
+
+    // Se rejeitado, estorna os créditos? Na lógica do prompt "mesma que crédito", se rejeitado o admin bloqueia e o usuário reenvia (ex: corrigindo dados). 
+    // Se o admin quiser estornar, ele pode fazer manualmente no painel de jogadores.
+
+    await supabase.from('solicitacoes_resgate').update({
+        status, receipt_url: receiptPath, notes: notes || null, resolved_at: new Date().toISOString(), resolved_by: user.id
+    }).eq('id', requestId);
+
+    if (notes) {
+        await supabase.from('mensagens_resgate').insert({ redeem_request_id: requestId, sender_id: user.id, message: notes });
+    }
+
+    queryClient.invalidateQueries({ queryKey: ['rawRedeemRequests'] });
+    queryClient.invalidateQueries({ queryKey: ['redeemRequests'] });
+    return true;
+  };
+
+  const deleteRedeemRequest = async (requestId: string) => {
+    await supabase.from('solicitacoes_resgate').delete().eq('id', requestId);
+    queryClient.invalidateQueries({ queryKey: ['rawRedeemRequests'] });
+    queryClient.invalidateQueries({ queryKey: ['redeemRequests'] });
   };
 
   const unblockCreditRequest = async (requestId: string) => {
@@ -313,7 +432,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (p) await supabase.from('perfis').update({ credits: p.credits + amount }).eq('id', playerId);
   };
 
-  const createPlayerCard = async (options: { name: string; numbers: number[][]; }): Promise<PlayerCard | null> => {
+  const createPlayerCard = async (options: { name: string; numbers: number[][]; }) => {
     if (!user || !profile || !gameSettings || profile.credits < gameSettings.custo_nova_cartela) return null;
     await supabase.from('perfis').update({ credits: profile.credits - gameSettings.custo_nova_cartela }).eq('id', user.id);
     const { data } = await supabase.from('cartelas_jogador').insert({ player_id: user.id, ...options, uses_left: 1 }).select().single();
@@ -324,13 +443,13 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const deletePlayerCard = async (cardId: string) => { await supabase.from('cartelas_jogador').delete().eq('id', cardId); };
   const toggleArchivePlayerCard = async (cardId: string, archive: boolean) => { await supabase.from('cartelas_jogador').update({ is_archived: archive }).eq('id', cardId); };
 
-  const joinMatch = async (matchId: string, playerCardIds: string[]): Promise<MatchCard[] | null> => {
+  const joinMatch = async (matchId: string, playerCardIds: string[]) => {
     const { data } = await supabase.functions.invoke('join-match', { body: { matchId, playerCardIds } });
     queryClient.invalidateQueries({ queryKey: ['profile'] });
     return data as MatchCard[];
   };
 
-  const buyCardUses = async (playerCardId: string): Promise<boolean> => {
+  const buyCardUses = async (playerCardId: string) => {
     if (!profile || !gameSettings || profile.credits < gameSettings.custo_recarga_cartela) return false;
     await supabase.from('perfis').update({ credits: profile.credits - gameSettings.custo_recarga_cartela }).eq('id', profile.id);
     const card = playerCards.find(c => c.id === playerCardId);
@@ -343,19 +462,27 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const getMatchCards = (matchId: string) => matchCards.filter(c => c.match_id === matchId);
   const getPlayerMatchCards = (matchId: string, playerId: string) => matchCards.filter(c => c.match_id === matchId && c.player_id === playerId);
 
-  const fetchRequestMessages = async (requestId: string): Promise<CreditRequestMessage[]> => {
+  const fetchRequestMessages = async (requestId: string) => {
     const { data, error } = await supabase.from('mensagens_solicitacao').select('*').eq('credit_request_id', requestId).order('created_at', { ascending: true });
     if (error) return [];
     return data as CreditRequestMessage[];
   };
 
+  const fetchRedeemMessages = async (requestId: string) => {
+    const { data, error } = await supabase.from('mensagens_resgate').select('*').eq('redeem_request_id', requestId).order('created_at', { ascending: true });
+    if (error) return [];
+    return data as RedeemRequestMessage[];
+  };
+
   return (
     <GameContext.Provider value={{
-      matches, players, playerCards, allPlayerCards, matchCards, wins, allWins, creditRequests, allCreditRequests, gameSettings, isLoading: isLoadingRequests || (isAdmin && isLoadingPlayers),
+      matches, players, playerCards, allPlayerCards, matchCards, wins, allWins, creditRequests, allCreditRequests, 
+      redeemRequests, allRedeemRequests, gameSettings, isLoading: isLoadingRequests || isLoadingRedeems || (isAdmin && isLoadingPlayers),
       createMatch, openMatch, startMatch, callNumber, finishMatch, deleteMatch, toggleAutoCall,
       updateGameSettings, createPlayerCard, deletePlayerCard, toggleArchivePlayerCard, joinMatch, buyCardUses,
-      requestCredits, resubmitCreditRequest, resolveCreditRequest, unblockCreditRequest, deleteCreditRequest, updatePlayerCredits, getMatchCards, getPlayerMatchCards,
-      fetchRequestMessages
+      requestCredits, resubmitCreditRequest, resolveCreditRequest, unblockCreditRequest, deleteCreditRequest, 
+      requestRedeem, resubmitRedeemRequest, resolveRedeemRequest, deleteRedeemRequest, updatePlayerCredits, 
+      getMatchCards, getPlayerMatchCards, fetchRequestMessages, fetchRedeemMessages
     }}>
       {children}
     </GameContext.Provider>

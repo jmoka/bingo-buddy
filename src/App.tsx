@@ -14,6 +14,7 @@ import PrintView from "./pages/PrintView";
 import NotFound from "./pages/NotFound";
 import PlayersAdmin from "./pages/PlayersAdmin";
 import CreditRequestsAdmin from "./pages/CreditRequestsAdmin";
+import RedeemRequestsAdmin from "./pages/RedeemRequestsAdmin";
 
 const queryClient = new QueryClient();
 
@@ -32,6 +33,7 @@ const App = () => (
               <Route path="/admin" element={<Admin />} />
               <Route path="/admin/players" element={<PlayersAdmin />} />
               <Route path="/admin/credit-requests" element={<CreditRequestsAdmin />} />
+              <Route path="/admin/redeem-requests" element={<RedeemRequestsAdmin />} />
               <Route path="/match/:id" element={<MatchView />} />
               <Route path="/print" element={<PrintView />} />
               <Route path="*" element={<NotFound />} />

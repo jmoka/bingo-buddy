@@ -89,3 +89,30 @@ export interface CreditRequest {
   };
   mensagens?: CreditRequestMessage[];
 }
+
+// Novos tipos para Resgate
+export interface RedeemRequestMessage {
+  id: string;
+  redeem_request_id: string;
+  sender_id: string;
+  message: string;
+  created_at: string;
+}
+
+export interface RedeemRequest {
+  id: string;
+  player_id: string;
+  status: 'pending' | 'approved' | 'rejected';
+  credits_requested: number;
+  amount_to_receive: number;
+  receipt_url: string | null;
+  requested_at: string;
+  resolved_at: string | null;
+  resolved_by: string | null;
+  notes: string | null;
+  resubmission_notes: string | null;
+  perfis?: {
+    full_name: string;
+    avatar_url: string;
+  };
+}
