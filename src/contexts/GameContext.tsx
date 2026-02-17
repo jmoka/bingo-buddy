@@ -100,7 +100,6 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     queryKey: ['playerCards', user?.id],
     queryFn: async () => {
       if (!user) return [];
-      // Deixando o RLS do Supabase fazer todo o trabalho de filtragem
       const { data, error } = await supabase.from('cartelas_jogador').select('*');
       if (error) throw error;
       return data as PlayerCard[];
@@ -516,51 +515,68 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const createPlayerCard = async (options: { name: string; numbers: number[][]; creditType: CreditType; }) => {
-    if (!user || !profile || !gameSettings) return null;
-    
-    const cost = gameSettings.custo_nova_cartela;
-    const { name, numbers, creditType } = options;
+    try {
+      if (!user || !profile || !gameSettings) {
+        console.error("Dados de usuário ou configurações incompletos.");
+        return null;
+      }
+      
+      const cost = gameSettings.custo_nova_cartela;
+      const { name, numbers, creditType } = options;
 
-    const currentCredits = creditType === 'real' ? profile.credits : profile.fake_credits;
-    if (currentCredits < cost) {
-      toast.error(`Saldo de ${creditType === 'real' ? 'reais' : 'brincar'} insuficiente.`);
+      // Verificar saldo antes de tentar qualquer coisa
+      const currentCredits = creditType === 'real' ? profile.credits : profile.fake_credits;
+      if (currentCredits < cost) {
+        toast.error(`Saldo insuficiente de créditos ${creditType === 'real' ? 'reais' : 'de brincar'}.`);
+        return null;
+      }
+
+      // 1. Debitar créditos
+      const creditColumn = creditType === 'real' ? 'credits' : 'fake_credits';
+      const { error: debitError } = await supabase
+        .from('perfis')
+        .update({ [creditColumn]: currentCredits - cost })
+        .eq('id', user.id);
+
+      if (debitError) {
+        console.error("Erro ao debitar:", debitError);
+        toast.error(`Erro ao processar pagamento: ${debitError.message}`);
+        return null;
+      }
+
+      // 2. Inserir Cartela (Formato simples do objeto)
+      const { data, error: insertError } = await supabase
+        .from('cartelas_jogador')
+        .insert({
+          player_id: user.id,
+          name: name,
+          numbers: numbers,
+          credit_type: creditType, // 'real' ou 'fake'
+          uses_left: 1
+        })
+        .select()
+        .single();
+      
+      if (insertError) {
+        console.error("Erro ao inserir cartela:", insertError);
+        toast.error(`Erro ao salvar cartela: ${insertError.message}`);
+        
+        // Estorno
+        await supabase.from('perfis').update({ [creditColumn]: currentCredits }).eq('id', user.id);
+        toast.info("Seus créditos foram estornados.");
+        return null;
+      }
+
+      // Sucesso
+      queryClient.invalidateQueries({ queryKey: ['profile'] });
+      queryClient.invalidateQueries({ queryKey: ['playerCards', user.id] });
+      return data as PlayerCard;
+
+    } catch (error: any) {
+      console.error("Erro inesperado ao criar cartela:", error);
+      toast.error(`Ocorreu um erro inesperado: ${error.message}`);
       return null;
     }
-
-    const creditColumn = creditType === 'real' ? 'credits' : 'fake_credits';
-    const { error: debitError } = await supabase
-      .from('perfis')
-      .update({ [creditColumn]: currentCredits - cost })
-      .eq('id', user.id);
-
-    if (debitError) {
-      toast.error('Erro ao processar pagamento da cartela.', { description: debitError.message });
-      return null;
-    }
-
-    const { data, error: insertError } = await supabase
-      .from('cartelas_jogador')
-      .insert([{
-        player_id: user.id,
-        name: name,
-        numbers: numbers,
-        credit_type: creditType,
-        uses_left: 1
-      }])
-      .select()
-      .single();
-    
-    if (insertError) {
-      console.error('[createPlayerCard] Erro:', insertError);
-      toast.error('Erro ao salvar cartela no banco.', { description: insertError.message });
-      // Estorno
-      await supabase.from('perfis').update({ [creditColumn]: currentCredits }).eq('id', user.id);
-      return null;
-    }
-
-    queryClient.invalidateQueries({ queryKey: ['profile'] });
-    queryClient.invalidateQueries({ queryKey: ['playerCards', user.id] });
-    return data as PlayerCard;
   };
 
   const deletePlayerCard = async (cardId: string) => { await supabase.from('cartelas_jogador').delete().eq('id', cardId); };
