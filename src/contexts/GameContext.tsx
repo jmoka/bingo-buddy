@@ -63,6 +63,26 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const isAdmin = profile?.role === 'admin';
 
+  // 1. Configurações (Essencial para o funcionamento do app)
+  const { data: gameSettings, isLoading: l4 } = useQuery({
+    queryKey: ['gameSettings'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('configuracoes').select('*').limit(1).single();
+      if (error) {
+        console.warn("Usando configurações padrão.");
+        return {
+          custo_nova_cartela: 10,
+          custo_recarga_cartela: 5,
+          usos_por_recarga: 1,
+          intervalo_sorteio_auto_seg: 120,
+          valor_por_credito: 1,
+        } as GameSettings;
+      }
+      return data as GameSettings;
+    }
+  });
+
+  // 2. Partidas
   const { data: matches = [], isLoading: l1 } = useQuery({
     queryKey: ['matches'],
     queryFn: async () => {
@@ -72,16 +92,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     },
   });
 
-  const { data: players = [] } = useQuery({
-    queryKey: ['players', isAdmin],
-    queryFn: async () => {
-      const { data, error } = await supabase.from('perfis').select('*');
-      if (error) throw error;
-      return data as Profile[];
-    },
-    enabled: isAdmin,
-  });
-
+  // 3. Cartelas do Jogador Logado
   const { data: playerCards = [], isLoading: l2 } = useQuery({
     queryKey: ['playerCards', user?.id],
     queryFn: async () => {
@@ -93,16 +104,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     enabled: !!user,
   });
 
-  const { data: allPlayerCards = [] } = useQuery({
-    queryKey: ['allPlayerCards', isAdmin],
-    queryFn: async () => {
-      const { data, error } = await supabase.from('cartelas_jogador').select('*');
-      if (error) throw error;
-      return data as PlayerCard[];
-    },
-    enabled: isAdmin,
-  });
-
+  // 4. Cartelas em Partidas (Inscrições)
   const { data: matchCards = [], isLoading: l3 } = useQuery({
     queryKey: ['matchCards'],
     queryFn: async () => {
@@ -112,6 +114,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     },
   });
 
+  // 5. Vitórias do Jogador
   const { data: wins = [], isLoading: l5 } = useQuery({
     queryKey: ['wins', user?.id],
     queryFn: async () => {
@@ -123,16 +126,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     enabled: !!user,
   });
 
-  const { data: allWins = [] } = useQuery({
-    queryKey: ['allWins', isAdmin],
-    queryFn: async () => {
-      const { data, error } = await supabase.from('vitorias').select('*');
-      if (error) throw error;
-      return data as Win[];
-    },
-    enabled: isAdmin,
-  });
-
+  // 6. Solicitações de Crédito (Jogador)
   const { data: creditRequests = [], isLoading: l6 } = useQuery({
     queryKey: ['creditRequests', user?.id],
     queryFn: async () => {
@@ -149,71 +143,64 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     enabled: !!user,
   });
 
+  // 7. Dados Administrativos (Só carregam se for admin)
+  const { data: players = [] } = useQuery({
+    queryKey: ['players', isAdmin],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('perfis').select('*');
+      if (error) throw error;
+      return data as Profile[];
+    },
+    enabled: isAdmin,
+  });
+
+  const { data: allPlayerCards = [] } = useQuery({
+    queryKey: ['allPlayerCards', isAdmin],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('cartelas_jogador').select('*');
+      if (error) throw error;
+      return data as PlayerCard[];
+    },
+    enabled: isAdmin,
+  });
+
+  const { data: allWins = [] } = useQuery({
+    queryKey: ['allWins', isAdmin],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('vitorias').select('*');
+      if (error) throw error;
+      return data as Win[];
+    },
+    enabled: isAdmin,
+  });
+
   const { data: allCreditRequests = [], isLoading: l7 } = useQuery({
     queryKey: ['allCreditRequests', isAdmin],
     queryFn: async () => {
-      // Usamos uma seleção explícita para garantir que os dados venham mesmo se houver erro no join
       const { data, error } = await supabase
         .from('solicitacoes_credito')
-        .select(`
-          id, 
-          player_id, 
-          status, 
-          receipt_url, 
-          credits_granted, 
-          credits_requested, 
-          amount_paid, 
-          requested_at, 
-          resolved_at, 
-          resolved_by, 
-          notes,
-          perfis:player_id(full_name, avatar_url)
-        `)
+        .select('*, perfis:player_id(full_name, avatar_url)')
         .order('requested_at', { ascending: false });
-      
-      if (error) {
-        console.error("Erro ao buscar solicitações (Admin):", error);
-        throw error;
-      }
+      if (error) throw error;
       return data as any[];
     },
     enabled: isAdmin,
   });
 
+  // Real-time updates
   useEffect(() => {
-    const channel = supabase.channel('game-updates-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public' }, (payload) => {
-        const table = payload.table;
-        if (table === 'partidas') queryClient.invalidateQueries({ queryKey: ['matches'] });
-        if (table === 'cartelas_jogador') {
-          queryClient.invalidateQueries({ queryKey: ['playerCards'] });
-          queryClient.invalidateQueries({ queryKey: ['allPlayerCards'] });
-        }
-        if (table === 'cartelas_partida') queryClient.invalidateQueries({ queryKey: ['matchCards'] });
-        if (table === 'perfis') {
-          queryClient.invalidateQueries({ queryKey: ['profile'] });
-          queryClient.invalidateQueries({ queryKey: ['players'] });
-        }
-        if (table === 'vitorias') {
-          queryClient.invalidateQueries({ queryKey: ['wins'] });
-          queryClient.invalidateQueries({ queryKey: ['allWins'] });
-        }
-        if (table === 'solicitacoes_credito') {
-          queryClient.invalidateQueries({ queryKey: ['creditRequests'] });
-          queryClient.invalidateQueries({ queryKey: ['allCreditRequests'] });
-        }
-        if (table === 'configuracoes') queryClient.invalidateQueries({ queryKey: ['gameSettings'] });
+    const channel = supabase.channel('game-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public' }, () => {
+        queryClient.invalidateQueries();
       }).subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [queryClient]);
 
+  // Actions
   const createMatch = async (data: any) => {
     const { error } = await supabase.from('partidas').insert([{ ...data, status: 'waiting' }]);
-    if (error) {
-      toast.error(error.message);
-    } else {
-      toast.success("Partida criada com sucesso!");
-    }
+    if (error) toast.error(error.message);
+    else toast.success("Partida criada!");
   };
 
   const updateMatchStatus = async (matchId: string, status: MatchStatus) => {
@@ -228,7 +215,6 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const deleteMatch = async (matchId: string) => {
     const { error } = await supabase.from('partidas').delete().eq('id', matchId);
     if (error) toast.error(error.message);
-    else toast.success("Partida excluída.");
   };
 
   const toggleAutoCall = async (matchId: string) => {
@@ -244,7 +230,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const callNumber = async (matchId: string, num: number) => {
     const { error } = await supabase.functions.invoke('call-number', { body: { matchId, num } });
-    if (error) toast.error(`Erro ao sortear número: ${error.message}`);
+    if (error) toast.error(`Erro: ${error.message}`);
   };
 
   const requestCredits = async (file: File, creditsRequested: number, amountPaid: number): Promise<boolean> => {
@@ -272,7 +258,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     if (status === 'approved') {
       if (creditsGranted === undefined || creditsGranted < 0) {
-        toast.error("Informe um valor válido.");
+        toast.error("Valor inválido.");
         return false;
       }
       await updatePlayerCredits(request.player_id, creditsGranted);
@@ -284,14 +270,12 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }).eq('id', requestId);
 
     if (error) { toast.error(error.message); return false; }
-    toast.success(`Solicitação processada.`);
     return true;
   };
 
   const deleteCreditRequest = async (requestId: string) => {
     const { error } = await supabase.from('solicitacoes_credito').delete().eq('id', requestId);
     if (error) toast.error(error.message);
-    else toast.success("Solicitação excluída.");
   };
 
   const updatePlayerCredits = async (playerId: string, amount: number) => {
@@ -335,7 +319,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const updateGameSettings = async (newSettings: Partial<GameSettings>) => {
     const { error } = await supabase.from('configuracoes').update(newSettings).eq('singleton', true);
     if (error) toast.error(error.message);
-    else toast.success("Salvo!");
+    else toast.success("Ajustes salvos.");
   };
 
   const getMatchCards = (matchId: string) => matchCards.filter(c => c.match_id === matchId);
@@ -357,6 +341,6 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
 export const useGame = (): GameContextType => {
   const context = useContext(GameContext);
-  if (!context) throw new Error('useGame must be used within GameProvider');
+  if (!context) throw new Error('useGame deve ser usado dentro de GameProvider');
   return context;
 };
