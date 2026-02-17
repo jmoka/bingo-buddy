@@ -4,6 +4,8 @@ import { BingoCell } from '@/components/BingoCell';
 import { Button } from '@/components/ui/button';
 import { gameTypeLabels } from '@/utils/bingoUtils';
 import { ArrowLeft, Coins, Trophy, Users } from 'lucide-react';
+import { useEffect, useRef } from 'react';
+import { toast } from 'sonner';
 
 const MatchView = () => {
   const { id } = useParams<{ id: string }>();
@@ -12,6 +14,24 @@ const MatchView = () => {
 
   const match = matches.find(m => m.id === id);
   const myCards = currentPlayer && id ? getPlayerMatchCards(id, currentPlayer.id) : [];
+
+  const prevCalledNumbersRef = useRef<number[]>(match ? match.calledNumbers : []);
+
+  useEffect(() => {
+    if (!match) return;
+
+    const prevNumbers = prevCalledNumbersRef.current;
+    const currentNumbers = match.calledNumbers;
+
+    if (currentNumbers.length > prevNumbers.length) {
+      const newNumber = currentNumbers[currentNumbers.length - 1];
+      toast.info(`Número sorteado: ${newNumber}!`, {
+        description: 'Confira sua cartela.',
+      });
+    }
+
+    prevCalledNumbersRef.current = currentNumbers;
+  }, [match]);
 
   if (!match) {
     return (

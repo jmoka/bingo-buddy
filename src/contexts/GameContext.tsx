@@ -136,6 +136,30 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [players, currentPlayer]);
 
+  // Sync state across tabs
+  useEffect(() => {
+    const handleStorageChange = (event: StorageEvent) => {
+      if (!event.newValue) return;
+
+      switch (event.key) {
+        case STORAGE_KEYS.matches:
+          setMatches(JSON.parse(event.newValue));
+          break;
+        case STORAGE_KEYS.matchCards:
+          setMatchCards(deserializeMatchCards(event.newValue));
+          break;
+        case STORAGE_KEYS.players:
+          setPlayers(JSON.parse(event.newValue));
+          break;
+        default:
+          break;
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
+
   const adminLogin = useCallback((password: string) => { if (password === ADMIN_PASSWORD) { setIsAdmin(true); return true; } return false; }, []);
   const adminLogout = useCallback(() => setIsAdmin(false), []);
   const updateGameSettings = useCallback((settings: GameSettings) => setGameSettings(settings), []);
