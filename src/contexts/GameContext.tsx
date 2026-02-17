@@ -121,12 +121,21 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const createMatch = async (data: any) => {
     const { error } = await supabase.from('partidas').insert([{ ...data, status: 'waiting' }]);
-    if (error) toast.error(error.message);
+    if (error) {
+      toast.error(error.message);
+    } else {
+      toast.success("Partida criada com sucesso!");
+      queryClient.invalidateQueries({ queryKey: ['matches'] });
+    }
   };
 
   const updateMatchStatus = async (matchId: string, status: MatchStatus) => {
     const { error } = await supabase.from('partidas').update({ status }).eq('id', matchId);
-    if (error) toast.error(error.message);
+    if (error) {
+      toast.error(error.message);
+    } else {
+      queryClient.invalidateQueries({ queryKey: ['matches'] });
+    }
   };
 
   const openMatch = (matchId: string) => updateMatchStatus(matchId, 'open');
@@ -135,7 +144,12 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const deleteMatch = async (matchId: string) => {
     const { error } = await supabase.from('partidas').delete().eq('id', matchId);
-    if (error) toast.error(error.message);
+    if (error) {
+      toast.error(error.message);
+    } else {
+      toast.success("Partida excluída.");
+      queryClient.invalidateQueries({ queryKey: ['matches'] });
+    }
   };
 
   const toggleAutoCall = async (matchId: string) => {
@@ -146,7 +160,11 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       is_auto_calling: isEnabling,
       next_auto_call_timestamp: isEnabling ? new Date(Date.now() + gameSettings.intervalo_sorteio_auto_seg * 1000).toISOString() : null,
     }).eq('id', matchId);
-    if (error) toast.error(error.message);
+    if (error) {
+      toast.error(error.message);
+    } else {
+      queryClient.invalidateQueries({ queryKey: ['matches'] });
+    }
   };
 
   const callNumber = async (matchId: string, num: number) => {
@@ -156,6 +174,8 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const newCalledNumbers = [...match.called_numbers, num];
     const { error: updateError } = await supabase.from('partidas').update({ called_numbers: newCalledNumbers }).eq('id', matchId);
     if (updateError) { toast.error(updateError.message); return; }
+
+    queryClient.invalidateQueries({ queryKey: ['matches'] });
 
     const cardsInMatch = matchCards.filter(c => c.match_id === matchId);
     const foundWinners: { card: MatchCard, result: WinResult }[] = [];
@@ -180,6 +200,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }));
 
       await supabase.from('partidas').update({ status: 'finished', winners: winnerData, is_auto_calling: false }).eq('id', matchId);
+      queryClient.invalidateQueries({ queryKey: ['matches'] });
       toast.success('BINGO! Temos um vencedor!');
     }
   };
@@ -187,7 +208,11 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const buyCredits = async (amount: number) => {
     if (!profile) return;
     const { error } = await supabase.from('perfis').update({ credits: profile.credits + amount }).eq('id', profile.id);
-    if (error) toast.error(error.message);
+    if (error) {
+      toast.error(error.message);
+    } else {
+      queryClient.invalidateQueries({ queryKey: ['profile'] });
+    }
   };
 
   const createPlayerCard = async (options: { name: string; numbers: number[][]; }): Promise<PlayerCard | null> => {
@@ -201,6 +226,9 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const newCard = { player_id: user.id, ...options, uses_left: 1 };
     const { data, error } = await supabase.from('cartelas_jogador').insert(newCard).select().single();
     if (error) { toast.error(error.message); return null; }
+    
+    queryClient.invalidateQueries({ queryKey: ['playerCards'] });
+    queryClient.invalidateQueries({ queryKey: ['profile'] });
     return data as PlayerCard;
   };
 
@@ -236,6 +264,12 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (error) { toast.error(error.message); return null; }
 
     await supabase.from('partidas').update({ pot: match.pot + totalCost }).eq('id', matchId);
+    
+    queryClient.invalidateQueries({ queryKey: ['matchCards'] });
+    queryClient.invalidateQueries({ queryKey: ['playerCards'] });
+    queryClient.invalidateQueries({ queryKey: ['matches'] });
+    queryClient.invalidateQueries({ queryKey: ['profile'] });
+
     return data as MatchCard[];
   };
 
@@ -252,6 +286,9 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const { error } = await supabase.from('cartelas_jogador').update({ uses_left: card.uses_left + gameSettings.usos_por_recarga }).eq('id', playerCardId);
       if (error) { toast.error(error.message); return false; }
     }
+
+    queryClient.invalidateQueries({ queryKey: ['playerCards'] });
+    queryClient.invalidateQueries({ queryKey: ['profile'] });
     return true;
   };
 
