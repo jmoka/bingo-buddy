@@ -7,7 +7,7 @@ import { Match } from '@/types/match';
 import { gameTypeLabels } from '@/utils/bingoUtils';
 import { 
   LogIn, LogOut, Coins, Plus, Trophy, Users, Settings, Wallet, 
-  CreditCard, Timer, DoorOpen, Ticket, Check, Zap, ZapOff
+  CreditCard, Timer, DoorOpen, Ticket, Check, Zap, ZapOff, Tv
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
@@ -229,7 +229,7 @@ const Lobby = () => {
                     <div className="flex flex-col items-end">
                       {alreadyJoined ? (
                         <Button size="sm" className="bg-success/10 text-success hover:bg-success/20" onClick={() => navigate(`/match/${match.id}`)}>
-                          <Check className="w-4 h-4 mr-2" /> {myMatchCards.length} Cartela(s) na Partida
+                          <Tv className="w-4 h-4 mr-2" /> Acompanhar ao vivo
                         </Button>
                       ) : canJoin ? (
                         <Button size="sm" className="gradient-accent shadow-button" onClick={() => openJoinDialog(match)}>
