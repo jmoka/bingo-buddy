@@ -216,27 +216,42 @@ const Lobby = () => {
             <div className="card-container text-center py-8"><p className="text-muted-foreground">Você ainda não tem cartelas. Crie uma!</p></div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {myOwnedCards.map(card => (
-                <div key={card.id} className={`card-container p-3 transition-opacity ${card.uses_left === 0 ? 'opacity-60' : ''}`}>
-                  <div className="flex justify-between items-start mb-2">
-                    <h3 className="font-heading font-semibold text-foreground">{card.name}</h3>
-                    <div className="flex items-center gap-2">
-                      <div className={`flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-full ${card.uses_left > 0 ? 'bg-success/10 text-success' : 'bg-destructive/10 text-destructive'}`}>
-                        {card.uses_left > 0 ? <Zap className="w-3 h-3" /> : <ZapOff className="w-3 h-3" />}
-                        <span>{card.uses_left} uso(s)</span>
+              {myOwnedCards.map(card => {
+                const activeMatchCard = matchCards.find(mc => 
+                  mc.player_card_id === card.id && 
+                  matches.some(m => m.id === mc.match_id && m.status === 'in_progress')
+                );
+                const markedNumbers = activeMatchCard ? activeMatchCard.marked_numbers : new Set<number>();
+
+                return (
+                  <div key={card.id} className={`card-container p-3 transition-opacity ${card.uses_left === 0 ? 'opacity-60' : ''}`}>
+                    <div className="flex justify-between items-start mb-2">
+                      <h3 className="font-heading font-semibold text-foreground">{card.name}</h3>
+                      <div className="flex items-center gap-2">
+                        <div className={`flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-full ${card.uses_left > 0 ? 'bg-success/10 text-success' : 'bg-destructive/10 text-destructive'}`}>
+                          {card.uses_left > 0 ? <Zap className="w-3 h-3" /> : <ZapOff className="w-3 h-3" />}
+                          <span>{card.uses_left} uso(s)</span>
+                        </div>
+                        {card.uses_left === 0 && (
+                          <Button size="sm" variant="outline" onClick={() => handleBuyUses(card.id)}>
+                            Recarregar <Coins className="w-3 h-3 ml-1" />
+                          </Button>
+                        )}
                       </div>
-                      {card.uses_left === 0 && (
-                        <Button size="sm" variant="outline" onClick={() => handleBuyUses(card.id)}>
-                          Recarregar <Coins className="w-3 h-3 ml-1" />
-                        </Button>
-                      )}
+                    </div>
+                    <div className="grid grid-cols-5 gap-1">
+                      {card.numbers.flat().map((num, i) => (
+                        <BingoCell 
+                          key={i} 
+                          number={num} 
+                          isMarked={markedNumbers.has(num)}
+                          isFreeSpace={i === 12} 
+                        />
+                      ))}
                     </div>
                   </div>
-                  <div className="grid grid-cols-5 gap-1">
-                    {card.numbers.flat().map((num, i) => <BingoCell key={i} number={num} isMarked={false} isFreeSpace={i === 12} />)}
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

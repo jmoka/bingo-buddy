@@ -119,10 +119,10 @@
   }
 
   .bingo-cell.marked {
-    background: var(--gradient-primary);
-    color: hsl(var(--primary-foreground));
+    background: var(--gradient-accent);
+    color: hsl(var(--accent-foreground));
     transform: scale(0.95);
-    box-shadow: var(--shadow-button);
+    box-shadow: var(--shadow-accent);
   }
 
   .bingo-cell.free {
