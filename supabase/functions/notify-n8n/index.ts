@@ -65,6 +65,8 @@ serve(async (req) => {
       });
     }
 
+    console.log(`[notify-n8n] Enviando evento '${event}' para a URL: ${webhookUrl}`);
+
     // Monta o payload final para enviar ao n8n
     const payload = {
       event,
