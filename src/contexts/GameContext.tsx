@@ -73,7 +73,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
   });
 
   const { data: players = [] } = useQuery({
-    queryKey: ['players'],
+    queryKey: ['players', isAdmin],
     queryFn: async () => {
       const { data, error } = await supabase.from('perfis').select('*');
       if (error) throw error;
@@ -94,7 +94,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
   });
 
   const { data: allPlayerCards = [] } = useQuery({
-    queryKey: ['allPlayerCards'],
+    queryKey: ['allPlayerCards', isAdmin],
     queryFn: async () => {
       const { data, error } = await supabase.from('cartelas_jogador').select('*');
       if (error) throw error;
@@ -124,7 +124,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
   });
 
   const { data: allWins = [] } = useQuery({
-    queryKey: ['allWins'],
+    queryKey: ['allWins', isAdmin],
     queryFn: async () => {
       const { data, error } = await supabase.from('vitorias').select('*');
       if (error) throw error;
@@ -150,38 +150,38 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
   });
 
   const { data: allCreditRequests = [], isLoading: l7 } = useQuery({
-    queryKey: ['allCreditRequests'],
+    queryKey: ['allCreditRequests', isAdmin],
     queryFn: async () => {
+      // Usamos uma seleção explícita para garantir que os dados venham mesmo se houver erro no join
       const { data, error } = await supabase
         .from('solicitacoes_credito')
-        .select('*, perfis(full_name, avatar_url)')
+        .select(`
+          id, 
+          player_id, 
+          status, 
+          receipt_url, 
+          credits_granted, 
+          credits_requested, 
+          amount_paid, 
+          requested_at, 
+          resolved_at, 
+          resolved_by, 
+          notes,
+          perfis:player_id(full_name, avatar_url)
+        `)
         .order('requested_at', { ascending: false });
-      if (error) throw error;
-      return data as CreditRequest[];
+      
+      if (error) {
+        console.error("Erro ao buscar solicitações (Admin):", error);
+        throw error;
+      }
+      return data as any[];
     },
     enabled: isAdmin,
   });
 
-  const { data: gameSettings, isLoading: l4 } = useQuery({
-    queryKey: ['gameSettings'],
-    queryFn: async () => {
-      const { data, error } = await supabase.from('configuracoes').select('*').limit(1).single();
-      if (error) {
-        return {
-          custo_nova_cartela: 10,
-          custo_recarga_cartela: 5,
-          usos_por_recarga: 1,
-          intervalo_sorteio_auto_seg: 120,
-          valor_por_credito: 1,
-        } as GameSettings;
-      }
-      return data as GameSettings;
-    },
-    staleTime: 0,
-  });
-
   useEffect(() => {
-    const channel = supabase.channel('game-updates')
+    const channel = supabase.channel('game-updates-realtime')
       .on('postgres_changes', { event: '*', schema: 'public' }, (payload) => {
         const table = payload.table;
         if (table === 'partidas') queryClient.invalidateQueries({ queryKey: ['matches'] });

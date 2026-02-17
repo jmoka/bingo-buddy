@@ -11,7 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose, DialogDescription } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Check, X, Download, MessageSquare, Trash2, Coins, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, Check, X, Download, MessageSquare, Trash2, Coins, AlertTriangle, RefreshCw } from 'lucide-react';
 import { Footer } from '@/components/Footer';
 import PlayerAvatar from '@/components/PlayerAvatar';
 import { CreditRequest } from '@/types/match';
@@ -19,6 +19,7 @@ import { format, formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { useQueryClient } from '@tanstack/react-query';
 
 const statusConfig = {
   pending: { label: 'Pendente', color: 'bg-amber-500/10 text-amber-600' },
@@ -28,20 +29,28 @@ const statusConfig = {
 
 const CreditRequestsAdmin = () => {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { profile } = useAuth();
-  const { allCreditRequests, resolveCreditRequest, deleteCreditRequest } = useGame();
+  const { allCreditRequests, resolveCreditRequest, deleteCreditRequest, isLoading } = useGame();
   
   const [selectedRequest, setSelectedRequest] = useState<CreditRequest | null>(null);
   const [creditsToGrant, setCreditsToGrant] = useState(0);
   const [rejectionNotes, setRejectionNotes] = useState('');
   const [isResolveDialogOpen, setIsResolveDialogOpen] = useState(false);
   const [actionType, setActionType] = useState<'approve' | 'reject' | 'delete' | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   useEffect(() => {
     if (!profile || profile.role !== 'admin') {
       navigate('/');
     }
   }, [profile, navigate]);
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    await queryClient.invalidateQueries({ queryKey: ['allCreditRequests'] });
+    setTimeout(() => setIsRefreshing(false), 500);
+  };
 
   const handleOpenDialog = (request: CreditRequest, type: 'approve' | 'reject' | 'delete') => {
     setSelectedRequest(request);
@@ -92,6 +101,16 @@ const CreditRequestsAdmin = () => {
             </Button>
             <h1 className="font-heading text-2xl md:text-3xl font-bold text-primary-foreground">Gerenciar Créditos</h1>
           </div>
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            className="text-primary-foreground" 
+            onClick={handleRefresh}
+            disabled={isRefreshing || isLoading}
+          >
+            <RefreshCw className={`w-4 h-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
+            Atualizar
+          </Button>
         </div>
       </header>
 
@@ -121,7 +140,7 @@ const CreditRequestsAdmin = () => {
                         <div className="flex items-center gap-3">
                           <PlayerAvatar url={req.perfis?.avatar_url || null} />
                           <div className="flex flex-col">
-                            <span className="font-medium">{req.perfis?.full_name || 'Não definido'}</span>
+                            <span className="font-medium">{req.perfis?.full_name || 'Usuário Desconhecido'}</span>
                             <span className="text-[10px] text-muted-foreground font-mono">ID: ...{req.player_id.slice(-6)}</span>
                           </div>
                         </div>
@@ -131,8 +150,8 @@ const CreditRequestsAdmin = () => {
                         <div className="text-[10px] text-muted-foreground">{formatDistanceToNow(new Date(req.requested_at), { addSuffix: true, locale: ptBR })}</div>
                       </TableCell>
                       <TableCell>
-                        <div className="font-bold text-primary">{req.credits_requested} cr.</div>
-                        <div className="text-xs text-muted-foreground">R$ {Number(req.amount_paid).toFixed(2).replace('.', ',')}</div>
+                        <div className="font-bold text-primary">{(req.credits_requested || 0)} cr.</div>
+                        <div className="text-xs text-muted-foreground">R$ {Number(req.amount_paid || 0).toFixed(2).replace('.', ',')}</div>
                       </TableCell>
                       <TableCell className="text-center">
                         <Button variant="outline" size="sm" onClick={() => handleDownloadReceipt(req.receipt_url)}>
@@ -156,7 +175,7 @@ const CreditRequestsAdmin = () => {
                   ))}
                 </TableBody>
               </Table>
-              {pendingRequests.length === 0 && <div className="text-center py-12 text-muted-foreground">Tudo em dia! Nenhuma solicitação pendente.</div>}
+              {pendingRequests.length === 0 && <div className="text-center py-12 text-muted-foreground">Tudo em dia! Nenhuma solicitação pendente encontrada.</div>}
             </div>
           </TabsContent>
 
@@ -178,11 +197,11 @@ const CreditRequestsAdmin = () => {
                       <TableCell>
                         <div className="flex items-center gap-2 text-sm">
                           <PlayerAvatar url={req.perfis?.avatar_url || null} />
-                          <span>{req.perfis?.full_name}</span>
+                          <span>{req.perfis?.full_name || 'Removido'}</span>
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Badge className={`${statusConfig[req.status].color} border-none`}>{statusConfig[req.status].label}</Badge>
+                        <Badge className={`${statusConfig[req.status]?.color || 'bg-muted'} border-none`}>{statusConfig[req.status]?.label || 'Desconhecido'}</Badge>
                       </TableCell>
                       <TableCell>
                         <div className="text-sm font-bold">{req.credits_granted || 0} de {req.credits_requested}</div>
@@ -252,7 +271,7 @@ const CreditRequestsAdmin = () => {
           {actionType === 'delete' && (
             <div className="p-4 bg-destructive/5 rounded-lg border border-destructive/10 text-destructive text-sm flex gap-3">
               <AlertTriangle className="w-5 h-5 shrink-0" />
-              <p>Esta ação é irreversível. A solicitação do jogador <strong>{selectedRequest?.perfis?.full_name}</strong> será apagada.</p>
+              <p>Esta ação é irreversível. A solicitação do jogador <strong>{selectedRequest?.perfis?.full_name || 'Desconhecido'}</strong> será apagada.</p>
             </div>
           )}
 
