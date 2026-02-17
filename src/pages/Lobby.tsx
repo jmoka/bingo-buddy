@@ -146,6 +146,8 @@ const Lobby = () => {
     return null; // or a loading spinner
   }
 
+  const activeMatchIds = new Set(matches.filter(m => m.status === 'in_progress').map(m => m.id));
+
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <header className="gradient-hero py-6 px-4">
@@ -218,8 +220,7 @@ const Lobby = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {myOwnedCards.map(card => {
                 const activeMatchCard = matchCards.find(mc => 
-                  mc.player_card_id === card.id && 
-                  matches.some(m => m.id === mc.match_id && m.status === 'in_progress')
+                  mc.player_card_id === card.id && activeMatchIds.has(mc.match_id)
                 );
                 const markedNumbers = activeMatchCard ? activeMatchCard.marked_numbers : new Set<number>();
 
