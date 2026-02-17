@@ -2,7 +2,7 @@ import React, { createContext, useContext, useEffect, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './AuthContext';
-import { Match, PlayerCard, MatchCard, Win, MatchStatus, CreditRequest } from '@/types/match';
+import { Match, PlayerCard, MatchCard, Win, MatchStatus, CreditRequest, CreditRequestMessage } from '@/types/match';
 import { toast } from 'sonner';
 import { Profile } from './AuthContext';
 
@@ -55,6 +55,7 @@ interface GameContextType {
   updatePlayerCredits: (playerId: string, amount: number) => Promise<void>;
   getMatchCards: (matchId: string) => MatchCard[];
   getPlayerMatchCards: (matchId: string, playerId: string) => MatchCard[];
+  fetchRequestMessages: (requestId: string) => Promise<CreditRequestMessage[]>;
 }
 
 const GameContext = createContext<GameContextType | null>(null);
@@ -65,7 +66,6 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const isAdmin = profile?.role === 'admin';
 
-  // 1. Configurações
   const { data: gameSettings } = useQuery({
     queryKey: ['gameSettings'],
     queryFn: async () => {
@@ -75,7 +75,6 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   });
 
-  // 2. Partidas
   const { data: matches = [] } = useQuery({
     queryKey: ['matches'],
     queryFn: async () => {
@@ -85,7 +84,6 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     },
   });
 
-  // 3. Cartelas do Jogador
   const { data: playerCards = [] } = useQuery({
     queryKey: ['playerCards', user?.id],
     queryFn: async () => {
@@ -97,7 +95,6 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     enabled: !!user,
   });
 
-  // 4. Cartelas em Partida
   const { data: matchCards = [] } = useQuery({
     queryKey: ['matchCards'],
     queryFn: async () => {
@@ -107,7 +104,6 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     },
   });
 
-  // 5. Vitórias
   const { data: wins = [] } = useQuery({
     queryKey: ['wins', user?.id],
     queryFn: async () => {
@@ -118,7 +114,6 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     enabled: !!user,
   });
 
-  // 6. Solicitações do Jogador Logado
   const { data: creditRequests = [] } = useQuery({
     queryKey: ['creditRequests', user?.id],
     queryFn: async () => {
@@ -129,7 +124,6 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     enabled: !!user,
   });
 
-  // 7. Dados Administrativos (Só carregam se for admin)
   const { data: players = [], isLoading: isLoadingPlayers } = useQuery({
     queryKey: ['players', isAdmin],
     queryFn: async () => {
@@ -167,10 +161,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     queryKey: ['rawCreditRequests', isAdmin],
     queryFn: async () => {
       if (!isAdmin) return [];
-      const { data, error } = await supabase
-        .from('solicitacoes_credito')
-        .select('*')
-        .order('requested_at', { ascending: false });
+      const { data, error } = await supabase.from('solicitacoes_credito').select('*').order('requested_at', { ascending: false });
       if (error) throw error;
       return data;
     },
@@ -178,9 +169,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
   });
 
   const allCreditRequests = useMemo(() => {
-    if (!isAdmin || !rawCreditRequests || !players) {
-      return [];
-    }
+    if (!isAdmin || !rawCreditRequests || !players) return [];
     const playersMap = new Map(players.map(p => [p.id, { full_name: p.full_name, avatar_url: p.avatar_url }]));
     return rawCreditRequests.map(req => ({
       ...req,
@@ -188,7 +177,6 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     })) as CreditRequest[];
   }, [isAdmin, rawCreditRequests, players]);
 
-  // Escuta mudanças em tempo real para invalidar o cache
   useEffect(() => {
     const channel = supabase.channel('schema-db-changes')
       .on('postgres_changes', { event: '*', schema: 'public' }, () => {
@@ -197,7 +185,6 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => { supabase.removeChannel(channel); };
   }, [queryClient]);
 
-  // Ações
   const createMatch = async (data: any) => {
     const { error } = await supabase.from('partidas').insert([{ ...data, status: 'waiting' }]);
     if (error) toast.error(error.message);
@@ -210,10 +197,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const openMatch = (matchId: string) => updateMatchStatus(matchId, 'open');
   const startMatch = (matchId: string) => updateMatchStatus(matchId, 'in_progress');
   const finishMatch = (matchId: string) => updateMatchStatus(matchId, 'finished');
-
-  const deleteMatch = async (matchId: string) => {
-    await supabase.from('partidas').delete().eq('id', matchId);
-  };
+  const deleteMatch = async (matchId: string) => { await supabase.from('partidas').delete().eq('id', matchId); };
 
   const toggleAutoCall = async (matchId: string) => {
     const match = matches.find(m => m.id === matchId);
@@ -237,6 +221,13 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       player_id: user.id, receipt_url: fileName, status: 'pending', credits_requested: creditsRequested, amount_paid: amountPaid,
     }).select().single();
     if (error) return false;
+    
+    await supabase.from('mensagens_solicitacao').insert({
+        credit_request_id: newRequest.id,
+        sender_id: user.id,
+        message: `Nova solicitação: ${creditsRequested} créditos. Valor pago: R$ ${amountPaid.toFixed(2)}`
+    });
+
     await supabase.functions.invoke('notify-n8n', { body: { event: 'CREDIT_REQUEST', data: { requestId: newRequest.id, creditsRequested, amountPaid, userEmail: user.email } } });
     return true;
   };
@@ -246,27 +237,19 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const fileName = `${user.id}/${Date.now()}.${file.name.split('.').pop()}`;
     
     const { error: uploadError } = await supabase.storage.from('receipts').upload(fileName, file);
-    if (uploadError) {
-      toast.error('Erro ao enviar comprovante.', { description: uploadError.message });
-      return false;
-    }
+    if (uploadError) { toast.error('Erro ao enviar comprovante.', { description: uploadError.message }); return false; }
 
     const { error } = await supabase.from('solicitacoes_credito').update({
-      status: 'pending',
-      receipt_url: fileName,
-      resubmission_notes: message,
-      resolved_at: null,
-      resolved_by: null,
-      notes: null,
-      credits_granted: null,
+      status: 'pending', receipt_url: fileName, resubmission_notes: message, resolved_at: null, resolved_by: null, notes: null, credits_granted: null,
     }).eq('id', requestId);
 
     if (error) {
       toast.error('Falha ao reenviar solicitação.', { description: error.message });
-      // Clean up orphaned file
       await supabase.storage.from('receipts').remove([fileName]);
       return false;
     }
+
+    await supabase.from('mensagens_solicitacao').insert({ credit_request_id: requestId, sender_id: user.id, message: message || "Reenvio de comprovante." });
 
     await supabase.functions.invoke('notify-n8n', { body: { event: 'CREDIT_RESUBMISSION', data: { requestId, userEmail: user.email, message } } });
     return true;
@@ -286,24 +269,26 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       status, credits_granted: status === 'approved' ? creditsGranted : null,
       resolved_at: new Date().toISOString(), resolved_by: user.id, notes: notes || null,
     }).eq('id', requestId);
+
+    if (notes) {
+        await supabase.from('mensagens_solicitacao').insert({
+            credit_request_id: requestId,
+            sender_id: user.id,
+            message: notes
+        });
+    }
     
     return true;
   };
 
   const unblockCreditRequest = async (requestId: string) => {
     await supabase.from('solicitacoes_credito').update({
-      status: 'pending',
-      notes: 'Solicitação reaberta pelo administrador.',
-      resolved_at: null,
-      resolved_by: null,
-      credits_granted: null,
+      status: 'pending', notes: 'Solicitação reaberta pelo administrador.', resolved_at: null, resolved_by: null, credits_granted: null,
     }).eq('id', requestId);
-    toast.success('Solicitação reaberta', { description: 'A solicitação foi movida para pendentes para nova análise.' });
+    toast.success('Solicitação reaberta');
   };
 
-  const deleteCreditRequest = async (requestId: string) => {
-    await supabase.from('solicitacoes_credito').delete().eq('id', requestId);
-  };
+  const deleteCreditRequest = async (requestId: string) => { await supabase.from('solicitacoes_credito').delete().eq('id', requestId); };
 
   const updatePlayerCredits = async (playerId: string, amount: number) => {
     const { data: p } = await supabase.from('perfis').select('credits').eq('id', playerId).single();
@@ -317,13 +302,8 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return data as PlayerCard;
   };
 
-  const deletePlayerCard = async (cardId: string) => {
-    await supabase.from('cartelas_jogador').delete().eq('id', cardId);
-  };
-
-  const toggleArchivePlayerCard = async (cardId: string, archive: boolean) => {
-    await supabase.from('cartelas_jogador').update({ is_archived: archive }).eq('id', cardId);
-  };
+  const deletePlayerCard = async (cardId: string) => { await supabase.from('cartelas_jogador').delete().eq('id', cardId); };
+  const toggleArchivePlayerCard = async (cardId: string, archive: boolean) => { await supabase.from('cartelas_jogador').update({ is_archived: archive }).eq('id', cardId); };
 
   const joinMatch = async (matchId: string, playerCardIds: string[]): Promise<MatchCard[] | null> => {
     const { data } = await supabase.functions.invoke('join-match', { body: { matchId, playerCardIds } });
@@ -338,12 +318,15 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return true;
   };
 
-  const updateGameSettings = async (newSettings: Partial<GameSettings>) => {
-    await supabase.from('configuracoes').update(newSettings).eq('singleton', true);
-  };
-
+  const updateGameSettings = async (newSettings: Partial<GameSettings>) => { await supabase.from('configuracoes').update(newSettings).eq('singleton', true); };
   const getMatchCards = (matchId: string) => matchCards.filter(c => c.match_id === matchId);
   const getPlayerMatchCards = (matchId: string, playerId: string) => matchCards.filter(c => c.match_id === matchId && c.player_id === playerId);
+
+  const fetchRequestMessages = async (requestId: string): Promise<CreditRequestMessage[]> => {
+    const { data, error } = await supabase.from('mensagens_solicitacao').select('*').eq('credit_request_id', requestId).order('created_at', { ascending: true });
+    if (error) return [];
+    return data as CreditRequestMessage[];
+  };
 
   return (
     <GameContext.Provider value={{
@@ -351,6 +334,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       createMatch, openMatch, startMatch, callNumber, finishMatch, deleteMatch, toggleAutoCall,
       updateGameSettings, createPlayerCard, deletePlayerCard, toggleArchivePlayerCard, joinMatch, buyCardUses,
       requestCredits, resubmitCreditRequest, resolveCreditRequest, unblockCreditRequest, deleteCreditRequest, updatePlayerCredits, getMatchCards, getPlayerMatchCards,
+      fetchRequestMessages
     }}>
       {children}
     </GameContext.Provider>

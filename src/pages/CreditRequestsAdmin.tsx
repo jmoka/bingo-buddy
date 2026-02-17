@@ -12,15 +12,16 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose, DialogDescription } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Check, X, Download, MessageSquare, Trash2, Coins, AlertTriangle, RefreshCw, Undo2, User, ShieldCheck } from 'lucide-react';
+import { ArrowLeft, Check, X, Download, MessageSquare, Trash2, Coins, AlertTriangle, RefreshCw, Undo2, User, ShieldCheck, Loader2 } from 'lucide-react';
 import { Footer } from '@/components/Footer';
 import PlayerAvatar from '@/components/PlayerAvatar';
-import { CreditRequest } from '@/types/match';
+import { CreditRequest, CreditRequestMessage } from '@/types/match';
 import { format, formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 const statusConfig = {
   pending: { label: 'Pendente', color: 'bg-amber-500/10 text-amber-600' },
@@ -32,10 +33,13 @@ const CreditRequestsAdmin = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { profile } = useAuth();
-  const { allCreditRequests, resolveCreditRequest, deleteCreditRequest, unblockCreditRequest, isLoading } = useGame();
+  const { allCreditRequests, resolveCreditRequest, deleteCreditRequest, unblockCreditRequest, fetchRequestMessages, isLoading } = useGame();
   
   const [selectedRequest, setSelectedRequest] = useState<CreditRequest | null>(null);
   const [conversationRequest, setConversationRequest] = useState<CreditRequest | null>(null);
+  const [messages, setMessages] = useState<CreditRequestMessage[]>([]);
+  const [isLoadingMessages, setIsLoadingMessages] = useState(false);
+  
   const [creditsToGrant, setCreditsToGrant] = useState(0);
   const [rejectionNotes, setRejectionNotes] = useState('');
   const [isResolveDialogOpen, setIsResolveDialogOpen] = useState(false);
@@ -48,9 +52,24 @@ const CreditRequestsAdmin = () => {
     }
   }, [profile, navigate]);
 
+  useEffect(() => {
+    if (conversationRequest) {
+      loadMessages(conversationRequest.id);
+    } else {
+      setMessages([]);
+    }
+  }, [conversationRequest]);
+
+  const loadMessages = async (requestId: string) => {
+    setIsLoadingMessages(true);
+    const data = await fetchRequestMessages(requestId);
+    setMessages(data);
+    setIsLoadingMessages(false);
+  };
+
   const handleRefresh = async () => {
     setIsRefreshing(true);
-    await queryClient.invalidateQueries({ queryKey: ['allCreditRequests'] });
+    await queryClient.invalidateQueries({ queryKey: ['rawCreditRequests'] });
     setTimeout(() => setIsRefreshing(false), 500);
   };
 
@@ -77,10 +96,7 @@ const CreditRequestsAdmin = () => {
 
   const handleDownloadReceipt = async (path: string) => {
     const { data, error } = await supabase.storage.from('receipts').download(path);
-    if (error) {
-      toast.error('Erro ao baixar comprovante.');
-      return;
-    }
+    if (error) { toast.error('Erro ao baixar comprovante.'); return; }
     const url = URL.createObjectURL(data);
     const a = document.createElement('a');
     a.href = url;
@@ -103,15 +119,8 @@ const CreditRequestsAdmin = () => {
             </Button>
             <h1 className="font-heading text-2xl md:text-3xl font-bold text-primary-foreground">Gerenciar Créditos</h1>
           </div>
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            className="text-primary-foreground" 
-            onClick={handleRefresh}
-            disabled={isRefreshing || isLoading}
-          >
-            <RefreshCw className={`w-4 h-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
-            Atualizar
+          <Button variant="ghost" size="sm" className="text-primary-foreground" onClick={handleRefresh} disabled={isRefreshing || isLoading}>
+            <RefreshCw className={`w-4 h-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} /> Atualizar
           </Button>
         </div>
       </header>
@@ -144,21 +153,18 @@ const CreditRequestsAdmin = () => {
                           <div className="flex flex-col">
                             <span className="font-medium">{req.perfis?.full_name || 'Usuário Desconhecido'}</span>
                             <span className="text-[10px] text-muted-foreground font-mono">ID: ...{req.player_id.slice(-6)}</span>
-                            {req.resubmission_notes && (
-                              <button 
+                            <button 
                                 onClick={() => setConversationRequest(req)}
                                 className="mt-2 flex items-start gap-2 p-3 rounded-lg bg-primary/10 border border-primary/20 text-left hover:bg-primary/20 transition-colors w-full max-w-[280px] shadow-sm group"
                               >
                                 <MessageSquare className="w-5 h-5 text-primary shrink-0 mt-0.5 group-hover:scale-110 transition-transform" />
                                 <div className="flex flex-col overflow-hidden">
-                                  <span className="text-[10px] font-bold text-primary uppercase tracking-wider mb-0.5">Mensagem do Usuário</span>
-                                  <span className="text-xs text-foreground font-medium leading-normal line-clamp-3">
-                                    {req.resubmission_notes}
+                                  <span className="text-[10px] font-bold text-primary uppercase tracking-wider mb-0.5 text-center">Abrir Conversa Completa</span>
+                                  <span className="text-xs text-foreground font-medium leading-normal line-clamp-2">
+                                    {req.resubmission_notes || "Ver histórico de mensagens..."}
                                   </span>
-                                  <span className="text-[9px] text-primary/70 mt-1 font-bold">Clique para ver histórico</span>
                                 </div>
                               </button>
-                            )}
                           </div>
                         </div>
                       </TableCell>
@@ -177,22 +183,15 @@ const CreditRequestsAdmin = () => {
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-1.5">
-                          <Button size="icon" variant="ghost" className="text-destructive h-8 w-8" title="Bloquear/Rejeitar" onClick={() => handleOpenDialog(req, 'reject')}>
-                            <X className="w-4 h-4" />
-                          </Button>
-                          <Button size="icon" variant="ghost" className="text-success h-8 w-8" title="Aprovar" onClick={() => handleOpenDialog(req, 'approve')}>
-                            <Check className="w-4 h-4" />
-                          </Button>
-                          <Button size="icon" variant="ghost" className="text-muted-foreground h-8 w-8" title="Excluir" onClick={() => handleOpenDialog(req, 'delete')}>
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
+                          <Button size="icon" variant="ghost" className="text-destructive h-8 w-8" onClick={() => handleOpenDialog(req, 'reject')}><X className="w-4 h-4" /></Button>
+                          <Button size="icon" variant="ghost" className="text-success h-8 w-8" onClick={() => handleOpenDialog(req, 'approve')}><Check className="w-4 h-4" /></Button>
+                          <Button size="icon" variant="ghost" className="text-muted-foreground h-8 w-8" onClick={() => handleOpenDialog(req, 'delete')}><Trash2 className="w-4 h-4" /></Button>
                         </div>
                       </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
               </Table>
-              {pendingRequests.length === 0 && <div className="text-center py-12 text-muted-foreground">Tudo em dia! Nenhuma solicitação pendente encontrada.</div>}
             </div>
           </TabsContent>
 
@@ -204,7 +203,7 @@ const CreditRequestsAdmin = () => {
                     <TableHead>Jogador</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Créditos</TableHead>
-                    <TableHead>Mensagem/Nota</TableHead>
+                    <TableHead>Mensagem</TableHead>
                     <TableHead className="text-right">Ação</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -217,36 +216,17 @@ const CreditRequestsAdmin = () => {
                           <span>{req.perfis?.full_name || 'Removido'}</span>
                         </div>
                       </TableCell>
-                      <TableCell>
-                        <Badge className={`${statusConfig[req.status]?.color || 'bg-muted'} border-none`}>{statusConfig[req.status]?.label || 'Desconhecido'}</Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className="text-sm font-bold">{req.credits_granted || 0} de {req.credits_requested}</div>
-                      </TableCell>
-                      <TableCell className="max-w-[200px] truncate text-xs italic text-muted-foreground">
-                        <div className="flex flex-col gap-1">
-                          {req.notes && <span>{req.notes}</span>}
-                          {req.resubmission_notes && (
-                            <button 
-                              onClick={() => setConversationRequest(req)}
-                              className="text-[10px] text-primary/70 hover:text-primary transition-colors text-left font-bold"
-                            >
-                              Ver conversa...
-                            </button>
-                          )}
-                          {!req.notes && !req.resubmission_notes && '-'}
-                        </div>
+                      <TableCell><Badge className={`${statusConfig[req.status]?.color || 'bg-muted'} border-none`}>{statusConfig[req.status]?.label}</Badge></TableCell>
+                      <TableCell><div className="text-sm font-bold">{req.credits_granted || 0} de {req.credits_requested}</div></TableCell>
+                      <TableCell className="max-w-[200px] truncate">
+                        <button onClick={() => setConversationRequest(req)} className="text-[10px] text-primary/70 hover:text-primary transition-colors text-left font-bold flex items-center gap-1">
+                          <MessageSquare className="w-3 h-3" /> Ver conversa...
+                        </button>
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-1.5">
-                          {req.status === 'rejected' && (
-                            <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground" title="Reabrir Solicitação" onClick={() => unblockCreditRequest(req.id)}>
-                              <Undo2 className="w-4 h-4" />
-                            </Button>
-                          )}
-                          <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground" onClick={() => handleOpenDialog(req, 'delete')}>
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
+                          {req.status === 'rejected' && <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground" onClick={() => unblockCreditRequest(req.id)}><Undo2 className="w-4 h-4" /></Button>}
+                          <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground" onClick={() => handleOpenDialog(req, 'delete')}><Trash2 className="w-4 h-4" /></Button>
                         </div>
                       </TableCell>
                     </TableRow>
@@ -258,42 +238,45 @@ const CreditRequestsAdmin = () => {
         </Tabs>
       </main>
 
-      {/* Dialog de Histórico da Conversa */}
       <Dialog open={!!conversationRequest} onOpenChange={(open) => !open && setConversationRequest(null)}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
+        <DialogContent className="max-w-md h-[70vh] flex flex-col p-0">
+          <DialogHeader className="p-6 pb-2 border-b">
             <DialogTitle className="flex items-center gap-2 font-heading">
-              <MessageSquare className="w-5 h-5 text-primary" />
-              Histórico de Revisão
+              <MessageSquare className="w-5 h-5 text-primary" /> Histórico da Conversa
             </DialogTitle>
-            <DialogDescription>
-              Abaixo está o motivo da rejeição anterior e a justificativa enviada pelo jogador.
-            </DialogDescription>
+            <DialogDescription>Solicitação de {conversationRequest?.perfis?.full_name}</DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-6 py-4">
-            {conversationRequest?.notes && (
-              <div className="flex flex-col items-end space-y-2">
-                <div className="flex items-center gap-1.5 text-[10px] font-bold text-muted-foreground uppercase tracking-widest mr-2">
-                  <ShieldCheck className="w-3 h-3" /> Sua Nota Anterior (Admin)
+          <ScrollArea className="flex-grow p-4">
+            {isLoadingMessages ? (
+                <div className="flex justify-center py-10"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>
+            ) : messages.length === 0 ? (
+                <div className="text-center py-10 text-muted-foreground">Nenhuma mensagem no histórico.</div>
+            ) : (
+                <div className="space-y-4">
+                    {messages.map(msg => {
+                        const isMe = msg.sender_id === profile?.id;
+                        return (
+                            <div key={msg.id} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'} space-y-1`}>
+                                <div className={`flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-widest ${isMe ? 'text-muted-foreground mr-2' : 'text-primary ml-2'}`}>
+                                    {isMe ? <ShieldCheck className="w-3 h-3" /> : <User className="w-3 h-3" />}
+                                    {isMe ? 'Admin (Você)' : 'Jogador'} • {format(new Date(msg.created_at), "HH:mm", { locale: ptBR })}
+                                </div>
+                                <div className={`p-3 rounded-2xl shadow-sm max-w-[85%] text-sm leading-relaxed border ${
+                                    isMe 
+                                    ? 'bg-muted border-border rounded-tr-none' 
+                                    : 'bg-primary/10 border-primary/20 rounded-tl-none text-foreground'
+                                }`}>
+                                    {msg.message}
+                                </div>
+                            </div>
+                        );
+                    })}
                 </div>
-                <div className="bg-muted p-4 rounded-2xl rounded-tr-none text-sm text-foreground shadow-sm max-w-[85%] border border-border">
-                  {conversationRequest.notes}
-                </div>
-              </div>
             )}
+          </ScrollArea>
 
-            <div className="flex flex-col items-start space-y-2">
-              <div className="flex items-center gap-1.5 text-[10px] font-bold text-primary uppercase tracking-widest ml-2">
-                <User className="w-3 h-3" /> Resposta do Jogador
-              </div>
-              <div className="bg-primary/10 p-4 rounded-2xl rounded-tl-none text-sm text-foreground shadow-sm max-w-[85%] border border-primary/20">
-                {conversationRequest?.resubmission_notes}
-              </div>
-            </div>
-          </div>
-
-          <DialogFooter>
+          <DialogFooter className="p-4 border-t bg-muted/20">
             <DialogClose asChild><Button variant="outline" className="w-full">Fechar</Button></DialogClose>
           </DialogFooter>
         </DialogContent>
@@ -308,57 +291,25 @@ const CreditRequestsAdmin = () => {
               {actionType === 'reject' && <X className="w-5 h-5 text-destructive" />}
               {actionType === 'delete' ? 'Excluir Solicitação' : 'Resolver Solicitação'}
             </DialogTitle>
-            <DialogDescription>
-              {actionType === 'delete' ? 'Deseja remover esta solicitação permanentemente do histórico?' : 'Preencha as informações para processar o pedido.'}
-            </DialogDescription>
           </DialogHeader>
-          
           {selectedRequest && actionType !== 'delete' && (
             <div className="space-y-4 py-2">
               <div className="p-3 bg-muted rounded-lg flex items-center justify-between">
-                <div>
-                  <p className="text-[10px] uppercase font-bold text-muted-foreground">Solicitado</p>
-                  <p className="text-lg font-bold">{selectedRequest.credits_requested} créditos</p>
-                </div>
+                <div><p className="text-[10px] uppercase font-bold text-muted-foreground">Solicitado</p><p className="text-lg font-bold">{selectedRequest.credits_requested} créditos</p></div>
                 <Coins className="w-8 h-8 text-primary/20" />
               </div>
-
               {actionType === 'approve' && (
-                <div className="space-y-2">
-                  <Label>Créditos a Liberar</Label>
-                  <Input type="number" value={creditsToGrant} onChange={e => setCreditsToGrant(parseInt(e.target.value, 10) || 0)} className="text-lg font-bold" />
-                </div>
+                <div className="space-y-2"><Label>Créditos a Liberar</Label><Input type="number" value={creditsToGrant} onChange={e => setCreditsToGrant(+e.target.value || 0)} className="text-lg font-bold" /></div>
               )}
-
               <div className="space-y-2">
-                <Label className="flex items-center gap-2">
-                  <MessageSquare className="w-4 h-4" />
-                  Mensagem para o Jogador (Opcional)
-                </Label>
-                <Textarea 
-                  placeholder="Explique o motivo do bloqueio ou confirme a liberação..." 
-                  value={rejectionNotes} 
-                  onChange={e => setRejectionNotes(e.target.value)} 
-                />
+                <Label className="flex items-center gap-2"><MessageSquare className="w-4 h-4" /> Mensagem para o Jogador</Label>
+                <Textarea placeholder="Explique o motivo do bloqueio ou confirme a liberação..." value={rejectionNotes} onChange={e => setRejectionNotes(e.target.value)} />
               </div>
             </div>
           )}
-
-          {actionType === 'delete' && (
-            <div className="p-4 bg-destructive/5 rounded-lg border border-destructive/10 text-destructive text-sm flex gap-3">
-              <AlertTriangle className="w-5 h-5 shrink-0" />
-              <p>Esta ação é irreversível. A solicitação do jogador <strong>{selectedRequest?.perfis?.full_name || 'Desconhecido'}</strong> será apagada.</p>
-            </div>
-          )}
-
           <DialogFooter>
             <DialogClose asChild><Button variant="ghost">Cancelar</Button></DialogClose>
-            <Button 
-              variant={actionType === 'approve' ? 'default' : 'destructive'} 
-              onClick={handleResolve}
-            >
-              {actionType === 'approve' ? 'Confirmar Aprovação' : actionType === 'delete' ? 'Excluir Agora' : 'Bloquear/Rejeitar'}
-            </Button>
+            <Button variant={actionType === 'approve' ? 'default' : 'destructive'} onClick={handleResolve}>Confirmar</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
