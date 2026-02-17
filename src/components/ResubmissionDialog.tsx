@@ -6,7 +6,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { toast } from 'sonner';
-import { Loader2, Send } from 'lucide-react';
+import { Loader2, Send, RefreshCw } from 'lucide-react';
 import { CreditRequest } from '@/types/match';
 
 interface ResubmissionDialogProps {
@@ -47,7 +47,10 @@ export const ResubmissionDialog = ({ request, children }: ResubmissionDialogProp
       <DialogTrigger asChild>{children}</DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle className="font-heading">Pedir Nova Revisão</DialogTitle>
+          <DialogTitle className="font-heading flex items-center gap-2">
+            <RefreshCw className="w-5 h-5 text-primary" />
+            Pedir Nova Revisão
+          </DialogTitle>
         </DialogHeader>
         <div className="space-y-4 pt-4">
           <p className="text-sm text-muted-foreground">
