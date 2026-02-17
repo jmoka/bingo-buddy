@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { GameSettings } from '@/contexts/GameContext';
-import { QRCode } from 'react-qr-code';
+import QRCode from 'qrcode.react';
 import { toast } from 'sonner';
 import { Copy, Upload, Loader2 } from 'lucide-react';
 
