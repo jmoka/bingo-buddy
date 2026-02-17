@@ -233,6 +233,52 @@ const Admin = () => {
                         <div><Label>Preço</Label><Input type="number" value={matchForm.cardPrice} onChange={e => setMatchForm(p => ({ ...p, cardPrice: +e.target.value }))} /></div>
                         <div><Label>Máx. Cartelas</Label><Input type="number" value={matchForm.maxCardsPerPlayer} onChange={e => setMatchForm(p => ({ ...p, maxCardsPerPlayer: +e.target.value }))} /></div>
                     </div>
+                    <div>
+                      <Label>Tipo de Prêmio</Label>
+                      <RadioGroup
+                          value={matchForm.prizeType}
+                          onValueChange={(v: PrizeType) => setMatchForm(p => ({ ...p, prizeType: v }))}
+                          className="grid grid-cols-3 gap-2 mt-2"
+                      >
+                          <div>
+                          <RadioGroupItem value="percentage" id="percentage" className="peer sr-only" />
+                          <Label htmlFor="percentage" className="flex text-xs items-center justify-center rounded-md border-2 border-muted bg-popover p-3 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary">
+                              % do Pote
+                          </Label>
+                          </div>
+                          <div>
+                          <RadioGroupItem value="fixed" id="fixed" className="peer sr-only" />
+                          <Label htmlFor="fixed" className="flex text-xs items-center justify-center rounded-md border-2 border-muted bg-popover p-3 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary">
+                              Valor Fixo
+                          </Label>
+                          </div>
+                          <div>
+                          <RadioGroupItem value="product" id="product" className="peer sr-only" />
+                          <Label htmlFor="product" className="flex text-xs items-center justify-center rounded-md border-2 border-muted bg-popover p-3 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary">
+                              Produto
+                          </Label>
+                          </div>
+                      </RadioGroup>
+                    </div>
+
+                    {matchForm.prizeType === 'percentage' && (
+                    <div>
+                        <Label>Porcentagem do Pote (%)</Label>
+                        <Input type="number" value={matchForm.prizeValue} onChange={e => setMatchForm(p => ({ ...p, prizeValue: +e.target.value }))} />
+                    </div>
+                    )}
+                    {matchForm.prizeType === 'fixed' && (
+                    <div>
+                        <Label>Valor Fixo (créditos)</Label>
+                        <Input type="number" value={matchForm.prizeValue} onChange={e => setMatchForm(p => ({ ...p, prizeValue: +e.target.value }))} />
+                    </div>
+                    )}
+                    {matchForm.prizeType === 'product' && (
+                    <div>
+                        <Label>Nome do Produto</Label>
+                        <Input value={matchForm.prizeName} onChange={e => setMatchForm(p => ({ ...p, prizeName: e.target.value }))} />
+                    </div>
+                    )}
                     <Button className="w-full !mt-6" onClick={handleCreateMatch}>Criar Partida</Button>
                   </div>
                 </DialogContent>
