@@ -9,7 +9,7 @@ import { PrizeType, Match, MatchStatus } from '@/types/match';
 import { gameTypeLabels } from '@/utils/bingoUtils';
 import { 
   Plus, LogOut, Play, DoorOpen, Trash2, Trophy, Users, 
-  Clock, Coins, Hash, ArrowLeft, StopCircle, Settings, Save, Bot
+  Clock, Coins, Hash, ArrowLeft, StopCircle, Settings, Save, Bot, Shuffle
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
@@ -124,6 +124,22 @@ const Admin = () => {
     if (num >= 1 && num <= 75) {
       callNumber(matchId, num);
       setCallerInput(prev => ({ ...prev, [matchId]: '' }));
+    }
+  };
+
+  const handleRandomCall = (matchId: string) => {
+    const match = matches.find(m => m.id === matchId);
+    if (!match) return;
+
+    const allNumbers = Array.from({ length: 75 }, (_, i) => i + 1);
+    const availableNumbers = allNumbers.filter(num => !match.calledNumbers.includes(num));
+
+    if (availableNumbers.length > 0) {
+      const randomIndex = Math.floor(Math.random() * availableNumbers.length);
+      const randomNumber = availableNumbers[randomIndex];
+      callNumber(match.id, randomNumber);
+    } else {
+      toast({ title: 'Todos os números já foram sorteados!', variant: 'destructive' });
     }
   };
 
@@ -333,10 +349,13 @@ const Admin = () => {
                             value={callerInput[match.id] || ''}
                             onChange={e => setCallerInput(prev => ({ ...prev, [match.id]: e.target.value }))}
                             onKeyDown={e => e.key === 'Enter' && handleCallNumber(match.id)}
-                            className="bg-secondary border-0 text-center font-semibold w-40"
+                            className="bg-secondary border-0 text-center font-semibold w-32"
                           />
                           <Button onClick={() => handleCallNumber(match.id)} className="gradient-accent">
-                            Sortear
+                            Marcar
+                          </Button>
+                          <Button variant="outline" size="icon" onClick={() => handleRandomCall(match.id)} title="Sortear número aleatório">
+                            <Shuffle className="w-4 h-4" />
                           </Button>
                         </div>
                         <div className="flex items-center space-x-2">
