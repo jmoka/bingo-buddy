@@ -22,6 +22,7 @@ interface GameContextType {
   matches: Match[];
   players: Profile[];
   playerCards: PlayerCard[];
+  allPlayerCards: PlayerCard[];
   matchCards: MatchCard[];
   gameSettings: GameSettings | undefined;
   isLoading: boolean;
@@ -38,6 +39,7 @@ interface GameContextType {
   joinMatch: (matchId: string, playerCardIds: string[]) => Promise<MatchCard[] | null>;
   buyCardUses: (playerCardId: string) => Promise<boolean>;
   buyCredits: (amount: number) => Promise<void>;
+  updatePlayerCredits: (playerId: string, amount: number) => Promise<void>;
   getMatchCards: (matchId: string) => MatchCard[];
   getPlayerMatchCards: (matchId: string, playerId: string) => MatchCard[];
 }
@@ -78,6 +80,16 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     enabled: !!user,
   });
 
+  const { data: allPlayerCards = [] } = useQuery({
+    queryKey: ['allPlayerCards'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('cartelas_jogador').select('*');
+      if (error) throw error;
+      return data as PlayerCard[];
+    },
+    enabled: !!profile && profile.role === 'admin',
+  });
+
   const { data: matchCards = [], isLoading: l3 } = useQuery({
     queryKey: ['matchCards'],
     queryFn: async () => {
@@ -110,6 +122,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       .on('postgres_changes', { event: '*', schema: 'public' }, (payload) => {
         queryClient.invalidateQueries({ queryKey: ['matches'] });
         queryClient.invalidateQueries({ queryKey: ['playerCards'] });
+        queryClient.invalidateQueries({ queryKey: ['allPlayerCards'] });
         queryClient.invalidateQueries({ queryKey: ['matchCards'] });
         queryClient.invalidateQueries({ queryKey: ['profile'] });
         queryClient.invalidateQueries({ queryKey: ['players'] });
@@ -188,6 +201,43 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       toast.error(error.message);
     } else {
       queryClient.invalidateQueries({ queryKey: ['profile'] });
+    }
+  };
+
+  const updatePlayerCredits = async (playerId: string, amount: number) => {
+    if (!profile || profile.role !== 'admin') {
+      toast.error("Apenas administradores podem alterar créditos.");
+      return;
+    }
+    if (isNaN(amount) || amount === 0) return;
+
+    const { data: targetPlayer, error: fetchError } = await supabase
+      .from('perfis')
+      .select('credits')
+      .eq('id', playerId)
+      .single();
+
+    if (fetchError || !targetPlayer) {
+      toast.error("Não foi possível encontrar o jogador.");
+      return;
+    }
+
+    const newCredits = targetPlayer.credits + amount;
+    if (newCredits < 0) {
+      toast.error("O jogador não pode ter créditos negativos.");
+      return;
+    }
+
+    const { error: updateError } = await supabase
+      .from('perfis')
+      .update({ credits: newCredits })
+      .eq('id', playerId);
+
+    if (updateError) {
+      toast.error(`Erro ao atualizar créditos: ${updateError.message}`);
+    } else {
+      toast.success(`Créditos ${amount > 0 ? 'adicionados' : 'removidos'}. Novo saldo: ${newCredits}.`);
+      queryClient.invalidateQueries({ queryKey: ['players'] });
     }
   };
 
@@ -331,10 +381,10 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   return (
     <GameContext.Provider value={{
-      matches, players, playerCards, matchCards, gameSettings, isLoading: l1 || l2 || l3 || l4,
+      matches, players, playerCards, allPlayerCards, matchCards, gameSettings, isLoading: l1 || l2 || l3 || l4,
       createMatch, openMatch, startMatch, callNumber, finishMatch, deleteMatch, toggleAutoCall,
       updateGameSettings, createPlayerCard, deletePlayerCard, joinMatch, buyCardUses, buyCredits,
-      getMatchCards, getPlayerMatchCards,
+      updatePlayerCredits, getMatchCards, getPlayerMatchCards,
     }}>
       {children}
     </GameContext.Provider>

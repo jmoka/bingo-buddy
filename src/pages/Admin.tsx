@@ -10,13 +10,19 @@ import { PrizeType, Match, MatchStatus } from '@/types/match';
 import { gameTypeLabels } from '@/utils/bingoUtils';
 import { 
   Plus, LogOut, Play, DoorOpen, Trash2, Trophy, Users, 
-  Clock, Coins, Hash, ArrowLeft, StopCircle, Settings, Save, Bot, Shuffle
+  Clock, Coins, Hash, ArrowLeft, StopCircle, Settings, Save, Bot, Shuffle, Ticket
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Footer } from '@/components/Footer';
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 
 const statusLabels: Record<MatchStatus, string> = {
   waiting: 'Aguardando',
@@ -39,7 +45,8 @@ const Admin = () => {
   const { 
     matches, players, createMatch, matchCards,
     openMatch, startMatch, finishMatch, deleteMatch, callNumber,
-    toggleAutoCall, gameSettings, updateGameSettings
+    toggleAutoCall, gameSettings, updateGameSettings, allPlayerCards,
+    updatePlayerCredits
   } = useGame();
 
   const [showCreate, setShowCreate] = useState(false);
@@ -62,6 +69,7 @@ const Admin = () => {
   const [callerInput, setCallerInput] = useState<Record<string, string>>({});
   const [now, setNow] = useState(Date.now());
   const processingRef = useRef(new Set());
+  const [creditInputs, setCreditInputs] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (!session || (profile && profile.role !== 'admin')) {
@@ -168,6 +176,16 @@ const Admin = () => {
     updateGameSettings(currentSettings);
   };
 
+  const handleCreditInputChange = (playerId: string, value: string) => {
+    setCreditInputs(prev => ({ ...prev, [playerId]: value }));
+  };
+
+  const handleUpdateCredits = (playerId: string, amount: number) => {
+    if (isNaN(amount) || amount === 0) return;
+    updatePlayerCredits(playerId, amount);
+    setCreditInputs(prev => ({ ...prev, [playerId]: '' }));
+  };
+
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <header className="gradient-hero py-6 px-4">
@@ -209,6 +227,56 @@ const Admin = () => {
           <div className="mt-4 flex justify-end">
             <Button onClick={handleSaveSettings}><Save className="w-4 h-4 mr-2" /> Salvar Configurações</Button>
           </div>
+        </div>
+
+        <div className="card-container mb-8">
+          <h2 className="font-heading text-xl font-bold text-foreground mb-4 flex items-center gap-2"><Users className="w-5 h-5" /> Gerenciamento de Jogadores</h2>
+          <Accordion type="single" collapsible className="w-full">
+            {players.map(player => {
+                const pCards = allPlayerCards.filter(c => c.player_id === player.id);
+                return (
+                    <AccordionItem value={player.id} key={player.id}>
+                        <AccordionTrigger>
+                            <div className="flex items-center justify-between w-full pr-4">
+                                <span className="font-semibold">{player.full_name || 'Nome não definido'}</span>
+                                <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                                    <span className="flex items-center gap-1"><Coins className="w-4 h-4" /> {player.credits}</span>
+                                    <span className="flex items-center gap-1"><Ticket className="w-4 h-4" /> {pCards.length}</span>
+                                </div>
+                            </div>
+                        </AccordionTrigger>
+                        <AccordionContent>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
+                                <div>
+                                    <h4 className="font-semibold mb-2">Cartelas</h4>
+                                    {pCards.length > 0 ? (
+                                        <ul className="list-disc list-inside text-sm space-y-1">
+                                            {pCards.map(card => <li key={card.id}>{card.name}</li>)}
+                                        </ul>
+                                    ) : (
+                                        <p className="text-sm text-muted-foreground">Nenhuma cartela criada.</p>
+                                    )}
+                                </div>
+                                <div>
+                                    <h4 className="font-semibold mb-2">Gerenciar Créditos</h4>
+                                    <div className="flex items-center gap-2">
+                                        <Input 
+                                            type="number" 
+                                            placeholder="Valor" 
+                                            className="w-28"
+                                            value={creditInputs[player.id] || ''}
+                                            onChange={(e) => handleCreditInputChange(player.id, e.target.value)}
+                                        />
+                                        <Button size="sm" onClick={() => handleUpdateCredits(player.id, parseInt(creditInputs[player.id] || '0'))}>Adicionar</Button>
+                                        <Button size="sm" variant="outline" onClick={() => handleUpdateCredits(player.id, -parseInt(creditInputs[player.id] || '0'))}>Remover</Button>
+                                    </div>
+                                </div>
+                            </div>
+                        </AccordionContent>
+                    </AccordionItem>
+                );
+            })}
+          </Accordion>
         </div>
 
         <div className="flex items-center justify-between mb-6">
