@@ -63,6 +63,7 @@ interface GameContextType {
   unblockRedeemRequest: (requestId: string) => Promise<void>;
   deleteRedeemRequest: (requestId: string) => Promise<void>;
   updatePlayerCredits: (playerId: string, amount: number) => Promise<void>;
+  cleanupMatchDuplicates: (matchId: string) => Promise<void>;
   getMatchCards: (matchId: string) => MatchCard[];
   getPlayerMatchCards: (matchId: string, playerId: string) => MatchCard[];
   fetchRequestMessages: (requestId: string) => Promise<CreditRequestMessage[]>;
@@ -568,6 +569,29 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const updateGameSettings = async (newSettings: Partial<GameSettings>) => { await supabase.from('configuracoes').update(newSettings).eq('singleton', true); };
+  
+  const cleanupMatchDuplicates = async (matchId: string) => {
+    const { data, error } = await supabase.functions.invoke('cleanup-duplicates', {
+        body: { matchId },
+    });
+
+    if (error) {
+        toast.error('Falha na limpeza', { description: error.message });
+        return;
+    }
+
+    if (data.cards_deleted > 0) {
+      toast.success('Limpeza de duplicatas concluída!', {
+          description: `${data.cards_deleted} cartelas duplicadas removidas. ${data.credits_refunded} créditos estornados.`,
+      });
+    } else {
+      toast.info('Nenhuma duplicata encontrada.', {
+        description: 'A partida já estava correta.'
+      });
+    }
+    queryClient.invalidateQueries();
+  };
+
   const getMatchCards = (matchId: string) => matchCards.filter(c => c.match_id === matchId);
   const getPlayerMatchCards = (matchId: string, playerId: string) => matchCards.filter(c => c.match_id === matchId && c.player_id === playerId);
 
@@ -591,7 +615,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       updateGameSettings, createPlayerCard, deletePlayerCard, toggleArchivePlayerCard, joinMatch, buyCardUses, renewFakeCredits,
       requestCredits, resubmitCreditRequest, resolveCreditRequest, unblockCreditRequest, deleteCreditRequest, 
       requestRedeem, resubmitRedeemRequest, resolveRedeemRequest, unblockRedeemRequest, deleteRedeemRequest, 
-      getMatchCards, getPlayerMatchCards, fetchRequestMessages, fetchRedeemMessages
+      cleanupMatchDuplicates, getMatchCards, getPlayerMatchCards, fetchRequestMessages, fetchRedeemMessages
     }}>
       {children}
     </GameContext.Provider>
