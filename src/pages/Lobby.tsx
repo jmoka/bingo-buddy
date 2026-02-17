@@ -1,13 +1,14 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useGame } from '@/contexts/GameContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Match, MatchStatus } from '@/types/match';
 import { gameTypeLabels } from '@/utils/bingoUtils';
 import { 
   LogIn, LogOut, Coins, Plus, Trophy, Users, Settings, Wallet, 
-  CreditCard, Timer, DoorOpen, Ticket, Zap, ZapOff, Tv, Printer, Bot
+  CreditCard, Timer, DoorOpen, Ticket, Zap, ZapOff, Tv, Printer, Bot, User as UserIcon
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
@@ -18,12 +19,12 @@ import { Footer } from '@/components/Footer';
 const Lobby = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { session, profile, signOut } = useAuth();
   const { 
-    currentPlayer, registerPlayer, logoutPlayer, buyCredits, createPlayerCard,
-    matches, joinMatch, getPlayerMatchCards, playerCards, buyCardUses, gameSettings,
+    currentPlayer, registerPlayer,
+    matches, joinMatch, getPlayerMatchCards, playerCards, buyCardUses, gameSettings, buyCredits
   } = useGame();
 
-  const [playerName, setPlayerName] = useState('');
   const [buyAmount, setBuyAmount] = useState(50);
   const [now, setNow] = useState(Date.now());
 
@@ -37,17 +38,21 @@ const Lobby = () => {
   const [selectedMatch, setSelectedMatch] = useState<Match | null>(null);
   const [cardsToJoin, setCardsToJoin] = useState<Set<string>>(new Set());
 
+  useEffect(() => {
+    if (!session) {
+      navigate('/login');
+    } else if (profile && !currentPlayer) {
+      // Bridge to the old GameContext: register the player if they are not already in the local state.
+      registerPlayer(profile.full_name || session.user.email || 'Jogador');
+    }
+  }, [session, profile, currentPlayer, navigate, registerPlayer]);
+
   const myOwnedCards = playerCards.filter(c => c.playerId === currentPlayer?.id);
 
   useEffect(() => {
     const interval = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(interval);
   }, []);
-
-  const handleRegister = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (playerName.trim()) registerPlayer(playerName.trim());
-  };
 
   const handleCreateCard = () => {
     if (!newCardName.trim() || !newCardNumbers) return;
@@ -113,26 +118,8 @@ const Lobby = () => {
     return new Date(b.startTime).getTime() - new Date(a.startTime).getTime();
   });
 
-  if (!currentPlayer) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center p-4">
-        <div className="card-container max-w-sm w-full">
-          <div className="text-center mb-6">
-            <h1 className="font-heading text-3xl font-bold text-foreground mb-2">🎱 Bingo</h1>
-            <p className="text-muted-foreground">Entre com seu nome para jogar</p>
-          </div>
-          <form onSubmit={handleRegister} className="space-y-4">
-            <Input placeholder="Seu nome" value={playerName} onChange={e => setPlayerName(e.target.value)} className="bg-secondary border-0 text-center text-lg" />
-            <Button type="submit" className="w-full gradient-primary shadow-button" disabled={!playerName.trim()}>
-              <LogIn className="w-4 h-4 mr-2" /> Entrar
-            </Button>
-          </form>
-          <Button variant="ghost" className="w-full mt-4 text-muted-foreground" onClick={() => navigate('/admin/login')}>
-            <Settings className="w-4 h-4 mr-2" /> Painel Admin
-          </Button>
-        </div>
-      </div>
-    );
+  if (!currentPlayer || !profile) {
+    return null; // or a loading spinner
   }
 
   return (
@@ -141,9 +128,9 @@ const Lobby = () => {
         <div className="container max-w-6xl mx-auto flex items-center justify-between">
           <div>
             <h1 className="font-heading text-2xl font-bold text-primary-foreground">🎱 Bingo</h1>
-            <p className="text-primary-foreground/70 text-sm">Olá, {currentPlayer.name}!</p>
+            <p className="text-primary-foreground/70 text-sm">Olá, {profile.full_name || 'Jogador'}!</p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1 sm:gap-3">
             <div className="flex items-center gap-2 bg-primary-foreground/10 rounded-full px-4 py-2">
               <Wallet className="w-4 h-4 text-primary-foreground" />
               <span className="font-heading font-bold text-primary-foreground">{currentPlayer.credits}</span>
@@ -160,12 +147,20 @@ const Lobby = () => {
                 <Button className="w-full gradient-accent shadow-button" onClick={() => { buyCredits(buyAmount); toast({ title: `+${buyAmount} créditos!` }); }}><Coins className="w-4 h-4 mr-2" />Comprar</Button>
               </DialogContent>
             </Dialog>
-            <Button size="sm" variant="ghost" className="text-primary-foreground" onClick={logoutPlayer}><LogOut className="w-4 h-4" /></Button>
+            <Button size="icon" variant="ghost" className="text-primary-foreground" onClick={() => navigate('/account')}><UserIcon className="w-4 h-4" /></Button>
+            <Button size="icon" variant="ghost" className="text-primary-foreground" onClick={signOut}><LogOut className="w-4 h-4" /></Button>
           </div>
         </div>
       </header>
 
       <main className="container max-w-6xl mx-auto py-8 px-4 flex-grow">
+        {profile.role === 'admin' && (
+          <div className="mb-6">
+            <Button className="w-full" variant="outline" onClick={() => navigate('/admin')}>
+              <Settings className="w-4 h-4 mr-2" /> Acessar Painel de Admin
+            </Button>
+          </div>
+        )}
         {/* My Cards */}
         <div className="mb-8">
           <div className="flex items-center justify-between mb-4">

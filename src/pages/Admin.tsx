@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useGame } from '@/contexts/GameContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -34,8 +35,9 @@ const statusColors: Record<MatchStatus, string> = {
 const Admin = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { session, profile, signOut } = useAuth();
   const { 
-    isAdmin, adminLogout, matches, players, createMatch, 
+    matches, players, createMatch, 
     openMatch, startMatch, finishMatch, deleteMatch, callNumber,
     toggleAutoCall, getMatchCards, gameSettings, updateGameSettings,
   } = useGame();
@@ -55,6 +57,12 @@ const Admin = () => {
   const [callerInput, setCallerInput] = useState<Record<string, string>>({});
   const [now, setNow] = useState(Date.now());
   const processingRef = useRef(new Set());
+
+  useEffect(() => {
+    if (!session || (profile && profile.role !== 'admin')) {
+      navigate('/');
+    }
+  }, [session, profile, navigate]);
 
   useEffect(() => {
     setSettingsForm(gameSettings);
@@ -91,9 +99,8 @@ const Admin = () => {
     });
   }, [now, matches, callNumber, toggleAutoCall]);
 
-  if (!isAdmin) {
-    navigate('/admin/login');
-    return null;
+  if (!profile || profile.role !== 'admin') {
+    return null; // or a loading/access denied page
   }
 
   const handleCreateMatch = () => {
@@ -165,7 +172,7 @@ const Admin = () => {
             <span className="text-primary-foreground/70 text-sm hidden sm:block">
               {players.length} jogadores
             </span>
-            <Button variant="ghost" size="sm" className="text-primary-foreground" onClick={() => { adminLogout(); navigate('/'); }}>
+            <Button variant="ghost" size="sm" className="text-primary-foreground" onClick={() => { signOut(); navigate('/'); }}>
               <LogOut className="w-4 h-4 mr-1" />
               Sair
             </Button>
