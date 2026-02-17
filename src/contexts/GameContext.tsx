@@ -209,37 +209,21 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const joinMatch = async (matchId: string, playerCardIds: string[]): Promise<MatchCard[] | null> => {
     if (!user || !profile) return null;
-    const match = matches.find(m => m.id === matchId);
-    if (!match) { toast.error("Partida não encontrada"); return null; }
 
-    const totalCost = playerCardIds.length * match.card_price;
-    if (profile.credits < totalCost) { toast.error("Créditos insuficientes!"); return null; }
-
-    const { error: creditError } = await supabase.from('perfis').update({ credits: profile.credits - totalCost }).eq('id', user.id);
-    if (creditError) { toast.error(creditError.message); return null; }
-
-    for (const cardId of playerCardIds) {
-      const card = playerCards.find(c => c.id === cardId);
-      if (card) await supabase.from('cartelas_jogador').update({ uses_left: card.uses_left - 1 }).eq('id', cardId);
-    }
-
-    const newMatchCards = playerCardIds.map(cardId => {
-      const card = playerCards.find(c => c.id === cardId);
-      return {
-        player_id: user.id,
-        match_id: matchId,
-        player_card_id: cardId,
-        name: card?.name,
-        numbers: card?.numbers,
-        marked_numbers: [],
-      };
+    const { data, error } = await supabase.functions.invoke('join-match', {
+      body: { matchId, playerCardIds },
     });
 
-    const { data, error } = await supabase.from('cartelas_partida').insert(newMatchCards).select();
-    if (error) { toast.error(error.message); return null; }
+    if (error) {
+      try {
+        const errorData = await error.context.json();
+        toast.error(errorData.error || 'Ocorreu um erro ao entrar na partida.');
+      } catch (e) {
+        toast.error('Ocorreu um erro desconhecido ao entrar na partida.');
+      }
+      return null;
+    }
 
-    await supabase.from('partidas').update({ pot: match.pot + totalCost }).eq('id', matchId);
-    
     queryClient.invalidateQueries({ queryKey: ['matchCards'] });
     queryClient.invalidateQueries({ queryKey: ['playerCards'] });
     queryClient.invalidateQueries({ queryKey: ['matches'] });
