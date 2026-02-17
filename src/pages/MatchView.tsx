@@ -79,7 +79,7 @@ const MatchView = () => {
 
       <main className="container max-w-6xl mx-auto py-6 px-4">
         {match.isAutoCalling && (
-          <div className="card-container mb-6 bg-accent/10 text-accent-foreground text-center">
+          <div className="card-container mb-6 bg-accent/10 text-accent text-center">
             <p className="font-medium text-sm flex items-center justify-center gap-2">
               <Bot className="w-4 h-4" />
               Sorteio automático ativado. Aguardando próximo número...
