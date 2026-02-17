@@ -8,7 +8,7 @@ import { GameSettings } from '@/contexts/GameContext';
 import { QRCodeSVG as QRCode } from 'qrcode.react';
 import { toast } from 'sonner';
 import { Copy, Upload, Loader2, Minus, Plus } from 'lucide-react';
-import { qrCodePix } from 'qrcode-pix';
+import { QrCodePix } from 'qrcode-pix'; // Corrected named import
 import { useAuth } from '@/contexts/AuthContext';
 
 interface CreditRequestDialogProps {
@@ -26,7 +26,8 @@ export const CreditRequestDialog = ({ gameSettings, children }: CreditRequestDia
 
   const amount = credits * (gameSettings?.valor_por_credito || 1);
 
-  const pixPayload = gameSettings?.pix_key && profile ? qrCodePix({
+  // Using QrCodePix (PascalCase) as per the library's export
+  const pixPayload = gameSettings?.pix_key && profile ? QrCodePix({
     version: '01',
     key: gameSettings.pix_key,
     name: 'Bingo App',
