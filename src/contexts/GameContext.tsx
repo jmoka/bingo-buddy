@@ -49,6 +49,7 @@ interface GameContextType {
   buyCardUses: (playerCardId: string) => Promise<boolean>;
   requestCredits: (file: File, creditsRequested: number, amountPaid: number) => Promise<boolean>;
   resolveCreditRequest: (requestId: string, status: 'approved' | 'rejected', creditsGranted?: number, notes?: string) => Promise<boolean>;
+  deleteCreditRequest: (requestId: string) => Promise<void>;
   updatePlayerCredits: (playerId: string, amount: number) => Promise<void>;
   getMatchCards: (matchId: string) => MatchCard[];
   getPlayerMatchCards: (matchId: string, playerId: string) => MatchCard[];
@@ -134,7 +135,6 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     queryKey: ['creditRequests', user?.id],
     queryFn: async () => {
       if (!user) return [];
-      // Explicitly select all columns to avoid missing new fields
       const { data, error } = await supabase
         .from('solicitacoes_credito')
         .select('id, player_id, status, receipt_url, credits_granted, credits_requested, amount_paid, requested_at, resolved_at, resolved_by, notes')
@@ -338,8 +338,8 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     if (status === 'approved') {
-      if (!creditsGranted || creditsGranted <= 0) {
-        toast.error("É necessário informar um valor de crédito positivo para aprovar.");
+      if (creditsGranted === undefined || creditsGranted < 0) {
+        toast.error("É necessário informar um valor de crédito válido para aprovar.");
         return false;
       }
       await updatePlayerCredits(request.player_id, creditsGranted);
@@ -352,7 +352,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
         credits_granted: status === 'approved' ? creditsGranted : null,
         resolved_at: new Date().toISOString(),
         resolved_by: user.id,
-        notes,
+        notes: notes || null,
       })
       .eq('id', requestId);
 
@@ -365,6 +365,16 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     queryClient.invalidateQueries({ queryKey: ['allCreditRequests'] });
     queryClient.invalidateQueries({ queryKey: ['players'] });
     return true;
+  };
+
+  const deleteCreditRequest = async (requestId: string) => {
+    const { error } = await supabase.from('solicitacoes_credito').delete().eq('id', requestId);
+    if (error) {
+      toast.error(`Erro ao excluir solicitação: ${error.message}`);
+    } else {
+      toast.success("Solicitação excluída.");
+      queryClient.invalidateQueries({ queryKey: ['allCreditRequests'] });
+    }
   };
 
   const updatePlayerCredits = async (playerId: string, amount: number) => {
@@ -575,7 +585,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       matches, players, playerCards, allPlayerCards, matchCards, wins, allWins, creditRequests, allCreditRequests, gameSettings, isLoading,
       createMatch, openMatch, startMatch, callNumber, finishMatch, deleteMatch, toggleAutoCall,
       updateGameSettings, createPlayerCard, deletePlayerCard, toggleArchivePlayerCard, joinMatch, buyCardUses,
-      requestCredits, resolveCreditRequest, updatePlayerCredits, getMatchCards, getPlayerMatchCards,
+      requestCredits, resolveCreditRequest, deleteCreditRequest, updatePlayerCredits, getMatchCards, getPlayerMatchCards,
     }}>
       {children}
     </GameContext.Provider>
