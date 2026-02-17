@@ -3,11 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { useGame } from '@/contexts/GameContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Match } from '@/types/match';
+import { Match, MatchStatus } from '@/types/match';
 import { gameTypeLabels } from '@/utils/bingoUtils';
 import { 
   LogIn, LogOut, Coins, Plus, Trophy, Users, Settings, Wallet, 
-  CreditCard, Timer, DoorOpen, Ticket, Check, Zap, ZapOff, Tv, Printer, Bot
+  CreditCard, Timer, DoorOpen, Ticket, Zap, ZapOff, Tv, Printer, Bot
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
@@ -96,6 +96,22 @@ const Lobby = () => {
     const s = Math.floor((diff % 60000) / 1000);
     return `${h > 0 ? `${h}h ` : ''}${m > 0 ? `${m}m ` : ''}${s}s`;
   };
+
+  const statusOrder: Record<MatchStatus, number> = {
+    'in_progress': 1,
+    'open': 2,
+    'waiting': 3,
+    'finished': 4,
+  };
+
+  const sortedMatches = [...matches].sort((a, b) => {
+    const orderA = statusOrder[a.status];
+    const orderB = statusOrder[b.status];
+    if (orderA !== orderB) {
+      return orderA - orderB;
+    }
+    return new Date(b.startTime).getTime() - new Date(a.startTime).getTime();
+  });
 
   if (!currentPlayer) {
     return (
@@ -212,11 +228,39 @@ const Lobby = () => {
 
         {/* Matches */}
         <h2 className="font-heading text-xl font-bold text-foreground mb-4 flex items-center gap-2"><DoorOpen className="w-5 h-5 text-accent" /> Partidas</h2>
-        {matches.filter(m => m.status !== 'finished').length === 0 ? (
-          <div className="card-container text-center py-12"><p className="text-muted-foreground">Nenhuma partida disponível no momento.</p></div>
+        {matches.length === 0 ? (
+          <div className="card-container text-center py-12"><p className="text-muted-foreground">Nenhuma partida criada no momento.</p></div>
         ) : (
           <div className="space-y-4">
-            {matches.map(match => {
+            {sortedMatches.map(match => {
+              if (match.status === 'finished') {
+                return (
+                  <div key={match.id} className="card-container opacity-70">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <h3 className="font-heading font-bold text-lg text-foreground line-through">{match.name}</h3>
+                        <div className="flex flex-wrap gap-x-3 gap-y-1 text-sm text-muted-foreground mt-1">
+                          <span className="flex items-center gap-1"><Trophy className="w-3.5 h-3.5" />{gameTypeLabels[match.gameType]}</span>
+                          <span className="flex items-center gap-1"><Users className="w-3.5 h-3.5" />{match.playerIds.length}</span>
+                          <span className="flex items-center gap-1"><Coins className="w-3.5 h-3.5" />Pote: {match.pot}</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="mt-3 border-t border-border pt-3 text-center">
+                      <h4 className="font-heading font-bold text-success text-lg flex items-center justify-center gap-2">
+                        <Trophy className="w-5 h-5" />
+                        Sorteio Encerrado!
+                      </h4>
+                      {match.winners.length > 0 && (
+                        <p className="text-muted-foreground mt-1">
+                          Vencedor(es): <span className="font-semibold text-foreground">{match.winners.map(w => w.playerName).join(', ')}</span>
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                );
+              }
+
               const myMatchCards = getPlayerMatchCards(match.id, currentPlayer.id);
               const alreadyJoined = myMatchCards.length > 0;
               const canJoin = (match.status === 'open' || match.status === 'waiting') && myOwnedCards.some(c => c.usesLeft > 0);
@@ -224,12 +268,6 @@ const Lobby = () => {
 
               return (
                 <div key={match.id} className={`card-container relative ${match.status === 'in_progress' ? 'ring-2 ring-accent' : ''}`}>
-                  {match.status === 'finished' && match.winners.length > 0 && (
-                    <div className="absolute top-2 right-2 flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-full bg-success/10 text-success">
-                      <Trophy className="w-3 h-3" />
-                      <span>Vencedor: {match.winners[0].playerName}</span>
-                    </div>
-                  )}
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
                       <h3 className="font-heading font-bold text-lg text-foreground">{match.name}</h3>
