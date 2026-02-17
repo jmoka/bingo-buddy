@@ -33,7 +33,7 @@ const RedeemRequestsAdmin = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { profile } = useAuth();
-  const { allRedeemRequests, resolveRedeemRequest, deleteRedeemRequest, fetchRedeemMessages, isLoading } = useGame();
+  const { allRedeemRequests, resolveRedeemRequest, deleteRedeemRequest, unblockRedeemRequest, fetchRedeemMessages, isLoading } = useGame();
   
   const [selectedRequest, setSelectedRequest] = useState<RedeemRequest | null>(null);
   const [conversationRequest, setConversationRequest] = useState<RedeemRequest | null>(null);
@@ -212,7 +212,10 @@ const RedeemRequestsAdmin = () => {
                       <TableCell><Badge className={`${statusConfig[req.status]?.color || 'bg-muted'} border-none`}>{statusConfig[req.status]?.label}</Badge></TableCell>
                       <TableCell><div className="text-sm font-bold text-success">R$ {Number(req.amount_to_receive).toFixed(2)}</div></TableCell>
                       <TableCell className="text-right">
-                        <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground" onClick={() => handleOpenDialog(req, 'delete')}><Trash2 className="w-4 h-4" /></Button>
+                        <div className="flex justify-end gap-1.5">
+                          {req.status === 'rejected' && <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground" onClick={() => unblockRedeemRequest(req.id)}><Undo2 className="w-4 h-4" /></Button>}
+                          <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground" onClick={() => handleOpenDialog(req, 'delete')}><Trash2 className="w-4 h-4" /></Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}

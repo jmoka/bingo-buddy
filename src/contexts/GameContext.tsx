@@ -58,6 +58,7 @@ interface GameContextType {
   requestRedeem: (credits: number, amount: number, message?: string) => Promise<boolean>;
   resubmitRedeemRequest: (requestId: string, message: string) => Promise<boolean>;
   resolveRedeemRequest: (requestId: string, status: 'approved' | 'rejected', receiptFile?: File, notes?: string) => Promise<boolean>;
+  unblockRedeemRequest: (requestId: string) => Promise<void>;
   deleteRedeemRequest: (requestId: string) => Promise<void>;
   updatePlayerCredits: (playerId: string, amount: number) => Promise<void>;
   getMatchCards: (matchId: string) => MatchCard[];
@@ -400,8 +401,10 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
         receiptPath = fileName;
     }
 
-    // Se rejeitado, estorna os créditos? Na lógica do prompt "mesma que crédito", se rejeitado o admin bloqueia e o usuário reenvia (ex: corrigindo dados). 
-    // Se o admin quiser estornar, ele pode fazer manualmente no painel de jogadores.
+    if (status === 'rejected') {
+        await updatePlayerCredits(request.player_id, request.credits_requested);
+        toast.info(`${request.credits_requested} créditos foram estornados para o jogador.`);
+    }
 
     await supabase.from('solicitacoes_resgate').update({
         status, receipt_url: receiptPath, notes: notes || null, resolved_at: new Date().toISOString(), resolved_by: user.id
@@ -413,7 +416,28 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     queryClient.invalidateQueries({ queryKey: ['rawRedeemRequests'] });
     queryClient.invalidateQueries({ queryKey: ['redeemRequests'] });
+    queryClient.invalidateQueries({ queryKey: ['players'] });
     return true;
+  };
+
+  const unblockRedeemRequest = async (requestId: string) => {
+    const request = allRedeemRequests.find(r => r.id === requestId);
+    if (!request) return;
+
+    await updatePlayerCredits(request.player_id, -request.credits_requested);
+    toast.info(`${request.credits_requested} créditos foram debitados novamente para reanálise.`);
+
+    await supabase.from('solicitacoes_resgate').update({
+        status: 'pending',
+        notes: 'Solicitação reaberta pelo administrador.',
+        resolved_at: null,
+        resolved_by: null,
+    }).eq('id', requestId);
+
+    queryClient.invalidateQueries({ queryKey: ['rawRedeemRequests'] });
+    queryClient.invalidateQueries({ queryKey: ['redeemRequests'] });
+    queryClient.invalidateQueries({ queryKey: ['players'] });
+    toast.success('Solicitação de resgate reaberta.');
   };
 
   const deleteRedeemRequest = async (requestId: string) => {
@@ -491,7 +515,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       createMatch, openMatch, startMatch, callNumber, finishMatch, deleteMatch, toggleAutoCall,
       updateGameSettings, createPlayerCard, deletePlayerCard, toggleArchivePlayerCard, joinMatch, buyCardUses,
       requestCredits, resubmitCreditRequest, resolveCreditRequest, unblockCreditRequest, deleteCreditRequest, 
-      requestRedeem, resubmitRedeemRequest, resolveRedeemRequest, deleteRedeemRequest, updatePlayerCredits, 
+      requestRedeem, resubmitRedeemRequest, resolveRedeemRequest, unblockRedeemRequest, deleteRedeemRequest, 
       getMatchCards, getPlayerMatchCards, fetchRequestMessages, fetchRedeemMessages
     }}>
       {children}
