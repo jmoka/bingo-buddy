@@ -22,11 +22,12 @@ const statusConfig = {
 };
 
 export const MyRedeemRequestsDialog = ({ children }: MyRedeemRequestsDialogProps) => {
-  const { redeemRequests } = useGame();
+  const { redeemRequests = [] } = useGame(); // Fallback para array vazio
 
-  const pending = redeemRequests.filter(r => r.status === 'pending');
-  const approved = redeemRequests.filter(r => r.status === 'approved');
-  const rejected = redeemRequests.filter(r => r.status === 'rejected');
+  const safeRequests = Array.isArray(redeemRequests) ? redeemRequests : [];
+  const pending = safeRequests.filter(r => r.status === 'pending');
+  const approved = safeRequests.filter(r => r.status === 'approved');
+  const rejected = safeRequests.filter(r => r.status === 'rejected');
 
   const handleDownloadReceipt = async (path: string) => {
     const { data, error } = await supabase.storage.from('receipts').download(path);
@@ -53,7 +54,7 @@ export const MyRedeemRequestsDialog = ({ children }: MyRedeemRequestsDialogProps
     return (
       <div className="space-y-3 py-2">
         {requests.map(req => {
-          const config = statusConfig[req.status];
+          const config = statusConfig[req.status] || statusConfig.pending;
           const StatusIcon = config.icon;
 
           return (
