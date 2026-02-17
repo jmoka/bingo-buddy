@@ -15,12 +15,13 @@ interface GameContextType {
   isAdmin: boolean;
   adminLogin: (password: string) => boolean;
   adminLogout: () => void;
-  createMatch: (match: Omit<Match, 'id' | 'status' | 'playerIds' | 'calledNumbers' | 'pot' | 'createdAt'>) => Match;
+  createMatch: (match: Omit<Match, 'id' | 'status' | 'playerIds' | 'calledNumbers' | 'pot' | 'createdAt' | 'isAutoCalling'>) => Match;
   openMatch: (matchId: string) => void;
   startMatch: (matchId: string) => void;
   callNumber: (matchId: string, num: number) => void;
   finishMatch: (matchId: string) => void;
   deleteMatch: (matchId: string) => void;
+  toggleAutoCall: (matchId: string) => void;
   updateGameSettings: (settings: GameSettings) => void;
 
   // Player
@@ -166,15 +167,21 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const adminLogout = useCallback(() => setIsAdmin(false), []);
   const updateGameSettings = useCallback((settings: GameSettings) => setGameSettings(settings), []);
 
-  const createMatch = useCallback((data: Omit<Match, 'id' | 'status' | 'playerIds' | 'calledNumbers' | 'pot' | 'createdAt'>): Match => {
-    const match: Match = { ...data, id: generateId(), status: 'waiting', playerIds: [], calledNumbers: [], pot: 0, createdAt: new Date().toISOString() };
+  const createMatch = useCallback((data: Omit<Match, 'id' | 'status' | 'playerIds' | 'calledNumbers' | 'pot' | 'createdAt' | 'isAutoCalling'>): Match => {
+    const match: Match = { ...data, id: generateId(), status: 'waiting', playerIds: [], calledNumbers: [], pot: 0, createdAt: new Date().toISOString(), isAutoCalling: false };
     setMatches(prev => [...prev, match]);
     return match;
   }, []);
 
   const openMatch = useCallback((matchId: string) => setMatches(prev => prev.map(m => m.id === matchId ? { ...m, status: 'open' as MatchStatus } : m)), []);
   const startMatch = useCallback((matchId: string) => setMatches(prev => prev.map(m => m.id === matchId ? { ...m, status: 'in_progress' as MatchStatus } : m)), []);
-  const finishMatch = useCallback((matchId: string) => setMatches(prev => prev.map(m => m.id === matchId ? { ...m, status: 'finished' as MatchStatus } : m)), []);
+  const finishMatch = useCallback((matchId: string) => {
+    setMatches(prev => prev.map(m => m.id === matchId ? { ...m, status: 'finished' as MatchStatus, isAutoCalling: false } : m));
+  }, []);
+
+  const toggleAutoCall = useCallback((matchId: string) => {
+    setMatches(prev => prev.map(m => m.id === matchId ? { ...m, isAutoCalling: !m.isAutoCalling } : m));
+  }, []);
   
   const callNumber = useCallback((matchId: string, num: number) => {
     setMatches(prev => prev.map(m => m.id === matchId && !m.calledNumbers.includes(num) ? { ...m, calledNumbers: [...m.calledNumbers, num] } : m));
@@ -272,7 +279,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   return (
     <GameContext.Provider value={{
-      isAdmin, adminLogin, adminLogout, createMatch, openMatch, startMatch, callNumber, finishMatch, deleteMatch, updateGameSettings,
+      isAdmin, adminLogin, adminLogout, createMatch, openMatch, startMatch, callNumber, finishMatch, deleteMatch, toggleAutoCall, updateGameSettings,
       currentPlayer, registerPlayer, logoutPlayer, buyCredits, createPlayerCard, joinMatch, buyCardUses,
       matches, players, playerCards, matchCards, gameSettings, getMatchCards, getPlayerMatchCards,
     }}>

@@ -20,6 +20,7 @@ export interface Match {
   status: MatchStatus;
   playerIds: string[];
   calledNumbers: number[];
+  isAutoCalling?: boolean;
   winnerId?: string;
   pot: number; // total credits bet
   createdAt: string;

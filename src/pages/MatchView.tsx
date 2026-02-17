@@ -3,7 +3,7 @@ import { useGame } from '@/contexts/GameContext';
 import { BingoCell } from '@/components/BingoCell';
 import { Button } from '@/components/ui/button';
 import { gameTypeLabels } from '@/utils/bingoUtils';
-import { ArrowLeft, Coins, Trophy, Users } from 'lucide-react';
+import { ArrowLeft, Coins, Trophy, Users, Bot } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { playNotificationSound } from '@/utils/soundUtils';
@@ -78,6 +78,15 @@ const MatchView = () => {
       </header>
 
       <main className="container max-w-6xl mx-auto py-6 px-4">
+        {match.isAutoCalling && (
+          <div className="card-container mb-6 bg-accent/10 text-accent-foreground text-center">
+            <p className="font-medium text-sm flex items-center justify-center gap-2">
+              <Bot className="w-4 h-4" />
+              Sorteio automático ativado. Aguardando próximo número...
+            </p>
+          </div>
+        )}
+
         <div className="card-container mb-6">
           <p className="text-sm text-muted-foreground mb-2">Números sorteados ({match.calledNumbers.length})</p>
           <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto">

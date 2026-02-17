@@ -36,7 +36,7 @@ const Admin = () => {
   const { 
     isAdmin, adminLogout, matches, players, createMatch, 
     openMatch, startMatch, finishMatch, deleteMatch, callNumber,
-    getMatchCards, gameSettings, updateGameSettings,
+    toggleAutoCall, getMatchCards, gameSettings, updateGameSettings,
   } = useGame();
 
   const [showCreate, setShowCreate] = useState(false);
@@ -52,20 +52,20 @@ const Admin = () => {
   });
   const [settingsForm, setSettingsForm] = useState(gameSettings);
   const [callerInput, setCallerInput] = useState<Record<string, string>>({});
-  const [autoCallEnabled, setAutoCallEnabled] = useState<Set<string>>(new Set());
+  const [countdown, setCountdown] = useState<Record<string, number>>({});
 
   useEffect(() => {
     setSettingsForm(gameSettings);
   }, [gameSettings]);
 
-  // Auto-call logic
+  // Auto-call and countdown logic
   useEffect(() => {
     const intervals = new Map<string, NodeJS.Timeout>();
+    const countdownIntervals = new Map<string, NodeJS.Timeout>();
 
-    autoCallEnabled.forEach(matchId => {
-      const match = matches.find(m => m.id === matchId);
-
-      if (match && match.status === 'in_progress') {
+    matches.forEach(match => {
+      if (match.isAutoCalling && match.status === 'in_progress') {
+        // Main auto-call interval
         const intervalId = setInterval(() => {
           const availableNumbers = Array.from({ length: 75 }, (_, i) => i + 1)
             .filter(num => !match.calledNumbers.includes(num));
@@ -75,22 +75,33 @@ const Admin = () => {
             const newNumber = availableNumbers[randomIndex];
             callNumber(match.id, newNumber);
           } else {
-            // All numbers called, stop this interval
-            setAutoCallEnabled(prev => {
-              const next = new Set(prev);
-              next.delete(match.id);
-              return next;
-            });
+            toggleAutoCall(match.id);
           }
         }, gameSettings.autoCallIntervalSeconds * 1000);
-        intervals.set(matchId, intervalId);
+        intervals.set(match.id, intervalId);
+
+        // Countdown interval
+        if (!countdown[match.id]) {
+          setCountdown(prev => ({ ...prev, [match.id]: gameSettings.autoCallIntervalSeconds }));
+        }
+        const countdownId = setInterval(() => {
+          setCountdown(prev => {
+            const current = prev[match.id] || 0;
+            if (current <= 1) {
+              return { ...prev, [match.id]: gameSettings.autoCallIntervalSeconds };
+            }
+            return { ...prev, [match.id]: current - 1 };
+          });
+        }, 1000);
+        countdownIntervals.set(match.id, countdownId);
       }
     });
 
     return () => {
-      intervals.forEach(intervalId => clearInterval(intervalId));
+      intervals.forEach(id => clearInterval(id));
+      countdownIntervals.forEach(id => clearInterval(id));
     };
-  }, [autoCallEnabled, matches, gameSettings.autoCallIntervalSeconds, callNumber]);
+  }, [matches, gameSettings.autoCallIntervalSeconds, callNumber, toggleAutoCall, countdown]);
 
   if (!isAdmin) {
     navigate('/admin/login');
@@ -126,18 +137,6 @@ const Admin = () => {
       callNumber(matchId, num);
       setCallerInput(prev => ({ ...prev, [matchId]: '' }));
     }
-  };
-
-  const toggleAutoCall = (matchId: string) => {
-    setAutoCallEnabled(prev => {
-      const next = new Set(prev);
-      if (next.has(matchId)) {
-        next.delete(matchId);
-      } else {
-        next.add(matchId);
-      }
-      return next;
-    });
   };
 
   const getPrizeDisplay = (match: Match) => {
@@ -353,11 +352,14 @@ const Admin = () => {
                         <div className="flex items-center space-x-2">
                           <Switch
                             id={`auto-call-${match.id}`}
-                            checked={autoCallEnabled.has(match.id)}
+                            checked={!!match.isAutoCalling}
                             onCheckedChange={() => toggleAutoCall(match.id)}
                           />
                           <Label htmlFor={`auto-call-${match.id}`} className="flex items-center gap-1">
                             <Bot className="w-4 h-4" /> Sorteio Automático
+                            {match.isAutoCalling && countdown[match.id] && (
+                              <span className="ml-2 text-xs font-mono text-muted-foreground">(Próximo em {countdown[match.id]}s)</span>
+                            )}
                           </Label>
                         </div>
                       </div>
