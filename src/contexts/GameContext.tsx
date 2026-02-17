@@ -2,7 +2,7 @@ import React, { createContext, useContext, useEffect, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './AuthContext';
-import { Match, PlayerCard, MatchCard, Win, MatchStatus, CreditRequest, CreditRequestMessage, RedeemRequest, RedeemRequestMessage, CreditType } from '@/types/match';
+import { Match, PlayerCard, MatchCard, Win, MatchStatus, CreditRequest, CreditRequestMessage, RedeemRequest, RedeemRequestMessage } from '@/types/match';
 import { toast } from 'sonner';
 import { Profile } from './AuthContext';
 
@@ -45,12 +45,11 @@ interface GameContextType {
   deleteMatch: (matchId: string) => Promise<void>;
   toggleAutoCall: (matchId: string) => Promise<void>;
   updateGameSettings: (newSettings: Partial<GameSettings>) => Promise<void>;
-  createPlayerCard: (options: { name: string; numbers: number[][]; creditType: CreditType; }) => Promise<PlayerCard | null>;
+  createPlayerCard: (options: { name: string; numbers: number[][]; }) => Promise<PlayerCard | null>;
   deletePlayerCard: (cardId: string) => Promise<void>;
   toggleArchivePlayerCard: (cardId: string, archive: boolean) => Promise<void>;
   joinMatch: (matchId: string, playerCardIds: string[]) => Promise<MatchCard[] | null>;
-  buyCardUses: (playerCardId: string, creditType: CreditType) => Promise<boolean>;
-  renewFakeCredits: () => Promise<void>;
+  buyCardUses: (playerCardId: string) => Promise<boolean>;
   requestCredits: (file: File, creditsRequested: number, amountPaid: number) => Promise<boolean>;
   resubmitCreditRequest: (requestId: string, file: File, message: string) => Promise<boolean>;
   resolveCreditRequest: (requestId: string, status: 'approved' | 'rejected', creditsGranted?: number, notes?: string) => Promise<boolean>;
@@ -63,7 +62,6 @@ interface GameContextType {
   unblockRedeemRequest: (requestId: string) => Promise<void>;
   deleteRedeemRequest: (requestId: string) => Promise<void>;
   updatePlayerCredits: (playerId: string, amount: number) => Promise<void>;
-  cleanupMatchDuplicates: (matchId: string) => Promise<void>;
   getMatchCards: (matchId: string) => MatchCard[];
   getPlayerMatchCards: (matchId: string, playerId: string) => MatchCard[];
   fetchRequestMessages: (requestId: string) => Promise<CreditRequestMessage[]>;
@@ -100,7 +98,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     queryKey: ['playerCards', user?.id],
     queryFn: async () => {
       if (!user) return [];
-      const { data, error } = await supabase.from('cartelas_jogador').select('*');
+      const { data, error } = await supabase.from('cartelas_jogador').select('*').eq('player_id', user.id);
       if (error) throw error;
       return data as PlayerCard[];
     },
@@ -514,45 +512,16 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (p) await supabase.from('perfis').update({ credits: p.credits + amount }).eq('id', playerId);
   };
 
-  const createPlayerCard = async (options: { name: string; numbers: number[][]; creditType: CreditType; }) => {
-    if (!user) {
-      toast.error("Você precisa estar logado para criar uma cartela.");
-      return null;
-    }
-    try {
-      const { name, numbers, creditType } = options;
-      
-      const { data, error } = await supabase.rpc('buy_player_card', {
-        p_name: name,
-        p_numbers: numbers,
-        p_credit_type: creditType
-      });
-
-      if (error) {
-        console.error("RPC Error:", JSON.stringify(error, null, 2));
-        toast.error('Erro ao criar cartela', { 
-          description: `Mensagem: ${error.message}. Por favor, tente novamente ou contate o suporte.`
-        });
-        return null;
-      }
-
-      toast.success("Cartela criada com sucesso!");
-      queryClient.invalidateQueries({ queryKey: ['profile'] });
-      queryClient.invalidateQueries({ queryKey: ['playerCards', user.id] });
-      
-      return data as PlayerCard;
-
-    } catch (err: any) {
-      console.error("Client Error:", err);
-      toast.error('Erro inesperado no aplicativo', { description: err.message });
-      return null;
-    }
+  const createPlayerCard = async (options: { name: string; numbers: number[][]; }) => {
+    if (!user || !profile || !gameSettings || profile.credits < gameSettings.custo_nova_cartela) return null;
+    await supabase.from('perfis').update({ credits: profile.credits - gameSettings.custo_nova_cartela }).eq('id', user.id);
+    const { data } = await supabase.from('cartelas_jogador').insert({ player_id: user.id, ...options, uses_left: 1 }).select().single();
+    queryClient.invalidateQueries({ queryKey: ['profile'] });
+    return data as PlayerCard;
   };
 
   const deletePlayerCard = async (cardId: string) => { await supabase.from('cartelas_jogador').delete().eq('id', cardId); };
-  const toggleArchivePlayerCard = async (cardId: string, archive: boolean) => { 
-      console.warn("Funcionalidade de arquivamento removida por falta de suporte no banco.");
-  };
+  const toggleArchivePlayerCard = async (cardId: string, archive: boolean) => { await supabase.from('cartelas_jogador').update({ is_archived: archive }).eq('id', cardId); };
 
   const joinMatch = async (matchId: string, playerCardIds: string[]) => {
     const { data } = await supabase.functions.invoke('join-match', { body: { matchId, playerCardIds } });
@@ -560,54 +529,16 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return data as MatchCard[];
   };
 
-  const buyCardUses = async (playerCardId: string, creditType: CreditType) => {
-    if (!profile || !gameSettings) return false;
-    
-    const cost = gameSettings.custo_recarga_cartela;
-    
-    if (creditType === 'real') {
-      if (profile.credits < cost) { toast.error('Créditos reais insuficientes.'); return false; }
-      await supabase.from('perfis').update({ credits: profile.credits - cost }).eq('id', profile.id);
-    } else {
-      if (profile.fake_credits < cost) { toast.error('Créditos de brincar insuficientes.'); return false; }
-      await supabase.from('perfis').update({ fake_credits: profile.fake_credits - cost }).eq('id', profile.id);
-    }
-
+  const buyCardUses = async (playerCardId: string) => {
+    if (!profile || !gameSettings || profile.credits < gameSettings.custo_recarga_cartela) return false;
+    await supabase.from('perfis').update({ credits: profile.credits - gameSettings.custo_recarga_cartela }).eq('id', profile.id);
     const card = playerCards.find(c => c.id === playerCardId);
     if (card) await supabase.from('cartelas_jogador').update({ uses_left: card.uses_left + gameSettings.usos_por_recarga }).eq('id', playerCardId);
     queryClient.invalidateQueries({ queryKey: ['profile'] });
     return true;
   };
 
-  const renewFakeCredits = async () => {
-    if (!user) return;
-    await supabase.from('perfis').update({ fake_credits: 100 }).eq('id', user.id);
-    toast.success('Seu saldo de brincar foi renovado!');
-    queryClient.invalidateQueries({ queryKey: ['profile'] });
-  };
-
   const updateGameSettings = async (newSettings: Partial<GameSettings>) => { await supabase.from('configuracoes').update(newSettings).eq('singleton', true); };
-  
-  const cleanupMatchDuplicates = async (matchId: string) => {
-    const { data, error } = await supabase.functions.invoke('cleanup-duplicates', {
-        body: { matchId },
-    });
-
-    if (error) {
-        toast.error('Falha na limpeza', { description: error.message });
-        return;
-    }
-
-    if (data.cards_deleted > 0) {
-      toast.success('Limpeza de duplicatas concluída!', {
-          description: `${data.cards_deleted} cartelas duplicadas removidas. ${data.credits_refunded} créditos estornados.`,
-      });
-    } else {
-      toast.info('Nenhuma duplicata encontrada.');
-    }
-    queryClient.invalidateQueries();
-  };
-
   const getMatchCards = (matchId: string) => matchCards.filter(c => c.match_id === matchId);
   const getPlayerMatchCards = (matchId: string, playerId: string) => matchCards.filter(c => c.match_id === matchId && c.player_id === playerId);
 
@@ -628,10 +559,10 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       matches, players, playerCards, allPlayerCards, matchCards, wins, allWins, creditRequests, allCreditRequests, 
       redeemRequests, allRedeemRequests, gameSettings, isLoading: isLoadingRequests || isLoadingRedeems || (isAdmin && isLoadingPlayers),
       createMatch, updateMatch, openMatch, startMatch, callNumber, finishMatch, deleteMatch, toggleAutoCall,
-      updateGameSettings, createPlayerCard, deletePlayerCard, toggleArchivePlayerCard, joinMatch, buyCardUses, renewFakeCredits,
+      updateGameSettings, createPlayerCard, deletePlayerCard, toggleArchivePlayerCard, joinMatch, buyCardUses,
       requestCredits, resubmitCreditRequest, resolveCreditRequest, unblockCreditRequest, deleteCreditRequest, 
       requestRedeem, resubmitRedeemRequest, resolveRedeemRequest, unblockRedeemRequest, deleteRedeemRequest, 
-      cleanupMatchDuplicates, getMatchCards, getPlayerMatchCards, fetchRequestMessages, fetchRedeemMessages
+      getMatchCards, getPlayerMatchCards, fetchRequestMessages, fetchRedeemMessages
     }}>
       {children}
     </GameContext.Provider>

@@ -9,7 +9,6 @@ export interface Profile {
   avatar_url: string | null;
   role: 'admin' | 'user';
   credits: number;
-  fake_credits: number;
   cpf: string | null;
   whatsapp: string | null;
   address: string | null;

@@ -2,7 +2,6 @@ import { GameType } from './bingo';
 
 export type MatchStatus = 'waiting' | 'open' | 'in_progress' | 'finished';
 export type PrizeType = 'product' | 'fixed' | 'percentage';
-export type CreditType = 'real' | 'fake';
 
 export interface Prize {
   type: PrizeType;
@@ -42,8 +41,7 @@ export interface PlayerCard {
   name: string;
   numbers: number[][];
   uses_left: number;
-  created_at: string;
-  credit_type: CreditType;
+  is_archived: boolean;
 }
 
 export interface MatchCard {
@@ -94,6 +92,7 @@ export interface CreditRequest {
   mensagens?: CreditRequestMessage[];
 }
 
+// Novos tipos para Resgate
 export interface RedeemRequestMessage {
   id: string;
   redeem_request_id: string;

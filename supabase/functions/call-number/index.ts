@@ -59,7 +59,7 @@ serve(async (req) => {
 
     const { data: freshMatchCards, error: freshCardsError } = await supabaseAdmin
       .from('cartelas_partida')
-      .select('*, player_card_id(credit_type)')
+      .select('*')
       .eq('match_id', matchId)
     
     if (freshCardsError) throw freshCardsError
@@ -69,11 +69,6 @@ serve(async (req) => {
 
     const foundWinners = []
     for (const card of freshMatchCards) {
-      // @ts-ignore: Deno/Supabase have issues with related table types
-      if (card.player_card_id?.credit_type === 'fake') {
-        continue; // Pula a verificação de vitória para cartelas de brincar
-      }
-
       const tempBingoCard: BingoCard = {
         id: card.id,
         name: card.name,
@@ -110,8 +105,7 @@ serve(async (req) => {
       const winRecords = foundWinners.map(fw => ({
         match_id: match.id,
         player_id: fw.card.player_id,
-        // @ts-ignore
-        player_card_id: fw.card.player_card_id.id,
+        player_card_id: fw.card.player_card_id,
         match_card_id: fw.card.id,
         prize_details: match.prize,
       }));

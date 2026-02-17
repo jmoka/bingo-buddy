@@ -11,20 +11,9 @@ import { PrizeType, MatchStatus, Match } from '@/types/match';
 import { gameTypeLabels } from '@/utils/bingoUtils';
 import { 
   Plus, LogOut, Play, DoorOpen, Trash2, Trophy, Users, 
-  Hash, ArrowLeft, StopCircle, Settings, Save, Bot, Shuffle, ArrowRight, Webhook, Key, Send, Loader2, CreditCard, Banknote, Check, Edit, Sparkles
+  Hash, ArrowLeft, StopCircle, Settings, Save, Bot, Shuffle, ArrowRight, Webhook, Key, Send, Loader2, CreditCard, Banknote, Check, Edit
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
 import { useToast } from '@/hooks/use-toast';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
@@ -57,7 +46,7 @@ const Admin = () => {
     matches, createMatch, updateMatch, matchCards,
     openMatch, startMatch, finishMatch, deleteMatch, callNumber,
     toggleAutoCall, gameSettings, updateGameSettings, allCreditRequests,
-    allRedeemRequests, cleanupMatchDuplicates
+    allRedeemRequests
   } = useGame();
 
   const [showCreate, setShowCreate] = useState(false);
@@ -449,28 +438,6 @@ const Admin = () => {
                       <div className="text-sm text-muted-foreground flex gap-3"><span className="flex items-center gap-1"><Trophy className="w-3.5 h-3.5" />{gameTypeLabels[match.game_type]}</span></div>
                     </div>
                     <div className="flex gap-2">
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button size="sm" variant="outline" className="text-amber-600 border-amber-600/20 hover:bg-amber-600/10 hover:text-amber-700">
-                            <Sparkles className="w-4 h-4 mr-2" />
-                            Corrigir
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Corrigir cartelas duplicadas?</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              Esta ação irá verificar a partida "{match.name}" por cartelas duplicadas, removê-las e reembolsar os jogadores. Isso não pode ser desfeito.
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                            <AlertDialogAction onClick={() => cleanupMatchDuplicates(match.id)}>
-                              Sim, corrigir agora
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
                       {match.status === 'waiting' && <Button size="sm" variant="outline" onClick={() => handleOpenEditDialog(match)}><Edit className="w-4 h-4 mr-2" />Editar</Button>}
                       {match.status === 'waiting' && <Button size="sm" onClick={() => openMatch(match.id)}>Abrir</Button>}
                       {match.status === 'open' && <Button size="sm" onClick={() => startMatch(match.id)} disabled={!canStart} title={!canStart ? `Requer ${match.min_players} jogadores` : ''}>Iniciar</Button>}
