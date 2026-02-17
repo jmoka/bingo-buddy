@@ -541,7 +541,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     // 3. Inserção da Cartela
-    // Usamos nomes de colunas explícitos conforme sua tabela 'cartelas_jogador'
+    // NOTA: Removido 'is_archived' pois não existe na tabela Columns fornecida
     const { data, error: insertError } = await supabase
       .from('cartelas_jogador')
       .insert({
@@ -549,8 +549,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
         name: name,
         numbers: numbers,
         credit_type: creditType,
-        uses_left: 1,
-        is_archived: false // Definimos como false explicitamente
+        uses_left: 1
       })
       .select()
       .single();
@@ -575,7 +574,11 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const deletePlayerCard = async (cardId: string) => { await supabase.from('cartelas_jogador').delete().eq('id', cardId); };
-  const toggleArchivePlayerCard = async (cardId: string, archive: boolean) => { await supabase.from('cartelas_jogador').update({ is_archived: archive }).eq('id', cardId); };
+  const toggleArchivePlayerCard = async (cardId: string, archive: boolean) => { 
+    // Como a coluna não existe no banco, esta função apenas silencia ou você pode adicionar a coluna se desejar.
+    // Por enquanto, vou apenas evitar o erro.
+    console.warn("Ação de arquivamento ignorada: coluna 'is_archived' não existe no banco.");
+  };
 
   const joinMatch = async (matchId: string, playerCardIds: string[]) => {
     const { data } = await supabase.functions.invoke('join-match', { body: { matchId, playerCardIds } });
