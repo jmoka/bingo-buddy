@@ -10,13 +10,14 @@ import { PrizeType, Match, MatchStatus } from '@/types/match';
 import { gameTypeLabels } from '@/utils/bingoUtils';
 import { 
   Plus, LogOut, Play, DoorOpen, Trash2, Trophy, Users, 
-  Clock, Coins, Hash, ArrowLeft, StopCircle, Settings, Save, Bot, Shuffle, Ticket, ArrowRight
+  Clock, Coins, Hash, ArrowLeft, StopCircle, Settings, Save, Bot, Shuffle, Ticket, ArrowRight, Webhook
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Footer } from '@/components/Footer';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 
 const statusLabels: Record<MatchStatus, string> = {
   waiting: 'Aguardando',
@@ -58,6 +59,9 @@ const Admin = () => {
     custo_recarga_cartela: 5,
     usos_por_recarga: 1,
     intervalo_sorteio_auto_seg: 120,
+    n8n_test_url: '',
+    n8n_prod_url: '',
+    n8n_env: 'test',
   });
   const [callerInput, setCallerInput] = useState<Record<string, string>>({});
   const [now, setNow] = useState(Date.now());
@@ -76,6 +80,9 @@ const Admin = () => {
         custo_recarga_cartela: gameSettings.custo_recarga_cartela,
         usos_por_recarga: gameSettings.usos_por_recarga,
         intervalo_sorteio_auto_seg: gameSettings.intervalo_sorteio_auto_seg,
+        n8n_test_url: gameSettings.n8n_test_url || '',
+        n8n_prod_url: gameSettings.n8n_prod_url || '',
+        n8n_env: gameSettings.n8n_env || 'test',
       });
     }
   }, [gameSettings]);
@@ -155,11 +162,17 @@ const Admin = () => {
 
   const handleSettingsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setCurrentSettings(prev => ({ ...prev, [name]: parseInt(value, 10) || 0 }));
+    setCurrentSettings(prev => ({ ...prev, [name]: value }));
   };
 
   const handleSaveSettings = () => {
-    updateGameSettings(currentSettings);
+    updateGameSettings({
+      ...currentSettings,
+      custo_nova_cartela: parseInt(currentSettings.custo_nova_cartela as any, 10),
+      custo_recarga_cartela: parseInt(currentSettings.custo_recarga_cartela as any, 10),
+      usos_por_recarga: parseInt(currentSettings.usos_por_recarga as any, 10),
+      intervalo_sorteio_auto_seg: parseInt(currentSettings.intervalo_sorteio_auto_seg as any, 10),
+    });
   };
 
   return (
@@ -180,7 +193,7 @@ const Admin = () => {
       </header>
 
       <main className="container max-w-6xl mx-auto py-8 px-4 flex-grow">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           <div className="card-container">
             <h2 className="font-heading text-xl font-bold text-foreground mb-4 flex items-center gap-2"><Settings className="w-5 h-5" /> Configurações Gerais</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -201,8 +214,38 @@ const Admin = () => {
                 <Input id="intervalo_sorteio_auto_seg" name="intervalo_sorteio_auto_seg" type="number" value={currentSettings.intervalo_sorteio_auto_seg} onChange={handleSettingsChange} />
               </div>
             </div>
-            <div className="mt-4 flex justify-end">
-              <Button onClick={handleSaveSettings}><Save className="w-4 h-4 mr-2" /> Salvar Configurações</Button>
+            <div className="mt-6 pt-4 border-t">
+              <h3 className="font-heading text-lg font-bold text-foreground mb-4 flex items-center gap-2"><Webhook className="w-5 h-5" /> Notificações (n8n)</h3>
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="n8n_test_url">URL de Teste</Label>
+                  <Input id="n8n_test_url" name="n8n_test_url" type="text" placeholder="https://.../webhook-test/..." value={currentSettings.n8n_test_url} onChange={handleSettingsChange} />
+                </div>
+                <div>
+                  <Label htmlFor="n8n_prod_url">URL de Produção</Label>
+                  <Input id="n8n_prod_url" name="n8n_prod_url" type="text" placeholder="https://.../webhook/..." value={currentSettings.n8n_prod_url} onChange={handleSettingsChange} />
+                </div>
+                <div>
+                  <Label>Ambiente Ativo</Label>
+                  <RadioGroup
+                    value={currentSettings.n8n_env}
+                    onValueChange={(value) => setCurrentSettings(prev => ({ ...prev, n8n_env: value }))}
+                    className="flex items-center gap-4 mt-2"
+                  >
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="test" id="r1" />
+                      <Label htmlFor="r1">Teste</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="production" id="r2" />
+                      <Label htmlFor="r2">Produção</Label>
+                    </div>
+                  </RadioGroup>
+                </div>
+              </div>
+            </div>
+            <div className="mt-6 flex justify-end">
+              <Button onClick={handleSaveSettings}><Save className="w-4 h-4 mr-2" /> Salvar Todas as Configurações</Button>
             </div>
           </div>
 
