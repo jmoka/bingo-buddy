@@ -36,6 +36,7 @@ interface GameContextType {
   updateGameSettings: (newSettings: Partial<GameSettings>) => Promise<void>;
   createPlayerCard: (options: { name: string; numbers: number[][]; }) => Promise<PlayerCard | null>;
   deletePlayerCard: (cardId: string) => Promise<void>;
+  toggleArchivePlayerCard: (cardId: string, archive: boolean) => Promise<void>;
   joinMatch: (matchId: string, playerCardIds: string[]) => Promise<MatchCard[] | null>;
   buyCardUses: (playerCardId: string) => Promise<boolean>;
   buyCredits: (amount: number) => Promise<void>;
@@ -274,7 +275,6 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return null;
     }
 
-    // Check for duplicate card name for this user
     const { data: existingName, error: nameCheckError } = await supabase
         .from('cartelas_jogador')
         .select('id', { count: 'exact' })
@@ -291,7 +291,6 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return null;
     }
 
-    // Check for duplicate card numbers for this user
     const { data: existingCards, error: checkError } = await supabase
       .from('cartelas_jogador')
       .select('id', { count: 'exact' })
@@ -314,7 +313,6 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const newCard = { player_id: user.id, ...options, uses_left: 1 };
     const { data, error } = await supabase.from('cartelas_jogador').insert(newCard).select().single();
     if (error) { 
-        // refund credits if card creation fails
         await supabase.from('perfis').update({ credits: profile.credits }).eq('id', user.id);
         toast.error(error.message); 
         return null; 
@@ -326,6 +324,12 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const deletePlayerCard = async (cardId: string) => {
+    const hasWins = wins.some(w => w.player_card_id === cardId);
+    if (hasWins) {
+      toast.error("Cartelas premiadas não podem ser excluídas. Você pode arquivá-las.");
+      return;
+    }
+
     const activeMatchCards = matchCards.filter(mc => 
       mc.player_card_id === cardId && 
       matches.some(m => m.id === mc.match_id && (m.status === 'in_progress' || m.status === 'open'))
@@ -341,6 +345,20 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       toast.error(error.message);
     } else {
       toast.success("Cartela excluída com sucesso.");
+      queryClient.invalidateQueries({ queryKey: ['playerCards'] });
+    }
+  };
+
+  const toggleArchivePlayerCard = async (cardId: string, archive: boolean) => {
+    const { error } = await supabase
+      .from('cartelas_jogador')
+      .update({ is_archived: archive })
+      .eq('id', cardId);
+
+    if (error) {
+      toast.error(error.message);
+    } else {
+      toast.success(archive ? "Cartela arquivada." : "Cartela restaurada.");
       queryClient.invalidateQueries({ queryKey: ['playerCards'] });
     }
   };
@@ -406,7 +424,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     <GameContext.Provider value={{
       matches, players, playerCards, allPlayerCards, matchCards, wins, allWins, gameSettings, isLoading: l1 || l2 || l3 || l4 || l5,
       createMatch, openMatch, startMatch, callNumber, finishMatch, deleteMatch, toggleAutoCall,
-      updateGameSettings, createPlayerCard, deletePlayerCard, joinMatch, buyCardUses, buyCredits,
+      updateGameSettings, createPlayerCard, deletePlayerCard, toggleArchivePlayerCard, joinMatch, buyCardUses, buyCredits,
       updatePlayerCredits, getMatchCards, getPlayerMatchCards,
     }}>
       {children}

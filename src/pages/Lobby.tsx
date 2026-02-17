@@ -9,7 +9,7 @@ import { gameTypeLabels } from '@/utils/bingoUtils';
 import { 
   LogOut, Coins, Plus, Trophy, Users, Settings, Wallet, 
   CreditCard, Timer, DoorOpen, Ticket, Zap, ZapOff, Tv, Printer, Bot, User as UserIcon,
-  Volume2, VolumeX, Trash2
+  Volume2, VolumeX, Trash2, Archive, ArchiveRestore
 } from 'lucide-react';
 import { 
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose 
@@ -40,12 +40,13 @@ const Lobby = () => {
   const { 
     matches, joinMatch, getPlayerMatchCards, playerCards, 
     buyCardUses, buyCredits, createPlayerCard, deletePlayerCard,
-    matchCards, gameSettings, wins
+    toggleArchivePlayerCard, matchCards, gameSettings, wins
   } = useGame();
 
   const [buyAmount, setBuyAmount] = useState(50);
   const [now, setNow] = useState(Date.now());
   const [isSoundOn, setIsSoundOn] = useState(true);
+  const [showArchived, setShowArchived] = useState(false);
   const prevMatchesRef = useRef<Match[]>([]);
 
   const [isCreateCardOpen, setCreateCardOpen] = useState(false);
@@ -63,6 +64,8 @@ const Lobby = () => {
   }, [session, navigate]);
 
   const myOwnedCards = profile ? playerCards.filter(c => c.player_id === profile.id) : [];
+  const activeCards = myOwnedCards.filter(c => !c.is_archived);
+  const archivedCards = myOwnedCards.filter(c => c.is_archived);
 
   useEffect(() => {
     const interval = setInterval(() => setNow(Date.now()), 1000);
@@ -159,7 +162,7 @@ const Lobby = () => {
   });
 
   if (!profile) {
-    return null; // or a loading spinner
+    return null;
   }
 
   const activeMatchIds = new Set(matches.filter(m => m.status === 'in_progress').map(m => m.id));
@@ -223,7 +226,7 @@ const Lobby = () => {
         )}
         <div className="mb-8">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="font-heading text-xl font-bold text-foreground flex items-center gap-2"><Ticket className="w-5 h-5 text-primary" /> Minhas Cartelas ({myOwnedCards.length})</h2>
+            <h2 className="font-heading text-xl font-bold text-foreground flex items-center gap-2"><Ticket className="w-5 h-5 text-primary" /> Minhas Cartelas ({activeCards.length})</h2>
             <div className="flex items-center gap-2">
               <Button variant="outline" size="sm" onClick={() => navigate('/print')} disabled={myOwnedCards.length === 0}>
                 <Printer className="w-4 h-4 mr-2" />
@@ -245,16 +248,17 @@ const Lobby = () => {
               </Dialog>
             </div>
           </div>
-          {myOwnedCards.length === 0 ? (
-            <div className="card-container text-center py-8"><p className="text-muted-foreground">Você ainda não tem cartelas. Crie uma!</p></div>
+          {activeCards.length === 0 && !showArchived ? (
+            <div className="card-container text-center py-8"><p className="text-muted-foreground">Você não tem cartelas ativas. Crie uma ou restaure uma arquivada.</p></div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {myOwnedCards.map(card => {
+              {activeCards.map(card => {
                 const activeMatchCard = matchCards.find(mc => 
                   mc.player_card_id === card.id && activeMatchIds.has(mc.match_id)
                 );
                 const markedNumbers = activeMatchCard ? activeMatchCard.marked_numbers : new Set<number>();
                 const winCount = wins.filter(w => w.player_card_id === card.id).length;
+                const hasWins = winCount > 0;
 
                 return (
                   <div key={card.id} className={`card-container p-3 transition-opacity ${card.uses_left === 0 ? 'opacity-60' : ''}`}>
@@ -262,7 +266,7 @@ const Lobby = () => {
                       <div>
                         <div className="flex items-center gap-2">
                           <h3 className="font-heading font-semibold text-foreground">{card.name}</h3>
-                          {winCount > 0 && (
+                          {hasWins && (
                             <div className="flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-amber-400/20 text-amber-600">
                               <Trophy className="w-3 h-3" />
                               <span>{winCount}x</span>
@@ -281,9 +285,12 @@ const Lobby = () => {
                             Recarregar <Coins className="w-3 h-3 ml-1" />
                           </Button>
                         )}
+                        <Button size="icon" variant="ghost" className="text-muted-foreground hover:text-foreground hover:bg-muted h-8 w-8" onClick={() => toggleArchivePlayerCard(card.id, true)}>
+                          <Archive className="w-4 h-4" />
+                        </Button>
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
-                            <Button size="icon" variant="ghost" className="text-destructive/70 hover:text-destructive hover:bg-destructive/10 h-8 w-8">
+                            <Button size="icon" variant="ghost" disabled={hasWins} className="text-destructive/70 hover:text-destructive hover:bg-destructive/10 h-8 w-8 disabled:opacity-50 disabled:cursor-not-allowed">
                               <Trash2 className="w-4 h-4" />
                             </Button>
                           </AlertDialogTrigger>
@@ -320,6 +327,35 @@ const Lobby = () => {
                   </div>
                 );
               })}
+            </div>
+          )}
+          {archivedCards.length > 0 && (
+            <div className="mt-6">
+              <Button variant="link" onClick={() => setShowArchived(!showArchived)}>
+                {showArchived ? 'Ocultar Arquivadas' : 'Ver Arquivadas'} ({archivedCards.length})
+              </Button>
+              {showArchived && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                  {archivedCards.map(card => (
+                    <div key={card.id} className="card-container p-3 opacity-70">
+                       <div className="flex justify-between items-center mb-2">
+                         <h3 className="font-heading font-semibold text-muted-foreground">{card.name}</h3>
+                         <Button size="sm" variant="outline" onClick={() => toggleArchivePlayerCard(card.id, false)}>
+                           <ArchiveRestore className="w-4 h-4 mr-2" />
+                           Restaurar
+                         </Button>
+                       </div>
+                       <div className="grid grid-cols-5 gap-1">
+                        {card.numbers.flat().map((num, i) => (
+                          <div key={i} className={`w-12 h-12 rounded-lg flex items-center justify-center text-lg font-semibold bg-secondary/50 ${i === 12 ? 'text-xl' : ''}`}>
+                            {i === 12 ? '★' : num}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -446,13 +482,13 @@ const Lobby = () => {
               
               const myCardsInThisMatch = getPlayerMatchCards(selectedMatch.id, profile.id);
               const myCardIdsInThisMatch = new Set(myCardsInThisMatch.map(c => c.player_card_id));
-              const availableCardsToJoin = myOwnedCards.filter(card => !myCardIdsInThisMatch.has(card.id));
+              const availableCardsToJoin = myOwnedCards.filter(card => !myCardIdsInThisMatch.has(card.id) && !card.is_archived);
 
-              if (myOwnedCards.length === 0) {
+              if (myOwnedCards.filter(c => !c.is_archived).length === 0) {
                 return (
                   <div className="text-center py-10">
-                    <p className="text-muted-foreground font-medium">Você não tem nenhuma cartela.</p>
-                    <p className="text-sm text-muted-foreground mt-1">Crie uma nova cartela para poder entrar na partida.</p>
+                    <p className="text-muted-foreground font-medium">Você não tem nenhuma cartela ativa.</p>
+                    <p className="text-sm text-muted-foreground mt-1">Crie uma nova cartela ou restaure uma arquivada para poder entrar na partida.</p>
                   </div>
                 );
               }
@@ -460,7 +496,7 @@ const Lobby = () => {
               if (availableCardsToJoin.length === 0) {
                 return (
                   <div className="text-center py-10">
-                    <p className="text-muted-foreground font-medium">Todas as suas cartelas já estão nesta partida.</p>
+                    <p className="text-muted-foreground font-medium">Todas as suas cartelas ativas já estão nesta partida.</p>
                     <p className="text-sm text-muted-foreground mt-1">Você pode acompanhar a partida ao vivo no lobby.</p>
                   </div>
                 );

@@ -40,6 +40,7 @@ export interface PlayerCard {
   name: string;
   numbers: number[][];
   uses_left: number;
+  is_archived: boolean;
 }
 
 // An instance of a card used in a match
