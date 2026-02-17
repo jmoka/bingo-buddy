@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useGame } from '@/contexts/GameContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -8,18 +8,19 @@ import { Match, MatchStatus } from '@/types/match';
 import { gameTypeLabels } from '@/utils/bingoUtils';
 import { 
   LogOut, Coins, Plus, Trophy, Users, Settings, Wallet, 
-  CreditCard, Timer, DoorOpen, Ticket, Zap, ZapOff, Tv, Printer, Bot, User as UserIcon
+  CreditCard, Timer, DoorOpen, Ticket, Zap, ZapOff, Tv, Printer, Bot, User as UserIcon,
+  Volume2, VolumeX
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from '@/components/ui/dialog';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
 import { CardCreator } from '@/components/CardCreator';
 import { BingoCell } from '@/components/BingoCell';
 import { Footer } from '@/components/Footer';
 import { Badge } from '@/components/ui/badge';
+import { playNotificationSound } from '@/utils/soundUtils';
 
 const Lobby = () => {
   const navigate = useNavigate();
-  const { toast } = useToast();
   const { session, profile, signOut } = useAuth();
   const { 
     matches, joinMatch, getPlayerMatchCards, playerCards, 
@@ -28,6 +29,8 @@ const Lobby = () => {
 
   const [buyAmount, setBuyAmount] = useState(50);
   const [now, setNow] = useState(Date.now());
+  const [isSoundOn, setIsSoundOn] = useState(true);
+  const prevMatchesRef = useRef<Match[]>([]);
 
   const [isCreateCardOpen, setCreateCardOpen] = useState(false);
   const [newCardName, setNewCardName] = useState('');
@@ -50,11 +53,43 @@ const Lobby = () => {
     return () => clearInterval(interval);
   }, []);
 
+  useEffect(() => {
+    if (!profile || matches.length === 0) return;
+
+    const myJoinedMatchIds = new Set(
+        matchCards.filter(mc => mc.player_id === profile.id).map(mc => mc.match_id)
+    );
+
+    matches.forEach(currentMatch => {
+        if (!myJoinedMatchIds.has(currentMatch.id) || currentMatch.status !== 'in_progress') {
+            return;
+        }
+
+        const prevMatch = prevMatchesRef.current.find(m => m.id === currentMatch.id);
+        if (prevMatch && prevMatch.called_numbers) {
+            const prevNumbers = prevMatch.called_numbers;
+            const currentNumbers = currentMatch.called_numbers;
+
+            if (currentNumbers.length > prevNumbers.length) {
+                const newNumber = currentNumbers[currentNumbers.length - 1];
+                toast.info(`Número sorteado: ${newNumber}!`, {
+                  description: `Na partida "${currentMatch.name}"`,
+                });
+                if (isSoundOn) {
+                    playNotificationSound();
+                }
+            }
+        }
+    });
+
+    prevMatchesRef.current = JSON.parse(JSON.stringify(matches));
+  }, [matches, matchCards, profile, isSoundOn]);
+
   const handleCreateCard = async () => {
     if (!newCardName.trim() || !newCardNumbers) return;
     const card = await createPlayerCard({ name: newCardName, numbers: newCardNumbers });
     if (card) {
-      toast({ title: 'Cartela criada!', description: `A cartela "${card.name}" foi adicionada à sua coleção.` });
+      toast.success('Cartela criada!', { description: `A cartela "${card.name}" foi adicionada à sua coleção.` });
       setCreateCardOpen(false);
       setNewCardName('');
       setNewCardNumbers(null);
@@ -72,7 +107,7 @@ const Lobby = () => {
     const cardIds = Array.from(cardsToJoin);
     const newMatchCards = await joinMatch(selectedMatch.id, cardIds);
     if (newMatchCards && newMatchCards.length > 0) {
-      toast({ title: '🎉 Você entrou na partida!', description: `${newMatchCards.length} cartela(s) inscrita(s).` });
+      toast.success('🎉 Você entrou na partida!', { description: `${newMatchCards.length} cartela(s) inscrita(s).` });
       setJoinDialogOpen(false);
     }
   };
@@ -80,7 +115,7 @@ const Lobby = () => {
   const handleBuyUses = async (cardId: string) => {
     const success = await buyCardUses(cardId);
     if (success) {
-      toast({ title: 'Cartela Recarregada!', description: `Você comprou mais usos para sua cartela.` });
+      toast.success('Cartela Recarregada!', { description: `Você comprou mais usos para sua cartela.` });
     }
   };
 
@@ -133,9 +168,12 @@ const Lobby = () => {
                   <span className="font-heading text-3xl font-bold w-20 text-center">{buyAmount}</span>
                   <Button size="icon" variant="outline" onClick={() => setBuyAmount(p => p + 10)}>+</Button>
                 </div>
-                <Button className="w-full gradient-accent shadow-button" onClick={() => { buyCredits(buyAmount); toast({ title: `+${buyAmount} créditos!` }); }}><Coins className="w-4 h-4 mr-2" />Comprar</Button>
+                <Button className="w-full gradient-accent shadow-button" onClick={() => { buyCredits(buyAmount); toast.success(`+${buyAmount} créditos!`); }}><Coins className="w-4 h-4 mr-2" />Comprar</Button>
               </DialogContent>
             </Dialog>
+            <Button size="icon" variant="ghost" className="text-primary-foreground" onClick={() => setIsSoundOn(!isSoundOn)}>
+              {isSoundOn ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+            </Button>
             <Button size="icon" variant="ghost" className="text-primary-foreground" onClick={() => navigate('/account')}><UserIcon className="w-4 h-4" /></Button>
             <Button size="icon" variant="ghost" className="text-primary-foreground" onClick={signOut}><LogOut className="w-4 h-4" /></Button>
           </div>
@@ -213,7 +251,7 @@ const Lobby = () => {
               const myMatchCards = getPlayerMatchCards(match.id, profile.id);
               const alreadyJoined = myMatchCards.length > 0;
               const canJoin = (match.status === 'open' || match.status === 'waiting') && myOwnedCards.some(c => c.uses_left > 0);
-              const countdown = match.next_auto_call_timestamp ? Math.max(0, Math.round((match.next_auto_call_timestamp - now) / 1000)) : null;
+              const countdown = match.next_auto_call_timestamp ? Math.max(0, Math.round((new Date(match.next_auto_call_timestamp).getTime() - now) / 1000)) : null;
 
               if (match.status === 'finished') {
                 return (

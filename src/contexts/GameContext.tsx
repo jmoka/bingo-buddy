@@ -171,38 +171,73 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const match = matches.find(m => m.id === matchId);
     if (!match || match.called_numbers.includes(num)) return;
 
+    // 1. Update called numbers for the match
     const newCalledNumbers = [...match.called_numbers, num];
-    const { error: updateError } = await supabase.from('partidas').update({ called_numbers: newCalledNumbers }).eq('id', matchId);
-    if (updateError) { toast.error(updateError.message); return; }
+    const { error: updateMatchError } = await supabase
+        .from('partidas')
+        .update({ called_numbers: newCalledNumbers })
+        .eq('id', matchId);
 
-    queryClient.invalidateQueries({ queryKey: ['matches'] });
+    if (updateMatchError) {
+        toast.error(updateMatchError.message);
+        return;
+    }
 
-    const cardsInMatch = matchCards.filter(c => c.match_id === matchId);
+    // 2. Find all player cards in this match that have the new number and update them
+    const cardsToUpdate = matchCards.filter(c =>
+        c.match_id === matchId &&
+        c.numbers.flat().includes(num) &&
+        !c.marked_numbers.has(num)
+    );
+
+    if (cardsToUpdate.length > 0) {
+        const updatePromises = cardsToUpdate.map(card => {
+            const newMarkedNumbers = Array.from(card.marked_numbers);
+            newMarkedNumbers.push(num);
+            return supabase
+                .from('cartelas_partida')
+                .update({ marked_numbers: newMarkedNumbers })
+                .eq('id', card.id);
+        });
+        await Promise.all(updatePromises);
+    }
+
+    // Invalidate queries to get fresh data for winner check
+    await queryClient.invalidateQueries({ queryKey: ['matchCards'] });
+    const freshMatchCardsData = await queryClient.fetchQuery({ queryKey: ['matchCards'] });
+    const freshMatchCards = freshMatchCardsData as MatchCard[];
+
+    // 3. Check for winners with the fresh data
+    const cardsInMatch = freshMatchCards.filter(c => c.match_id === matchId);
     const foundWinners: { card: MatchCard, result: WinResult }[] = [];
 
     for (const card of cardsInMatch) {
-      const tempBingoCard: BingoCard = {
-        id: card.id,
-        name: card.name,
-        numbers: card.numbers,
-        markedNumbers: new Set([...(card.marked_numbers || []), num]),
-      };
-      const winResult = checkWin(tempBingoCard, match.game_type);
-      if (winResult) foundWinners.push({ card, result: winResult });
+        const tempBingoCard: BingoCard = {
+            id: card.id,
+            name: card.name,
+            numbers: card.numbers,
+            markedNumbers: card.marked_numbers,
+        };
+        const winResult = checkWin(tempBingoCard, match.game_type);
+        if (winResult) {
+            foundWinners.push({ card, result: winResult });
+        }
     }
 
     if (foundWinners.length > 0) {
-      const winnerData: Winner[] = foundWinners.map(fw => ({
-        playerId: fw.card.player_id,
-        playerName: players?.find(p => p.id === fw.card.player_id)?.full_name || 'Desconhecido',
-        cardId: fw.card.id,
-        cardName: fw.card.name,
-      }));
+        const winnerData: Winner[] = foundWinners.map(fw => ({
+            playerId: fw.card.player_id,
+            playerName: players?.find(p => p.id === fw.card.player_id)?.full_name || 'Desconhecido',
+            cardId: fw.card.id,
+            cardName: fw.card.name,
+        }));
 
-      await supabase.from('partidas').update({ status: 'finished', winners: winnerData, is_auto_calling: false }).eq('id', matchId);
-      queryClient.invalidateQueries({ queryKey: ['matches'] });
-      toast.success('BINGO! Temos um vencedor!');
+        await supabase.from('partidas').update({ status: 'finished', winners: winnerData, is_auto_calling: false }).eq('id', matchId);
+        toast.success('BINGO! Temos um vencedor!');
     }
+    
+    // Final invalidation to ensure UI is fully up-to-date
+    queryClient.invalidateQueries({ queryKey: ['matches'] });
   };
 
   const buyCredits = async (amount: number) => {
