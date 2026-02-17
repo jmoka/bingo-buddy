@@ -107,7 +107,7 @@ const MatchView = () => {
 
         <div className="card-container mb-6">
           <p className="text-sm text-muted-foreground mb-2">Números sorteados ({match.calledNumbers.length})</p>
-          <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto">
+          <div className="flex flex-wrap gap-1.5">
             {match.calledNumbers.map(num => (
               <span key={num} className="w-8 h-8 rounded-full bg-primary text-primary-foreground text-sm font-medium flex items-center justify-center">
                 {num}
