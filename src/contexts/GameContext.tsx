@@ -534,26 +534,25 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       .eq('id', user.id);
 
     if (debitError) {
-      toast.error('Erro ao processar pagamento da cartela.');
+      toast.error('Erro ao processar pagamento da cartela.', { description: debitError.message });
       return null;
     }
 
-    // Inserimos APENAS as colunas que existem no seu banco
     const { data, error: insertError } = await supabase
       .from('cartelas_jogador')
-      .insert({
+      .insert([{
         player_id: user.id,
         name: name,
         numbers: numbers,
         credit_type: creditType,
         uses_left: 1
-      })
+      }])
       .select()
       .single();
     
     if (insertError) {
       console.error('[createPlayerCard] Erro:', insertError);
-      toast.error('Erro ao salvar cartela no banco.');
+      toast.error('Erro ao salvar cartela no banco.', { description: insertError.message });
       // Estorno
       await supabase.from('perfis').update({ [creditColumn]: currentCredits }).eq('id', user.id);
       return null;
