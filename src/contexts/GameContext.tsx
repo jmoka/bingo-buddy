@@ -516,45 +516,59 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const createPlayerCard = async (options: { name: string; numbers: number[][]; creditType: CreditType; }) => {
-    if (!user || !profile || !gameSettings) return null;
+    if (!user || !profile || !gameSettings) {
+        toast.error("Erro: Usuário não autenticado.");
+        return null;
+    }
     
     const cost = gameSettings.custo_nova_cartela;
     const { name, numbers, creditType } = options;
 
-    const currentCredits = creditType === 'real' ? profile.credits : profile.fake_credits;
-    if (currentCredits < cost) {
-      toast.error(`Saldo de ${creditType === 'real' ? 'reais' : 'brincar'} insuficiente.`);
-      return null;
+    let debitError: any = null;
+
+    if (creditType === 'real') {
+        if (profile.credits < cost) {
+            toast.error("Saldo de reais insuficiente.", { description: `Você tem ${profile.credits}, mas precisa de ${cost}.` });
+            return null;
+        }
+        const result = await supabase.from('perfis').update({ credits: profile.credits - cost }).eq('id', user.id);
+        debitError = result.error;
+    } else { // creditType === 'fake'
+        if (profile.fake_credits < cost) {
+            toast.error("Saldo de brincar insuficiente.", { description: `Você tem ${profile.fake_credits}, mas precisa de ${cost}.` });
+            return null;
+        }
+        const result = await supabase.from('perfis').update({ fake_credits: profile.fake_credits - cost }).eq('id', user.id);
+        debitError = result.error;
     }
 
-    const creditColumn = creditType === 'real' ? 'credits' : 'fake_credits';
-    const { error: debitError } = await supabase
-      .from('perfis')
-      .update({ [creditColumn]: currentCredits - cost })
-      .eq('id', user.id);
-
     if (debitError) {
-      toast.error('Erro ao processar pagamento da cartela.', { description: debitError.message });
+      toast.error('Erro ao debitar créditos.', { description: `[Code: D2] ${debitError.message}` });
       return null;
     }
 
     const { data, error: insertError } = await supabase
       .from('cartelas_jogador')
-      .insert([{
+      .insert({
         player_id: user.id,
         name: name,
         numbers: numbers,
         credit_type: creditType,
         uses_left: 1
-      }])
+      })
       .select()
       .single();
     
     if (insertError) {
-      console.error('[createPlayerCard] Erro:', insertError);
-      toast.error('Erro ao salvar cartela no banco.', { description: insertError.message });
+      console.error('[createPlayerCard] Erro ao inserir:', insertError);
+      toast.error('Erro ao salvar a cartela.', { description: `[Code: I2] ${insertError.message}` });
       // Estorno
-      await supabase.from('perfis').update({ [creditColumn]: currentCredits }).eq('id', user.id);
+      if (creditType === 'real') {
+          await supabase.from('perfis').update({ credits: profile.credits }).eq('id', user.id);
+      } else {
+          await supabase.from('perfis').update({ fake_credits: profile.fake_credits }).eq('id', user.id);
+      }
+      toast.info("Seus créditos foram estornados.");
       return null;
     }
 
