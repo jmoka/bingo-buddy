@@ -263,15 +263,12 @@
 
 @media print {
   body {
-    background-color: white;
+    background-color: white !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
   .print-container {
     padding: 0;
     background-color: white;
-  }
-  .grid {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 1rem;
   }
 }

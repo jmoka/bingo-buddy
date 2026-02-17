@@ -1,18 +1,33 @@
 import { PlayerCard } from '@/types/match';
+import { cn } from '@/lib/utils';
 
 interface PrintableBingoCardProps {
   card: PlayerCard;
 }
 
+const headerColors = [
+  'bg-primary text-primary-foreground',
+  'bg-destructive text-destructive-foreground',
+  'bg-secondary text-secondary-foreground',
+  'bg-success text-success-foreground',
+  'bg-accent text-accent-foreground',
+];
+
 export const PrintableBingoCard = ({ card }: PrintableBingoCardProps) => {
   return (
-    <div className="w-[18rem] h-[20rem] border-2 border-black p-2 flex flex-col break-inside-avoid bg-white">
-      <h2 className="text-center text-xl font-bold mb-2 text-black">{card.name}</h2>
-      <table className="w-full border-collapse border-2 border-black">
+    <div className="w-[20rem] p-3 flex flex-col break-inside-avoid bg-card shadow-lg rounded-lg border-2 border-border">
+      <h2 className="text-center text-3xl font-bold mb-3 text-foreground font-heading">{card.name}</h2>
+      <table className="w-full border-collapse">
         <thead>
           <tr>
-            {['B', 'I', 'N', 'G', 'O'].map(letter => (
-              <th key={letter} className="w-1/5 bg-black text-white text-2xl font-bold p-1">
+            {['B', 'I', 'N', 'G', 'O'].map((letter, colIndex) => (
+              <th
+                key={letter}
+                className={cn(
+                  "w-1/5 h-16 text-4xl font-bold border-2 border-border",
+                  headerColors[colIndex]
+                )}
+              >
                 {letter}
               </th>
             ))}
@@ -24,7 +39,10 @@ export const PrintableBingoCard = ({ card }: PrintableBingoCardProps) => {
               {row.map((num, colIndex) => (
                 <td
                   key={`${rowIndex}-${colIndex}`}
-                  className="h-12 text-center border-2 border-black text-2xl font-bold text-black"
+                  className={cn(
+                    "h-16 text-center border-2 border-border text-3xl font-bold text-foreground",
+                    rowIndex === 2 && colIndex === 2 && 'bg-muted'
+                  )}
                 >
                   {rowIndex === 2 && colIndex === 2 ? '★' : num}
                 </td>
