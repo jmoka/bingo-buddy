@@ -244,7 +244,10 @@ const Lobby = () => {
                 return (
                   <div key={card.id} className={`card-container p-3 transition-opacity ${card.uses_left === 0 ? 'opacity-60' : ''}`}>
                     <div className="flex justify-between items-start mb-2">
-                      <h3 className="font-heading font-semibold text-foreground">{card.name}</h3>
+                      <div>
+                        <h3 className="font-heading font-semibold text-foreground">{card.name}</h3>
+                        <p className="text-xs text-muted-foreground font-mono">ID: ...{card.id.slice(-6).toUpperCase()}</p>
+                      </div>
                       <div className="flex items-center gap-2">
                         <div className={`flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-full ${card.uses_left > 0 ? 'bg-success/10 text-success' : 'bg-destructive/10 text-destructive'}`}>
                           {card.uses_left > 0 ? <Zap className="w-3 h-3" /> : <ZapOff className="w-3 h-3" />}

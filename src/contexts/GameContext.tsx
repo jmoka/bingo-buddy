@@ -191,16 +191,60 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const createPlayerCard = async (options: { name: string; numbers: number[][]; }): Promise<PlayerCard | null> => {
-    if (!user || !profile || !gameSettings || profile.credits < gameSettings.custo_nova_cartela) {
+    if (!user || !profile || !gameSettings) {
+        toast.error('Não foi possível criar a cartela.');
+        return null;
+    }
+    if (profile.credits < gameSettings.custo_nova_cartela) {
       toast.error('Créditos insuficientes!');
       return null;
     }
+
+    // Check for duplicate card name for this user
+    const { data: existingName, error: nameCheckError } = await supabase
+        .from('cartelas_jogador')
+        .select('id', { count: 'exact' })
+        .eq('player_id', user.id)
+        .eq('name', options.name);
+
+    if (nameCheckError) {
+        toast.error(`Erro ao verificar nomes: ${nameCheckError.message}`);
+        return null;
+    }
+
+    if (existingName && existingName.length > 0) {
+        toast.error('Você já possui uma cartela com este nome. Por favor, escolha outro.');
+        return null;
+    }
+
+    // Check for duplicate card numbers for this user
+    const { data: existingCards, error: checkError } = await supabase
+      .from('cartelas_jogador')
+      .select('id', { count: 'exact' })
+      .eq('player_id', user.id)
+      .eq('numbers', JSON.stringify(options.numbers));
+
+    if (checkError) {
+      toast.error(`Erro ao verificar cartelas: ${checkError.message}`);
+      return null;
+    }
+
+    if (existingCards && existingCards.length > 0) {
+      toast.error('Você já possui uma cartela com exatamente os mesmos números.');
+      return null;
+    }
+    
     const { error: creditError } = await supabase.from('perfis').update({ credits: profile.credits - gameSettings.custo_nova_cartela }).eq('id', user.id);
     if (creditError) { toast.error(creditError.message); return null; }
 
     const newCard = { player_id: user.id, ...options, uses_left: 1 };
     const { data, error } = await supabase.from('cartelas_jogador').insert(newCard).select().single();
-    if (error) { toast.error(error.message); return null; }
+    if (error) { 
+        // refund credits if card creation fails
+        await supabase.from('perfis').update({ credits: profile.credits }).eq('id', user.id);
+        toast.error(error.message); 
+        return null; 
+    }
     
     queryClient.invalidateQueries({ queryKey: ['playerCards'] });
     queryClient.invalidateQueries({ queryKey: ['profile'] });

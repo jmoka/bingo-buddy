@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Button } from './ui/button';
 import { Textarea } from './ui/textarea';
-import { generateBingoCard } from '@/utils/bingoUtils';
+import { generateBingoCard, BINGO_RANGES } from '@/utils/bingoUtils';
 import { AlertCircle, Info, Trash2, Shuffle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -10,23 +10,48 @@ interface CardCreatorProps {
   onCardChange: (numbers: number[][] | null) => void;
 }
 
-// Function to create a 5x5 grid from a set of 24 numbers
+// Function to create a valid 5x5 grid from a set of 24 numbers
 const createGridFromNumbers = (selectedNumbers: Set<number>): { grid: number[][], error: string | null } => {
-    const grid: number[][] = Array(5).fill(0).map(() => Array(5).fill(0));
-    const sortedNumbers = Array.from(selectedNumbers).sort((a, b) => a - b);
-    
-    if (sortedNumbers.length !== 24) {
-        return { grid, error: `Selecione exatamente 24 números. Você selecionou ${sortedNumbers.length}.` };
+    if (selectedNumbers.size !== 24) {
+        return { grid: [], error: `Selecione exatamente 24 números. Você selecionou ${selectedNumbers.size}.` };
     }
 
-    // Fill the grid with any 24 numbers, sorted, without column range validation.
-    let numberIndex = 0;
+    const numbers = Array.from(selectedNumbers);
+    const columns: number[][] = Array(5).fill(0).map(() => []);
+
+    for (const num of numbers) {
+        let placed = false;
+        for (let i = 0; i < BINGO_RANGES.length; i++) {
+            const range = BINGO_RANGES[i];
+            if (num >= range.min && num <= range.max) {
+                columns[i].push(num);
+                placed = true;
+                break;
+            }
+        }
+        if (!placed) {
+            return { grid: [], error: `Número inválido encontrado: ${num}` };
+        }
+    }
+
+    const expectedCounts = [5, 5, 4, 5, 5];
+    for (let i = 0; i < columns.length; i++) {
+        if (columns[i].length !== expectedCounts[i]) {
+            const range = BINGO_RANGES[i];
+            return { grid: [], error: `A coluna ${range.col} (${range.min}-${range.max}) deve ter ${expectedCounts[i]} números. Você selecionou ${columns[i].length}.` };
+        }
+        columns[i].sort((a, b) => a - b);
+    }
+
+    const grid: number[][] = Array(5).fill(0).map(() => Array(5).fill(0));
     for (let col = 0; col < 5; col++) {
         for (let row = 0; row < 5; row++) {
-            if (row === 2 && col === 2) {
-                grid[row][col] = 0; // Free space
+            if (col === 2) { // Column N
+                if (row < 2) grid[row][col] = columns[col][row];
+                else if (row === 2) grid[row][col] = 0; // Free space
+                else grid[row][col] = columns[col][row - 1];
             } else {
-                grid[row][col] = sortedNumbers[numberIndex++];
+                grid[row][col] = columns[col][row];
             }
         }
     }
