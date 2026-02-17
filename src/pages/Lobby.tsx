@@ -162,38 +162,38 @@ const Lobby = () => {
   if (!profile) return null;
 
   const activeMatchIds = new Set(matches.filter(m => m.status === 'in_progress').map(m => m.id));
-  const pendingRedeemsCount = redeemRequests.filter(r => r.status === 'pending').length;
+  const pendingRedeemsCount = (redeemRequests || []).filter(r => r.status === 'pending').length;
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      <header className="gradient-hero py-6 px-4">
+      <header className="gradient-hero py-4 px-4">
         <div className="container max-w-6xl mx-auto flex items-center justify-between">
           <div>
-            <h1 className="font-heading text-2xl font-bold text-primary-foreground">🎱 Bingo</h1>
-            <p className="text-primary-foreground/70 text-sm">Olá, {profile.full_name || 'Jogador'}!</p>
+            <h1 className="font-heading text-xl md:text-2xl font-bold text-primary-foreground">🎱 Bingo</h1>
+            <p className="text-primary-foreground/70 text-[10px] md:text-xs">Olá, {profile.full_name || 'Jogador'}!</p>
           </div>
           <div className="flex items-center gap-1 sm:gap-2">
-            <div className="flex items-center gap-2 bg-primary-foreground/10 rounded-full px-4 py-2">
-              <Wallet className="w-4 h-4 text-primary-foreground" />
-              <span className="font-heading font-bold text-primary-foreground">{profile.credits}</span>
+            <div className="flex items-center gap-1 bg-primary-foreground/10 rounded-full px-3 py-1.5 md:px-4 md:py-2">
+              <Wallet className="w-3.5 h-3.5 text-primary-foreground" />
+              <span className="font-heading font-bold text-sm md:text-base text-primary-foreground">{profile.credits}</span>
             </div>
             
             <div className="flex items-center gap-1">
                 <CreditRequestDialog gameSettings={gameSettings}>
-                <Button size="sm" variant="ghost" className="text-primary-foreground h-9 px-3">
-                    <Plus className="w-4 h-4 mr-1" />Créditos
+                <Button size="sm" variant="ghost" className="text-primary-foreground h-8 px-2 md:h-9 md:px-3 text-xs md:text-sm">
+                    <Plus className="w-3.5 h-3.5 mr-1" />Créditos
                 </Button>
                 </CreditRequestDialog>
                 
                 <RedeemRequestDialog>
-                    <Button size="sm" variant="ghost" className="text-primary-foreground h-9 px-3">
-                        <Banknote className="w-4 h-4 mr-1" />Resgatar
+                    <Button size="sm" variant="ghost" className="text-primary-foreground h-8 px-2 md:h-9 md:px-3 text-xs md:text-sm">
+                        <Banknote className="w-3.5 h-3.5 mr-1" />Resgatar
                     </Button>
                 </RedeemRequestDialog>
             </div>
 
-            <Button size="icon" variant="ghost" className="text-primary-foreground" onClick={() => navigate('/account')}><UserIcon className="w-4 h-4" /></Button>
-            <Button size="icon" variant="ghost" className="text-primary-foreground" onClick={signOut}><LogOut className="w-4 h-4" /></Button>
+            <Button size="icon" variant="ghost" className="text-primary-foreground h-8 w-8" onClick={() => navigate('/account')}><UserIcon className="w-4 h-4" /></Button>
+            <Button size="icon" variant="ghost" className="text-primary-foreground h-8 w-8" onClick={signOut}><LogOut className="w-4 h-4" /></Button>
           </div>
         </div>
       </header>
@@ -207,14 +207,14 @@ const Lobby = () => {
           </div>
         )}
 
-        <div className="flex gap-2 mb-8 overflow-x-auto pb-2">
+        <div className="flex gap-2 mb-8 overflow-x-auto pb-2 scrollbar-hide">
             <MyCreditRequestsDialog>
-                <Button variant="outline" size="sm" className="rounded-full bg-card">
+                <Button variant="outline" size="sm" className="rounded-full bg-card whitespace-nowrap text-xs md:text-sm">
                     <History className="w-4 h-4 mr-2" /> Histórico Créditos
                 </Button>
             </MyCreditRequestsDialog>
             <MyRedeemRequestsDialog>
-                <Button variant="outline" size="sm" className="rounded-full bg-card relative">
+                <Button variant="outline" size="sm" className="rounded-full bg-card relative whitespace-nowrap text-xs md:text-sm">
                     <Banknote className="w-4 h-4 mr-2" /> Meus Resgates
                     {pendingRedeemsCount > 0 && (
                         <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-amber-500 text-[8px] font-bold text-white border border-background">
@@ -223,16 +223,16 @@ const Lobby = () => {
                     )}
                 </Button>
             </MyRedeemRequestsDialog>
-             <Button variant="outline" size="sm" className="rounded-full bg-card" onClick={() => navigate('/print')} disabled={myOwnedCards.length === 0}>
+             <Button variant="outline" size="sm" className="rounded-full bg-card whitespace-nowrap text-xs md:text-sm" onClick={() => navigate('/print')} disabled={myOwnedCards.length === 0}>
                 <Printer className="w-4 h-4 mr-2" /> Imprimir Cartelas
             </Button>
         </div>
 
         <div className="mb-8">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="font-heading text-xl font-bold text-foreground flex items-center gap-2"><Ticket className="w-5 h-5 text-primary" /> Minhas Cartelas ({activeCards.length})</h2>
+            <h2 className="font-heading text-lg md:text-xl font-bold text-foreground flex items-center gap-2"><Ticket className="w-5 h-5 text-primary" /> Minhas Cartelas ({activeCards.length})</h2>
             <Dialog open={isCreateCardOpen} onOpenChange={setCreateCardOpen}>
-                <DialogTrigger asChild><Button size="sm" className="gradient-primary shadow-button"><Plus className="w-4 h-4 mr-2" />Criar Cartela</Button></DialogTrigger>
+                <DialogTrigger asChild><Button size="sm" className="gradient-primary shadow-button h-8 md:h-9 text-xs md:text-sm"><Plus className="w-4 h-4 mr-2" />Criar Cartela</Button></DialogTrigger>
                 <DialogContent className="max-w-xl">
                     <DialogHeader>
                     <DialogTitle className="font-heading">Criar Nova Cartela</DialogTitle>
@@ -250,7 +250,7 @@ const Lobby = () => {
             </Dialog>
           </div>
           {activeCards.length === 0 && !showArchived ? (
-            <div className="card-container text-center py-8"><p className="text-muted-foreground">Você não tem cartelas ativas. Crie uma ou restaure uma arquivada.</p></div>
+            <div className="card-container text-center py-8"><p className="text-sm text-muted-foreground">Você não tem cartelas ativas. Crie uma ou restaure uma arquivada.</p></div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {activeCards.map(card => {
@@ -262,20 +262,20 @@ const Lobby = () => {
                     <div className="flex justify-between items-start mb-2">
                       <div>
                         <div className="flex items-center gap-2">
-                          <h3 className="font-heading font-semibold text-foreground">{card.name}</h3>
-                          {winCount > 0 && <div className="flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-amber-400/20 text-amber-600"><Trophy className="w-3 h-3" /><span>{winCount}x</span></div>}
+                          <h3 className="font-heading font-semibold text-sm md:text-base text-foreground">{card.name}</h3>
+                          {winCount > 0 && <div className="flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-amber-400/20 text-amber-600"><Trophy className="w-3 h-3" /><span>{winCount}x</span></div>}
                         </div>
-                        <p className="text-xs text-muted-foreground font-mono">ID: ...{card.id.slice(-6).toUpperCase()}</p>
+                        <p className="text-[10px] text-muted-foreground font-mono">ID: ...{card.id.slice(-6).toUpperCase()}</p>
                       </div>
                       <div className="flex items-center gap-1">
-                        <div className={`flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-full ${card.uses_left > 0 ? 'bg-success/10 text-success' : 'bg-destructive/10 text-destructive'}`}>
+                        <div className={`flex items-center gap-1 text-[10px] font-medium px-2 py-1 rounded-full ${card.uses_left > 0 ? 'bg-success/10 text-success' : 'bg-destructive/10 text-destructive'}`}>
                           {card.uses_left > 0 ? <Zap className="w-3 h-3" /> : <ZapOff className="w-3 h-3" />}
                           <span>{card.uses_left} uso(s)</span>
                         </div>
-                        {card.uses_left === 0 && <Button size="sm" variant="outline" onClick={() => handleBuyUses(card.id)}>Recarregar <Coins className="w-3 h-3 ml-1" /></Button>}
-                        <Button size="icon" variant="ghost" className="text-muted-foreground h-8 w-8" onClick={() => toggleArchivePlayerCard(card.id, true)}><Archive className="w-4 h-4" /></Button>
+                        {card.uses_left === 0 && <Button size="sm" variant="outline" className="h-7 text-[10px]" onClick={() => handleBuyUses(card.id)}>Recarregar <Coins className="w-3 h-3 ml-1" /></Button>}
+                        <Button size="icon" variant="ghost" className="text-muted-foreground h-7 w-7" onClick={() => toggleArchivePlayerCard(card.id, true)}><Archive className="w-3.5 h-3.5" /></Button>
                         <AlertDialog>
-                          <AlertDialogTrigger asChild><Button size="icon" variant="ghost" disabled={winCount > 0} className="text-destructive/70 h-8 w-8"><Trash2 className="w-4 h-4" /></Button></AlertDialogTrigger>
+                          <AlertDialogTrigger asChild><Button size="icon" variant="ghost" disabled={winCount > 0} className="text-destructive/70 h-7 w-7"><Trash2 className="w-3.5 h-3.5" /></Button></AlertDialogTrigger>
                           <AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Você tem certeza?</AlertDialogTitle><AlertDialogDescription>Esta ação não pode ser desfeita. Isso excluirá permanentemente a cartela "{card.name}".</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={() => deletePlayerCard(card.id)}>Excluir</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
                         </AlertDialog>
                       </div>
@@ -292,7 +292,7 @@ const Lobby = () => {
           )}
         </div>
 
-        <h2 className="font-heading text-xl font-bold text-foreground mb-4 flex items-center gap-2"><DoorOpen className="w-5 h-5 text-accent" /> Partidas</h2>
+        <h2 className="font-heading text-lg md:text-xl font-bold text-foreground mb-4 flex items-center gap-2"><DoorOpen className="w-5 h-5 text-accent" /> Partidas</h2>
         <div className="space-y-4">
             {sortedMatches.map(match => {
               const playersInMatchCount = new Set(matchCards.filter(mc => mc.match_id === match.id).map(mc => mc.player_id)).size;
@@ -303,13 +303,13 @@ const Lobby = () => {
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
                       <div className="flex items-center gap-2 mb-1">
-                        <h3 className={`font-heading font-bold text-lg text-foreground ${match.status === 'finished' ? 'line-through' : ''}`}>{match.name}</h3>
-                        {match.status === 'waiting' && <Badge variant="outline">Aguardando</Badge>}
-                        {match.status === 'open' && <Badge variant="secondary" className="text-primary">Aberto</Badge>}
-                        {match.status === 'in_progress' && <Badge variant="destructive" className="animate-pulse">AO VIVO</Badge>}
-                        {match.status === 'finished' && <Badge variant="outline">Finalizada</Badge>}
+                        <h3 className={`font-heading font-bold text-base md:text-lg text-foreground ${match.status === 'finished' ? 'line-through' : ''}`}>{match.name}</h3>
+                        {match.status === 'waiting' && <Badge variant="outline" className="text-[10px] h-5">Aguardando</Badge>}
+                        {match.status === 'open' && <Badge variant="secondary" className="text-primary text-[10px] h-5">Aberto</Badge>}
+                        {match.status === 'in_progress' && <Badge variant="destructive" className="animate-pulse text-[10px] h-5">AO VIVO</Badge>}
+                        {match.status === 'finished' && <Badge variant="outline" className="text-[10px] h-5">Finalizada</Badge>}
                       </div>
-                      <div className="flex flex-wrap gap-x-3 gap-y-1 text-sm text-muted-foreground">
+                      <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
                         <span className="flex items-center gap-1"><Trophy className="w-3.5 h-3.5" />{gameTypeLabels[match.game_type]}</span>
                         <span className="flex items-center gap-1"><Users className="w-3.5 h-3.5" />{playersInMatchCount}</span>
                         <span className="flex items-center gap-1"><Coins className="w-3.5 h-3.5" />Pote: {match.pot}</span>
@@ -317,13 +317,13 @@ const Lobby = () => {
                     </div>
                     <div className="flex flex-col items-end">
                       {alreadyJoined ? (
-                        <Button size="sm" className="bg-success/10 text-success hover:bg-success/20" onClick={() => navigate(`/match/${match.id}`)}><Tv className="w-4 h-4 mr-2" /> Acompanhar</Button>
+                        <Button size="sm" className="bg-success/10 text-success hover:bg-success/20 h-8 text-xs" onClick={() => navigate(`/match/${match.id}`)}><Tv className="w-3.5 h-3.5 mr-2" /> Acompanhar</Button>
                       ) : match.status === 'open' ? (
-                        <Button size="sm" className="gradient-accent shadow-button" onClick={() => openJoinDialog(match)}>Entrar na Partida</Button>
+                        <Button size="sm" className="gradient-accent shadow-button h-8 text-xs" onClick={() => openJoinDialog(match)}>Entrar na Partida</Button>
                       ) : (
-                        <Button size="sm" disabled>{match.status === 'waiting' ? 'Aguardando' : 'Encerrada'}</Button>
+                        <Button size="sm" disabled className="h-8 text-xs">{match.status === 'waiting' ? 'Aguardando' : 'Encerrada'}</Button>
                       )}
-                      <span className="text-xs text-muted-foreground mt-1">{match.card_price} créditos por cartela</span>
+                      <span className="text-[10px] text-muted-foreground mt-1">{match.card_price} créditos por cartela</span>
                     </div>
                   </div>
                 </div>
@@ -341,12 +341,12 @@ const Lobby = () => {
                 const isDisabled = card.uses_left === 0;
                 return (
                   <div key={card.id} onClick={() => !isDisabled && setCardsToJoin(prev => { const next = new Set(prev); if (isSelected) next.delete(card.id); else next.add(card.id); return next; })} className={`p-3 rounded-lg border-2 ${isDisabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'} ${isSelected ? 'border-primary bg-primary/5' : 'border-transparent bg-secondary'}`}>
-                    <div className="flex justify-between items-center"><h3 className="font-heading font-semibold">{card.name}</h3>{isDisabled && <span className="text-xs text-destructive font-medium">Sem usos</span>}</div>
+                    <div className="flex justify-between items-center"><h3 className="font-heading font-semibold text-sm">{card.name}</h3>{isDisabled && <span className="text-[10px] text-destructive font-medium">Sem usos</span>}</div>
                   </div>
                 );
             })}
           </div>
-          <DialogFooter><div className="w-full flex justify-between items-center"><span className="font-heading font-semibold text-lg">Total: {cardsToJoin.size * (selectedMatch?.card_price || 0)} créditos</span><Button onClick={handleJoinMatch} disabled={cardsToJoin.size === 0}>Confirmar e Pagar</Button></div></DialogFooter>
+          <DialogFooter><div className="w-full flex justify-between items-center"><span className="font-heading font-semibold text-base md:text-lg">Total: {cardsToJoin.size * (selectedMatch?.card_price || 0)} créditos</span><Button onClick={handleJoinMatch} disabled={cardsToJoin.size === 0}>Confirmar e Pagar</Button></div></DialogFooter>
         </DialogContent>
       </Dialog>
       <Footer />

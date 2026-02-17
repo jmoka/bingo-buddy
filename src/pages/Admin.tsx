@@ -177,8 +177,8 @@ const Admin = () => {
     setIsTestingN8n(false);
   };
 
-  const pendingRequestsCount = allCreditRequests.filter(r => r.status === 'pending').length;
-  const pendingRedeemsCount = allRedeemRequests.filter(r => r.status === 'pending').length;
+  const pendingRequestsCount = (allCreditRequests || []).filter(r => r.status === 'pending').length;
+  const pendingRedeemsCount = (allRedeemRequests || []).filter(r => r.status === 'pending').length;
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
