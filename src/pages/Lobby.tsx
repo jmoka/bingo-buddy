@@ -4,7 +4,7 @@ import { useGame } from '@/contexts/GameContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Match, MatchStatus, CreditType } from '@/types/match';
+import { Match, MatchStatus, CreditType, PlayerCard } from '@/types/match';
 import { gameTypeLabels } from '@/utils/bingoUtils';
 import { 
   LogOut, Coins, Plus, Trophy, Users, Settings, Wallet, 
@@ -60,6 +60,8 @@ const Lobby = () => {
   const [isJoinDialogOpen, setJoinDialogOpen] = useState(false);
   const [selectedMatch, setSelectedMatch] = useState<Match | null>(null);
   const [cardsToJoin, setCardsToJoin] = useState<Set<string>>(new Set());
+  
+  const [rechargeCard, setRechargeCard] = useState<PlayerCard | null>(null);
 
   useEffect(() => {
     if (!session) {
@@ -138,6 +140,7 @@ const Lobby = () => {
     const success = await buyCardUses(cardId, creditType);
     if (success) {
       toast.success('Cartela Recarregada!', { description: `Você comprou mais usos para sua cartela.` });
+      setRechargeCard(null);
     }
   };
 
@@ -293,7 +296,7 @@ const Lobby = () => {
                           {card.uses_left > 0 ? <Zap className="w-3 h-3" /> : <ZapOff className="w-3 h-3" />}
                           <span>{card.uses_left} uso(s)</span>
                         </div>
-                        {card.uses_left === 0 && <Button size="sm" variant="outline" className="h-7 text-[10px]" onClick={() => handleBuyUses(card.id, card.credit_type)}>Recarregar <Coins className="w-3 h-3 ml-1" /></Button>}
+                        {card.uses_left === 0 && <Button size="sm" variant="outline" className="h-7 text-[10px]" onClick={() => setRechargeCard(card)}>Recarregar <Coins className="w-3 h-3 ml-1" /></Button>}
                         <Button size="icon" variant="ghost" className="text-muted-foreground h-7 w-7" onClick={() => toggleArchivePlayerCard(card.id, true)}><Archive className="w-3.5 h-3.5" /></Button>
                         <AlertDialog>
                           <AlertDialogTrigger asChild><Button size="icon" variant="ghost" disabled={winCount > 0} className="text-destructive/70 h-7 w-7"><Trash2 className="w-3.5 h-3.5" /></Button></AlertDialogTrigger>
@@ -376,6 +379,50 @@ const Lobby = () => {
           <DialogFooter><div className="w-full flex justify-between items-center"><span className="font-heading font-semibold text-base md:text-lg">Total: {cardsToJoin.size * (selectedMatch?.card_price || 0)} créditos</span><Button onClick={handleJoinMatch} disabled={cardsToJoin.size === 0}>Confirmar e Pagar</Button></div></DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={!!rechargeCard} onOpenChange={(isOpen) => !isOpen && setRechargeCard(null)}>
+        <AlertDialogContent>
+            <AlertDialogHeader>
+                <AlertDialogTitle>Recarregar Cartela "{rechargeCard?.name}"</AlertDialogTitle>
+                <AlertDialogDescription>
+                    A recarga custará {gameSettings?.custo_recarga_cartela} créditos. Escolha qual saldo usar para a recarga.
+                </AlertDialogDescription>
+            </AlertDialogHeader>
+            <div className="grid grid-cols-2 gap-4 my-4">
+                <div className="text-center p-4 border rounded-lg flex flex-col items-center justify-center">
+                    <div className="flex items-center gap-2 mb-2">
+                        <Wallet className="w-5 h-5 text-primary" />
+                        <span className="font-bold text-lg">Reais</span>
+                    </div>
+                    <span className="text-sm text-muted-foreground">Saldo: {profile.credits}</span>
+                </div>
+                <div className="text-center p-4 border rounded-lg flex flex-col items-center justify-center">
+                    <div className="flex items-center gap-2 mb-2">
+                        <Star className="w-5 h-5 text-amber-500" />
+                        <span className="font-bold text-lg">De Brincar</span>
+                    </div>
+                    <span className="text-sm text-muted-foreground">Saldo: {profile.fake_credits}</span>
+                </div>
+            </div>
+            <AlertDialogFooter>
+                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                <Button 
+                    variant="outline" 
+                    onClick={() => handleBuyUses(rechargeCard!.id, 'fake')}
+                    disabled={profile.fake_credits < (gameSettings?.custo_recarga_cartela || 0)}
+                >
+                    Usar de Brincar
+                </Button>
+                <Button 
+                    onClick={() => handleBuyUses(rechargeCard!.id, 'real')}
+                    disabled={profile.credits < (gameSettings?.custo_recarga_cartela || 0)}
+                >
+                    Usar Reais
+                </Button>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <Footer />
     </div>
   );
