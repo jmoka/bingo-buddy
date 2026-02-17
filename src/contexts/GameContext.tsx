@@ -234,7 +234,23 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const openMatch = (matchId: string) => updateMatchStatus(matchId, 'open');
-  const startMatch = (matchId: string) => updateMatchStatus(matchId, 'in_progress');
+  
+  const startMatch = async (matchId: string) => {
+    const match = matches.find(m => m.id === matchId);
+    if (!match) return;
+
+    const playersInMatch = new Set(matchCards.filter(mc => mc.match_id === matchId).map(mc => mc.player_id)).size;
+
+    if (match.min_players > 1 && playersInMatch < match.min_players) {
+      toast.error('A partida não pode ser iniciada.', {
+        description: `São necessários no mínimo ${match.min_players} jogadores, mas há apenas ${playersInMatch}.`
+      });
+      return;
+    }
+    
+    await updateMatchStatus(matchId, 'in_progress');
+  };
+
   const finishMatch = (matchId: string) => updateMatchStatus(matchId, 'finished');
   const deleteMatch = async (matchId: string) => { await supabase.from('partidas').delete().eq('id', matchId); };
 

@@ -32,6 +32,7 @@ export interface Match {
   is_auto_calling?: boolean;
   next_auto_call_timestamp?: number;
   winners: Winner[];
+  min_players: number;
 }
 
 export interface PlayerCard {

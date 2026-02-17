@@ -59,6 +59,7 @@ const Admin = () => {
     prizeName: '',
     startTime: '',
     prizeImageFile: null as File | null,
+    min_players: 1,
   });
   
   const [currentSettings, setCurrentSettings] = useState({
@@ -108,6 +109,17 @@ const Admin = () => {
     const timer = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(timer);
   }, []);
+
+  useEffect(() => {
+    if (matchForm.prizeType === 'fixed' || matchForm.prizeType === 'product') {
+      if (matchForm.cardPrice > 0 && matchForm.prizeValue > 0) {
+        const min = Math.ceil(matchForm.prizeValue / matchForm.cardPrice);
+        setMatchForm(p => ({ ...p, min_players: min }));
+      }
+    } else {
+      setMatchForm(p => ({ ...p, min_players: 1 }));
+    }
+  }, [matchForm.prizeType, matchForm.prizeValue, matchForm.cardPrice]);
 
   useEffect(() => {
     matches.forEach(match => {
@@ -164,6 +176,7 @@ const Admin = () => {
         prize: prizePayload,
         start_time: new Date(matchForm.startTime).toISOString(),
         prize_image_url: prizeImageUrl,
+        min_players: matchForm.min_players,
     };
 
     await createMatch(matchData);
@@ -178,6 +191,7 @@ const Admin = () => {
         prizeName: '',
         startTime: '',
         prizeImageFile: null,
+        min_players: 1,
     });
   };
 
@@ -326,6 +340,10 @@ const Admin = () => {
                             <Input value={matchForm.prizeName} onChange={e => setMatchForm(p => ({ ...p, prizeName: e.target.value }))} />
                         </div>
                         <div>
+                            <Label>Valor do Produto (em créditos)</Label>
+                            <Input type="number" value={matchForm.prizeValue} onChange={e => setMatchForm(p => ({ ...p, prizeValue: +e.target.value }))} />
+                        </div>
+                        <div>
                             <Label>Imagem do Produto</Label>
                             <Input 
                                 type="file" 
@@ -336,30 +354,41 @@ const Admin = () => {
                         </div>
                     </div>
                     )}
+                     {(matchForm.prizeType === 'fixed' || matchForm.prizeType === 'product') && (
+                      <div>
+                        <Label>Mínimo de Jogadores</Label>
+                        <Input type="number" value={matchForm.min_players} onChange={e => setMatchForm(p => ({ ...p, min_players: +e.target.value }))} />
+                        <p className="text-[10px] text-muted-foreground mt-1">Calculado: {Math.ceil(matchForm.prizeValue / matchForm.cardPrice) || 1} jogadores para cobrir o prêmio.</p>
+                      </div>
+                    )}
                     <Button className="w-full !mt-6" onClick={handleCreateMatch}>Criar Partida</Button>
                   </div>
                 </DialogContent>
               </Dialog>
             </div>
-            {matches.map(match => (
-              <div key={match.id} className="card-container">
-                <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
-                  <div>
-                    <div className="flex items-center gap-2 mb-1">
-                      <h3 className="font-heading font-bold text-lg text-foreground">{match.name}</h3>
-                      <Badge className={statusColors[match.status]}>{statusLabels[match.status]}</Badge>
+            {matches.map(match => {
+              const playersInMatchCount = new Set(matchCards.filter(mc => mc.match_id === match.id).map(mc => mc.player_id)).size;
+              const canStart = playersInMatchCount >= match.min_players;
+              return (
+                <div key={match.id} className="card-container">
+                  <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
+                    <div>
+                      <div className="flex items-center gap-2 mb-1">
+                        <h3 className="font-heading font-bold text-lg text-foreground">{match.name}</h3>
+                        <Badge className={statusColors[match.status]}>{statusLabels[match.status]}</Badge>
+                      </div>
+                      <div className="text-sm text-muted-foreground flex gap-3"><span className="flex items-center gap-1"><Trophy className="w-3.5 h-3.5" />{gameTypeLabels[match.game_type]}</span></div>
                     </div>
-                    <div className="text-sm text-muted-foreground flex gap-3"><span className="flex items-center gap-1"><Trophy className="w-3.5 h-3.5" />{gameTypeLabels[match.game_type]}</span></div>
-                  </div>
-                  <div className="flex gap-2">
-                    {match.status === 'waiting' && <Button size="sm" onClick={() => openMatch(match.id)}>Abrir</Button>}
-                    {match.status === 'open' && <Button size="sm" onClick={() => startMatch(match.id)}>Iniciar</Button>}
-                    {match.status === 'in_progress' && <Button size="sm" variant="outline" onClick={() => finishMatch(match.id)}>Finalizar</Button>}
-                    {(match.status === 'waiting' || match.status === 'finished') && <Button size="sm" variant="destructive" onClick={() => deleteMatch(match.id)}><Trash2 className="w-4 h-4" /></Button>}
+                    <div className="flex gap-2">
+                      {match.status === 'waiting' && <Button size="sm" onClick={() => openMatch(match.id)}>Abrir</Button>}
+                      {match.status === 'open' && <Button size="sm" onClick={() => startMatch(match.id)} disabled={!canStart} title={!canStart ? `Requer ${match.min_players} jogadores` : ''}>Iniciar</Button>}
+                      {match.status === 'in_progress' && <Button size="sm" variant="outline" onClick={() => finishMatch(match.id)}>Finalizar</Button>}
+                      {(match.status === 'waiting' || match.status === 'finished') && <Button size="sm" variant="destructive" onClick={() => deleteMatch(match.id)}><Trash2 className="w-4 h-4" /></Button>}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </TabsContent>
 
           <TabsContent value="credits">
