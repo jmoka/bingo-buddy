@@ -26,6 +26,12 @@ export const MyCreditRequestsDialog = ({ children }: MyCreditRequestsDialogProps
   const approved = creditRequests.filter(r => r.status === 'approved');
   const rejected = creditRequests.filter(r => r.status === 'rejected');
 
+  const formatCurrency = (value: any) => {
+    const num = parseFloat(value);
+    if (isNaN(num)) return '0,00';
+    return num.toFixed(2).replace('.', ',');
+  };
+
   const renderRequestList = (requests: CreditRequest[]) => {
     if (requests.length === 0) {
       return (
@@ -55,23 +61,37 @@ export const MyCreditRequestsDialog = ({ children }: MyCreditRequestsDialogProps
                 </Badge>
               </div>
               
-              <div className="flex flex-wrap items-center justify-between gap-4">
-                <div className="flex-1 min-w-[120px]">
-                  <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider mb-1">Solicitado</p>
-                  <div className="flex items-baseline gap-2">
-                    <span className="text-xl font-bold font-heading">{req.credits_requested} cr.</span>
-                    <span className="text-xs text-muted-foreground">
-                      R$ {Number(req.amount_paid).toFixed(2).replace('.', ',')}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Coluna do que foi solicitado pelo jogador */}
+                <div className="p-3 rounded-lg bg-muted/50 border border-border/50">
+                  <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider mb-2">Solicitado</p>
+                  <div className="flex flex-col gap-1">
+                    <div className="flex items-center gap-2">
+                      <Coins className="w-4 h-4 text-primary" />
+                      <span className="text-lg font-bold font-heading">
+                        {(req.credits_requested ?? 0)} cr.
+                      </span>
+                    </div>
+                    <span className="text-xs font-medium text-muted-foreground">
+                      Valor: R$ {formatCurrency(req.amount_paid)}
                     </span>
                   </div>
                 </div>
 
+                {/* Coluna do que foi aprovado pelo admin (só aparece se aprovado) */}
                 {req.status === 'approved' && (
-                  <div className="flex-1 min-w-[120px] border-l pl-4 border-success/20">
-                    <p className="text-[10px] uppercase font-bold text-success tracking-wider mb-1">Liberado</p>
-                    <div className="flex items-center gap-1.5">
-                      <Coins className="w-5 h-5 text-success" />
-                      <span className="text-xl font-bold text-success font-heading">{req.credits_granted} cr.</span>
+                  <div className="p-3 rounded-lg bg-success/5 border border-success/20">
+                    <p className="text-[10px] uppercase font-bold text-success tracking-wider mb-2">Aprovado</p>
+                    <div className="flex flex-col gap-1">
+                      <div className="flex items-center gap-2">
+                        <CheckCircle2 className="w-4 h-4 text-success" />
+                        <span className="text-lg font-bold text-success font-heading">
+                          {(req.credits_granted ?? 0)} cr.
+                        </span>
+                      </div>
+                      <span className="text-xs font-medium text-success/70">
+                        Liberado pelo Admin
+                      </span>
                     </div>
                   </div>
                 )}
@@ -112,8 +132,8 @@ export const MyCreditRequestsDialog = ({ children }: MyCreditRequestsDialogProps
                   </span>
                 )}
               </TabsTrigger>
-              <TabsTrigger value="approved">Concluídas</TabsTrigger>
-              <TabsTrigger value="rejected">Canceladas</TabsTrigger>
+              <TabsTrigger value="approved">Aprovadas</TabsTrigger>
+              <TabsTrigger value="rejected">Rejeitadas</TabsTrigger>
             </TabsList>
           </div>
 
