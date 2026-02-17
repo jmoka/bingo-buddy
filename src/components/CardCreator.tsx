@@ -2,8 +2,7 @@ import { useState, useEffect } from 'react';
 import { Button } from './ui/button';
 import { Textarea } from './ui/textarea';
 import { generateBingoCard } from '@/contexts/GameContext';
-import { BINGO_RANGES } from '@/utils/bingoUtils';
-import { AlertCircle, Dices, Info, Trash2 } from 'lucide-react';
+import { AlertCircle, Info, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
@@ -20,40 +19,16 @@ const createGridFromNumbers = (selectedNumbers: Set<number>): { grid: number[][]
         return { grid, error: `Selecione exatamente 24 números. Você selecionou ${sortedNumbers.length}.` };
     }
 
-    const numberPool = [...sortedNumbers];
-
+    // Fill the grid with any 24 numbers, sorted, without column range validation.
+    let numberIndex = 0;
     for (let col = 0; col < 5; col++) {
-        const range = BINGO_RANGES[col];
-        const colNumbers: number[] = [];
-        
-        // Find numbers that fit this column's range
-        for (let i = numberPool.length - 1; i >= 0; i--) {
-            const num = numberPool[i];
-            if (num >= range.min && num <= range.max) {
-                colNumbers.push(num);
-                numberPool.splice(i, 1);
-            }
-        }
-
-        const expectedCount = (col === 2) ? 4 : 5;
-        if (colNumbers.length !== expectedCount) {
-            return { grid, error: `Coluna ${range.col} deve ter ${expectedCount} números (${range.min}-${range.max}). Encontrado(s): ${colNumbers.length}.` };
-        }
-
-        colNumbers.sort((a, b) => a - b);
-
         for (let row = 0; row < 5; row++) {
-            if (col === 2 && row === 2) {
+            if (row === 2 && col === 2) {
                 grid[row][col] = 0; // Free space
             } else {
-                const index = (col === 2 && row > 2) ? row - 1 : row;
-                grid[row][col] = colNumbers[index];
+                grid[row][col] = sortedNumbers[numberIndex++];
             }
         }
-    }
-
-    if (numberPool.length > 0) {
-        return { grid, error: `Os seguintes números não se encaixam em nenhuma coluna: ${numberPool.join(', ')}` };
     }
 
     return { grid, error: null };
@@ -191,7 +166,7 @@ export const CardCreator = ({ onCardChange }: CardCreatorProps) => {
                 </div>
             ) : (
                 <p className="text-sm text-success">
-                    Cartela válida! Você selecionou 24 números corretamente distribuídos.
+                    Cartela válida! Você selecionou 24 números corretamente.
                 </p>
             )}
         </div>
