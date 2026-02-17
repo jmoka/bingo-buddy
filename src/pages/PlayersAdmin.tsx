@@ -19,8 +19,11 @@ import {
   DialogTitle,
   DialogFooter,
   DialogClose,
+  DialogDescription,
 } from "@/components/ui/dialog";
-import { ArrowLeft, Coins, Edit } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
+import { ArrowLeft, Coins, Edit, Zap, ZapOff } from 'lucide-react';
 import { Footer } from '@/components/Footer';
 import PlayerAvatar from '@/components/PlayerAvatar';
 import { Profile } from '@/contexts/AuthContext';
@@ -49,6 +52,8 @@ const PlayersAdmin = () => {
       updatePlayerCredits(selectedPlayer.id, amount);
     }
   };
+
+  const selectedPlayerCards = selectedPlayer ? allPlayerCards.filter(c => c.player_id === selectedPlayer.id) : [];
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -106,32 +111,87 @@ const PlayersAdmin = () => {
       </main>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Gerenciar Créditos de {selectedPlayer?.full_name}</DialogTitle>
+            <DialogTitle>Gerenciar: {selectedPlayer?.full_name}</DialogTitle>
+            <DialogDescription>
+              Visualize detalhes, gerencie créditos e veja as cartelas do jogador.
+            </DialogDescription>
           </DialogHeader>
-          <div className="py-4 space-y-4">
-            <p>Saldo atual: <strong className="font-mono">{selectedPlayer?.credits}</strong> créditos</p>
-            <div>
-              <label htmlFor="creditAmount" className="text-sm font-medium">Valor a adicionar/remover</label>
-              <Input
-                id="creditAmount"
-                type="number"
-                value={creditAmount === 0 ? '' : creditAmount}
-                onChange={(e) => setCreditAmount(parseInt(e.target.value, 10) || 0)}
-                placeholder="Ex: 50 ou -20"
-              />
-            </div>
+          
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2 text-sm text-muted-foreground border-t border-b py-4">
+            <div><strong>CPF:</strong> {selectedPlayer?.cpf || 'Não informado'}</div>
+            <div><strong>WhatsApp:</strong> {selectedPlayer?.whatsapp || 'Não informado'}</div>
+            <div className="col-span-2"><strong>Endereço:</strong> {selectedPlayer?.address || 'Não informado'}</div>
           </div>
-          <DialogFooter>
-            <DialogClose asChild>
-              <Button variant="ghost">Cancelar</Button>
-            </DialogClose>
-            <Button onClick={() => { handleUpdateCredits(creditAmount); setIsDialogOpen(false); }}>
-              <Coins className="w-4 h-4 mr-2" />
-              Confirmar
-            </Button>
-          </DialogFooter>
+
+          <Tabs defaultValue="credits" className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="credits">Gerenciar Créditos</TabsTrigger>
+              <TabsTrigger value="cards">Cartelas ({selectedPlayerCards.length})</TabsTrigger>
+            </TabsList>
+            <TabsContent value="credits">
+              <div className="py-4 space-y-4">
+                <p>Saldo atual: <strong className="font-mono">{selectedPlayer?.credits}</strong> créditos</p>
+                <div>
+                  <label htmlFor="creditAmount" className="text-sm font-medium">Valor a adicionar/remover</label>
+                  <Input
+                    id="creditAmount"
+                    type="number"
+                    value={creditAmount === 0 ? '' : creditAmount}
+                    onChange={(e) => setCreditAmount(parseInt(e.target.value, 10) || 0)}
+                    placeholder="Ex: 50 ou -20"
+                  />
+                </div>
+              </div>
+              <DialogFooter>
+                <DialogClose asChild>
+                  <Button variant="ghost">Fechar</Button>
+                </DialogClose>
+                <Button onClick={() => { handleUpdateCredits(creditAmount); setIsDialogOpen(false); }}>
+                  <Coins className="w-4 h-4 mr-2" />
+                  Confirmar
+                </Button>
+              </DialogFooter>
+            </TabsContent>
+            <TabsContent value="cards">
+              <div className="max-h-64 overflow-y-auto mt-4">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Nome</TableHead>
+                      <TableHead>ID</TableHead>
+                      <TableHead className="text-center">Usos</TableHead>
+                      <TableHead className="text-center">Status</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {selectedPlayerCards.map(card => (
+                      <TableRow key={card.id}>
+                        <TableCell className="font-medium">{card.name}</TableCell>
+                        <TableCell className="font-mono text-xs">...{card.id.slice(-6)}</TableCell>
+                        <TableCell className="text-center font-mono">{card.uses_left}</TableCell>
+                        <TableCell className="text-center">
+                          {card.uses_left > 0 ? (
+                            <Badge className="bg-success/10 text-success hover:bg-success/20">
+                              <Zap className="w-3 h-3 mr-1" /> Válida
+                            </Badge>
+                          ) : (
+                            <Badge variant="destructive">
+                              <ZapOff className="w-3 h-3 mr-1" /> Sem Usos
+                            </Badge>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+                {selectedPlayerCards.length === 0 && (
+                  <p className="text-center text-sm text-muted-foreground py-8">Este jogador não possui cartelas.</p>
+                )}
+              </div>
+            </TabsContent>
+          </Tabs>
         </DialogContent>
       </Dialog>
 
