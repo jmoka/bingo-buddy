@@ -162,7 +162,9 @@ const Lobby = () => {
   if (!profile) return null;
 
   const activeMatchIds = new Set(matches.filter(m => m.status === 'in_progress').map(m => m.id));
-  const pendingRedeemsCount = (redeemRequests || []).filter(r => r.status === 'pending').length;
+  const safeRedeemRequests = Array.isArray(redeemRequests) ? redeemRequests : [];
+  const pendingRedeemsCount = safeRedeemRequests.filter(r => r.status === 'pending').length;
+  const rejectedRedeemsCount = safeRedeemRequests.filter(r => r.status === 'rejected').length;
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -216,8 +218,12 @@ const Lobby = () => {
             <MyRedeemRequestsDialog>
                 <Button variant="outline" size="sm" className="rounded-full bg-card relative whitespace-nowrap text-xs md:text-sm">
                     <Banknote className="w-4 h-4 mr-2" /> Meus Resgates
-                    {pendingRedeemsCount > 0 && (
-                        <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-amber-500 text-[8px] font-bold text-white border border-background">
+                    {rejectedRedeemsCount > 0 ? (
+                        <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-[8px] font-bold text-white border border-background">
+                            {rejectedRedeemsCount}
+                        </span>
+                    ) : pendingRedeemsCount > 0 && (
+                        <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-success text-[8px] font-bold text-white border border-background">
                             {pendingRedeemsCount}
                         </span>
                     )}
