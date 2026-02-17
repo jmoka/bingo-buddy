@@ -518,51 +518,59 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!user || !profile || !gameSettings) return null;
     
     const cost = gameSettings.custo_nova_cartela;
-    const { creditType, ...cardData } = options;
+    const { name, numbers, creditType } = options;
 
-    // 1. Check credits
-    const hasEnoughCredits = creditType === 'real' ? profile.credits >= cost : profile.fake_credits >= cost;
-    if (!hasEnoughCredits) {
-      toast.error(`Créditos de ${creditType === 'real' ? 'reais' : 'brincar'} insuficientes.`);
+    // 1. Verificação de Créditos
+    const currentCredits = creditType === 'real' ? profile.credits : profile.fake_credits;
+    if (currentCredits < cost) {
+      toast.error(`Saldo de ${creditType === 'real' ? 'reais' : 'brincar'} insuficiente.`);
       return null;
     }
 
-    // 2. Debit credits
+    // 2. Débito de Créditos
     const creditColumn = creditType === 'real' ? 'credits' : 'fake_credits';
-    const currentCredits = creditType === 'real' ? profile.credits : profile.fake_credits;
-    
-    const { error: creditError } = await supabase
+    const { error: debitError } = await supabase
       .from('perfis')
       .update({ [creditColumn]: currentCredits - cost })
       .eq('id', user.id);
 
-    if (creditError) {
-      toast.error('Erro ao debitar créditos.', { description: creditError.message });
+    if (debitError) {
+      console.error('[createPlayerCard] Erro ao debitar créditos:', debitError.message);
+      toast.error('Erro ao processar pagamento da cartela.');
       return null;
     }
 
-    // 3. Insert card
+    // 3. Inserção da Cartela
+    // Usamos nomes de colunas explícitos conforme sua tabela 'cartelas_jogador'
     const { data, error: insertError } = await supabase
       .from('cartelas_jogador')
-      .insert({ player_id: user.id, ...cardData, credit_type: creditType, uses_left: 1 })
+      .insert({
+        player_id: user.id,
+        name: name,
+        numbers: numbers,
+        credit_type: creditType,
+        uses_left: 1,
+        is_archived: false // Definimos como false explicitamente
+      })
       .select()
       .single();
     
     if (insertError) {
-      toast.error('Erro ao salvar a cartela no banco de dados.', { 
-        description: `A cobrança de ${cost} créditos será estornada. Erro: ${insertError.message}` 
-      });
-      // Rollback credit deduction
+      console.error('[createPlayerCard] Erro ao salvar cartela:', insertError.message);
+      toast.error('Erro ao salvar cartela no banco de dados. Estornando créditos...');
+      
+      // Estorno Automático
       await supabase
         .from('perfis')
-        .update({ [creditColumn]: currentCredits }) // Restore original amount
+        .update({ [creditColumn]: currentCredits })
         .eq('id', user.id);
+        
       return null;
     }
 
-    // 4. Success
+    // 4. Sucesso e Atualização
     queryClient.invalidateQueries({ queryKey: ['profile'] });
-    queryClient.invalidateQueries({ queryKey: ['playerCards', user?.id] });
+    queryClient.invalidateQueries({ queryKey: ['playerCards', user.id] });
     return data as PlayerCard;
   };
 
