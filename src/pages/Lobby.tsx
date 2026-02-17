@@ -432,8 +432,32 @@ const Lobby = () => {
         <DialogContent className="max-w-2xl">
           <DialogHeader><DialogTitle className="font-heading">Entrar na Partida: {selectedMatch?.name}</DialogTitle></DialogHeader>
           <div className="max-h-[60vh] overflow-y-auto p-1 space-y-3">
-            {myOwnedCards.length > 0 ? (
-              myOwnedCards.map(card => {
+            {(() => {
+              if (!selectedMatch || !profile) return null;
+              
+              const myCardsInThisMatch = getPlayerMatchCards(selectedMatch.id, profile.id);
+              const myCardIdsInThisMatch = new Set(myCardsInThisMatch.map(c => c.player_card_id));
+              const availableCardsToJoin = myOwnedCards.filter(card => !myCardIdsInThisMatch.has(card.id));
+
+              if (myOwnedCards.length === 0) {
+                return (
+                  <div className="text-center py-10">
+                    <p className="text-muted-foreground font-medium">Você não tem nenhuma cartela.</p>
+                    <p className="text-sm text-muted-foreground mt-1">Crie uma nova cartela para poder entrar na partida.</p>
+                  </div>
+                );
+              }
+
+              if (availableCardsToJoin.length === 0) {
+                return (
+                  <div className="text-center py-10">
+                    <p className="text-muted-foreground font-medium">Todas as suas cartelas já estão nesta partida.</p>
+                    <p className="text-sm text-muted-foreground mt-1">Você pode acompanhar a partida ao vivo no lobby.</p>
+                  </div>
+                );
+              }
+
+              return availableCardsToJoin.map(card => {
                 const isSelected = cardsToJoin.has(card.id);
                 const isDisabled = card.uses_left === 0;
                 return (
@@ -452,13 +476,8 @@ const Lobby = () => {
                     </div>
                   </div>
                 );
-              })
-            ) : (
-              <div className="text-center py-10">
-                <p className="text-muted-foreground font-medium">Você não tem nenhuma cartela.</p>
-                <p className="text-sm text-muted-foreground mt-1">Crie uma nova cartela para poder entrar na partida.</p>
-              </div>
-            )}
+              });
+            })()}
           </div>
           <DialogFooter>
             <div className="w-full flex justify-between items-center">

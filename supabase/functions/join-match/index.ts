@@ -30,6 +30,21 @@ serve(async (req) => {
     const { data: { user }, error: userError } = await userSupabaseClient.auth.getUser()
     if (userError || !user) throw new Error("Usuário não encontrado ou token inválido.");
 
+    // Server-side validation to prevent duplicate card entries in the same match
+    const { data: existingMatchCards, error: existingError } = await supabaseAdmin
+      .from('cartelas_partida')
+      .select('player_card_id')
+      .eq('match_id', matchId)
+      .in('player_card_id', playerCardIds);
+
+    if (existingError) {
+      throw new Error(`Erro ao verificar cartelas existentes: ${existingError.message}`);
+    }
+
+    if (existingMatchCards && existingMatchCards.length > 0) {
+      throw new Error("Uma ou mais cartelas selecionadas já estão inscritas nesta partida.");
+    }
+
     const [matchRes, profileRes, playerCardsRes] = await Promise.all([
       supabaseAdmin.from('partidas').select('card_price, pot').eq('id', matchId).single(),
       supabaseAdmin.from('perfis').select('credits').eq('id', user.id).single(),
