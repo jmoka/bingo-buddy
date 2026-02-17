@@ -3,22 +3,24 @@ import { useGame } from '@/contexts/GameContext';
 import { BingoCell } from '@/components/BingoCell';
 import { Button } from '@/components/ui/button';
 import { gameTypeLabels } from '@/utils/bingoUtils';
-import { ArrowLeft, Coins, Trophy, Users, Bot } from 'lucide-react';
+import { ArrowLeft, Coins, Users, Bot } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { playNotificationSound } from '@/utils/soundUtils';
 import { Footer } from '@/components/Footer';
 import { WinnerDisplay } from '@/components/WinnerDisplay';
+import { useAuth } from '@/contexts/AuthContext';
 
 const MatchView = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { matches, currentPlayer, getPlayerMatchCards, matchCards } = useGame();
+  const { profile } = useAuth();
+  const { matches, getPlayerMatchCards, matchCards } = useGame();
   const [lastCalledNumber, setLastCalledNumber] = useState<number | null>(null);
   const [now, setNow] = useState(Date.now());
 
   const match = matches.find(m => m.id === id);
-  const myCards = currentPlayer && id ? getPlayerMatchCards(id, currentPlayer.id) : [];
+  const myCards = profile && id ? getPlayerMatchCards(id, profile.id) : [];
 
   const prevCalledNumbersRef = useRef<number[]>(match ? match.called_numbers : []);
 
@@ -67,8 +69,9 @@ const MatchView = () => {
     );
   }
 
+  const playersInMatchCount = new Set(matchCards.filter(mc => mc.match_id === match.id).map(mc => mc.player_id)).size;
   const lastCalled = match.called_numbers.length > 0 ? match.called_numbers[match.called_numbers.length - 1] : null;
-  const countdown = match.next_auto_call_timestamp ? Math.max(0, Math.round((match.next_auto_call_timestamp - now) / 1000)) : null;
+  const countdown = match.next_auto_call_timestamp ? Math.max(0, Math.round((new Date(match.next_auto_call_timestamp).getTime() - now) / 1000)) : null;
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -83,7 +86,7 @@ const MatchView = () => {
                 <h1 className="font-heading text-xl font-bold text-primary-foreground">{match.name}</h1>
                 <div className="flex gap-3 text-primary-foreground/70 text-xs">
                   <span>{gameTypeLabels[match.game_type]}</span>
-                  <span className="flex items-center gap-1"><Users className="w-3 h-3" />{match.playerIds.length}</span>
+                  <span className="flex items-center gap-1"><Users className="w-3 h-3" />{playersInMatchCount}</span>
                   <span className="flex items-center gap-1"><Coins className="w-3 h-3" />Pote: {match.pot}</span>
                 </div>
               </div>
