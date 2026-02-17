@@ -6,7 +6,7 @@ import { Match, PlayerCard, MatchCard, Win, MatchStatus } from '@/types/match';
 import { toast } from 'sonner';
 import { Profile } from './AuthContext';
 
-interface GameSettings {
+export interface GameSettings {
   id: string;
   singleton: boolean;
   custo_nova_cartela: number;
@@ -14,6 +14,11 @@ interface GameSettings {
   usos_por_recarga: number;
   intervalo_sorteio_auto_seg: number;
   created_at: string;
+  n8n_test_url?: string;
+  n8n_prod_url?: string;
+  n8n_env?: 'test' | 'production';
+  pix_key?: string;
+  credit_request_text?: string;
 }
 
 interface GameContextType {
@@ -40,6 +45,7 @@ interface GameContextType {
   joinMatch: (matchId: string, playerCardIds: string[]) => Promise<MatchCard[] | null>;
   buyCardUses: (playerCardId: string) => Promise<boolean>;
   buyCredits: (amount: number) => Promise<void>;
+  requestCredits: (file: File) => Promise<boolean>;
   updatePlayerCredits: (playerId: string, amount: number) => Promise<void>;
   getMatchCards: (matchId: string) => MatchCard[];
   getPlayerMatchCards: (matchId: string, playerId: string) => MatchCard[];
@@ -226,6 +232,45 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } else {
       queryClient.invalidateQueries({ queryKey: ['profile'] });
     }
+  };
+
+  const requestCredits = async (file: File): Promise<boolean> => {
+    if (!user || !profile) {
+      toast.error("Você precisa estar logado para solicitar créditos.");
+      return false;
+    }
+
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${Date.now()}.${fileExt}`;
+    const filePath = `${user.id}/${fileName}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from('receipts')
+      .upload(filePath, file);
+
+    if (uploadError) {
+      toast.error(`Erro no upload: ${uploadError.message}`);
+      return false;
+    }
+
+    const { error: notifyError } = await supabase.functions.invoke('notify-n8n', {
+      body: {
+        event: 'CREDIT_REQUEST',
+        data: {
+          receiptPath: filePath,
+          userName: profile.full_name || 'Não definido',
+          userEmail: user.email,
+          userId: user.id,
+        }
+      }
+    });
+
+    if (notifyError) {
+      toast.error(`Erro ao notificar o admin: ${notifyError.message}`);
+      return false;
+    }
+
+    return true;
   };
 
   const updatePlayerCredits = async (playerId: string, amount: number) => {
@@ -437,7 +482,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       matches, players, playerCards, allPlayerCards, matchCards, wins, allWins, gameSettings, isLoading: l1 || l2 || l3 || l4 || l5,
       createMatch, openMatch, startMatch, callNumber, finishMatch, deleteMatch, toggleAutoCall,
       updateGameSettings, createPlayerCard, deletePlayerCard, toggleArchivePlayerCard, joinMatch, buyCardUses, buyCredits,
-      updatePlayerCredits, getMatchCards, getPlayerMatchCards,
+      requestCredits, updatePlayerCredits, getMatchCards, getPlayerMatchCards,
     }}>
       {children}
     </GameContext.Provider>

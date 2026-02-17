@@ -33,17 +33,17 @@ import { Badge } from '@/components/ui/badge';
 import { playNotificationSound } from '@/utils/soundUtils';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { CreditRequestDialog } from '@/components/CreditRequestDialog';
 
 const Lobby = () => {
   const navigate = useNavigate();
   const { session, profile, signOut } = useAuth();
   const { 
     matches, joinMatch, getPlayerMatchCards, playerCards, 
-    buyCardUses, buyCredits, createPlayerCard, deletePlayerCard,
+    buyCardUses, createPlayerCard, deletePlayerCard,
     toggleArchivePlayerCard, matchCards, gameSettings, wins
   } = useGame();
 
-  const [buyAmount, setBuyAmount] = useState(50);
   const [now, setNow] = useState(Date.now());
   const [isSoundOn, setIsSoundOn] = useState(true);
   const [showArchived, setShowArchived] = useState(false);
@@ -195,18 +195,11 @@ const Lobby = () => {
               <Wallet className="w-4 h-4 text-primary-foreground" />
               <span className="font-heading font-bold text-primary-foreground">{profile.credits}</span>
             </div>
-            <Dialog>
-              <DialogTrigger asChild><Button size="sm" variant="ghost" className="text-primary-foreground"><CreditCard className="w-4 h-4 mr-1" />Comprar</Button></DialogTrigger>
-              <DialogContent className="max-w-xs">
-                <DialogHeader><DialogTitle className="font-heading">Comprar Créditos</DialogTitle></DialogHeader>
-                <div className="flex items-center gap-3 justify-center my-4">
-                  <Button size="icon" variant="outline" onClick={() => setBuyAmount(p => Math.max(10, p - 10))}>-</Button>
-                  <span className="font-heading text-3xl font-bold w-20 text-center">{buyAmount}</span>
-                  <Button size="icon" variant="outline" onClick={() => setBuyAmount(p => p + 10)}>+</Button>
-                </div>
-                <Button className="w-full gradient-accent shadow-button" onClick={() => { buyCredits(buyAmount); toast.success(`+${buyAmount} créditos!`); }}><Coins className="w-4 h-4 mr-2" />Comprar</Button>
-              </DialogContent>
-            </Dialog>
+            <CreditRequestDialog gameSettings={gameSettings}>
+              <Button size="sm" variant="ghost" className="text-primary-foreground">
+                <CreditCard className="w-4 h-4 mr-1" />Solicitar
+              </Button>
+            </CreditRequestDialog>
             <Button size="icon" variant="ghost" className="text-primary-foreground" onClick={() => setIsSoundOn(!isSoundOn)}>
               {isSoundOn ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
             </Button>

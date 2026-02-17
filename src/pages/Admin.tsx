@@ -4,13 +4,14 @@ import { useGame } from '@/contexts/GameContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { GameType } from '@/types/bingo';
 import { PrizeType, Match, MatchStatus } from '@/types/match';
 import { gameTypeLabels } from '@/utils/bingoUtils';
 import { 
   Plus, LogOut, Play, DoorOpen, Trash2, Trophy, Users, 
-  Clock, Coins, Hash, ArrowLeft, StopCircle, Settings, Save, Bot, Shuffle, Ticket, ArrowRight, Webhook
+  Clock, Coins, Hash, ArrowLeft, StopCircle, Settings, Save, Bot, Shuffle, Ticket, ArrowRight, Webhook, Key
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
@@ -62,6 +63,8 @@ const Admin = () => {
     n8n_test_url: '',
     n8n_prod_url: '',
     n8n_env: 'test',
+    pix_key: '',
+    credit_request_text: '',
   });
   const [callerInput, setCallerInput] = useState<Record<string, string>>({});
   const [now, setNow] = useState(Date.now());
@@ -83,6 +86,8 @@ const Admin = () => {
         n8n_test_url: gameSettings.n8n_test_url || '',
         n8n_prod_url: gameSettings.n8n_prod_url || '',
         n8n_env: gameSettings.n8n_env || 'test',
+        pix_key: gameSettings.pix_key || '',
+        credit_request_text: gameSettings.credit_request_text || '',
       });
     }
   }, [gameSettings]);
@@ -160,7 +165,7 @@ const Admin = () => {
     }
   };
 
-  const handleSettingsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleSettingsChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setCurrentSettings(prev => ({ ...prev, [name]: value }));
   };
@@ -214,6 +219,21 @@ const Admin = () => {
                 <Input id="intervalo_sorteio_auto_seg" name="intervalo_sorteio_auto_seg" type="number" value={currentSettings.intervalo_sorteio_auto_seg} onChange={handleSettingsChange} />
               </div>
             </div>
+            
+            <div className="mt-6 pt-4 border-t">
+              <h3 className="font-heading text-lg font-bold text-foreground mb-4 flex items-center gap-2"><Key className="w-5 h-5" /> Solicitação de Créditos (PIX)</h3>
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="pix_key">Chave PIX</Label>
+                  <Input id="pix_key" name="pix_key" type="text" placeholder="Sua chave PIX (e.g., CPF, email, telefone)" value={currentSettings.pix_key} onChange={handleSettingsChange} />
+                </div>
+                <div>
+                  <Label htmlFor="credit_request_text">Texto de Instrução</Label>
+                  <Textarea id="credit_request_text" name="credit_request_text" placeholder="Instruções para o jogador sobre como fazer o PIX e enviar o comprovante." value={currentSettings.credit_request_text} onChange={handleSettingsChange} />
+                </div>
+              </div>
+            </div>
+
             <div className="mt-6 pt-4 border-t">
               <h3 className="font-heading text-lg font-bold text-foreground mb-4 flex items-center gap-2"><Webhook className="w-5 h-5" /> Notificações (n8n)</h3>
               <div className="space-y-4">
