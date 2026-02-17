@@ -516,65 +516,30 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const createPlayerCard = async (options: { name: string; numbers: number[][]; creditType: CreditType; }) => {
     try {
-      if (!user || !profile || !gameSettings) {
-        console.error("Dados de usuário ou configurações incompletos.");
-        return null;
-      }
-      
-      const cost = gameSettings.custo_nova_cartela;
       const { name, numbers, creditType } = options;
-
-      // Verificar saldo antes de tentar qualquer coisa
-      const currentCredits = creditType === 'real' ? profile.credits : profile.fake_credits;
-      if (currentCredits < cost) {
-        toast.error(`Saldo insuficiente de créditos ${creditType === 'real' ? 'reais' : 'de brincar'}.`);
-        return null;
-      }
-
-      // 1. Debitar créditos
-      const creditColumn = creditType === 'real' ? 'credits' : 'fake_credits';
-      const { error: debitError } = await supabase
-        .from('perfis')
-        .update({ [creditColumn]: currentCredits - cost })
-        .eq('id', user.id);
-
-      if (debitError) {
-        console.error("Erro ao debitar:", debitError);
-        toast.error(`Erro ao processar pagamento: ${debitError.message}`);
-        return null;
-      }
-
-      // 2. Inserir Cartela (Formato simples do objeto)
-      const { data, error: insertError } = await supabase
-        .from('cartelas_jogador')
-        .insert({
-          player_id: user.id,
-          name: name,
-          numbers: numbers,
-          credit_type: creditType, // 'real' ou 'fake'
-          uses_left: 1
-        })
-        .select()
-        .single();
       
-      if (insertError) {
-        console.error("Erro ao inserir cartela:", insertError);
-        toast.error(`Erro ao salvar cartela: ${insertError.message}`);
-        
-        // Estorno
-        await supabase.from('perfis').update({ [creditColumn]: currentCredits }).eq('id', user.id);
-        toast.info("Seus créditos foram estornados.");
+      const { data, error } = await supabase.rpc('buy_player_card', {
+        p_name: name,
+        p_numbers: numbers,
+        p_credit_type: creditType
+      });
+
+      if (error) {
+        console.error("RPC Error:", error);
+        toast.error('Erro ao criar cartela', { description: error.message });
         return null;
       }
 
       // Sucesso
-      queryClient.invalidateQueries({ queryKey: ['profile'] });
-      queryClient.invalidateQueries({ queryKey: ['playerCards', user.id] });
+      if (user) {
+        queryClient.invalidateQueries({ queryKey: ['profile'] });
+        queryClient.invalidateQueries({ queryKey: ['playerCards', user.id] });
+      }
       return data as PlayerCard;
 
-    } catch (error: any) {
-      console.error("Erro inesperado ao criar cartela:", error);
-      toast.error(`Ocorreu um erro inesperado: ${error.message}`);
+    } catch (err: any) {
+      console.error("Client Error:", err);
+      toast.error('Erro inesperado', { description: err.message });
       return null;
     }
   };
