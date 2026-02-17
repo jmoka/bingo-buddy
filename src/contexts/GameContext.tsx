@@ -61,6 +61,8 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const { user, profile } = useAuth();
   const queryClient = useQueryClient();
 
+  const isAdmin = profile?.role === 'admin';
+
   const { data: matches = [], isLoading: l1 } = useQuery({
     queryKey: ['matches'],
     queryFn: async () => {
@@ -77,7 +79,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (error) throw error;
       return data as Profile[];
     },
-    enabled: !!profile && profile.role === 'admin',
+    enabled: isAdmin,
   });
 
   const { data: playerCards = [], isLoading: l2 } = useQuery({
@@ -98,7 +100,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (error) throw error;
       return data as PlayerCard[];
     },
-    enabled: !!profile && profile.role === 'admin',
+    enabled: isAdmin,
   });
 
   const { data: matchCards = [], isLoading: l3 } = useQuery({
@@ -128,7 +130,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (error) throw error;
       return data as Win[];
     },
-    enabled: !!profile && profile.role === 'admin',
+    enabled: isAdmin,
   });
 
   const { data: creditRequests = [], isLoading: l6 } = useQuery({
@@ -137,7 +139,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (!user) return [];
       const { data, error } = await supabase
         .from('solicitacoes_credito')
-        .select('id, player_id, status, receipt_url, credits_granted, credits_requested, amount_paid, requested_at, resolved_at, resolved_by, notes')
+        .select('*')
         .eq('player_id', user.id)
         .order('requested_at', { ascending: false });
       
@@ -157,7 +159,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (error) throw error;
       return data as CreditRequest[];
     },
-    enabled: !!profile && profile.role === 'admin',
+    enabled: isAdmin,
   });
 
   const { data: gameSettings, isLoading: l4 } = useQuery({
@@ -165,7 +167,6 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     queryFn: async () => {
       const { data, error } = await supabase.from('configuracoes').select('*').limit(1).single();
       if (error) {
-        console.error("Error fetching settings, using defaults", error);
         return {
           custo_nova_cartela: 10,
           custo_recarga_cartela: 5,
@@ -180,21 +181,28 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
   });
 
   useEffect(() => {
-    const channel = supabase.channel('public-db-changes')
+    const channel = supabase.channel('game-updates')
       .on('postgres_changes', { event: '*', schema: 'public' }, (payload) => {
-        queryClient.invalidateQueries({ queryKey: ['matches'] });
-        queryClient.invalidateQueries({ queryKey: ['playerCards'] });
-        queryClient.invalidateQueries({ queryKey: ['allPlayerCards'] });
-        queryClient.invalidateQueries({ queryKey: ['matchCards'] });
-        queryClient.invalidateQueries({ queryKey: ['profile'] });
-        queryClient.invalidateQueries({ queryKey: ['players'] });
-        queryClient.invalidateQueries({ queryKey: ['wins'] });
-        queryClient.invalidateQueries({ queryKey: ['allWins'] });
-        queryClient.invalidateQueries({ queryKey: ['creditRequests'] });
-        queryClient.invalidateQueries({ queryKey: ['allCreditRequests'] });
-        if (payload.table === 'configuracoes') {
-          queryClient.invalidateQueries({ queryKey: ['gameSettings'] });
+        const table = payload.table;
+        if (table === 'partidas') queryClient.invalidateQueries({ queryKey: ['matches'] });
+        if (table === 'cartelas_jogador') {
+          queryClient.invalidateQueries({ queryKey: ['playerCards'] });
+          queryClient.invalidateQueries({ queryKey: ['allPlayerCards'] });
         }
+        if (table === 'cartelas_partida') queryClient.invalidateQueries({ queryKey: ['matchCards'] });
+        if (table === 'perfis') {
+          queryClient.invalidateQueries({ queryKey: ['profile'] });
+          queryClient.invalidateQueries({ queryKey: ['players'] });
+        }
+        if (table === 'vitorias') {
+          queryClient.invalidateQueries({ queryKey: ['wins'] });
+          queryClient.invalidateQueries({ queryKey: ['allWins'] });
+        }
+        if (table === 'solicitacoes_credito') {
+          queryClient.invalidateQueries({ queryKey: ['creditRequests'] });
+          queryClient.invalidateQueries({ queryKey: ['allCreditRequests'] });
+        }
+        if (table === 'configuracoes') queryClient.invalidateQueries({ queryKey: ['gameSettings'] });
       }).subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [queryClient]);
@@ -205,17 +213,12 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       toast.error(error.message);
     } else {
       toast.success("Partida criada com sucesso!");
-      queryClient.invalidateQueries({ queryKey: ['matches'] });
     }
   };
 
   const updateMatchStatus = async (matchId: string, status: MatchStatus) => {
     const { error } = await supabase.from('partidas').update({ status }).eq('id', matchId);
-    if (error) {
-      toast.error(error.message);
-    } else {
-      queryClient.invalidateQueries({ queryKey: ['matches'] });
-    }
+    if (error) toast.error(error.message);
   };
 
   const openMatch = (matchId: string) => updateMatchStatus(matchId, 'open');
@@ -224,12 +227,8 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const deleteMatch = async (matchId: string) => {
     const { error } = await supabase.from('partidas').delete().eq('id', matchId);
-    if (error) {
-      toast.error(error.message);
-    } else {
-      toast.success("Partida excluída.");
-      queryClient.invalidateQueries({ queryKey: ['matches'] });
-    }
+    if (error) toast.error(error.message);
+    else toast.success("Partida excluída.");
   };
 
   const toggleAutoCall = async (matchId: string) => {
@@ -240,339 +239,103 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       is_auto_calling: isEnabling,
       next_auto_call_timestamp: isEnabling ? new Date(Date.now() + gameSettings.intervalo_sorteio_auto_seg * 1000).toISOString() : null,
     }).eq('id', matchId);
-    if (error) {
-      toast.error(error.message);
-    } else {
-      queryClient.invalidateQueries({ queryKey: ['matches'] });
-    }
+    if (error) toast.error(error.message);
   };
 
   const callNumber = async (matchId: string, num: number) => {
-    const match = matches.find(m => m.id === matchId);
-    if (!match || match.called_numbers.includes(num)) return;
-
-    const { error } = await supabase.functions.invoke('call-number', {
-      body: { matchId, num },
-    });
-
-    if (error) {
-      toast.error(`Erro ao sortear número: ${error.message}`);
-    }
+    const { error } = await supabase.functions.invoke('call-number', { body: { matchId, num } });
+    if (error) toast.error(`Erro ao sortear número: ${error.message}`);
   };
 
   const requestCredits = async (file: File, creditsRequested: number, amountPaid: number): Promise<boolean> => {
-    if (!user || !profile) {
-      toast.error("Você precisa estar logado para solicitar créditos.");
-      return false;
-    }
+    if (!user || !profile) return false;
+    const fileName = `${user.id}/${Date.now()}.${file.name.split('.').pop()}`;
+    const { error: uploadError } = await supabase.storage.from('receipts').upload(fileName, file);
+    if (uploadError) { toast.error(uploadError.message); return false; }
 
-    const fileExt = file.name.split('.').pop();
-    const fileName = `${Date.now()}.${fileExt}`;
-    const filePath = `${user.id}/${fileName}`;
+    const { data: newRequest, error: insertError } = await supabase.from('solicitacoes_credito').insert({ 
+      player_id: user.id, receipt_url: fileName, status: 'pending', credits_requested: creditsRequested, amount_paid: amountPaid,
+    }).select().single();
 
-    const { error: uploadError } = await supabase.storage
-      .from('receipts')
-      .upload(filePath, file);
-
-    if (uploadError) {
-      toast.error(`Erro no upload: ${uploadError.message}`);
-      return false;
-    }
-
-    const { data: newRequest, error: insertError } = await supabase
-      .from('solicitacoes_credito')
-      .insert({ 
-        player_id: user.id, 
-        receipt_url: filePath, 
-        status: 'pending',
-        credits_requested: creditsRequested,
-        amount_paid: amountPaid,
-      })
-      .select()
-      .single();
-
-    if (insertError) {
-      toast.error(`Erro ao criar solicitação: ${insertError.message}`);
-      return false;
-    }
-
-    const { error: notifyError } = await supabase.functions.invoke('notify-n8n', {
-      body: {
-        event: 'CREDIT_REQUEST',
-        data: {
-          requestId: newRequest.id,
-          receiptPath: filePath,
-          userName: profile.full_name || 'Não definido',
-          userEmail: user.email,
-          userId: user.id,
-          creditsRequested,
-          amountPaid,
-        }
-      }
+    if (insertError) { toast.error(insertError.message); return false; }
+    
+    await supabase.functions.invoke('notify-n8n', {
+      body: { event: 'CREDIT_REQUEST', data: { requestId: newRequest.id, creditsRequested, amountPaid, userEmail: user.email } }
     });
-
-    if (notifyError) {
-      let detailedError = notifyError.message;
-      if ('context' in notifyError && typeof notifyError.context.json === 'function') {
-        try {
-          const errorJson = await notifyError.context.json();
-          if (errorJson.error) { detailedError = errorJson.error; }
-        } catch (e) { console.error("Failed to parse edge function error response:", e); }
-      }
-      toast.error(`Erro ao notificar o admin: ${detailedError}`);
-    }
-
     return true;
   };
 
   const resolveCreditRequest = async (requestId: string, status: 'approved' | 'rejected', creditsGranted?: number, notes?: string): Promise<boolean> => {
-    if (!profile || profile.role !== 'admin' || !user) {
-      toast.error("Apenas administradores podem resolver solicitações.");
-      return false;
-    }
-
+    if (!profile || profile.role !== 'admin' || !user) return false;
     const request = allCreditRequests.find(r => r.id === requestId);
-    if (!request) {
-      toast.error("Solicitação não encontrada.");
-      return false;
-    }
+    if (!request) return false;
 
     if (status === 'approved') {
       if (creditsGranted === undefined || creditsGranted < 0) {
-        toast.error("É necessário informar um valor de crédito válido para aprovar.");
+        toast.error("Informe um valor válido.");
         return false;
       }
       await updatePlayerCredits(request.player_id, creditsGranted);
     }
 
-    const { error } = await supabase
-      .from('solicitacoes_credito')
-      .update({
-        status,
-        credits_granted: status === 'approved' ? creditsGranted : null,
-        resolved_at: new Date().toISOString(),
-        resolved_by: user.id,
-        notes: notes || null,
-      })
-      .eq('id', requestId);
+    const { error } = await supabase.from('solicitacoes_credito').update({
+      status, credits_granted: status === 'approved' ? creditsGranted : null,
+      resolved_at: new Date().toISOString(), resolved_by: user.id, notes: notes || null,
+    }).eq('id', requestId);
 
-    if (error) {
-      toast.error(`Erro ao resolver solicitação: ${error.message}`);
-      return false;
-    }
-
-    toast.success(`Solicitação ${status === 'approved' ? 'aprovada' : 'rejeitada'} com sucesso.`);
-    queryClient.invalidateQueries({ queryKey: ['allCreditRequests'] });
-    queryClient.invalidateQueries({ queryKey: ['players'] });
+    if (error) { toast.error(error.message); return false; }
+    toast.success(`Solicitação processada.`);
     return true;
   };
 
   const deleteCreditRequest = async (requestId: string) => {
     const { error } = await supabase.from('solicitacoes_credito').delete().eq('id', requestId);
-    if (error) {
-      toast.error(`Erro ao excluir solicitação: ${error.message}`);
-    } else {
-      toast.success("Solicitação excluída.");
-      queryClient.invalidateQueries({ queryKey: ['allCreditRequests'] });
-    }
+    if (error) toast.error(error.message);
+    else toast.success("Solicitação excluída.");
   };
 
   const updatePlayerCredits = async (playerId: string, amount: number) => {
-    if (isNaN(amount) || amount === 0) return;
-
-    const { data: targetPlayer, error: fetchError } = await supabase
-      .from('perfis')
-      .select('credits')
-      .eq('id', playerId)
-      .single();
-
-    if (fetchError || !targetPlayer) {
-      toast.error("Não foi possível encontrar o jogador.");
-      return;
-    }
-
-    const newCredits = targetPlayer.credits + amount;
-    if (newCredits < 0) {
-      toast.error("O jogador não pode ter créditos negativos.");
-      return;
-    }
-
-    const { error: updateError } = await supabase
-      .from('perfis')
-      .update({ credits: newCredits })
-      .eq('id', playerId);
-
-    if (updateError) {
-      toast.error(`Erro ao atualizar créditos: ${updateError.message}`);
-    } else {
-      toast.success(`Créditos ${amount > 0 ? 'adicionados' : 'removidos'}. Novo saldo: ${newCredits}.`);
-      queryClient.invalidateQueries({ queryKey: ['players'] });
-      queryClient.invalidateQueries({ queryKey: ['profile', playerId] });
-    }
+    const { data: p } = await supabase.from('perfis').select('credits').eq('id', playerId).single();
+    if (!p) return;
+    const { error } = await supabase.from('perfis').update({ credits: p.credits + amount }).eq('id', playerId);
+    if (error) toast.error(error.message);
   };
 
   const createPlayerCard = async (options: { name: string; numbers: number[][]; }): Promise<PlayerCard | null> => {
-    if (!user || !profile || !gameSettings) {
-        toast.error('Não foi possível criar a cartela.');
-        return null;
-    }
-    if (profile.credits < gameSettings.custo_nova_cartela) {
-      toast.error('Créditos insuficientes!');
-      return null;
-    }
-
-    const { data: existingName, error: nameCheckError } = await supabase
-        .from('cartelas_jogador')
-        .select('id', { count: 'exact' })
-        .eq('player_id', user.id)
-        .eq('name', options.name);
-
-    if (nameCheckError) {
-        toast.error(`Erro ao verificar nomes: ${nameCheckError.message}`);
-        return null;
-    }
-
-    if (existingName && existingName.length > 0) {
-        toast.error('Você já possui uma cartela com este nome. Por favor, escolha outro.');
-        return null;
-    }
-
-    const { data: existingCards, error: checkError } = await supabase
-      .from('cartelas_jogador')
-      .select('id', { count: 'exact' })
-      .eq('player_id', user.id)
-      .eq('numbers', JSON.stringify(options.numbers));
-
-    if (checkError) {
-      toast.error(`Erro ao verificar cartelas: ${checkError.message}`);
-      return null;
-    }
-
-    if (existingCards && existingCards.length > 0) {
-      toast.error('Você já possui uma cartela com exatamente os mesmos números.');
-      return null;
-    }
-    
+    if (!user || !profile || !gameSettings || profile.credits < gameSettings.custo_nova_cartela) return null;
     const { error: creditError } = await supabase.from('perfis').update({ credits: profile.credits - gameSettings.custo_nova_cartela }).eq('id', user.id);
-    if (creditError) { toast.error(creditError.message); return null; }
-
-    const newCard = { player_id: user.id, ...options, uses_left: 1 };
-    const { data, error } = await supabase.from('cartelas_jogador').insert(newCard).select().single();
-    if (error) { 
-        await supabase.from('perfis').update({ credits: profile.credits }).eq('id', user.id);
-        toast.error(error.message); 
-        return null; 
-    }
-    
-    queryClient.invalidateQueries({ queryKey: ['playerCards'] });
-    queryClient.invalidateQueries({ queryKey: ['profile'] });
-    return data as PlayerCard;
+    if (creditError) return null;
+    const { data, error } = await supabase.from('cartelas_jogador').insert({ player_id: user.id, ...options, uses_left: 1 }).select().single();
+    return error ? null : data as PlayerCard;
   };
 
   const deletePlayerCard = async (cardId: string) => {
-    const hasWins = wins.some(w => w.player_card_id === cardId);
-    if (hasWins) {
-      toast.error("Cartelas premiadas não podem ser excluídas. Você pode arquivá-las.");
-      return;
-    }
-
-    const activeMatchCards = matchCards.filter(mc => 
-      mc.player_card_id === cardId && 
-      matches.some(m => m.id === mc.match_id && (m.status === 'in_progress' || m.status === 'open'))
-    );
-
-    if (activeMatchCards.length > 0) {
-      toast.error("Não é possível excluir uma cartela que está em uma partida ativa ou com inscrições abertas.");
-      return;
-    }
-
     const { error } = await supabase.from('cartelas_jogador').delete().eq('id', cardId);
-    if (error) {
-      toast.error(error.message);
-    } else {
-      toast.success("Cartela excluída com sucesso.");
-      queryClient.invalidateQueries({ queryKey: ['playerCards'] });
-    }
+    if (error) toast.error(error.message);
   };
 
   const toggleArchivePlayerCard = async (cardId: string, archive: boolean) => {
-    if (archive) {
-      const activeMatchCards = matchCards.filter(mc => 
-        mc.player_card_id === cardId && 
-        matches.some(m => m.id === mc.match_id && (m.status === 'in_progress' || m.status === 'open'))
-      );
-
-      if (activeMatchCards.length > 0) {
-        toast.error("Não é possível arquivar uma cartela que está em uma partida ativa ou com inscrições abertas.");
-        return;
-      }
-    }
-
-    const { error } = await supabase
-      .from('cartelas_jogador')
-      .update({ is_archived: archive })
-      .eq('id', cardId);
-
-    if (error) {
-      toast.error(error.message);
-    } else {
-      toast.success(archive ? "Cartela arquivada." : "Cartela restaurada.");
-      queryClient.invalidateQueries({ queryKey: ['playerCards'] });
-    }
+    const { error } = await supabase.from('cartelas_jogador').update({ is_archived: archive }).eq('id', cardId);
+    if (error) toast.error(error.message);
   };
 
   const joinMatch = async (matchId: string, playerCardIds: string[]): Promise<MatchCard[] | null> => {
-    if (!user || !profile) return null;
-
-    const { data, error } = await supabase.functions.invoke('join-match', {
-      body: { matchId, playerCardIds },
-    });
-
-    if (error) {
-      try {
-        const errorData = await error.context.json();
-        toast.error(errorData.error || 'Ocorreu um erro ao entrar na partida.');
-      } catch (e) {
-        toast.error('Ocorreu um erro desconhecido ao entrar na partida.');
-      }
-      return null;
-    }
-
-    queryClient.invalidateQueries({ queryKey: ['matchCards'] });
-    queryClient.invalidateQueries({ queryKey: ['playerCards'] });
-    queryClient.invalidateQueries({ queryKey: ['matches'] });
-    queryClient.invalidateQueries({ queryKey: ['profile'] });
-
-    return data as MatchCard[];
+    const { data, error } = await supabase.functions.invoke('join-match', { body: { matchId, playerCardIds } });
+    return error ? null : data as MatchCard[];
   };
 
   const buyCardUses = async (playerCardId: string): Promise<boolean> => {
-    if (!profile || !gameSettings || profile.credits < gameSettings.custo_recarga_cartela) {
-      toast.error('Créditos insuficientes!');
-      return false;
-    }
-    const { error: creditError } = await supabase.from('perfis').update({ credits: profile.credits - gameSettings.custo_recarga_cartela }).eq('id', profile.id);
-    if (creditError) { toast.error(creditError.message); return false; }
-
+    if (!profile || !gameSettings || profile.credits < gameSettings.custo_recarga_cartela) return false;
+    await supabase.from('perfis').update({ credits: profile.credits - gameSettings.custo_recarga_cartela }).eq('id', profile.id);
     const card = playerCards.find(c => c.id === playerCardId);
-    if (card) {
-      const { error } = await supabase.from('cartelas_jogador').update({ uses_left: card.uses_left + gameSettings.usos_por_recarga }).eq('id', playerCardId);
-      if (error) { toast.error(error.message); return false; }
-    }
-
-    queryClient.invalidateQueries({ queryKey: ['playerCards'] });
-    queryClient.invalidateQueries({ queryKey: ['profile'] });
+    if (card) await supabase.from('cartelas_jogador').update({ uses_left: card.uses_left + gameSettings.usos_por_recarga }).eq('id', playerCardId);
     return true;
   };
 
   const updateGameSettings = async (newSettings: Partial<GameSettings>) => {
     const { error } = await supabase.from('configuracoes').update(newSettings).eq('singleton', true);
-    if (error) {
-        toast.error(error.message);
-    } else {
-        toast.success("Configurações salvas com sucesso!");
-        queryClient.invalidateQueries({ queryKey: ['gameSettings'] });
-    }
+    if (error) toast.error(error.message);
+    else toast.success("Salvo!");
   };
 
   const getMatchCards = (matchId: string) => matchCards.filter(c => c.match_id === matchId);
