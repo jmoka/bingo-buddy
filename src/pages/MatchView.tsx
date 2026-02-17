@@ -4,13 +4,15 @@ import { BingoCell } from '@/components/BingoCell';
 import { Button } from '@/components/ui/button';
 import { gameTypeLabels } from '@/utils/bingoUtils';
 import { ArrowLeft, Coins, Trophy, Users } from 'lucide-react';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
+import { playNotificationSound } from '@/utils/soundUtils';
 
 const MatchView = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { matches, currentPlayer, getPlayerMatchCards } = useGame();
+  const [lastCalledNumber, setLastCalledNumber] = useState<number | null>(null);
 
   const match = matches.find(m => m.id === id);
   const myCards = currentPlayer && id ? getPlayerMatchCards(id, currentPlayer.id) : [];
@@ -25,9 +27,11 @@ const MatchView = () => {
 
     if (currentNumbers.length > prevNumbers.length) {
       const newNumber = currentNumbers[currentNumbers.length - 1];
+      setLastCalledNumber(newNumber);
       toast.info(`Número sorteado: ${newNumber}!`, {
         description: 'Confira sua cartela.',
       });
+      playNotificationSound();
     }
 
     prevCalledNumbersRef.current = currentNumbers;
@@ -108,6 +112,7 @@ const MatchView = () => {
                       number={num}
                       isMarked={card.markedNumbers.has(num)}
                       isFreeSpace={rowIndex === 2 && colIndex === 2}
+                      isNewlyMarked={num === lastCalledNumber}
                     />
                   ))
                 )}
