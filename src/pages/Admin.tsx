@@ -11,7 +11,7 @@ import { PrizeType, Match, MatchStatus } from '@/types/match';
 import { gameTypeLabels } from '@/utils/bingoUtils';
 import { 
   Plus, LogOut, Play, DoorOpen, Trash2, Trophy, Users, 
-  Clock, Coins, Hash, ArrowLeft, StopCircle, Settings, Save, Bot, Shuffle, Ticket, ArrowRight, Webhook, Key
+  Clock, Coins, Hash, ArrowLeft, StopCircle, Settings, Save, Bot, Shuffle, Ticket, ArrowRight, Webhook, Key, Send, Loader2
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
@@ -19,6 +19,7 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Footer } from '@/components/Footer';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { supabase } from '@/integrations/supabase/client';
 
 const statusLabels: Record<MatchStatus, string> = {
   waiting: 'Aguardando',
@@ -68,6 +69,7 @@ const Admin = () => {
   });
   const [callerInput, setCallerInput] = useState<Record<string, string>>({});
   const [now, setNow] = useState(Date.now());
+  const [isTestingN8n, setIsTestingN8n] = useState(false);
   const processingRef = useRef(new Set());
 
   useEffect(() => {
@@ -180,6 +182,36 @@ const Admin = () => {
     });
   };
 
+  const handleTestN8n = async () => {
+    setIsTestingN8n(true);
+    const { data, error } = await supabase.functions.invoke('test-n8n');
+
+    if (error) {
+      let detailedError = error.message;
+      if ('context' in error && typeof (error as any).context.json === 'function') {
+        try {
+          const errorJson = await (error as any).context.json();
+          if (errorJson.error) {
+            detailedError = errorJson.error;
+          }
+        } catch (e) {
+          console.error("Failed to parse edge function error response:", e);
+        }
+      }
+      toast({
+        title: 'Falha no Teste',
+        description: detailedError,
+        variant: 'destructive',
+      });
+    } else {
+      toast({
+        title: 'Sucesso!',
+        description: data.message || 'Notificação de teste enviada.',
+      });
+    }
+    setIsTestingN8n(false);
+  };
+
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <header className="gradient-hero py-6 px-4">
@@ -261,6 +293,21 @@ const Admin = () => {
                       <Label htmlFor="r2">Produção</Label>
                     </div>
                   </RadioGroup>
+                </div>
+                <div className="pt-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleTestN8n}
+                    disabled={isTestingN8n}
+                  >
+                    {isTestingN8n ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <Send className="w-4 h-4 mr-2" />
+                    )}
+                    Testar Ambiente Ativo
+                  </Button>
                 </div>
               </div>
             </div>
