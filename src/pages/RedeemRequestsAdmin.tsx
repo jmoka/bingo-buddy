@@ -152,14 +152,6 @@ const RedeemRequestsAdmin = () => {
       <main className="container max-w-6xl mx-auto py-8 px-4 flex-grow">
         <Tabs defaultValue="pending">
           <TabsList className="grid w-full grid-cols-3 mb-6 h-12">
-            <TabsTrigger value="approved" className="flex items-center gap-2">
-              Pagos
-              {approvedRequests.length > 0 && (
-                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-success text-[10px] font-bold text-white">
-                  {approvedRequests.length}
-                </span>
-              )}
-            </TabsTrigger>
             <TabsTrigger value="pending" className="flex items-center gap-2">
               A Pagar
               {pendingRequests.length > 0 && (
@@ -173,6 +165,14 @@ const RedeemRequestsAdmin = () => {
               {rejectedRequests.length > 0 && (
                 <span className="flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-[10px] font-bold text-white">
                   {rejectedRequests.length}
+                </span>
+              )}
+            </TabsTrigger>
+            <TabsTrigger value="approved" className="flex items-center gap-2">
+              Pagos
+              {approvedRequests.length > 0 && (
+                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-success text-[10px] font-bold text-white">
+                  {approvedRequests.length}
                 </span>
               )}
             </TabsTrigger>
