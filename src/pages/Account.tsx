@@ -32,7 +32,7 @@ export default function Account() {
     setLoading(true)
     const { user } = session
 
-    const { error } = await supabase.from('profiles').upsert({
+    const { error } = await supabase.from('perfis').upsert({
       id: user.id,
       full_name: fullName,
       updated_at: new Date(),

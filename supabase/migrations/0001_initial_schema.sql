@@ -1,16 +1,16 @@
 -- Drop existing objects in reverse order of dependency to avoid errors
-drop table if exists public.match_cards;
-drop table if exists public.player_cards;
-drop table if exists public.matches;
+drop table if exists public.cartelas_partida;
+drop table if exists public.cartelas_jogador;
+drop table if exists public.partidas;
 drop trigger if exists on_auth_user_created on auth.users;
 drop function if exists public.handle_new_user;
-drop table if exists public.profiles;
-drop function if exists public.is_admin; -- Drop new function if it exists
+drop table if exists public.perfis;
+drop function if exists public.is_admin;
 drop type if exists public.user_role;
 drop type if exists public.prize_type;
 drop type if exists public.match_status;
 
--- Recreate everything with the corrected policies
+-- Recreate everything with Portuguese names and new admin logic
 
 -- Create custom types for better data integrity
 create type public.match_status as enum ('waiting', 'open', 'in_progress', 'finished');
@@ -28,7 +28,7 @@ begin
   if auth.uid() is null then
     return false;
   end if;
-  return (select role from public.profiles where id = auth.uid()) = 'admin'::user_role;
+  return (select role from public.perfis where id = auth.uid()) = 'admin'::user_role;
 exception
   when no_data_found then
     return false;
@@ -37,8 +37,8 @@ exception
 end;
 $$;
 
--- Create Profiles Table to store user-specific data
-create table public.profiles (
+-- Create Profiles Table (Perfis) to store user-specific data
+create table public.perfis (
   id uuid not null references auth.users on delete cascade,
   full_name text,
   avatar_url text,
@@ -48,21 +48,29 @@ create table public.profiles (
   primary key (id)
 );
 -- Enable Row Level Security for Profiles
-alter table public.profiles enable row level security;
+alter table public.perfis enable row level security;
 -- Policies for Profiles
-create policy "Users can view their own profile" on public.profiles for select using (auth.uid() = id);
-create policy "Users can update their own profile" on public.profiles for update using (auth.uid() = id) with check (auth.uid() = id);
-create policy "Admins can view all profiles" on public.profiles for select using (public.is_admin());
+create policy "Users can view their own profile" on public.perfis for select using (auth.uid() = id);
+create policy "Users can update their own profile" on public.perfis for update using (auth.uid() = id) with check (auth.uid() = id);
+create policy "Admins can view all profiles" on public.perfis for select using (public.is_admin());
 
--- Function to automatically create a profile for a new user upon signup
+-- Function to automatically create a profile and set the first user as admin
 create or replace function public.handle_new_user()
 returns trigger
 language plpgsql
 security definer set search_path = public
 as $$
+declare
+  user_count integer;
 begin
-  insert into public.profiles (id, full_name, avatar_url)
-  values (new.id, new.raw_user_meta_data->>'full_name', new.raw_user_meta_data->>'avatar_url');
+  select count(*) into user_count from public.perfis;
+  insert into public.perfis (id, full_name, avatar_url, role)
+  values (
+    new.id,
+    new.raw_user_meta_data->>'full_name',
+    new.raw_user_meta_data->>'avatar_url',
+    case when user_count = 0 then 'admin' else 'user' end
+  );
   return new;
 end;
 $$;
@@ -73,8 +81,8 @@ create trigger on_auth_user_created
   for each row execute procedure public.handle_new_user();
 
 
--- Create Matches Table
-create table public.matches (
+-- Create Matches Table (Partidas)
+create table public.partidas (
   id uuid not null default gen_random_uuid() primary key,
   name text not null,
   game_type text not null,
@@ -91,16 +99,16 @@ create table public.matches (
   winners jsonb not null default '[]'
 );
 -- Enable RLS for Matches
-alter table public.matches enable row level security;
+alter table public.partidas enable row level security;
 -- Policies for Matches
-create policy "Authenticated users can view matches" on public.matches for select to authenticated using (true);
-create policy "Admins can create matches" on public.matches for insert with check (public.is_admin());
-create policy "Admins can update matches" on public.matches for update using (public.is_admin());
-create policy "Admins can delete matches" on public.matches for delete using (public.is_admin());
+create policy "Authenticated users can view matches" on public.partidas for select to authenticated using (true);
+create policy "Admins can create matches" on public.partidas for insert with check (public.is_admin());
+create policy "Admins can update matches" on public.partidas for update using (public.is_admin());
+create policy "Admins can delete matches" on public.partidas for delete using (public.is_admin());
 
 
--- Create Player Cards Table (templates owned by players)
-create table public.player_cards (
+-- Create Player Cards Table (Cartelas do Jogador)
+create table public.cartelas_jogador (
   id uuid not null default gen_random_uuid() primary key,
   player_id uuid not null references auth.users on delete cascade,
   name text not null,
@@ -109,26 +117,26 @@ create table public.player_cards (
   created_at timestamp with time zone default timezone('utc'::text, now())
 );
 -- Enable RLS for Player Cards
-alter table public.player_cards enable row level security;
+alter table public.cartelas_jogador enable row level security;
 -- Policies for Player Cards
-create policy "Users can manage their own cards" on public.player_cards for all using (auth.uid() = player_id);
-create policy "Admins can view all player cards" on public.player_cards for select using (public.is_admin());
+create policy "Users can manage their own cards" on public.cartelas_jogador for all using (auth.uid() = player_id);
+create policy "Admins can view all player cards" on public.cartelas_jogador for select using (public.is_admin());
 
 
--- Create Match Cards Table (instances of player cards used in a specific match)
-create table public.match_cards (
+-- Create Match Cards Table (Cartelas da Partida)
+create table public.cartelas_partida (
   id uuid not null default gen_random_uuid() primary key,
-  player_card_id uuid not null references public.player_cards on delete cascade,
+  player_card_id uuid not null references public.cartelas_jogador on delete cascade,
   player_id uuid not null references auth.users on delete cascade,
-  match_id uuid not null references public.matches on delete cascade,
+  match_id uuid not null references public.partidas on delete cascade,
   name text not null,
   numbers jsonb not null,
   marked_numbers integer[] not null default '{}',
   created_at timestamp with time zone default timezone('utc'::text, now())
 );
 -- Enable RLS for Match Cards
-alter table public.match_cards enable row level security;
+alter table public.cartelas_partida enable row level security;
 -- Policies for Match Cards
-create policy "Users can view their own match cards" on public.match_cards for select using (auth.uid() = player_id);
-create policy "Users can insert their own match cards" on public.match_cards for insert with check (auth.uid() = player_id);
-create policy "Admins can view all match cards" on public.match_cards for select using (public.is_admin());
+create policy "Users can view their own match cards" on public.cartelas_partida for select using (auth.uid() = player_id);
+create policy "Users can insert their own match cards" on public.cartelas_partida for insert with check (auth.uid() = player_id);
+create policy "Admins can view all match cards" on public.cartelas_partida for select using (public.is_admin());

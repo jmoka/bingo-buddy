@@ -46,7 +46,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const { data: matches = [], isLoading: l1 } = useQuery({
     queryKey: ['matches'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('matches').select('*').order('start_time', { ascending: false });
+      const { data, error } = await supabase.from('partidas').select('*').order('start_time', { ascending: false });
       if (error) throw error;
       return data as Match[];
     },
@@ -55,7 +55,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const { data: players = [] } = useQuery({
     queryKey: ['players'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('profiles').select('*');
+      const { data, error } = await supabase.from('perfis').select('*');
       if (error) throw error;
       return data as Profile[];
     },
@@ -66,7 +66,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     queryKey: ['playerCards', user?.id],
     queryFn: async () => {
       if (!user) return [];
-      const { data, error } = await supabase.from('player_cards').select('*').eq('player_id', user.id);
+      const { data, error } = await supabase.from('cartelas_jogador').select('*').eq('player_id', user.id);
       if (error) throw error;
       return data as PlayerCard[];
     },
@@ -76,7 +76,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const { data: matchCards = [], isLoading: l3 } = useQuery({
     queryKey: ['matchCards'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('match_cards').select('*');
+      const { data, error } = await supabase.from('cartelas_partida').select('*');
       if (error) throw error;
       return data.map(c => ({ ...c, marked_numbers: new Set(c.marked_numbers || []) })) as MatchCard[];
     },
@@ -95,12 +95,12 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [queryClient]);
 
   const createMatch = async (data: any) => {
-    const { error } = await supabase.from('matches').insert([{ ...data, status: 'waiting' }]);
+    const { error } = await supabase.from('partidas').insert([{ ...data, status: 'waiting' }]);
     if (error) toast.error(error.message);
   };
 
   const updateMatchStatus = async (matchId: string, status: MatchStatus) => {
-    const { error } = await supabase.from('matches').update({ status }).eq('id', matchId);
+    const { error } = await supabase.from('partidas').update({ status }).eq('id', matchId);
     if (error) toast.error(error.message);
   };
 
@@ -109,7 +109,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const finishMatch = (matchId: string) => updateMatchStatus(matchId, 'finished');
 
   const deleteMatch = async (matchId: string) => {
-    const { error } = await supabase.from('matches').delete().eq('id', matchId);
+    const { error } = await supabase.from('partidas').delete().eq('id', matchId);
     if (error) toast.error(error.message);
   };
 
@@ -117,7 +117,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const match = matches.find(m => m.id === matchId);
     if (!match) return;
     const isEnabling = !match.is_auto_calling;
-    const { error } = await supabase.from('matches').update({
+    const { error } = await supabase.from('partidas').update({
       is_auto_calling: isEnabling,
       next_auto_call_timestamp: isEnabling ? new Date(Date.now() + gameSettings.autoCallIntervalSeconds * 1000).toISOString() : null,
     }).eq('id', matchId);
@@ -129,7 +129,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!match || match.called_numbers.includes(num)) return;
 
     const newCalledNumbers = [...match.called_numbers, num];
-    const { error: updateError } = await supabase.from('matches').update({ called_numbers: newCalledNumbers }).eq('id', matchId);
+    const { error: updateError } = await supabase.from('partidas').update({ called_numbers: newCalledNumbers }).eq('id', matchId);
     if (updateError) { toast.error(updateError.message); return; }
 
     const cardsInMatch = matchCards.filter(c => c.match_id === matchId);
@@ -154,14 +154,14 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
         cardName: fw.card.name,
       }));
 
-      await supabase.from('matches').update({ status: 'finished', winners: winnerData, is_auto_calling: false }).eq('id', matchId);
+      await supabase.from('partidas').update({ status: 'finished', winners: winnerData, is_auto_calling: false }).eq('id', matchId);
       toast.success('BINGO! Temos um vencedor!');
     }
   };
 
   const buyCredits = async (amount: number) => {
     if (!profile) return;
-    const { error } = await supabase.from('profiles').update({ credits: profile.credits + amount }).eq('id', profile.id);
+    const { error } = await supabase.from('perfis').update({ credits: profile.credits + amount }).eq('id', profile.id);
     if (error) toast.error(error.message);
   };
 
@@ -170,11 +170,11 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       toast.error('Créditos insuficientes!');
       return null;
     }
-    const { error: creditError } = await supabase.from('profiles').update({ credits: profile.credits - gameSettings.newCardCost }).eq('id', user.id);
+    const { error: creditError } = await supabase.from('perfis').update({ credits: profile.credits - gameSettings.newCardCost }).eq('id', user.id);
     if (creditError) { toast.error(creditError.message); return null; }
 
     const newCard = { player_id: user.id, ...options, uses_left: 1 };
-    const { data, error } = await supabase.from('player_cards').insert(newCard).select().single();
+    const { data, error } = await supabase.from('cartelas_jogador').insert(newCard).select().single();
     if (error) { toast.error(error.message); return null; }
     return data as PlayerCard;
   };
@@ -187,12 +187,12 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const totalCost = playerCardIds.length * match.card_price;
     if (profile.credits < totalCost) { toast.error("Créditos insuficientes!"); return null; }
 
-    const { error: creditError } = await supabase.from('profiles').update({ credits: profile.credits - totalCost }).eq('id', user.id);
+    const { error: creditError } = await supabase.from('perfis').update({ credits: profile.credits - totalCost }).eq('id', user.id);
     if (creditError) { toast.error(creditError.message); return null; }
 
     for (const cardId of playerCardIds) {
       const card = playerCards.find(c => c.id === cardId);
-      if (card) await supabase.from('player_cards').update({ uses_left: card.uses_left - 1 }).eq('id', cardId);
+      if (card) await supabase.from('cartelas_jogador').update({ uses_left: card.uses_left - 1 }).eq('id', cardId);
     }
 
     const newMatchCards = playerCardIds.map(cardId => {
@@ -207,10 +207,10 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       };
     });
 
-    const { data, error } = await supabase.from('match_cards').insert(newMatchCards).select();
+    const { data, error } = await supabase.from('cartelas_partida').insert(newMatchCards).select();
     if (error) { toast.error(error.message); return null; }
 
-    await supabase.from('matches').update({ pot: match.pot + totalCost }).eq('id', matchId);
+    await supabase.from('partidas').update({ pot: match.pot + totalCost }).eq('id', matchId);
     return data as MatchCard[];
   };
 
@@ -219,12 +219,12 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       toast.error('Créditos insuficientes!');
       return false;
     }
-    const { error: creditError } = await supabase.from('profiles').update({ credits: profile.credits - gameSettings.cardRechargeCost }).eq('id', profile.id);
+    const { error: creditError } = await supabase.from('perfis').update({ credits: profile.credits - gameSettings.cardRechargeCost }).eq('id', profile.id);
     if (creditError) { toast.error(creditError.message); return false; }
 
     const card = playerCards.find(c => c.id === playerCardId);
     if (card) {
-      const { error } = await supabase.from('player_cards').update({ uses_left: card.uses_left + gameSettings.usesPerRecharge }).eq('id', playerCardId);
+      const { error } = await supabase.from('cartelas_jogador').update({ uses_left: card.uses_left + gameSettings.usesPerRecharge }).eq('id', playerCardId);
       if (error) { toast.error(error.message); return false; }
     }
     return true;

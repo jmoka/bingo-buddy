@@ -30,7 +30,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     queryKey: ['profile', user?.id],
     queryFn: async () => {
       if (!user) return null;
-      const { data, error } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+      const { data, error } = await supabase.from('perfis').select('*').eq('id', user.id).single();
       if (error) {
         console.error('Error fetching profile:', error);
         return null;
