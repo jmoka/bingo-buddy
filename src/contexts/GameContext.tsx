@@ -193,7 +193,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const joinMatch = useCallback((matchId: string, playerCardIds: string[]): MatchCard[] => {
     if (!currentPlayer || playerCardIds.length === 0) return [];
     const match = matches.find(m => m.id === matchId);
-    if (!match || match.status !== 'open') return [];
+    if (!match || (match.status !== 'open' && match.status !== 'waiting')) return [];
 
     const cardsToUse = playerCards.filter(pc => playerCardIds.includes(pc.id));
     const allCardsAreValid = cardsToUse.every(c => c.usesLeft > 0 && c.playerId === currentPlayer.id);

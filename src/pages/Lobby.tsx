@@ -212,7 +212,7 @@ const Lobby = () => {
             {matches.filter(m => m.status !== 'finished').map(match => {
               const myMatchCards = getPlayerMatchCards(match.id, currentPlayer.id);
               const alreadyJoined = myMatchCards.length > 0;
-              const canJoin = match.status === 'open' && myOwnedCards.some(c => c.usesLeft > 0);
+              const canJoin = (match.status === 'open' || match.status === 'waiting') && myOwnedCards.some(c => c.usesLeft > 0);
 
               return (
                 <div key={match.id} className={`card-container ${match.status === 'in_progress' ? 'ring-2 ring-accent' : ''}`}>
