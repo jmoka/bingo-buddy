@@ -97,7 +97,41 @@ const RedeemRequestsAdmin = () => {
   };
 
   const pendingRequests = allRedeemRequests.filter(r => r.status === 'pending');
-  const resolvedRequests = allRedeemRequests.filter(r => r.status !== 'pending');
+  const approvedRequests = allRedeemRequests.filter(r => r.status === 'approved');
+  const rejectedRequests = allRedeemRequests.filter(r => r.status === 'rejected');
+
+  const renderHistoryTable = (requests: RedeemRequest[]) => (
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead>Jogador</TableHead>
+          <TableHead>Status</TableHead>
+          <TableHead>Valor</TableHead>
+          <TableHead className="text-right">Ação</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {requests.map(req => (
+          <TableRow key={req.id} className="opacity-80">
+            <TableCell>
+              <div className="flex items-center gap-2 text-sm">
+                <PlayerAvatar url={req.perfis?.avatar_url || null} />
+                <span>{req.perfis?.full_name || 'Usuário'}</span>
+              </div>
+            </TableCell>
+            <TableCell><Badge className={`${statusConfig[req.status]?.color || 'bg-muted'} border-none`}>{statusConfig[req.status]?.label}</Badge></TableCell>
+            <TableCell><div className="text-sm font-bold text-success">R$ {Number(req.amount_to_receive).toFixed(2)}</div></TableCell>
+            <TableCell className="text-right">
+              <div className="flex justify-end gap-1.5">
+                {req.status === 'rejected' && <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground" onClick={() => unblockRedeemRequest(req.id)}><Undo2 className="w-4 h-4" /></Button>}
+                <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground" onClick={() => handleOpenDialog(req, 'delete')}><Trash2 className="w-4 h-4" /></Button>
+              </div>
+            </TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
+  );
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -117,7 +151,7 @@ const RedeemRequestsAdmin = () => {
 
       <main className="container max-w-6xl mx-auto py-8 px-4 flex-grow">
         <Tabs defaultValue="pending">
-          <TabsList className="grid w-full grid-cols-2 mb-6 h-12">
+          <TabsList className="grid w-full grid-cols-3 mb-6 h-12">
             <TabsTrigger value="pending" className="flex items-center gap-2">
               A Pagar
               {pendingRequests.length > 0 && (
@@ -126,11 +160,19 @@ const RedeemRequestsAdmin = () => {
                 </span>
               )}
             </TabsTrigger>
-            <TabsTrigger value="resolved" className="flex items-center gap-2">
-              Histórico
-              {resolvedRequests.length > 0 && (
+            <TabsTrigger value="approved" className="flex items-center gap-2">
+              Pagos
+              {approvedRequests.length > 0 && (
                 <span className="flex h-5 w-5 items-center justify-center rounded-full bg-success text-[10px] font-bold text-white">
-                  {resolvedRequests.length}
+                  {approvedRequests.length}
+                </span>
+              )}
+            </TabsTrigger>
+            <TabsTrigger value="rejected" className="flex items-center gap-2">
+              Com Problema
+              {rejectedRequests.length > 0 && (
+                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-[10px] font-bold text-white">
+                  {rejectedRequests.length}
                 </span>
               )}
             </TabsTrigger>
@@ -189,38 +231,14 @@ const RedeemRequestsAdmin = () => {
             </div>
           </TabsContent>
 
-          <TabsContent value="resolved">
+          <TabsContent value="approved">
             <div className="card-container overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Jogador</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Valor</TableHead>
-                    <TableHead className="text-right">Ação</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {resolvedRequests.map(req => (
-                    <TableRow key={req.id} className="opacity-80">
-                      <TableCell>
-                        <div className="flex items-center gap-2 text-sm">
-                          <PlayerAvatar url={req.perfis?.avatar_url || null} />
-                          <span>{req.perfis?.full_name || 'Usuário'}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell><Badge className={`${statusConfig[req.status]?.color || 'bg-muted'} border-none`}>{statusConfig[req.status]?.label}</Badge></TableCell>
-                      <TableCell><div className="text-sm font-bold text-success">R$ {Number(req.amount_to_receive).toFixed(2)}</div></TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-1.5">
-                          {req.status === 'rejected' && <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground" onClick={() => unblockRedeemRequest(req.id)}><Undo2 className="w-4 h-4" /></Button>}
-                          <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground" onClick={() => handleOpenDialog(req, 'delete')}><Trash2 className="w-4 h-4" /></Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+              {renderHistoryTable(approvedRequests)}
+            </div>
+          </TabsContent>
+          <TabsContent value="rejected">
+            <div className="card-container overflow-x-auto">
+              {renderHistoryTable(rejectedRequests)}
             </div>
           </TabsContent>
         </Tabs>
