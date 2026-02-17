@@ -27,56 +27,51 @@ export const MatchStats = ({ match, allMatchCards }: MatchStatsProps) => {
   if (match.status === 'in_progress') {
     for (const card of allMatchCards) {
       const needed = calculateNumbersToWin(card, match.game_type);
-      if (needed === 1) stats.missing1++;
-      if (needed === 3) stats.missing3++;
-      if (needed === 5) stats.missing5++;
+      if (needed <= 1) {
+        stats.missing1++;
+      } else if (needed <= 3) {
+        stats.missing3++;
+      } else if (needed <= 5) {
+        stats.missing5++;
+      }
     }
   }
 
-  const hasStatsToShow = stats.missing1 > 0 || stats.missing3 > 0 || stats.missing5 > 0;
-
   return (
     <div className="card-container mb-6">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
-        <div className="flex flex-col items-center justify-center p-2 rounded-lg bg-muted/50">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-center">
+        <div className="flex flex-col items-center justify-center p-4 rounded-lg bg-muted/50">
           <Ticket className="w-6 h-6 text-primary mb-1" />
-          <span className="font-bold text-xl font-heading">{totalCards}</span>
-          <span className="text-xs text-muted-foreground">Cartelas na Partida</span>
+          <span className="font-bold text-2xl font-heading">{totalCards}</span>
+          <span className="text-sm text-muted-foreground">Cartelas na Partida</span>
         </div>
-        <div className="flex flex-col items-center justify-center p-2 rounded-lg bg-muted/50">
+        <div className="flex flex-col items-center justify-center p-4 rounded-lg bg-muted/50">
           <Trophy className="w-6 h-6 text-success mb-1" />
           <span className="font-bold text-lg font-heading text-center">{prizeDisplay}</span>
-          <span className="text-xs text-muted-foreground">Prêmio</span>
-        </div>
-        <div className="flex flex-col items-center justify-center p-2 rounded-lg bg-muted/50">
-          <Flame className="w-6 h-6 text-destructive mb-1" />
-          <span className="font-bold text-xl font-heading">Quase lá!</span>
-          <span className="text-xs text-muted-foreground">Cartelas perto de ganhar</span>
+          <span className="text-sm text-muted-foreground">Prêmio</span>
         </div>
       </div>
-      {hasStatsToShow && (
-        <div className="mt-4 pt-4 border-t border-border flex justify-center items-center gap-4 flex-wrap">
-          {stats.missing5 > 0 && (
-            <div className="flex items-center gap-2 text-sm">
-              <Target className="w-4 h-4 text-muted-foreground" />
-              <span className="font-semibold">{stats.missing5}</span>
-              <span className="text-muted-foreground">cartela(s) faltam 5</span>
+
+      {match.status === 'in_progress' && (
+        <div className="mt-4 pt-4 border-t border-border">
+          <h4 className="text-center font-heading font-bold mb-3 text-foreground">Quase lá!</h4>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
+            <div className="flex flex-col items-center justify-center p-4 rounded-lg bg-muted/50">
+              <Target className="w-6 h-6 text-muted-foreground mb-1" />
+              <span className="font-bold text-2xl font-heading">{stats.missing5}</span>
+              <span className="text-sm text-muted-foreground">Faltam 5</span>
             </div>
-          )}
-          {stats.missing3 > 0 && (
-            <div className="flex items-center gap-2 text-sm">
-              <Target className="w-4 h-4 text-accent" />
-              <span className="font-semibold">{stats.missing3}</span>
-              <span className="text-muted-foreground">cartela(s) faltam 3</span>
+            <div className="flex flex-col items-center justify-center p-4 rounded-lg bg-accent/10">
+              <Target className="w-6 h-6 text-accent mb-1" />
+              <span className="font-bold text-2xl font-heading text-accent">{stats.missing3}</span>
+              <span className="text-sm text-accent/80">Faltam 3</span>
             </div>
-          )}
-          {stats.missing1 > 0 && (
-            <div className="flex items-center gap-2 text-sm text-destructive font-bold">
-              <Target className="w-4 h-4" />
-              <span>{stats.missing1}</span>
-              <span>cartela(s) por 1!</span>
+            <div className="flex flex-col items-center justify-center p-4 rounded-lg bg-destructive/10">
+              <Flame className="w-6 h-6 text-destructive mb-1" />
+              <span className="font-bold text-2xl font-heading text-destructive">{stats.missing1}</span>
+              <span className="text-sm text-destructive/80">Por 1!</span>
             </div>
-          )}
+          </div>
         </div>
       )}
     </div>
