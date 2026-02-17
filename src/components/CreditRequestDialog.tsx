@@ -24,14 +24,12 @@ export const CreditRequestDialog = ({ gameSettings, children }: CreditRequestDia
   const [isOpen, setIsOpen] = useState(false);
   const [credits, setCredits] = useState(10);
 
-  // Memoize a transação para evitar que o QR Code mude a cada renderização
-  // Ele só vai mudar se a quantidade de créditos ou o ID do perfil mudar
+  // Valor total em reais baseado na quantidade de créditos e no valor unitário configurado
   const amount = credits * (gameSettings?.valor_por_credito || 1);
 
   const pixPayload = useMemo(() => {
     if (!gameSettings?.pix_key || !profile) return '';
 
-    // Criamos um ID de transação estável que muda apenas quando o diálogo é aberto
     const stableId = `BINGO${profile.id.substring(0, 8)}`.slice(0, 25);
 
     try {

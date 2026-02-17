@@ -9,7 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose, DialogDescription } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Check, X, Download, MessageSquare } from 'lucide-react';
+import { ArrowLeft, Check, X, Download, MessageSquare, Coins } from 'lucide-react';
 import { Footer } from '@/components/Footer';
 import PlayerAvatar from '@/components/PlayerAvatar';
 import { CreditRequest } from '@/types/match';
@@ -103,7 +103,7 @@ const CreditRequestsAdmin = () => {
                   <TableRow>
                     <TableHead>Jogador</TableHead>
                     <TableHead>Data</TableHead>
-                    <TableHead>Valor Solicitado</TableHead>
+                    <TableHead>Pedido</TableHead>
                     <TableHead className="text-center">Comprovante</TableHead>
                     <TableHead className="text-right">Ações</TableHead>
                   </TableRow>
@@ -121,7 +121,7 @@ const CreditRequestsAdmin = () => {
                         {formatDistanceToNow(new Date(req.requested_at), { addSuffix: true, locale: ptBR })}
                       </TableCell>
                       <TableCell>
-                        <div className="font-medium">{req.credits_requested} créditos</div>
+                        <div className="font-bold">{req.credits_requested} créditos</div>
                         <div className="text-xs text-muted-foreground">R$ {req.amount_paid?.toFixed(2).replace('.', ',')}</div>
                       </TableCell>
                       <TableCell className="text-center">
@@ -152,7 +152,8 @@ const CreditRequestsAdmin = () => {
                     <TableHead>Jogador</TableHead>
                     <TableHead>Data</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead className="text-center">Créditos</TableHead>
+                    <TableHead>Pedido</TableHead>
+                    <TableHead className="text-right">Aprovado</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -168,7 +169,13 @@ const CreditRequestsAdmin = () => {
                       <TableCell>
                         <Badge className={statusConfig[req.status].color}>{statusConfig[req.status].label}</Badge>
                       </TableCell>
-                      <TableCell className="text-center font-mono">{req.credits_granted || '-'}</TableCell>
+                      <TableCell>
+                        <div className="text-sm font-medium">{req.credits_requested} cr.</div>
+                        <div className="text-xs text-muted-foreground">R$ {req.amount_paid?.toFixed(2).replace('.', ',')}</div>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="font-bold text-success">{req.credits_granted || 0} créditos</div>
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -184,23 +191,48 @@ const CreditRequestsAdmin = () => {
           <DialogHeader>
             <DialogTitle>Resolver Solicitação</DialogTitle>
             <DialogDescription>
-              {actionType === 'approve' ? 'Defina quantos créditos serão adicionados ao jogador.' : 'Adicione uma nota para a rejeição (opcional).'}
+              {actionType === 'approve' ? 'Confirme ou altere a quantidade de créditos que o jogador receberá.' : 'Adicione uma nota para a rejeição (opcional).'}
             </DialogDescription>
           </DialogHeader>
+          
+          {selectedRequest && (
+            <div className="p-3 bg-muted rounded-lg mb-4 flex justify-between items-center">
+              <div>
+                <p className="text-xs text-muted-foreground uppercase font-bold tracking-wider">Solicitado pelo Jogador</p>
+                <p className="text-lg font-bold">{selectedRequest.credits_requested} créditos</p>
+                <p className="text-sm text-muted-foreground">R$ {selectedRequest.amount_paid?.toFixed(2).replace('.', ',')}</p>
+              </div>
+              <Coins className="w-8 h-8 text-primary/20" />
+            </div>
+          )}
+
           {actionType === 'approve' ? (
-            <div className="pt-4">
-              <label htmlFor="credits" className="text-sm font-medium">Créditos a Conceder</label>
-              <Input id="credits" type="number" value={creditsToGrant} onChange={e => setCreditsToGrant(parseInt(e.target.value, 10) || 0)} />
+            <div className="space-y-2">
+              <Label htmlFor="credits">Créditos a Liberar</Label>
+              <Input 
+                id="credits" 
+                type="number" 
+                value={creditsToGrant} 
+                onChange={e => setCreditsToGrant(parseInt(e.target.value, 10) || 0)} 
+                className="text-lg font-bold"
+              />
             </div>
           ) : (
-            <div className="pt-4">
-              <label htmlFor="notes" className="text-sm font-medium">Motivo da Rejeição</label>
-              <Textarea id="notes" placeholder="Ex: Comprovante inválido." value={rejectionNotes} onChange={e => setRejectionNotes(e.target.value)} />
+            <div className="space-y-2">
+              <Label htmlFor="notes">Motivo da Rejeição</Label>
+              <Textarea 
+                id="notes" 
+                placeholder="Ex: Comprovante não corresponde ao valor solicitado." 
+                value={rejectionNotes} 
+                onChange={e => setRejectionNotes(e.target.value)} 
+              />
             </div>
           )}
           <DialogFooter>
             <DialogClose asChild><Button variant="ghost">Cancelar</Button></DialogClose>
-            <Button onClick={handleResolve}>Confirmar</Button>
+            <Button onClick={handleResolve}>
+              {actionType === 'approve' ? 'Aprovar e Liberar' : 'Confirmar Rejeição'}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

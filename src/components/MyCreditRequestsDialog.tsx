@@ -5,16 +5,16 @@ import { Badge } from "@/components/ui/badge";
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { ScrollArea } from './ui/scroll-area';
-import { Coins, Calendar, Info } from 'lucide-react';
+import { Coins, Calendar, Info, CheckCircle2, AlertCircle } from 'lucide-react';
 
 interface MyCreditRequestsDialogProps {
   children: React.ReactNode;
 }
 
 const statusConfig = {
-  pending: { label: 'Pendente', color: 'bg-amber-500/10 text-amber-600' },
-  approved: { label: 'Aprovada', color: 'bg-success/10 text-success' },
-  rejected: { label: 'Rejeitada', color: 'bg-destructive/10 text-destructive' },
+  pending: { label: 'Pendente', color: 'bg-amber-500/10 text-amber-600', icon: Info },
+  approved: { label: 'Aprovada', color: 'bg-success/10 text-success', icon: CheckCircle2 },
+  rejected: { label: 'Rejeitada', color: 'bg-destructive/10 text-destructive', icon: AlertCircle },
 };
 
 export const MyCreditRequestsDialog = ({ children }: MyCreditRequestsDialogProps) => {
@@ -35,52 +35,56 @@ export const MyCreditRequestsDialog = ({ children }: MyCreditRequestsDialogProps
                 <p className="text-muted-foreground">Você ainda não fez nenhuma solicitação.</p>
               </div>
             ) : (
-              creditRequests.map(req => (
-                <div key={req.id} className="flex items-center justify-between p-4 rounded-xl bg-muted/50 border border-border/50">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <Calendar className="w-3.5 h-3.5 text-muted-foreground" />
-                      <span className="text-sm font-medium">
-                        {format(new Date(req.requested_at), "dd 'de' MMMM", { locale: ptBR })}
-                      </span>
-                      <span className="text-xs text-muted-foreground">
-                        {format(new Date(req.requested_at), "HH:mm", { locale: ptBR })}
-                      </span>
+              creditRequests.map(req => {
+                const config = statusConfig[req.status];
+                const StatusIcon = config.icon;
+
+                return (
+                  <div key={req.id} className="p-4 rounded-xl bg-muted/50 border border-border/50 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <Calendar className="w-3.5 h-3.5" />
+                        <span>{format(new Date(req.requested_at), "dd/MM/yy 'às' HH:mm", { locale: ptBR })}</span>
+                      </div>
+                      <Badge className={config.color}>
+                        <StatusIcon className="w-3 h-3 mr-1" />
+                        {config.label}
+                      </Badge>
                     </div>
                     
-                    <div className="flex items-center gap-2">
-                      <Coins className="w-4 h-4 text-primary" />
-                      <p className="font-bold text-lg">
-                        {req.credits_requested || req.credits_granted || 0} créditos
-                      </p>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Pedido</p>
+                        <div className="flex items-center gap-1.5">
+                          <Coins className="w-4 h-4 text-muted-foreground" />
+                          <span className="font-bold">{req.credits_requested} cr.</span>
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          R$ {req.amount_paid?.toFixed(2).replace('.', ',')}
+                        </p>
+                      </div>
+
+                      {req.status === 'approved' && (
+                        <div className="space-y-1 border-l pl-4 border-success/20">
+                          <p className="text-[10px] uppercase font-bold text-success tracking-wider">Aprovado</p>
+                          <div className="flex items-center gap-1.5">
+                            <Coins className="w-4 h-4 text-success" />
+                            <span className="font-bold text-success">{req.credits_granted} cr.</span>
+                          </div>
+                          <p className="text-xs text-success/70">Créditos liberados</p>
+                        </div>
+                      )}
                     </div>
-
-                    {req.amount_paid && (
-                      <p className="text-xs text-muted-foreground">
-                        Valor pago: R$ {req.amount_paid.toFixed(2).replace('.', ',')}
-                      </p>
-                    )}
-
-                    {req.status === 'approved' && req.credits_granted && req.credits_granted !== req.credits_requested && (
-                      <p className="text-xs text-success font-medium">
-                        Liberado: {req.credits_granted} créditos
-                      </p>
-                    )}
                     
                     {req.notes && req.status === 'rejected' && (
-                      <p className="text-xs text-destructive italic mt-1">
-                        Motivo: {req.notes}
-                      </p>
+                      <div className="mt-2 p-2 rounded bg-destructive/5 text-xs text-destructive flex gap-2">
+                        <Info className="w-3.5 h-3.5 shrink-0" />
+                        <span><strong>Motivo:</strong> {req.notes}</span>
+                      </div>
                     )}
                   </div>
-                  
-                  <div className="flex flex-col items-end gap-2">
-                    <Badge className={statusConfig[req.status].color}>
-                      {statusConfig[req.status].label}
-                    </Badge>
-                  </div>
-                </div>
-              ))
+                );
+              })
             )}
           </div>
         </ScrollArea>
