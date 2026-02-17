@@ -48,7 +48,9 @@ interface GameContextType {
   joinMatch: (matchId: string, playerCardIds: string[]) => Promise<MatchCard[] | null>;
   buyCardUses: (playerCardId: string) => Promise<boolean>;
   requestCredits: (file: File, creditsRequested: number, amountPaid: number) => Promise<boolean>;
+  resubmitCreditRequest: (requestId: string, file: File, message: string) => Promise<boolean>;
   resolveCreditRequest: (requestId: string, status: 'approved' | 'rejected', creditsGranted?: number, notes?: string) => Promise<boolean>;
+  unblockCreditRequest: (requestId: string) => Promise<void>;
   deleteCreditRequest: (requestId: string) => Promise<void>;
   updatePlayerCredits: (playerId: string, amount: number) => Promise<void>;
   getMatchCards: (matchId: string) => MatchCard[];
@@ -239,6 +241,24 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return true;
   };
 
+  const resubmitCreditRequest = async (requestId: string, file: File, message: string): Promise<boolean> => {
+    if (!user) return false;
+    const fileName = `${user.id}/${Date.now()}.${file.name.split('.').pop()}`;
+    await supabase.storage.from('receipts').upload(fileName, file);
+    const { error } = await supabase.from('solicitacoes_credito').update({
+      status: 'pending',
+      receipt_url: fileName,
+      resubmission_notes: message,
+      resolved_at: null,
+      resolved_by: null,
+      notes: null,
+      credits_granted: null,
+    }).eq('id', requestId);
+    if (error) return false;
+    await supabase.functions.invoke('notify-n8n', { body: { event: 'CREDIT_RESUBMISSION', data: { requestId, userEmail: user.email, message } } });
+    return true;
+  };
+
   const resolveCreditRequest = async (requestId: string, status: 'approved' | 'rejected', creditsGranted?: number, notes?: string): Promise<boolean> => {
     if (!profile || profile.role !== 'admin' || !user) return false;
     
@@ -255,6 +275,17 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }).eq('id', requestId);
     
     return true;
+  };
+
+  const unblockCreditRequest = async (requestId: string) => {
+    await supabase.from('solicitacoes_credito').update({
+      status: 'pending',
+      notes: 'Solicitação reaberta pelo administrador.',
+      resolved_at: null,
+      resolved_by: null,
+      credits_granted: null,
+    }).eq('id', requestId);
+    toast.success('Solicitação reaberta', { description: 'A solicitação foi movida para pendentes para nova análise.' });
   };
 
   const deleteCreditRequest = async (requestId: string) => {
@@ -306,7 +337,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       matches, players, playerCards, allPlayerCards, matchCards, wins, allWins, creditRequests, allCreditRequests, gameSettings, isLoading: isLoadingRequests || (isAdmin && isLoadingPlayers),
       createMatch, openMatch, startMatch, callNumber, finishMatch, deleteMatch, toggleAutoCall,
       updateGameSettings, createPlayerCard, deletePlayerCard, toggleArchivePlayerCard, joinMatch, buyCardUses,
-      requestCredits, resolveCreditRequest, deleteCreditRequest, updatePlayerCredits, getMatchCards, getPlayerMatchCards,
+      requestCredits, resubmitCreditRequest, resolveCreditRequest, unblockCreditRequest, deleteCreditRequest, updatePlayerCredits, getMatchCards, getPlayerMatchCards,
     }}>
       {children}
     </GameContext.Provider>

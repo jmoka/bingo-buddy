@@ -12,7 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose, DialogDescription } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Check, X, Download, MessageSquare, Trash2, Coins, AlertTriangle, RefreshCw } from 'lucide-react';
+import { ArrowLeft, Check, X, Download, MessageSquare, Trash2, Coins, AlertTriangle, RefreshCw, Undo2 } from 'lucide-react';
 import { Footer } from '@/components/Footer';
 import PlayerAvatar from '@/components/PlayerAvatar';
 import { CreditRequest } from '@/types/match';
@@ -32,7 +32,7 @@ const CreditRequestsAdmin = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { profile } = useAuth();
-  const { allCreditRequests, resolveCreditRequest, deleteCreditRequest, isLoading } = useGame();
+  const { allCreditRequests, resolveCreditRequest, deleteCreditRequest, unblockCreditRequest, isLoading } = useGame();
   
   const [selectedRequest, setSelectedRequest] = useState<CreditRequest | null>(null);
   const [creditsToGrant, setCreditsToGrant] = useState(0);
@@ -211,9 +211,16 @@ const CreditRequestsAdmin = () => {
                         {req.notes || '-'}
                       </TableCell>
                       <TableCell className="text-right">
-                        <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground" onClick={() => handleOpenDialog(req, 'delete')}>
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
+                        <div className="flex justify-end gap-1.5">
+                          {req.status === 'rejected' && (
+                            <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground" title="Reabrir Solicitação" onClick={() => unblockCreditRequest(req.id)}>
+                              <Undo2 className="w-4 h-4" />
+                            </Button>
+                          )}
+                          <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground" onClick={() => handleOpenDialog(req, 'delete')}>
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}

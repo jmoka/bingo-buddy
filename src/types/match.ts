@@ -78,6 +78,7 @@ export interface CreditRequest {
   resolved_at: string | null;
   resolved_by: string | null;
   notes: string | null;
+  resubmission_notes: string | null;
   // Joined data
   perfis?: {
     full_name: string;

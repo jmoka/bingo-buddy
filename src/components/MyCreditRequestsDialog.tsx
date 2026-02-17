@@ -6,8 +6,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { ScrollArea } from './ui/scroll-area';
-import { Coins, Calendar, Info, CheckCircle2, AlertCircle, Clock } from 'lucide-react';
+import { Coins, Calendar, Info, CheckCircle2, AlertCircle, Clock, RefreshCw } from 'lucide-react';
 import { CreditRequest } from '@/types/match';
+import { ResubmissionDialog } from './ResubmissionDialog';
 
 interface MyCreditRequestsDialogProps {
   children: React.ReactNode;
@@ -62,7 +63,6 @@ export const MyCreditRequestsDialog = ({ children }: MyCreditRequestsDialogProps
               </div>
               
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {/* Coluna do que foi solicitado pelo jogador */}
                 <div className="p-3 rounded-lg bg-muted/50 border border-border/50">
                   <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider mb-2">Solicitado</p>
                   <div className="flex flex-col gap-1">
@@ -78,7 +78,6 @@ export const MyCreditRequestsDialog = ({ children }: MyCreditRequestsDialogProps
                   </div>
                 </div>
 
-                {/* Coluna do que foi aprovado pelo admin (só aparece se aprovado) */}
                 {req.status === 'approved' && (
                   <div className="p-3 rounded-lg bg-success/5 border border-success/20">
                     <p className="text-[10px] uppercase font-bold text-success tracking-wider mb-2">Aprovado</p>
@@ -101,6 +100,17 @@ export const MyCreditRequestsDialog = ({ children }: MyCreditRequestsDialogProps
                 <div className="mt-2 p-3 rounded-lg bg-destructive/5 text-xs text-destructive flex gap-2 border border-destructive/10">
                   <AlertCircle className="w-4 h-4 shrink-0" />
                   <span><strong>Motivo do Admin:</strong> {req.notes}</span>
+                </div>
+              )}
+
+              {req.status === 'rejected' && (
+                <div className="mt-3 border-t pt-3">
+                  <ResubmissionDialog request={req}>
+                    <Button variant="outline" size="sm" className="w-full">
+                      <RefreshCw className="w-4 h-4 mr-2" />
+                      Pedir Nova Revisão
+                    </Button>
+                  </ResubmissionDialog>
                 </div>
               )}
             </div>
