@@ -59,6 +59,23 @@ export const useMatches = () => {
     const match = matches.find(m => m.id === matchId);
     if (!match) return;
     const playersInMatch = new Set(matchCards.filter(mc => mc.match_id === matchId).map(mc => mc.player_id)).size;
+
+    // Hard rule: must have at least 1 player to start.
+    if (playersInMatch < 1) {
+      toast.error('A partida não pode ser iniciada sem jogadores.', {
+        description: 'É necessário que pelo menos 1 jogador entre na partida para que ela comece.'
+      });
+      // If it was an auto-start attempt, disable it to prevent loops.
+      if (match.is_auto_calling) {
+        await supabase.from('partidas').update({ is_auto_calling: false }).eq('id', matchId);
+        toast.warning('Sorteio automático desativado.', {
+          description: `A partida "${match.name}" não pôde ser iniciada por falta de jogadores.`
+        });
+        await queryClient.refetchQueries({ queryKey: ['matches'] });
+      }
+      return;
+    }
+
     if (!force && playersInMatch < match.min_players) {
       toast.error('A partida não pode ser iniciada.', {
         description: `São necessários no mínimo ${match.min_players} jogadores, mas há apenas ${playersInMatch}.`
