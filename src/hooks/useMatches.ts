@@ -65,7 +65,22 @@ export const useMatches = () => {
       });
       return;
     }
-    await updateMatchStatus(matchId, 'in_progress');
+    
+    const updatePayload: Partial<Match> = {
+      status: 'in_progress',
+    };
+
+    if (match.is_auto_calling && gameSettings) {
+      // Define o timestamp para a PRIMEIRA chamada automática, iniciando o ciclo.
+      const intervalInMs = (gameSettings.intervalo_sorteio_auto_seg || 120) * 1000;
+      updatePayload.next_auto_call_timestamp = new Date(Date.now() + intervalInMs).toISOString();
+    }
+
+    const { error } = await supabase.from('partidas').update(updatePayload).eq('id', matchId);
+    if (error) {
+      toast.error(`Erro ao iniciar partida: ${error.message}`);
+    }
+    queryClient.invalidateQueries({ queryKey: ['matches'] });
   };
 
   const finishMatch = (matchId: string) => updateMatchStatus(matchId, 'finished');

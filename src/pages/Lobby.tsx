@@ -166,12 +166,14 @@ const Lobby = () => {
                     </div>
                   </div>
                   <div className="flex flex-col items-start sm:items-end w-full sm:w-auto">
-                    {alreadyJoined ? (
-                      <Button size="sm" className="bg-success/10 text-success hover:bg-success/20 h-8 text-xs w-full sm:w-auto" onClick={() => navigate(`/match/${match.id}`)}><Tv className="w-3.5 h-3.5 mr-2" /> Acompanhar</Button>
+                    { (alreadyJoined || match.status === 'in_progress') ? (
+                        <Button size="sm" className="bg-success/10 text-success hover:bg-success/20 h-8 text-xs w-full sm:w-auto" onClick={() => navigate(`/match/${match.id}`)}><Tv className="w-3.5 h-3.5 mr-2" /> Acompanhar</Button>
                     ) : match.status === 'open' ? (
-                      <Button size="sm" className="gradient-accent shadow-button h-8 text-xs w-full sm:w-auto" onClick={() => openJoinDialog(match)}>Entrar na Partida</Button>
+                        <Button size="sm" className="gradient-accent shadow-button h-8 text-xs w-full sm:w-auto" onClick={() => openJoinDialog(match)}>Entrar na Partida</Button>
+                    ) : match.status === 'waiting' ? (
+                        <Button size="sm" disabled className="h-8 text-xs w-full sm:w-auto">Aguardando</Button>
                     ) : (
-                      <Button size="sm" disabled className="h-8 text-xs w-full sm:w-auto">{match.status === 'waiting' ? 'Aguardando' : 'Encerrada'}</Button>
+                        <Button size="sm" disabled className="h-8 text-xs w-full sm:w-auto">Encerrada</Button>
                     )}
                     <span className="text-[10px] text-muted-foreground mt-1">{match.card_price} créditos por cartela</span>
                   </div>
