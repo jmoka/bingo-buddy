@@ -16,6 +16,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { supabase } from '@/integrations/supabase/client';
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const statusLabels: Record<MatchStatus, string> = {
   waiting: 'Aguardando',
@@ -306,6 +307,117 @@ const MatchManager = () => {
     return `${h > 0 ? `${h.toString().padStart(2, '0')}:` : ''}${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
 
+  const renderMatchList = (matchesToRender: Match[]) => {
+    if (matchesToRender.length === 0) {
+      return (
+        <div className="card-container text-center py-12">
+          <p className="text-sm text-muted-foreground">Nenhuma partida nesta categoria.</p>
+        </div>
+      );
+    }
+    return (
+      <div className="space-y-6">
+        {matchesToRender.map(match => {
+          const playersInMatchCount = new Set(matchCards.filter(mc => mc.match_id === match.id).map(mc => mc.player_id)).size;
+          const canStart = playersInMatchCount >= match.min_players;
+          const countdown = (match.status === 'waiting' || match.status === 'open') ? getCountdown(match.start_time) : null;
+          return (
+            <div key={match.id} className="card-container">
+              <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <h3 className="font-heading font-bold text-lg text-foreground">{match.name}</h3>
+                    <Badge className={statusColors[match.status]}>{statusLabels[match.status]}</Badge>
+                    {countdown && (
+                      <Badge variant="outline" className="font-mono text-xs">
+                          <Clock className="w-3 h-3 mr-1.5" />
+                          {countdown}
+                      </Badge>
+                    )}
+                  </div>
+                  <div className="text-sm text-muted-foreground flex gap-3"><span className="flex items-center gap-1"><Trophy className="w-3.5 h-3.5" />{gameTypeLabels[match.game_type]}</span></div>
+                </div>
+                <div className="flex gap-2">
+                  {match.status === 'waiting' && <Button size="sm" variant="outline" onClick={() => handleOpenEditDialog(match)}><Edit className="w-4 h-4 mr-2" />Editar</Button>}
+                  {match.status === 'waiting' && <Button size="sm" onClick={() => openMatch(match.id)}>Abrir</Button>}
+                  
+                  {match.status === 'open' && (
+                    !canStart ? (
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button size="sm" title={`Requer ${match.min_players} jogadores. Atualmente: ${playersInMatchCount}.`}>Iniciar</Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Forçar início da partida?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Esta partida não atingiu o número mínimo de {match.min_players} jogadores (atualmente com {playersInMatchCount}). 
+                              Iniciar a partida mesmo assim pode fazer com que o prêmio não seja coberto pelo valor arrecadado.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                            <AlertDialogAction onClick={() => startMatch(match.id, true)}>Forçar Início</AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    ) : (
+                      <Button size="sm" onClick={() => startMatch(match.id)}>Iniciar</Button>
+                    )
+                  )}
+
+                  {match.status === 'in_progress' && <Button size="sm" variant="outline" onClick={() => finishMatch(match.id)}>Finalizar</Button>}
+                  {(match.status === 'waiting' || match.status === 'finished') && <Button size="sm" variant="destructive" onClick={() => deleteMatch(match.id)}><Trash2 className="w-4 h-4" /></Button>}
+                </div>
+              </div>
+
+              {match.status === 'in_progress' && (
+                <div className="mt-4 pt-4 border-t">
+                    <div className="flex items-center justify-between">
+                        <h4 className="font-heading font-semibold">Sorteio</h4>
+                        <div className="flex items-center gap-2">
+                            <Label htmlFor={`auto-call-${match.id}`} className="text-xs">Sorteio Automático</Label>
+                            <Switch
+                                id={`auto-call-${match.id}`}
+                                checked={!!match.is_auto_calling}
+                                onCheckedChange={() => toggleAutoCall(match.id)}
+                            />
+                        </div>
+                    </div>
+                    <div className="flex gap-2 mt-2">
+                        <Input
+                            placeholder="Nº"
+                            type="number"
+                            className="w-20"
+                            value={callerInput[match.id] || ''}
+                            onChange={e => setCallerInput(p => ({ ...p, [match.id]: e.target.value }))}
+                            onKeyDown={e => e.key === 'Enter' && handleCallNumber(match.id)}
+                        />
+                        <Button variant="outline" onClick={() => handleCallNumber(match.id)}>Sortear</Button>
+                        <Button variant="secondary" onClick={() => handleRandomCall(match.id)}><Shuffle className="w-4 h-4" /></Button>
+                    </div>
+                    <div className="mt-4">
+                        <p className="text-xs text-muted-foreground mb-2">Sorteados ({(match.called_numbers || []).length})</p>
+                        <div className="flex flex-wrap gap-1.5">
+                            {(match.called_numbers || []).map(num => (
+                                <span key={num} className="w-7 h-7 rounded-full bg-secondary text-secondary-foreground text-xs font-bold flex items-center justify-center">{num}</span>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+
+  const inProgressMatches = matches.filter(m => m.status === 'in_progress');
+  const openMatches = matches.filter(m => m.status === 'open');
+  const waitingMatches = matches.filter(m => m.status === 'waiting');
+  const finishedMatches = matches.filter(m => m.status === 'finished');
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between mb-4">
@@ -319,98 +431,20 @@ const MatchManager = () => {
           </DialogContent>
         </Dialog>
       </div>
-      {matches.map(match => {
-        const playersInMatchCount = new Set(matchCards.filter(mc => mc.match_id === match.id).map(mc => mc.player_id)).size;
-        const canStart = playersInMatchCount >= match.min_players;
-        const countdown = (match.status === 'waiting' || match.status === 'open') ? getCountdown(match.start_time) : null;
-        return (
-          <div key={match.id} className="card-container">
-            <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
-              <div>
-                <div className="flex items-center gap-2 mb-1">
-                  <h3 className="font-heading font-bold text-lg text-foreground">{match.name}</h3>
-                  <Badge className={statusColors[match.status]}>{statusLabels[match.status]}</Badge>
-                  {countdown && (
-                    <Badge variant="outline" className="font-mono text-xs">
-                        <Clock className="w-3 h-3 mr-1.5" />
-                        {countdown}
-                    </Badge>
-                  )}
-                </div>
-                <div className="text-sm text-muted-foreground flex gap-3"><span className="flex items-center gap-1"><Trophy className="w-3.5 h-3.5" />{gameTypeLabels[match.game_type]}</span></div>
-              </div>
-              <div className="flex gap-2">
-                {match.status === 'waiting' && <Button size="sm" variant="outline" onClick={() => handleOpenEditDialog(match)}><Edit className="w-4 h-4 mr-2" />Editar</Button>}
-                {match.status === 'waiting' && <Button size="sm" onClick={() => openMatch(match.id)}>Abrir</Button>}
-                
-                {match.status === 'open' && (
-                  !canStart ? (
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button size="sm" title={`Requer ${match.min_players} jogadores. Atualmente: ${playersInMatchCount}.`}>Iniciar</Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Forçar início da partida?</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            Esta partida não atingiu o número mínimo de {match.min_players} jogadores (atualmente com {playersInMatchCount}). 
-                            Iniciar a partida mesmo assim pode fazer com que o prêmio não seja coberto pelo valor arrecadado.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                          <AlertDialogAction onClick={() => startMatch(match.id, true)}>Forçar Início</AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                  ) : (
-                    <Button size="sm" onClick={() => startMatch(match.id)}>Iniciar</Button>
-                  )
-                )}
+      
+      <Tabs defaultValue="in_progress" className="w-full">
+        <TabsList className="grid w-full grid-cols-4 mb-4">
+          <TabsTrigger value="in_progress">Em Andamento</TabsTrigger>
+          <TabsTrigger value="open">Abertas</TabsTrigger>
+          <TabsTrigger value="waiting">Aguardando</TabsTrigger>
+          <TabsTrigger value="finished">Finalizadas</TabsTrigger>
+        </TabsList>
+        <TabsContent value="in_progress" className="mt-0">{renderMatchList(inProgressMatches)}</TabsContent>
+        <TabsContent value="open" className="mt-0">{renderMatchList(openMatches)}</TabsContent>
+        <TabsContent value="waiting" className="mt-0">{renderMatchList(waitingMatches)}</TabsContent>
+        <TabsContent value="finished" className="mt-0">{renderMatchList(finishedMatches)}</TabsContent>
+      </Tabs>
 
-                {match.status === 'in_progress' && <Button size="sm" variant="outline" onClick={() => finishMatch(match.id)}>Finalizar</Button>}
-                {(match.status === 'waiting' || match.status === 'finished') && <Button size="sm" variant="destructive" onClick={() => deleteMatch(match.id)}><Trash2 className="w-4 h-4" /></Button>}
-              </div>
-            </div>
-
-            {match.status === 'in_progress' && (
-              <div className="mt-4 pt-4 border-t">
-                  <div className="flex items-center justify-between">
-                      <h4 className="font-heading font-semibold">Sorteio</h4>
-                      <div className="flex items-center gap-2">
-                          <Label htmlFor={`auto-call-${match.id}`} className="text-xs">Sorteio Automático</Label>
-                          <Switch
-                              id={`auto-call-${match.id}`}
-                              checked={!!match.is_auto_calling}
-                              onCheckedChange={() => toggleAutoCall(match.id)}
-                          />
-                      </div>
-                  </div>
-                  <div className="flex gap-2 mt-2">
-                      <Input
-                          placeholder="Nº"
-                          type="number"
-                          className="w-20"
-                          value={callerInput[match.id] || ''}
-                          onChange={e => setCallerInput(p => ({ ...p, [match.id]: e.target.value }))}
-                          onKeyDown={e => e.key === 'Enter' && handleCallNumber(match.id)}
-                      />
-                      <Button variant="outline" onClick={() => handleCallNumber(match.id)}>Sortear</Button>
-                      <Button variant="secondary" onClick={() => handleRandomCall(match.id)}><Shuffle className="w-4 h-4" /></Button>
-                  </div>
-                  <div className="mt-4">
-                      <p className="text-xs text-muted-foreground mb-2">Sorteados ({(match.called_numbers || []).length})</p>
-                      <div className="flex flex-wrap gap-1.5">
-                          {(match.called_numbers || []).map(num => (
-                              <span key={num} className="w-7 h-7 rounded-full bg-secondary text-secondary-foreground text-xs font-bold flex items-center justify-center">{num}</span>
-                          ))}
-                      </div>
-                  </div>
-              </div>
-            )}
-          </div>
-        );
-      })}
       <Dialog open={!!editingMatch} onOpenChange={(isOpen) => !isOpen && setEditingMatch(null)}>
         <DialogContent className="max-w-md">
           <DialogHeader><DialogTitle className="font-heading">Editar Partida</DialogTitle><DialogDescription>Ajuste os detalhes da partida.</DialogDescription></DialogHeader>
