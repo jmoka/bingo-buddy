@@ -304,12 +304,33 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const updateMatchStatus = async (matchId: string, status: MatchStatus) => {
+    await queryClient.cancelQueries({ queryKey: ['matches'] });
+    const previousMatches = queryClient.getQueryData<Match[]>(['matches']);
+
+    queryClient.setQueryData<Match[]>(['matches'], (old) =>
+      old
+        ? old.map((match) =>
+            match.id === matchId ? { ...match, status: status } : match
+          )
+        : []
+    );
+
     const { error } = await supabase.from('partidas').update({ status }).eq('id', matchId);
+
     if (error) {
-      toast.error(error.message);
+      queryClient.setQueryData(['matches'], previousMatches);
+      toast.error(`Erro ao atualizar status: ${error.message}`);
     } else {
-      queryClient.invalidateQueries({ queryKey: ['matches'] });
+      const statusLabels = {
+        open: 'aberta',
+        in_progress: 'iniciada',
+        finished: 'finalizada',
+        waiting: 'movida para aguardando'
+      };
+      toast.success(`Partida ${statusLabels[status] || 'atualizada'} com sucesso!`);
     }
+
+    await queryClient.invalidateQueries({ queryKey: ['matches'] });
   };
 
   const openMatch = (matchId: string) => updateMatchStatus(matchId, 'open');
