@@ -434,10 +434,38 @@ const MatchManager = () => {
       
       <Tabs defaultValue="in_progress" className="w-full">
         <TabsList className="grid w-full grid-cols-4 mb-4">
-          <TabsTrigger value="in_progress">Em Andamento</TabsTrigger>
-          <TabsTrigger value="open">Abertas</TabsTrigger>
-          <TabsTrigger value="waiting">Aguardando</TabsTrigger>
-          <TabsTrigger value="finished">Finalizadas</TabsTrigger>
+          <TabsTrigger value="in_progress" className="flex items-center gap-2">
+            Em Andamento
+            {inProgressMatches.length > 0 && (
+              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-[10px] font-bold text-white">
+                {inProgressMatches.length}
+              </span>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="open" className="flex items-center gap-2">
+            Abertas
+            {openMatches.length > 0 && (
+              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-accent text-[10px] font-bold text-white">
+                {openMatches.length}
+              </span>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="waiting" className="flex items-center gap-2">
+            Aguardando
+            {waitingMatches.length > 0 && (
+              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-amber-500 text-[10px] font-bold text-white">
+                {waitingMatches.length}
+              </span>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="finished" className="flex items-center gap-2">
+            Finalizadas
+            {finishedMatches.length > 0 && (
+              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-success text-[10px] font-bold text-white">
+                {finishedMatches.length}
+              </span>
+            )}
+          </TabsTrigger>
         </TabsList>
         <TabsContent value="in_progress" className="mt-0">{renderMatchList(inProgressMatches)}</TabsContent>
         <TabsContent value="open" className="mt-0">{renderMatchList(openMatches)}</TabsContent>
