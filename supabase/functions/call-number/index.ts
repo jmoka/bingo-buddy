@@ -23,11 +23,17 @@ serve(async (req) => {
       .single()
 
     if (matchError || !match || match.status !== 'in_progress') {
-      return new Response(JSON.stringify({ error: 'Partida não disponível.' }), { status: 400 });
+      return new Response(JSON.stringify({ error: 'Partida não disponível.' }), { 
+        status: 400, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      });
     }
 
     if (match.called_numbers.includes(num)) {
-      return new Response(JSON.stringify({ success: true }), { status: 200 });
+      return new Response(JSON.stringify({ success: true }), { 
+        status: 200, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      });
     }
 
     const { data: matchCards, error: cardsError } = await supabaseAdmin
@@ -91,7 +97,6 @@ serve(async (req) => {
         cardName: fw.card.name,
       }));
 
-      // Calcula prêmio apenas considerando quem usou cartela real
       const realWinners = foundWinners.filter(fw => fw.card.credit_type === 'real');
       let prizeAmountPerRealWinner = 0;
       
@@ -106,8 +111,6 @@ serve(async (req) => {
 
       for (const fw of foundWinners) {
         const isReal = fw.card.credit_type === 'real';
-        
-        // Registra vitória apenas se for Real (ou se quiser manter histórico de diversão, mas sem prêmio)
         if (isReal) {
             await supabaseAdmin.from('vitorias').insert({
               match_id: match.id,
@@ -137,8 +140,14 @@ serve(async (req) => {
 
     await supabaseAdmin.from('partidas').update(matchUpdatePayload).eq('id', matchId)
 
-    return new Response(JSON.stringify({ success: true, winners: foundWinners.length }), { status: 200 })
+    return new Response(JSON.stringify({ success: true, winners: foundWinners.length }), { 
+      status: 200, 
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+    })
   } catch (error) {
-    return new Response(JSON.stringify({ error: error.message }), { status: 500 })
+    return new Response(JSON.stringify({ error: error.message }), { 
+      status: 500, 
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+    })
   }
 })

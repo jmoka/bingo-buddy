@@ -20,7 +20,10 @@ serve(async (req) => {
 
     const authHeader = req.headers.get('Authorization')
     if (!authHeader) {
-      return new Response('Unauthorized', { status: 401, headers: corsHeaders })
+      return new Response('Unauthorized', { 
+        status: 401, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      })
     }
     const userSupabaseClient = createClient(
         Deno.env.get('SUPABASE_URL') ?? '',
@@ -53,7 +56,6 @@ serve(async (req) => {
     const profile = profileRes.data;
     const playerCards = playerCardsRes.data;
 
-    // Calcula o custo apenas para as cartelas que são 'real'
     const realCards = playerCards.filter(c => c.credit_type === 'real');
     const totalCost = realCards.length * match.card_price;
 
@@ -61,7 +63,6 @@ serve(async (req) => {
       throw new Error("Créditos insuficientes para as cartelas reais!");
     }
 
-    // Debita apenas se houver custo (cartelas reais)
     if (totalCost > 0) {
       const { error: creditError } = await supabaseAdmin
         .from('perfis')
@@ -85,7 +86,7 @@ serve(async (req) => {
       name: card.name,
       numbers: card.numbers,
       marked_numbers: [],
-      credit_type: card.credit_type, // Importante: mantém o tipo na partida
+      credit_type: card.credit_type,
     }));
 
     const { data: insertedMatchCards, error: insertError } = await supabaseAdmin
@@ -95,7 +96,6 @@ serve(async (req) => {
     
     if (insertError) throw new Error(`Erro ao inscrever cartelas.`);
 
-    // Apenas aumenta o pote se as cartelas forem pagas (reais)
     if (totalCost > 0) {
       await supabaseAdmin.from('partidas').update({ pot: match.pot + totalCost }).eq('id', matchId);
     }
