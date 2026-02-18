@@ -4,21 +4,32 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useGame } from '@/contexts/GameContext';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
-import { Menu, User, Wallet, Plus, Banknote, History, Printer, LogOut, Star } from 'lucide-react';
+import { Menu, User, Wallet, Plus, Banknote, History, Printer, LogOut, Star, RefreshCw } from 'lucide-react';
 import { CreditRequestDialog } from './CreditRequestDialog';
 import { MyCreditRequestsDialog } from './MyCreditRequestsDialog';
 import { RedeemRequestDialog } from './RedeemRequestDialog';
 import { MyRedeemRequestsDialog } from './MyRedeemRequestsDialog';
+import { toast } from 'sonner';
 
 export const AppHeader = () => {
   const navigate = useNavigate();
   const { profile, signOut } = useAuth();
-  const { gameSettings, playerCards } = useGame();
+  const { gameSettings, playerCards, updatePlayerFakeCredits } = useGame();
   const [isSheetOpen, setIsSheetOpen] = useState(false);
+  const [isRecharging, setIsRecharging] = useState(false);
 
   if (!profile) return null;
 
   const myOwnedCards = playerCards.filter(c => c.player_id === profile.id);
+
+  const handleRechargeFake = async () => {
+    setIsRecharging(true);
+    const success = await updatePlayerFakeCredits(profile.id, 1000);
+    if (success) {
+      toast.success('Você recebeu +1000 créditos de brincar!');
+    }
+    setIsRecharging(false);
+  };
 
   const menuItems = [
     {
@@ -54,10 +65,19 @@ export const AppHeader = () => {
             <span className="font-heading font-bold text-sm sm:text-base text-foreground">{profile.credits}</span>
           </div>
           
-          {/* Saldo de Brincar */}
-          <div className="flex items-center gap-1 bg-amber-400/10 rounded-full px-2 py-1.5 sm:px-3 border border-amber-400/20" title="Créditos de Brincar">
+          {/* Saldo de Brincar com Botão de Recarga */}
+          <div className="flex items-center gap-1 bg-amber-400/10 rounded-full pl-2 pr-1 py-1 sm:pl-3 border border-amber-400/20" title="Créditos de Brincar">
             <Star className="w-3.5 h-3.5 text-amber-600" />
-            <span className="font-heading font-bold text-sm sm:text-base text-amber-600">{profile.fake_credits}</span>
+            <span className="font-heading font-bold text-sm sm:text-base text-amber-600 mr-1">{profile.fake_credits || 0}</span>
+            <Button 
+                variant="ghost" 
+                size="icon" 
+                className="h-6 w-6 rounded-full hover:bg-amber-400/20 text-amber-600"
+                onClick={handleRechargeFake}
+                disabled={isRecharging}
+            >
+                <Plus className={`w-3 h-3 ${isRecharging ? 'animate-spin' : ''}`} />
+            </Button>
           </div>
 
           <Button size="icon" variant="ghost" onClick={() => navigate('/account')}>

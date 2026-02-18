@@ -19,7 +19,7 @@ export const useAdminData = () => {
       return data as Profile[];
     },
     enabled: isAdmin,
-    refetchInterval: 3000, // Atualiza lista de jogadores a cada 3s
+    refetchInterval: 3000,
   });
 
   const { data: allPlayerCards = [] } = useQuery({
@@ -52,7 +52,7 @@ export const useAdminData = () => {
       return data;
     },
     enabled: isAdmin,
-    refetchInterval: 3000, // Atualiza solicitações de crédito a cada 3s
+    refetchInterval: 3000,
   });
 
   const allCreditRequests = useMemo(() => {
@@ -87,18 +87,29 @@ export const useAdminData = () => {
   const updatePlayerCredits = async (playerId: string, amount: number): Promise<boolean> => {
     const { data: p, error: fetchError } = await supabase.from('perfis').select('credits').eq('id', playerId).single();
     if (fetchError || !p) {
-        toast.error("Erro ao buscar perfil do jogador.", { description: fetchError?.message });
+        toast.error("Erro ao buscar perfil.");
         return false;
     }
     const { error: updateError } = await supabase.from('perfis').update({ credits: p.credits + amount }).eq('id', playerId);
     if (updateError) {
-        toast.error("Erro ao atualizar créditos.", { description: updateError.message });
+        toast.error("Erro ao atualizar créditos.");
         return false;
     } else {
-        toast.success("Créditos atualizados com sucesso!");
+        toast.success("Créditos reais atualizados!");
         await queryClient.refetchQueries({ queryKey: ['players'] });
+        await queryClient.refetchQueries({ queryKey: ['profile'] });
         return true;
     }
+  };
+
+  const updatePlayerFakeCredits = async (playerId: string, amount: number): Promise<boolean> => {
+    const { data: p, error: fetchError } = await supabase.from('perfis').select('fake_credits').eq('id', playerId).single();
+    if (fetchError || !p) return false;
+    const { error: updateError } = await supabase.from('perfis').update({ fake_credits: (p.fake_credits || 0) + amount }).eq('id', playerId);
+    if (updateError) return false;
+    await queryClient.refetchQueries({ queryKey: ['players'] });
+    await queryClient.refetchQueries({ queryKey: ['profile'] });
+    return true;
   };
 
   const resolveCreditRequest = async (requestId: string, status: 'approved' | 'rejected', creditsGranted?: number, notes?: string): Promise<boolean> => {
@@ -148,7 +159,7 @@ export const useAdminData = () => {
     }
     if (status === 'rejected') {
         await updatePlayerCredits(request.player_id, request.credits_requested);
-        toast.info(`${request.credits_requested} créditos foram estornados para o jogador.`);
+        toast.info(`${request.credits_requested} créditos foram estornados.`);
     }
     await supabase.from('solicitacoes_resgate').update({
         status, receipt_url: receiptPath, notes: notes || null, resolved_at: new Date().toISOString(), resolved_by: user.id
@@ -164,7 +175,6 @@ export const useAdminData = () => {
     const request = allRedeemRequests.find(r => r.id === requestId);
     if (!request) return;
     await updatePlayerCredits(request.player_id, -request.credits_requested);
-    toast.info(`${request.credits_requested} créditos foram debitados novamente para reanálise.`);
     await supabase.from('solicitacoes_resgate').update({
         status: 'pending',
         notes: 'Solicitação reaberta pelo administrador.',
@@ -200,6 +210,7 @@ export const useAdminData = () => {
     allRedeemRequests,
     isLoading: isLoadingPlayers || isLoadingRequests || isLoadingRedeems,
     updatePlayerCredits,
+    updatePlayerFakeCredits,
     resolveCreditRequest,
     unblockCreditRequest,
     deleteCreditRequest,
