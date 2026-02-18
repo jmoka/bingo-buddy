@@ -24,16 +24,16 @@ export const usePlayerCards = () => {
   const createPlayerCard = async (options: { name: string; numbers: number[][]; creditType: 'real' | 'fake' }) => {
     if (!user || !profile || !gameSettings) return null;
     
-    const cost = gameSettings.custo_nova_cartela;
-    const balance = options.creditType === 'real' ? profile.credits : profile.fake_credits;
+    const isFake = options.creditType === 'fake';
+    const cost = isFake ? 0 : gameSettings.custo_nova_cartela;
+    const balance = isFake ? Infinity : profile.credits;
 
-    if (balance < cost) {
-      toast.error(`Saldo de créditos ${options.creditType === 'real' ? 'reais' : 'de brincar'} insuficiente.`);
+    if (!isFake && balance < cost) {
+      toast.error(`Saldo de créditos reais insuficiente.`);
       return null;
     }
 
     try {
-      // Usando a função RPC para garantir atomicidade (débito + criação)
       const { data, error } = await supabase.rpc('buy_player_card', {
         p_name: options.name,
         p_numbers: options.numbers,
@@ -74,29 +74,28 @@ export const usePlayerCards = () => {
   const buyCardUses = async (playerCardId: string) => {
     if (!profile || !gameSettings) return false;
 
-    // Precisamos saber o tipo da cartela para debitar o saldo correto
     const card = playerCards.find(c => c.id === playerCardId);
     if (!card) return false;
 
-    const cost = gameSettings.custo_recarga_cartela;
-    const creditType = (card as any).credit_type || 'real';
-    const balance = creditType === 'real' ? profile.credits : profile.fake_credits;
-
-    if (balance < cost) {
+    const isFake = (card as any).credit_type === 'fake';
+    const cost = isFake ? 0 : gameSettings.custo_recarga_cartela;
+    
+    if (!isFake && profile.credits < cost) {
       toast.error(`Saldo insuficiente para recarregar esta cartela.`);
       return false;
     }
 
-    const balanceField = creditType === 'real' ? 'credits' : 'fake_credits';
+    // Se for real, debita
+    if (!isFake && cost > 0) {
+      const { error: profileError } = await supabase
+        .from('perfis')
+        .update({ credits: profile.credits - cost })
+        .eq('id', profile.id);
 
-    const { error: profileError } = await supabase
-      .from('perfis')
-      .update({ [balanceField]: balance - cost })
-      .eq('id', profile.id);
-
-    if (profileError) {
-      toast.error("Erro ao debitar créditos.", { description: profileError.message });
-      return false;
+      if (profileError) {
+        toast.error("Erro ao debitar créditos.");
+        return false;
+      }
     }
 
     const { error: cardError } = await supabase
@@ -105,9 +104,8 @@ export const usePlayerCards = () => {
       .eq('id', playerCardId);
 
     if (cardError) {
-      // Reverter saldo se der erro na cartela
-      await supabase.from('perfis').update({ [balanceField]: balance }).eq('id', profile.id);
-      toast.error("Erro ao recarregar cartela.", { description: cardError.message });
+      if (!isFake) await supabase.from('perfis').update({ credits: profile.credits }).eq('id', profile.id);
+      toast.error("Erro ao recarregar cartela.");
       return false;
     }
     
@@ -120,19 +118,7 @@ export const usePlayerCards = () => {
     try {
       const { data, error } = await supabase.functions.invoke('join-match', { body: { matchId, playerCardIds } });
       if (error) {
-        let errorMessage = "Ocorreu um erro ao entrar na partida.";
-        if (error.context && typeof error.context.text === 'function') {
-            const errorText = await error.context.text();
-            try {
-                const errorJson = JSON.parse(errorText);
-                if (errorJson.error) errorMessage = errorJson.error;
-            } catch (e) {
-                errorMessage = errorText.length < 100 ? errorText : errorMessage;
-            }
-        } else {
-            errorMessage = error.message || errorMessage;
-        }
-        toast.error(errorMessage);
+        toast.error("Erro ao entrar na partida.");
         return null;
       }
       queryClient.invalidateQueries({ queryKey: ['profile', user?.id] });
@@ -141,7 +127,7 @@ export const usePlayerCards = () => {
       queryClient.invalidateQueries({ queryKey: ['matches'] });
       return data as MatchCard[];
     } catch (e) {
-      toast.error("Ocorreu um erro inesperado.", { description: (e as Error).message });
+      toast.error("Erro inesperado.");
       return null;
     }
   };

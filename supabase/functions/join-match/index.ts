@@ -30,20 +30,14 @@ serve(async (req) => {
     const { data: { user }, error: userError } = await userSupabaseClient.auth.getUser()
     if (userError || !user) throw new Error("Usuário não encontrado ou token inválido.");
 
-    // Server-side validation to prevent duplicate card entries in the same match
     const { data: existingMatchCards, error: existingError } = await supabaseAdmin
       .from('cartelas_partida')
       .select('player_card_id')
       .eq('match_id', matchId)
       .in('player_card_id', playerCardIds);
 
-    if (existingError) {
-      throw new Error(`Erro ao verificar cartelas existentes: ${existingError.message}`);
-    }
-
-    if (existingMatchCards && existingMatchCards.length > 0) {
-      throw new Error("Uma ou mais cartelas selecionadas já estão inscritas nesta partida.");
-    }
+    if (existingError) throw new Error(`Erro ao verificar cartelas: ${existingError.message}`);
+    if (existingMatchCards && existingMatchCards.length > 0) throw new Error("Uma ou mais cartelas já estão na partida.");
 
     const [matchRes, profileRes, playerCardsRes] = await Promise.all([
       supabaseAdmin.from('partidas').select('card_price, pot').eq('id', matchId).single(),
@@ -51,31 +45,30 @@ serve(async (req) => {
       supabaseAdmin.from('cartelas_jogador').select('*').in('id', playerCardIds)
     ]);
 
-    if (matchRes.error) throw new Error(`Partida não encontrada: ${matchRes.error.message}`);
-    if (profileRes.error) throw new Error(`Perfil não encontrado: ${profileRes.error.message}`);
-    if (playerCardsRes.error) throw new Error(`Erro ao buscar cartelas: ${playerCardsRes.error.message}`);
+    if (matchRes.error) throw new Error(`Partida não encontrada.`);
+    if (profileRes.error) throw new Error(`Perfil não encontrado.`);
+    if (playerCardsRes.error) throw new Error(`Erro ao buscar cartelas.`);
 
     const match = matchRes.data;
     const profile = profileRes.data;
     const playerCards = playerCardsRes.data;
 
-    const totalCost = playerCardIds.length * match.card_price;
+    // Calcula o custo apenas para as cartelas que são 'real'
+    const realCards = playerCards.filter(c => c.credit_type === 'real');
+    const totalCost = realCards.length * match.card_price;
+
     if (profile.credits < totalCost) {
-      throw new Error("Créditos insuficientes!");
-    }
-    if (playerCards.length !== playerCardIds.length) {
-      throw new Error("Uma ou mais cartelas não foram encontradas.");
-    }
-    for (const card of playerCards) {
-      if (card.player_id !== user.id) throw new Error(`A cartela "${card.name}" não pertence a você.`);
-      if (card.uses_left <= 0) throw new Error(`A cartela "${card.name}" não tem usos restantes.`);
+      throw new Error("Créditos insuficientes para as cartelas reais!");
     }
 
-    const { error: creditError } = await supabaseAdmin
-      .from('perfis')
-      .update({ credits: profile.credits - totalCost })
-      .eq('id', user.id);
-    if (creditError) throw new Error(`Erro ao debitar créditos: ${creditError.message}`);
+    // Debita apenas se houver custo (cartelas reais)
+    if (totalCost > 0) {
+      const { error: creditError } = await supabaseAdmin
+        .from('perfis')
+        .update({ credits: profile.credits - totalCost })
+        .eq('id', user.id);
+      if (creditError) throw new Error(`Erro ao debitar créditos.`);
+    }
 
     const cardUpdatePromises = playerCards.map(card => 
       supabaseAdmin
@@ -92,18 +85,20 @@ serve(async (req) => {
       name: card.name,
       numbers: card.numbers,
       marked_numbers: [],
+      credit_type: card.credit_type, // Importante: mantém o tipo na partida
     }));
+
     const { data: insertedMatchCards, error: insertError } = await supabaseAdmin
       .from('cartelas_partida')
       .insert(newMatchCards)
       .select();
-    if (insertError) throw new Error(`Erro ao inscrever cartelas: ${insertError.message}`);
+    
+    if (insertError) throw new Error(`Erro ao inscrever cartelas.`);
 
-    const { error: potError } = await supabaseAdmin
-      .from('partidas')
-      .update({ pot: match.pot + totalCost })
-      .eq('id', matchId);
-    if (potError) throw new Error(`Erro ao atualizar o pote: ${potError.message}`);
+    // Apenas aumenta o pote se as cartelas forem pagas (reais)
+    if (totalCost > 0) {
+      await supabaseAdmin.from('partidas').update({ pot: match.pot + totalCost }).eq('id', matchId);
+    }
 
     return new Response(JSON.stringify(insertedMatchCards), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -111,7 +106,6 @@ serve(async (req) => {
     })
 
   } catch (error) {
-    console.error('[join-match] Error:', error.message);
     return new Response(JSON.stringify({ error: error.message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 500,
