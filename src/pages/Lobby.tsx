@@ -199,20 +199,20 @@ const Lobby = () => {
           <h2 className="font-heading text-lg md:text-xl font-bold text-foreground flex items-center gap-2"><Ticket className="w-5 h-5 text-primary" /> Minhas Cartelas ({activeCards.length})</h2>
           <Dialog open={isCreateCardOpen} onOpenChange={setCreateCardOpen}>
               <DialogTrigger asChild><Button size="sm" className="gradient-primary shadow-button h-8 md:h-9 text-xs md:text-sm"><Plus className="w-4 h-4 mr-2" />Criar Cartela</Button></DialogTrigger>
-              <DialogContent className="max-w-xl">
-                  <DialogHeader>
-                  <DialogTitle className="font-heading">Criar Nova Cartela</DialogTitle>
-                  <DialogDescription>Escolha os números manualmente ou gere uma cartela aleatória.</DialogDescription>
+              <DialogContent className="max-w-xl p-0">
+                  <DialogHeader className="p-6 pb-4">
+                    <DialogTitle className="font-heading">Criar Nova Cartela</DialogTitle>
+                    <DialogDescription>Escolha os números manualmente ou gere uma cartela aleatória.</DialogDescription>
                   </DialogHeader>
-                  <div className="max-h-[60vh] overflow-y-auto">
-                    <div className="space-y-4 pt-4 pr-4">
+                  <div className="max-h-[60vh] overflow-y-auto px-6">
+                    <div className="space-y-4">
                       <Input placeholder="Nome da cartela (ex: Sorte Pura)" value={newCardName} onChange={e => setNewCardName(e.target.value)} className="bg-secondary border-0" />
                       <CardCreator onCardChange={setNewCardNumbers} />
                     </div>
                   </div>
-                  <DialogFooter className="pt-4">
-                  <DialogClose asChild><Button variant="ghost">Cancelar</Button></DialogClose>
-                  <Button onClick={handleCreateCard} disabled={!newCardName.trim() || !newCardNumbers}>Salvar</Button>
+                  <DialogFooter className="p-6 pt-4">
+                    <DialogClose asChild><Button variant="ghost">Cancelar</Button></DialogClose>
+                    <Button onClick={handleCreateCard} disabled={!newCardName.trim() || !newCardNumbers}>Salvar</Button>
                   </DialogFooter>
               </DialogContent>
           </Dialog>
