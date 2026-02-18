@@ -295,7 +295,43 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const callNumber = async (matchId: string, num: number) => {
-    await supabase.functions.invoke('call-number', { body: { matchId, num } });
+    await queryClient.cancelQueries({ queryKey: ['matches'] });
+    await queryClient.cancelQueries({ queryKey: ['matchCards'] });
+
+    const previousMatches = queryClient.getQueryData<Match[]>(['matches']);
+    const previousMatchCards = queryClient.getQueryData<MatchCard[]>(['matchCards']);
+
+    queryClient.setQueryData<Match[]>(['matches'], (old) =>
+      old
+        ? old.map((match) =>
+            match.id === matchId
+              ? { ...match, called_numbers: [...match.called_numbers, num] }
+              : match
+          )
+        : []
+    );
+
+    queryClient.setQueryData<MatchCard[]>(['matchCards'], (old) =>
+      old
+        ? old.map((card) => {
+            if (card.match_id === matchId && card.numbers.flat().includes(num)) {
+              const newMarkedNumbers = new Set(card.marked_numbers);
+              newMarkedNumbers.add(num);
+              return { ...card, marked_numbers: newMarkedNumbers };
+            }
+            return card;
+          })
+        : []
+    );
+
+    try {
+      const { error } = await supabase.functions.invoke('call-number', { body: { matchId, num } });
+      if (error) throw error;
+    } catch (error) {
+      toast.error("Erro ao sortear número.", { description: (error as Error).message });
+      queryClient.setQueryData(['matches'], previousMatches);
+      queryClient.setQueryData(['matchCards'], previousMatchCards);
+    }
   };
 
   const requestCredits = async (file: File, creditsRequested: number, amountPaid: number): Promise<boolean> => {
