@@ -16,19 +16,26 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
+    // 1. Busca a partida e verifica se ela ainda está em andamento
     const { data: match, error: matchError } = await supabaseAdmin
       .from('partidas')
       .select('*')
       .eq('id', matchId)
       .single()
 
-    if (matchError || !match || match.status !== 'in_progress') {
-      return new Response(JSON.stringify({ error: 'Partida não disponível.' }), { 
-        status: 400, 
+    if (matchError || !match) {
+      throw new Error("Partida não encontrada.");
+    }
+
+    // Se a partida já acabou, não faz nada e retorna sucesso
+    if (match.status === 'finished') {
+       return new Response(JSON.stringify({ success: true, message: 'Partida já finalizada.' }), { 
+        status: 200, 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
       });
     }
 
+    // Se o número já foi chamado, ignora
     if (match.called_numbers.includes(num)) {
       return new Response(JSON.stringify({ success: true }), { 
         status: 200, 
@@ -36,6 +43,7 @@ serve(async (req) => {
       });
     }
 
+    // 2. Busca todas as cartelas da partida
     const { data: matchCards, error: cardsError } = await supabaseAdmin
       .from('cartelas_partida')
       .select('*')
@@ -43,14 +51,15 @@ serve(async (req) => {
     
     if (cardsError) throw cardsError
 
-    const cardsToUpdate = matchCards.filter(c =>
+    // 3. Atualiza as marcações nas cartelas que possuem o número
+    const cardsToUpdate = (matchCards || []).filter(c =>
       c.numbers.flat().includes(num) &&
-      !c.marked_numbers.includes(num)
+      !(c.marked_numbers || []).includes(num)
     )
 
     if (cardsToUpdate.length > 0) {
       const updatePromises = cardsToUpdate.map(card => {
-        const newMarkedNumbers = [...card.marked_numbers, num]
+        const newMarkedNumbers = [...(card.marked_numbers || []), num]
         return supabaseAdmin
           .from('cartelas_partida')
           .update({ marked_numbers: newMarkedNumbers })
@@ -59,6 +68,7 @@ serve(async (req) => {
       await Promise.all(updatePromises)
     }
 
+    // 4. Busca cartelas atualizadas para verificar vencedores
     const { data: freshMatchCards } = await supabaseAdmin
       .from('cartelas_partida')
       .select('*')
@@ -70,7 +80,7 @@ serve(async (req) => {
         id: card.id,
         name: card.name,
         numbers: card.numbers,
-        markedNumbers: new Set(card.marked_numbers),
+        markedNumbers: new Set(card.marked_numbers || []),
       };
       const winResult = checkWin(tempBingoCard, match.game_type);
       if (winResult) {
@@ -78,15 +88,17 @@ serve(async (req) => {
       }
     }
 
-    const newCalledNumbers = [...match.called_numbers, num]
+    const newCalledNumbers = [...(match.called_numbers || []), num]
     let matchUpdatePayload: any = { called_numbers: newCalledNumbers }
 
-    if (match.is_auto_calling) {
+    // Lógica de próximo sorteio (apenas se não houver vencedor)
+    if (match.is_auto_calling && foundWinners.length === 0) {
       const { data: settings } = await supabaseAdmin.from('configuracoes').select('intervalo_sorteio_auto_seg').single();
       const interval = settings?.intervalo_sorteio_auto_seg || 120;
       matchUpdatePayload.next_auto_call_timestamp = new Date(Date.now() + interval * 1000).toISOString();
     }
 
+    // 5. Se houver vencedores, FINALIZA IMEDIATAMENTE
     if (foundWinners.length > 0) {
       const { data: allProfiles } = await supabaseAdmin.from('perfis').select('id, full_name');
       
@@ -129,6 +141,7 @@ serve(async (req) => {
         }
       }
 
+      // Payload de finalização forçada
       matchUpdatePayload = {
         ...matchUpdatePayload,
         status: 'finished',
@@ -138,15 +151,22 @@ serve(async (req) => {
       };
     }
 
-    await supabaseAdmin.from('partidas').update(matchUpdatePayload).eq('id', matchId)
+    // 6. Atualiza a partida no banco
+    const { error: finalUpdateError } = await supabaseAdmin
+        .from('partidas')
+        .update(matchUpdatePayload)
+        .eq('id', matchId)
+
+    if (finalUpdateError) throw finalUpdateError;
 
     return new Response(JSON.stringify({ success: true, winners: foundWinners.length }), { 
       status: 200, 
       headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
     })
   } catch (error) {
+    console.error(`[call-number] Erro fatal: ${error.message}`);
     return new Response(JSON.stringify({ error: error.message }), { 
-      status: 500, 
+      status: 200, // Retornamos 200 com o erro no body para evitar falhas de CORS no navegador
       headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
     })
   }

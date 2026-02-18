@@ -68,40 +68,36 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
         !processingRef.current.has(processingKeyStart)
       ) {
         processingRef.current.add(processingKeyStart);
-        console.log(`[Bingo] Auto-starting match: ${match.name}`);
         matchesHook.startMatch(match.id, true).finally(() => {
-           // Mantemos o lock por 5 segundos para o status mudar no banco
            setTimeout(() => processingRef.current.delete(processingKeyStart), 5000);
         });
       }
 
-      // Auto-call logic (O coração do sorteio automático)
+      // Auto-call logic (Proteção contra chamadas extras)
       const processingKeyCall = `call_${match.id}`;
       const nextTimestamp = match.next_auto_call_timestamp;
       
       if (
         match.is_auto_calling &&
-        match.status === 'in_progress' &&
+        match.status === 'in_progress' && // SÓ sorteia se estiver em progresso
         nextTimestamp &&
         now >= new Date(nextTimestamp).getTime() &&
         !processingRef.current.has(processingKeyCall) &&
         lastProcessedTimestampRef.current.get(match.id) !== nextTimestamp
       ) {
-        // Marcamos este timestamp como processado ANTES de chamar para evitar duplicidade no próximo tick de 'now'
         lastProcessedTimestampRef.current.set(match.id, nextTimestamp);
         processingRef.current.add(processingKeyCall);
         
-        console.log(`[Bingo] Auto-calling number for match: ${match.name} at ${nextTimestamp}`);
+        console.log(`[Bingo] Chamando número automático para: ${match.name}`);
         
         const availableNumbers = Array.from({ length: 75 }, (_, i) => i + 1)
-          .filter(num => !match.called_numbers.includes(num));
+          .filter(num => !(match.called_numbers || []).includes(num));
           
         if (availableNumbers.length > 0) {
           const randomIndex = Math.floor(Math.random() * availableNumbers.length);
           matchesHook.callNumber(match.id, availableNumbers[randomIndex]).finally(() => {
-            // Liberamos o lock apenas após 2 segundos para garantir que o estado local 
-            // tenha tempo de receber o próximo timestamp do banco de dados
-            setTimeout(() => processingRef.current.delete(processingKeyCall), 2000);
+            // Pequeno delay para o banco de dados atualizar antes de liberar a próxima chamada
+            setTimeout(() => processingRef.current.delete(processingKeyCall), 3000);
           });
         } else {
           processingRef.current.delete(processingKeyCall);
@@ -112,18 +108,13 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     const channel = supabase.channel('schema-db-changes')
-      .on('postgres_changes', { event: '*', schema: 'public' }, (payload) => {
-        // Invalidate all relevant queries to ensure data is fresh
+      .on('postgres_changes', { event: '*', schema: 'public' }, () => {
         queryClient.invalidateQueries({ queryKey: ['matches'] });
         queryClient.invalidateQueries({ queryKey: ['matchCards'] });
         queryClient.invalidateQueries({ queryKey: ['profile'] });
         queryClient.invalidateQueries({ queryKey: ['players'] });
         queryClient.invalidateQueries({ queryKey: ['wins'] });
-        queryClient.invalidateQueries({ queryKey: ['allWins'] });
         queryClient.invalidateQueries({ queryKey: ['creditRequests'] });
-        queryClient.invalidateQueries({ queryKey: ['rawCreditRequests'] });
-        queryClient.invalidateQueries({ queryKey: ['redeemRequests'] });
-        queryClient.invalidateQueries({ queryKey: ['rawRedeemRequests'] });
         queryClient.invalidateQueries({ queryKey: ['gameSettings'] });
       }).subscribe();
     return () => { supabase.removeChannel(channel); };
