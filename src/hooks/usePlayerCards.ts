@@ -35,14 +35,22 @@ export const usePlayerCards = () => {
 
   const deletePlayerCard = async (cardId: string) => {
     const { error } = await supabase.from('cartelas_jogador').delete().eq('id', cardId);
-    if (error) toast.error("Erro ao deletar cartela.", { description: error.message });
-    else toast.success("Cartela deletada com sucesso.");
-    queryClient.invalidateQueries({ queryKey: ['playerCards', user?.id] });
+    if (error) {
+      toast.error("Erro ao deletar cartela.", { description: error.message });
+    } else {
+      toast.success("Cartela excluída permanentemente.");
+      queryClient.invalidateQueries({ queryKey: ['playerCards', user?.id] });
+    }
   };
   
   const toggleArchivePlayerCard = async (cardId: string, archive: boolean) => {
-    await supabase.from('cartelas_jogador').update({ is_archived: archive }).eq('id', cardId);
-    queryClient.invalidateQueries({ queryKey: ['playerCards', user?.id] });
+    const { error } = await supabase.from('cartelas_jogador').update({ is_archived: archive }).eq('id', cardId);
+    if (error) {
+      toast.error("Erro ao alterar status da cartela.");
+    } else {
+      toast.success(archive ? "Cartela arquivada!" : "Cartela restaurada!");
+      queryClient.invalidateQueries({ queryKey: ['playerCards', user?.id] });
+    }
   };
 
   const buyCardUses = async (playerCardId: string) => {
