@@ -83,15 +83,17 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (availableNumbers.length > 0) {
           const randomIndex = Math.floor(Math.random() * availableNumbers.length);
           matchesHook.callNumber(match.id, availableNumbers[randomIndex]).finally(() => {
-            setTimeout(() => processingRef.current.delete(processingKeyCall), 500);
+            // Release the lock after a short delay to allow for state propagation
+            setTimeout(() => processingRef.current.delete(processingKeyCall), 1000);
           });
         } else {
-          matchesHook.toggleAutoCall(match.id);
+          // If no numbers are available, just release the lock and do nothing.
+          // The automatic calling will stop. The admin can manually finish the match.
           processingRef.current.delete(processingKeyCall);
         }
       }
     });
-  }, [now, matchesHook.matches, matchesHook.startMatch, matchesHook.callNumber, matchesHook.toggleAutoCall]);
+  }, [now, matchesHook.matches, matchesHook.startMatch, matchesHook.callNumber]);
 
   useEffect(() => {
     const channel = supabase.channel('schema-db-changes')
