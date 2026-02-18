@@ -1,5 +1,7 @@
 # Bingo App
 
+## Versão 1,0 LTS
+
 Este é um aplicativo completo de Bingo em tempo real, construído com React, TypeScript e Supabase. Ele oferece uma experiência de jogo multiplayer, gerenciamento de créditos, um painel de administração robusto e muito mais.
 
 ## ✨ Principais Funcionalidades
