@@ -9,9 +9,9 @@ interface MatchStatsProps {
 
 const getPrizeDisplay = (match: Match) => {
   if (match.prize.type === 'product') return `🎁 ${match.prize.productName || 'Produto'}`;
-  if (match.prize.type === 'fixed') return `💰 ${match.prize.value} créditos`;
-  if (match.prize.type === 'percentage') return `📊 ${match.prize.value}% do pote (${Math.floor(match.pot * (match.prize.value || 0) / 100)} créditos)`;
-  return 'Prêmio não definido';
+  if (match.prize.type === 'fixed') return `💰 ${match.prize.value} cr.`;
+  if (match.prize.type === 'percentage') return `📊 ${match.prize.value}% (${Math.floor(match.pot * (match.prize.value || 0) / 100)} cr.)`;
+  return 'N/A';
 };
 
 export const MatchStats = ({ match, allMatchCards }: MatchStatsProps) => {
@@ -41,40 +41,44 @@ export const MatchStats = ({ match, allMatchCards }: MatchStatsProps) => {
     <div className="card-container mb-6 overflow-hidden">
       {match.prize.type === 'product' && match.prize_image_url && (
         <div className="mx-[-1rem] mt-[-1rem] mb-4">
-          <img src={match.prize_image_url} alt={match.prize.productName || 'Prêmio'} className="w-full h-40 object-cover" />
+          <img src={match.prize_image_url} alt={match.prize.productName || 'Prêmio'} className="w-full h-32 md:h-40 object-cover" />
         </div>
       )}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-center">
-        <div className="flex flex-col items-center justify-center p-4 rounded-lg bg-muted/50">
-          <Ticket className="w-6 h-6 text-primary mb-1" />
-          <span className="font-bold text-2xl font-heading">{totalCards}</span>
-          <span className="text-sm text-muted-foreground">Cartelas na Partida</span>
+      
+      {/* Top Stats - Side by side always */}
+      <div className="grid grid-cols-2 gap-2 sm:gap-4 text-center">
+        <div className="flex flex-col items-center justify-center p-2 sm:p-4 rounded-lg bg-muted/50 border border-border/50">
+          <Ticket className="w-4 h-4 sm:w-6 sm:h-6 text-primary mb-1" />
+          <span className="font-bold text-lg sm:text-2xl font-heading">{totalCards}</span>
+          <span className="text-[10px] sm:text-sm text-muted-foreground">Cartelas</span>
         </div>
-        <div className="flex flex-col items-center justify-center p-4 rounded-lg bg-muted/50">
-          <Trophy className="w-6 h-6 text-success mb-1" />
-          <span className="font-bold text-lg font-heading text-center">{prizeDisplay}</span>
-          <span className="text-sm text-muted-foreground">Prêmio</span>
+        <div className="flex flex-col items-center justify-center p-2 sm:p-4 rounded-lg bg-muted/50 border border-border/50">
+          <Trophy className="w-4 h-4 sm:w-6 sm:h-6 text-success mb-1" />
+          <span className="font-bold text-sm sm:text-lg font-heading leading-tight">{prizeDisplay}</span>
+          <span className="text-[10px] sm:text-sm text-muted-foreground">Prêmio</span>
         </div>
       </div>
 
       {match.status === 'in_progress' && (
         <div className="mt-4 pt-4 border-t border-border">
-          <h4 className="text-center font-heading font-bold mb-3 text-foreground">Quase lá!</h4>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
-            <div className="flex flex-col items-center justify-center p-4 rounded-lg bg-muted/50">
-              <Target className="w-6 h-6 text-muted-foreground mb-1" />
-              <span className="font-bold text-2xl font-heading">{stats.missing5}</span>
-              <span className="text-sm text-muted-foreground">Faltam 5</span>
+          <h4 className="text-center font-heading font-bold mb-3 text-sm sm:text-base text-foreground">Quase lá!</h4>
+          
+          {/* Progress Stats - 3 columns always */}
+          <div className="grid grid-cols-3 gap-1.5 sm:gap-4 text-center">
+            <div className="flex flex-col items-center justify-center p-2 sm:p-4 rounded-lg bg-muted/50 border border-border/50">
+              <Target className="w-4 h-4 sm:w-6 sm:h-6 text-muted-foreground mb-1" />
+              <span className="font-bold text-lg sm:text-2xl font-heading">{stats.missing5}</span>
+              <span className="text-[9px] sm:text-sm text-muted-foreground">Faltam 5</span>
             </div>
-            <div className="flex flex-col items-center justify-center p-4 rounded-lg bg-accent/10">
-              <Target className="w-6 h-6 text-accent mb-1" />
-              <span className="font-bold text-2xl font-heading text-accent">{stats.missing3}</span>
-              <span className="text-sm text-accent/80">Faltam 3</span>
+            <div className="flex flex-col items-center justify-center p-2 sm:p-4 rounded-lg bg-accent/10 border border-accent/20">
+              <Target className="w-4 h-4 sm:w-6 sm:h-6 text-accent mb-1" />
+              <span className="font-bold text-lg sm:text-2xl font-heading text-accent">{stats.missing3}</span>
+              <span className="text-[9px] sm:text-sm text-accent/80">Faltam 3</span>
             </div>
-            <div className="flex flex-col items-center justify-center p-4 rounded-lg bg-destructive/10">
-              <Flame className="w-6 h-6 text-destructive mb-1" />
-              <span className="font-bold text-2xl font-heading text-destructive">{stats.missing1}</span>
-              <span className="text-sm text-destructive/80">Por 1!</span>
+            <div className="flex flex-col items-center justify-center p-2 sm:p-4 rounded-lg bg-destructive/10 border border-destructive/20">
+              <Flame className="w-4 h-4 sm:w-6 sm:h-6 text-destructive mb-1" />
+              <span className="font-bold text-lg sm:text-2xl font-heading text-destructive">{stats.missing1}</span>
+              <span className="text-[9px] sm:text-sm text-destructive/80">Por 1!</span>
             </div>
           </div>
         </div>
