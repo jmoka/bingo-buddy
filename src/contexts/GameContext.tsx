@@ -367,10 +367,37 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const match = matches.find(m => m.id === matchId);
     if (!match || !gameSettings) return;
     const isEnabling = !match.is_auto_calling;
-    await supabase.from('partidas').update({
+
+    await queryClient.cancelQueries({ queryKey: ['matches'] });
+    const previousMatches = queryClient.getQueryData<Match[]>(['matches']);
+
+    queryClient.setQueryData<Match[]>(['matches'], (old) =>
+      old
+        ? old.map((m) =>
+            m.id === matchId
+              ? {
+                  ...m,
+                  is_auto_calling: isEnabling,
+                  next_auto_call_timestamp: isEnabling
+                    ? new Date(Date.now() + gameSettings.intervalo_sorteio_auto_seg * 1000).toISOString()
+                    : null,
+                }
+              : m
+          )
+        : []
+    );
+
+    const { error } = await supabase.from('partidas').update({
       is_auto_calling: isEnabling,
       next_auto_call_timestamp: isEnabling ? new Date(Date.now() + gameSettings.intervalo_sorteio_auto_seg * 1000).toISOString() : null,
     }).eq('id', matchId);
+
+    if (error) {
+      toast.error('Erro ao alterar sorteio automático.');
+      queryClient.setQueryData(['matches'], previousMatches);
+    }
+    
+    await queryClient.invalidateQueries({ queryKey: ['matches'] });
   };
 
   const callNumber = async (matchId: string, num: number) => {
@@ -380,6 +407,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const previousMatches = queryClient.getQueryData<Match[]>(['matches']);
     const previousMatchCards = queryClient.getQueryData<MatchCard[]>(['matchCards']);
 
+    // Optimistic update
     queryClient.setQueryData<Match[]>(['matches'], (old) =>
       old
         ? old.map((match) =>
@@ -405,9 +433,18 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     try {
       const { error } = await supabase.functions.invoke('call-number', { body: { matchId, num } });
-      if (error) throw error;
+      if (error) {
+        throw error;
+      }
+      // On success, invalidate to get the authoritative state from the server
+      await queryClient.invalidateQueries({ queryKey: ['matches'] });
+      await queryClient.invalidateQueries({ queryKey: ['matchCards'] });
+      await queryClient.invalidateQueries({ queryKey: ['wins'] });
+      await queryClient.invalidateQueries({ queryKey: ['allWins'] });
+
     } catch (error) {
       toast.error("Erro ao sortear número.", { description: (error as Error).message });
+      // Rollback on error
       queryClient.setQueryData(['matches'], previousMatches);
       queryClient.setQueryData(['matchCards'], previousMatchCards);
     }
