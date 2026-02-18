@@ -39,7 +39,7 @@ interface GameContextType {
   createMatch: (data: any) => Promise<void>;
   updateMatch: (matchId: string, data: Partial<Match>) => Promise<void>;
   openMatch: (matchId: string) => Promise<void>;
-  startMatch: (matchId: string) => Promise<void>;
+  startMatch: (matchId: string, force?: boolean) => Promise<void>;
   callNumber: (matchId: string, num: number) => Promise<void>;
   finishMatch: (matchId: string) => Promise<void>;
   deleteMatch: (matchId: string) => Promise<void>;
@@ -256,13 +256,13 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const openMatch = (matchId: string) => updateMatchStatus(matchId, 'open');
   
-  const startMatch = async (matchId: string) => {
+  const startMatch = async (matchId: string, force = false) => {
     const match = matches.find(m => m.id === matchId);
     if (!match) return;
 
     const playersInMatch = new Set(matchCards.filter(mc => mc.match_id === matchId).map(mc => mc.player_id)).size;
 
-    if (match.min_players > 1 && playersInMatch < match.min_players) {
+    if (!force && playersInMatch < match.min_players) {
       toast.error('A partida não pode ser iniciada.', {
         description: `São necessários no mínimo ${match.min_players} jogadores, mas há apenas ${playersInMatch}.`
       });

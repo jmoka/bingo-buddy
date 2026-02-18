@@ -14,6 +14,17 @@ import {
   Hash, ArrowLeft, StopCircle, Settings, Save, Bot, Shuffle, ArrowRight, Webhook, Key, Send, Loader2, CreditCard, Banknote, Check, Edit
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { useToast } from '@/hooks/use-toast';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
@@ -440,7 +451,32 @@ const Admin = () => {
                     <div className="flex gap-2">
                       {match.status === 'waiting' && <Button size="sm" variant="outline" onClick={() => handleOpenEditDialog(match)}><Edit className="w-4 h-4 mr-2" />Editar</Button>}
                       {match.status === 'waiting' && <Button size="sm" onClick={() => openMatch(match.id)}>Abrir</Button>}
-                      {match.status === 'open' && <Button size="sm" onClick={() => startMatch(match.id)} disabled={!canStart} title={!canStart ? `Requer ${match.min_players} jogadores` : ''}>Iniciar</Button>}
+                      
+                      {match.status === 'open' && (
+                        !canStart ? (
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button size="sm" title={`Requer ${match.min_players} jogadores. Atualmente: ${playersInMatchCount}.`}>Iniciar</Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Forçar início da partida?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Esta partida não atingiu o número mínimo de {match.min_players} jogadores (atualmente com {playersInMatchCount}). 
+                                  Iniciar a partida mesmo assim pode fazer com que o prêmio não seja coberto pelo valor arrecadado.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                <AlertDialogAction onClick={() => startMatch(match.id, true)}>Forçar Início</AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        ) : (
+                          <Button size="sm" onClick={() => startMatch(match.id)}>Iniciar</Button>
+                        )
+                      )}
+
                       {match.status === 'in_progress' && <Button size="sm" variant="outline" onClick={() => finishMatch(match.id)}>Finalizar</Button>}
                       {(match.status === 'waiting' || match.status === 'finished') && <Button size="sm" variant="destructive" onClick={() => deleteMatch(match.id)}><Trash2 className="w-4 h-4" /></Button>}
                     </div>
