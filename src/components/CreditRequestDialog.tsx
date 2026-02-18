@@ -78,7 +78,7 @@ export const CreditRequestDialog = ({ gameSettings, children }: CreditRequestDia
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>{children}</DialogTrigger>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="font-heading">Solicitar Créditos</DialogTitle>
           <DialogDescription>
