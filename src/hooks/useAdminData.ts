@@ -19,6 +19,7 @@ export const useAdminData = () => {
       return data as Profile[];
     },
     enabled: isAdmin,
+    refetchInterval: 3000, // Atualiza lista de jogadores a cada 3s
   });
 
   const { data: allPlayerCards = [] } = useQuery({
@@ -29,6 +30,7 @@ export const useAdminData = () => {
       return data as PlayerCard[];
     },
     enabled: isAdmin,
+    refetchInterval: 5000,
   });
 
   const { data: allWins = [] } = useQuery({
@@ -39,6 +41,7 @@ export const useAdminData = () => {
       return data as Win[];
     },
     enabled: isAdmin,
+    refetchInterval: 5000,
   });
 
   const { data: rawCreditRequests = [], isLoading: isLoadingRequests } = useQuery({
@@ -49,6 +52,7 @@ export const useAdminData = () => {
       return data;
     },
     enabled: isAdmin,
+    refetchInterval: 3000, // Atualiza solicitações de crédito a cada 3s
   });
 
   const allCreditRequests = useMemo(() => {
@@ -68,6 +72,7 @@ export const useAdminData = () => {
       return data;
     },
     enabled: isAdmin,
+    refetchInterval: 3000,
   });
 
   const allRedeemRequests = useMemo(() => {
@@ -91,7 +96,7 @@ export const useAdminData = () => {
         return false;
     } else {
         toast.success("Créditos atualizados com sucesso!");
-        queryClient.invalidateQueries({ queryKey: ['players'] });
+        await queryClient.refetchQueries({ queryKey: ['players'] });
         return true;
     }
   };
@@ -114,7 +119,7 @@ export const useAdminData = () => {
             message: notes
         });
     }
-    queryClient.invalidateQueries({ queryKey: ['rawCreditRequests'] });
+    await queryClient.refetchQueries({ queryKey: ['rawCreditRequests'] });
     return true;
   };
 
@@ -123,12 +128,12 @@ export const useAdminData = () => {
       status: 'pending', notes: 'Solicitação reaberta pelo administrador.', resolved_at: null, resolved_by: null, credits_granted: null,
     }).eq('id', requestId);
     toast.success('Solicitação reaberta');
-    queryClient.invalidateQueries({ queryKey: ['rawCreditRequests'] });
+    await queryClient.refetchQueries({ queryKey: ['rawCreditRequests'] });
   };
 
   const deleteCreditRequest = async (requestId: string) => { 
     await supabase.from('solicitacoes_credito').delete().eq('id', requestId); 
-    queryClient.invalidateQueries({ queryKey: ['rawCreditRequests'] });
+    await queryClient.refetchQueries({ queryKey: ['rawCreditRequests'] });
   };
 
   const resolveRedeemRequest = async (requestId: string, status: 'approved' | 'rejected', receiptFile?: File, notes?: string): Promise<boolean> => {
@@ -151,7 +156,7 @@ export const useAdminData = () => {
     if (notes) {
         await supabase.from('mensagens_resgate').insert({ redeem_request_id: requestId, sender_id: user.id, message: notes });
     }
-    queryClient.invalidateQueries({ queryKey: ['rawRedeemRequests'] });
+    await queryClient.refetchQueries({ queryKey: ['rawRedeemRequests'] });
     return true;
   };
 
@@ -167,12 +172,12 @@ export const useAdminData = () => {
         resolved_by: null,
     }).eq('id', requestId);
     toast.success('Solicitação de resgate reaberta.');
-    queryClient.invalidateQueries({ queryKey: ['rawRedeemRequests'] });
+    await queryClient.refetchQueries({ queryKey: ['rawRedeemRequests'] });
   };
 
   const deleteRedeemRequest = async (requestId: string) => {
     await supabase.from('solicitacoes_resgate').delete().eq('id', requestId);
-    queryClient.invalidateQueries({ queryKey: ['rawRedeemRequests'] });
+    await queryClient.refetchQueries({ queryKey: ['rawRedeemRequests'] });
   };
 
   const fetchRequestMessages = async (requestId: string) => {
