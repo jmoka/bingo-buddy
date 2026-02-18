@@ -273,7 +273,8 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [queryClient]);
 
   const createMatch = async (data: any) => {
-    const { error } = await supabase.from('partidas').insert([{ ...data, status: 'waiting' }]);
+    const status = data.is_auto_calling ? 'open' : 'waiting';
+    const { error } = await supabase.from('partidas').insert([{ ...data, status }]);
     if (error) {
       toast.error(error.message);
     } else {
@@ -283,7 +284,17 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const updateMatch = async (matchId: string, data: Partial<Match>) => {
-    const { error } = await supabase.from('partidas').update(data).eq('id', matchId);
+    const matchToUpdate = matches.find(m => m.id === matchId);
+    if (!matchToUpdate) return;
+  
+    const updatedData = { ...data };
+  
+    // If toggling auto-calling on for a waiting match, open it.
+    if (data.is_auto_calling && matchToUpdate.status === 'waiting') {
+      updatedData.status = 'open';
+    }
+  
+    const { error } = await supabase.from('partidas').update(updatedData).eq('id', matchId);
     if (error) {
       toast.error(error.message);
     } else {
