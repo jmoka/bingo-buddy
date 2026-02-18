@@ -129,14 +129,14 @@ const MatchView = () => {
         )}
 
         <div className="card-container mb-6">
-          <p className="text-sm text-muted-foreground mb-2">Números sorteados ({match.called_numbers.length})</p>
+          <p className="text-sm text-muted-foreground mb-2">Números sorteados ({(match.called_numbers || []).length})</p>
           <div className="flex flex-wrap gap-1.5">
-            {match.called_numbers.map(num => (
+            {(match.called_numbers || []).map(num => (
               <span key={num} className="w-8 h-8 rounded-full bg-primary text-primary-foreground text-sm font-medium flex items-center justify-center">
                 {num}
               </span>
             ))}
-            {match.called_numbers.length === 0 && (
+            {(match.called_numbers || []).length === 0 && (
               <span className="text-sm text-muted-foreground italic">Aguardando sorteio...</span>
             )}
           </div>

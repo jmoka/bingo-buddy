@@ -1,6 +1,6 @@
 # Welcome to your Lovable project
 
-# Versão 2 em teste
+# Versão 2 em teste/
 
 ## Project info
 

@@ -508,9 +508,9 @@ const Admin = () => {
                             <Button variant="secondary" onClick={() => handleRandomCall(match.id)}><Shuffle className="w-4 h-4" /></Button>
                         </div>
                         <div className="mt-4">
-                            <p className="text-xs text-muted-foreground mb-2">Sorteados ({match.called_numbers.length})</p>
+                            <p className="text-xs text-muted-foreground mb-2">Sorteados ({(match.called_numbers || []).length})</p>
                             <div className="flex flex-wrap gap-1.5">
-                                {match.called_numbers.map(num => (
+                                {(match.called_numbers || []).map(num => (
                                     <span key={num} className="w-7 h-7 rounded-full bg-secondary text-secondary-foreground text-xs font-bold flex items-center justify-center">{num}</span>
                                 ))}
                             </div>
