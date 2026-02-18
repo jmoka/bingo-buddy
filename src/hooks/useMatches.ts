@@ -8,7 +8,6 @@ export const useMatches = () => {
   const queryClient = useQueryClient();
   const { gameSettings } = useGameSettings();
 
-  // Polling de 1 segundo para garantir sincronia absoluta
   const { data: matches = [] } = useQuery({
     queryKey: ['matches'],
     queryFn: async () => {
@@ -16,7 +15,6 @@ export const useMatches = () => {
       if (error) throw error;
       return data as Match[];
     },
-    refetchInterval: 1000, 
   });
 
   const { data: matchCards = [] } = useQuery({
@@ -26,7 +24,6 @@ export const useMatches = () => {
       if (error) throw error;
       return data.map(c => ({ ...c, marked_numbers: new Set(c.marked_numbers || []) })) as MatchCard[];
     },
-    refetchInterval: 1000,
   });
 
   const createMatch = async (data: any) => {
