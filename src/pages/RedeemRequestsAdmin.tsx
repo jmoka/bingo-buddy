@@ -9,16 +9,14 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose, DialogDescription } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Check, X, Download, MessageSquare, Trash2, Banknote, AlertTriangle, RefreshCw, Undo2, User, ShieldCheck, Loader2, Upload } from 'lucide-react';
-import { Footer } from '@/components/Footer';
+import { ArrowLeft, Check, X, MessageSquare, Trash2, Banknote, RefreshCw, Undo2, User, ShieldCheck, Loader2 } from 'lucide-react';
 import PlayerAvatar from '@/components/PlayerAvatar';
 import { RedeemRequest, RedeemRequestMessage } from '@/types/match';
 import { format, formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -113,7 +111,7 @@ const RedeemRequestsAdmin = () => {
       <TableBody>
         {requests.map(req => (
           <TableRow key={req.id} className="opacity-80">
-            <TableCell>
+            <TableCell className="min-w-[200px]">
               <div className="flex items-center gap-2 text-sm">
                 <PlayerAvatar url={req.perfis?.avatar_url || null} />
                 <span>{req.perfis?.full_name || 'Usuário'}</span>
@@ -134,124 +132,113 @@ const RedeemRequestsAdmin = () => {
   );
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
-      <header className="gradient-hero py-6 px-4">
-        <div className="container max-w-6xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" className="text-primary-foreground" onClick={() => navigate('/admin')}>
-              <ArrowLeft className="w-5 h-5" />
-            </Button>
-            <h1 className="font-heading text-2xl md:text-3xl font-bold text-primary-foreground">Pagamentos (Resgates)</h1>
-          </div>
-          <Button variant="ghost" size="sm" className="text-primary-foreground" onClick={handleRefresh} disabled={isRefreshing || isLoading}>
-            <RefreshCw className={`w-4 h-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} /> Atualizar
+    <>
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="icon" onClick={() => navigate('/admin')}>
+            <ArrowLeft className="w-5 h-5" />
           </Button>
+          <h1 className="font-heading text-2xl md:text-3xl font-bold text-foreground">Pagamentos (Resgates)</h1>
         </div>
-      </header>
+        <Button variant="ghost" size="sm" onClick={handleRefresh} disabled={isRefreshing || isLoading}>
+          <RefreshCw className={`w-4 h-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} /> Atualizar
+        </Button>
+      </div>
 
-      <main className="container max-w-6xl mx-auto py-8 px-4 flex-grow">
-        <Tabs defaultValue="pending">
-          <TabsList className="grid w-full grid-cols-3 mb-6 h-12">
-            <TabsTrigger value="pending" className="flex items-center gap-2">
-              A Pagar
-              {pendingRequests.length > 0 && (
-                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-amber-500 text-[10px] font-bold text-white">
-                  {pendingRequests.length}
-                </span>
-              )}
-            </TabsTrigger>
-            <TabsTrigger value="rejected" className="flex items-center gap-2">
-              Com Problema
-              {rejectedRequests.length > 0 && (
-                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-[10px] font-bold text-white">
-                  {rejectedRequests.length}
-                </span>
-              )}
-            </TabsTrigger>
-            <TabsTrigger value="approved" className="flex items-center gap-2">
-              Pagos
-              {approvedRequests.length > 0 && (
-                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-success text-[10px] font-bold text-white">
-                  {approvedRequests.length}
-                </span>
-              )}
-            </TabsTrigger>
-          </TabsList>
+      <Tabs defaultValue="pending">
+        <TabsList className="grid w-full grid-cols-3 mb-6 h-12">
+          <TabsTrigger value="pending" className="flex items-center gap-2">
+            A Pagar
+            {pendingRequests.length > 0 && (
+              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-amber-500 text-[10px] font-bold text-white">
+                {pendingRequests.length}
+              </span>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="rejected" className="flex items-center gap-2">
+            Com Problema
+            {rejectedRequests.length > 0 && (
+              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-[10px] font-bold text-white">
+                {rejectedRequests.length}
+              </span>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="approved" className="flex items-center gap-2">
+            Pagos
+          </TabsTrigger>
+        </TabsList>
 
-          <TabsContent value="pending">
-            <div className="card-container overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Jogador</TableHead>
-                    <TableHead>Data</TableHead>
-                    <TableHead>Valor PIX</TableHead>
-                    <TableHead className="text-right">Ações</TableHead>
+        <TabsContent value="pending">
+          <div className="card-container overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Jogador</TableHead>
+                  <TableHead>Data</TableHead>
+                  <TableHead>Valor PIX</TableHead>
+                  <TableHead className="text-right">Ações</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {pendingRequests.map(req => (
+                  <TableRow key={req.id}>
+                    <TableCell className="min-w-[250px]">
+                      <div className="flex items-center gap-3">
+                        <PlayerAvatar url={req.perfis?.avatar_url || null} />
+                        <div className="flex flex-col">
+                          <span className="font-medium">{req.perfis?.full_name || 'Usuário'}</span>
+                          <button 
+                              onClick={() => setConversationRequest(req)}
+                              className="mt-1 flex items-center gap-1 text-[10px] text-primary font-bold hover:underline"
+                            >
+                              <MessageSquare className="w-3 h-3" /> Ver conversa / chave PIX
+                            </button>
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-xs min-w-[150px]">
+                      <div>{format(new Date(req.requested_at), "dd/MM/yy HH:mm")}</div>
+                      <div className="text-muted-foreground">{formatDistanceToNow(new Date(req.requested_at), { addSuffix: true, locale: ptBR })}</div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="font-bold text-success text-lg">R$ {Number(req.amount_to_receive).toFixed(2).replace('.', ',')}</div>
+                      <div className="text-xs text-muted-foreground">{req.credits_requested} créditos</div>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-1.5">
+                        <Button size="icon" variant="ghost" className="text-destructive" onClick={() => handleOpenDialog(req, 'reject')}><X className="w-4 h-4" /></Button>
+                        <Button size="icon" variant="ghost" className="text-success" onClick={() => handleOpenDialog(req, 'approve')}><Check className="w-4 h-4" /></Button>
+                        <Button size="icon" variant="ghost" className="text-muted-foreground" onClick={() => handleOpenDialog(req, 'delete')}><Trash2 className="w-4 h-4" /></Button>
+                      </div>
+                    </TableCell>
                   </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {pendingRequests.map(req => (
-                    <TableRow key={req.id}>
-                      <TableCell>
-                        <div className="flex items-center gap-3">
-                          <PlayerAvatar url={req.perfis?.avatar_url || null} />
-                          <div className="flex flex-col">
-                            <span className="font-medium">{req.perfis?.full_name || 'Usuário'}</span>
-                            <button 
-                                onClick={() => setConversationRequest(req)}
-                                className="mt-1 flex items-center gap-1 text-[10px] text-primary font-bold hover:underline"
-                              >
-                                <MessageSquare className="w-3 h-3" /> Ver conversa / chave PIX
-                              </button>
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-xs">
-                        <div>{format(new Date(req.requested_at), "dd/MM/yy HH:mm")}</div>
-                        <div className="text-muted-foreground">{formatDistanceToNow(new Date(req.requested_at), { addSuffix: true, locale: ptBR })}</div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="font-bold text-success text-lg">R$ {Number(req.amount_to_receive).toFixed(2).replace('.', ',')}</div>
-                        <div className="text-xs text-muted-foreground">{req.credits_requested} créditos</div>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-1.5">
-                          <Button size="icon" variant="ghost" className="text-destructive" onClick={() => handleOpenDialog(req, 'reject')}><X className="w-4 h-4" /></Button>
-                          <Button size="icon" variant="ghost" className="text-success" onClick={() => handleOpenDialog(req, 'approve')}><Check className="w-4 h-4" /></Button>
-                          <Button size="icon" variant="ghost" className="text-muted-foreground" onClick={() => handleOpenDialog(req, 'delete')}><Trash2 className="w-4 h-4" /></Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                  {pendingRequests.length === 0 && (
-                      <TableRow><TableCell colSpan={4} className="text-center py-10 text-muted-foreground">Tudo pago por aqui! ✅</TableCell></TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </div>
-          </TabsContent>
+                ))}
+                {pendingRequests.length === 0 && (
+                    <TableRow><TableCell colSpan={4} className="text-center py-10 text-muted-foreground">Tudo pago por aqui! ✅</TableCell></TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </TabsContent>
 
-          <TabsContent value="approved">
-            <div className="card-container overflow-x-auto">
-              {renderHistoryTable(approvedRequests)}
-            </div>
-          </TabsContent>
-          <TabsContent value="rejected">
-            <div className="card-container overflow-x-auto">
-              {renderHistoryTable(rejectedRequests)}
-            </div>
-          </TabsContent>
-        </Tabs>
-      </main>
+        <TabsContent value="approved">
+          <div className="card-container overflow-x-auto">
+            {renderHistoryTable(approvedRequests)}
+          </div>
+        </TabsContent>
+        <TabsContent value="rejected">
+          <div className="card-container overflow-x-auto">
+            {renderHistoryTable(rejectedRequests)}
+          </div>
+        </TabsContent>
+      </Tabs>
 
-      {/* Chat de Resgate */}
       <Dialog open={!!conversationRequest} onOpenChange={(open) => !open && setConversationRequest(null)}>
         <DialogContent className="max-w-md h-[70vh] flex flex-col p-0">
           <DialogHeader className="p-6 pb-2 border-b">
             <DialogTitle className="flex items-center gap-2 font-heading">
               <MessageSquare className="w-5 h-5 text-primary" /> Chat de Pagamento
             </DialogTitle>
-            <DialogDescription>Resgate de {conversationRequest?.perfis?.full_name}</DialogDescription>
           </DialogHeader>
 
           <ScrollArea className="flex-grow p-4">
@@ -285,7 +272,6 @@ const RedeemRequestsAdmin = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Resolver Solicitação */}
       <Dialog open={isResolveDialogOpen} onOpenChange={setIsResolveDialogOpen}>
         <DialogContent>
           <DialogHeader>
@@ -329,9 +315,7 @@ const RedeemRequestsAdmin = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      <Footer />
-    </div>
+    </>
   );
 };
 

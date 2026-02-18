@@ -12,8 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose, DialogDescription } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Check, X, Download, MessageSquare, Trash2, Coins, AlertTriangle, RefreshCw, Undo2, User, ShieldCheck, Loader2 } from 'lucide-react';
-import { Footer } from '@/components/Footer';
+import { ArrowLeft, Check, X, Download, MessageSquare, Trash2, Coins, RefreshCw, Undo2, User, ShieldCheck, Loader2 } from 'lucide-react';
 import PlayerAvatar from '@/components/PlayerAvatar';
 import { CreditRequest, CreditRequestMessage } from '@/types/match';
 import { format, formatDistanceToNow } from 'date-fns';
@@ -110,147 +109,138 @@ const CreditRequestsAdmin = () => {
   const resolvedRequests = allCreditRequests.filter(r => r.status !== 'pending');
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
-      <header className="gradient-hero py-6 px-4">
-        <div className="container max-w-6xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" className="text-primary-foreground" onClick={() => navigate('/admin')}>
-              <ArrowLeft className="w-5 h-5" />
-            </Button>
-            <h1 className="font-heading text-2xl md:text-3xl font-bold text-primary-foreground">Gerenciar Créditos</h1>
-          </div>
-          <Button variant="ghost" size="sm" className="text-primary-foreground" onClick={handleRefresh} disabled={isRefreshing || isLoading}>
-            <RefreshCw className={`w-4 h-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} /> Atualizar
+    <>
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="icon" onClick={() => navigate('/admin')}>
+            <ArrowLeft className="w-5 h-5" />
           </Button>
+          <h1 className="font-heading text-2xl md:text-3xl font-bold text-foreground">Gerenciar Créditos</h1>
         </div>
-      </header>
+        <Button variant="ghost" size="sm" onClick={handleRefresh} disabled={isRefreshing || isLoading}>
+          <RefreshCw className={`w-4 h-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} /> Atualizar
+        </Button>
+      </div>
 
-      <main className="container max-w-6xl mx-auto py-8 px-4 flex-grow">
-        <Tabs defaultValue="pending">
-          <TabsList className="grid w-full grid-cols-2 mb-6 h-12">
-            <TabsTrigger value="pending" className="flex items-center gap-2">
-              Pendentes 
-              {pendingRequests.length > 0 && (
-                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-amber-500 text-[10px] font-bold text-white">
-                  {pendingRequests.length}
-                </span>
-              )}
-            </TabsTrigger>
-            <TabsTrigger value="resolved" className="flex items-center gap-2">
-              Resolvidas
-              {resolvedRequests.length > 0 && (
-                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-success text-[10px] font-bold text-white">
-                  {resolvedRequests.length}
-                </span>
-              )}
-            </TabsTrigger>
-          </TabsList>
+      <Tabs defaultValue="pending">
+        <TabsList className="grid w-full grid-cols-2 mb-6 h-12">
+          <TabsTrigger value="pending" className="flex items-center gap-2">
+            Pendentes 
+            {pendingRequests.length > 0 && (
+              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-amber-500 text-[10px] font-bold text-white">
+                {pendingRequests.length}
+              </span>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="resolved" className="flex items-center gap-2">
+            Resolvidas
+          </TabsTrigger>
+        </TabsList>
 
-          <TabsContent value="pending">
-            <div className="card-container overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Jogador</TableHead>
-                    <TableHead>Data</TableHead>
-                    <TableHead>Pedido</TableHead>
-                    <TableHead className="text-center">Comprovante</TableHead>
-                    <TableHead className="text-right">Ações</TableHead>
+        <TabsContent value="pending">
+          <div className="card-container overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Jogador</TableHead>
+                  <TableHead>Data</TableHead>
+                  <TableHead>Pedido</TableHead>
+                  <TableHead className="text-center">Comprovante</TableHead>
+                  <TableHead className="text-right">Ações</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {pendingRequests.map(req => (
+                  <TableRow key={req.id}>
+                    <TableCell className="min-w-[250px]">
+                      <div className="flex items-center gap-3">
+                        <PlayerAvatar url={req.perfis?.avatar_url || null} />
+                        <div className="flex flex-col">
+                          <span className="font-medium">{req.perfis?.full_name || 'Usuário Desconhecido'}</span>
+                          <span className="text-[10px] text-muted-foreground font-mono">ID: ...{req.player_id.slice(-6)}</span>
+                          <button 
+                              onClick={() => setConversationRequest(req)}
+                              className="mt-2 flex items-start gap-2 p-2 rounded-lg bg-primary/10 border border-primary/20 text-left hover:bg-primary/20 transition-colors w-full max-w-[280px] shadow-sm group"
+                            >
+                              <MessageSquare className="w-4 h-4 text-primary shrink-0 mt-0.5 group-hover:scale-110 transition-transform" />
+                              <div className="flex flex-col overflow-hidden">
+                                <span className="text-[10px] font-bold text-primary uppercase tracking-wider mb-0.5">Abrir Conversa</span>
+                                <span className="text-xs text-foreground font-medium leading-normal line-clamp-2">
+                                  {req.resubmission_notes || "Ver histórico de mensagens..."}
+                                </span>
+                              </div>
+                            </button>
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-sm min-w-[150px]">
+                      <div className="font-medium">{format(new Date(req.requested_at), "dd/MM/yy HH:mm", { locale: ptBR })}</div>
+                      <div className="text-[10px] text-muted-foreground">{formatDistanceToNow(new Date(req.requested_at), { addSuffix: true, locale: ptBR })}</div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="font-bold text-primary">{(req.credits_requested || 0)} cr.</div>
+                      <div className="text-xs text-muted-foreground">R$ {Number(req.amount_paid || 0).toFixed(2).replace('.', ',')}</div>
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <Button variant="outline" size="sm" onClick={() => handleDownloadReceipt(req.receipt_url)}>
+                        <Download className="w-3.5 h-3.5 mr-1" /> Ver
+                      </Button>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-1.5">
+                        <Button size="icon" variant="ghost" className="text-destructive h-8 w-8" onClick={() => handleOpenDialog(req, 'reject')}><X className="w-4 h-4" /></Button>
+                        <Button size="icon" variant="ghost" className="text-success h-8 w-8" onClick={() => handleOpenDialog(req, 'approve')}><Check className="w-4 h-4" /></Button>
+                        <Button size="icon" variant="ghost" className="text-muted-foreground h-8 w-8" onClick={() => handleOpenDialog(req, 'delete')}><Trash2 className="w-4 h-4" /></Button>
+                      </div>
+                    </TableCell>
                   </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {pendingRequests.map(req => (
-                    <TableRow key={req.id}>
-                      <TableCell>
-                        <div className="flex items-center gap-3">
-                          <PlayerAvatar url={req.perfis?.avatar_url || null} />
-                          <div className="flex flex-col">
-                            <span className="font-medium">{req.perfis?.full_name || 'Usuário Desconhecido'}</span>
-                            <span className="text-[10px] text-muted-foreground font-mono">ID: ...{req.player_id.slice(-6)}</span>
-                            <button 
-                                onClick={() => setConversationRequest(req)}
-                                className="mt-2 flex items-start gap-2 p-3 rounded-lg bg-primary/10 border border-primary/20 text-left hover:bg-primary/20 transition-colors w-full max-w-[280px] shadow-sm group"
-                              >
-                                <MessageSquare className="w-5 h-5 text-primary shrink-0 mt-0.5 group-hover:scale-110 transition-transform" />
-                                <div className="flex flex-col overflow-hidden">
-                                  <span className="text-[10px] font-bold text-primary uppercase tracking-wider mb-0.5 text-center">Abrir Conversa Completa</span>
-                                  <span className="text-xs text-foreground font-medium leading-normal line-clamp-2">
-                                    {req.resubmission_notes || "Ver histórico de mensagens..."}
-                                  </span>
-                                </div>
-                              </button>
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-sm">
-                        <div className="font-medium">{format(new Date(req.requested_at), "dd/MM/yy HH:mm", { locale: ptBR })}</div>
-                        <div className="text-[10px] text-muted-foreground">{formatDistanceToNow(new Date(req.requested_at), { addSuffix: true, locale: ptBR })}</div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="font-bold text-primary">{(req.credits_requested || 0)} cr.</div>
-                        <div className="text-xs text-muted-foreground">R$ {Number(req.amount_paid || 0).toFixed(2).replace('.', ',')}</div>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <Button variant="outline" size="sm" onClick={() => handleDownloadReceipt(req.receipt_url)}>
-                          <Download className="w-3.5 h-3.5 mr-1" /> Ver
-                        </Button>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-1.5">
-                          <Button size="icon" variant="ghost" className="text-destructive h-8 w-8" onClick={() => handleOpenDialog(req, 'reject')}><X className="w-4 h-4" /></Button>
-                          <Button size="icon" variant="ghost" className="text-success h-8 w-8" onClick={() => handleOpenDialog(req, 'approve')}><Check className="w-4 h-4" /></Button>
-                          <Button size="icon" variant="ghost" className="text-muted-foreground h-8 w-8" onClick={() => handleOpenDialog(req, 'delete')}><Trash2 className="w-4 h-4" /></Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          </TabsContent>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </TabsContent>
 
-          <TabsContent value="resolved">
-            <div className="card-container overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Jogador</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Créditos</TableHead>
-                    <TableHead>Mensagem</TableHead>
-                    <TableHead className="text-right">Ação</TableHead>
+        <TabsContent value="resolved">
+          <div className="card-container overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Jogador</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Créditos</TableHead>
+                  <TableHead>Mensagem</TableHead>
+                  <TableHead className="text-right">Ação</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {resolvedRequests.map(req => (
+                  <TableRow key={req.id} className="opacity-80">
+                    <TableCell className="min-w-[200px]">
+                      <div className="flex items-center gap-2 text-sm">
+                        <PlayerAvatar url={req.perfis?.avatar_url || null} />
+                        <span>{req.perfis?.full_name || 'Removido'}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell><Badge className={`${statusConfig[req.status]?.color || 'bg-muted'} border-none`}>{statusConfig[req.status]?.label}</Badge></TableCell>
+                    <TableCell><div className="text-sm font-bold">{req.credits_granted || 0} de {req.credits_requested}</div></TableCell>
+                    <TableCell className="max-w-[200px] truncate">
+                      <button onClick={() => setConversationRequest(req)} className="text-[10px] text-primary/70 hover:text-primary transition-colors text-left font-bold flex items-center gap-1">
+                        <MessageSquare className="w-3 h-3" /> Ver conversa...
+                      </button>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-1.5">
+                        {req.status === 'rejected' && <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground" onClick={() => unblockCreditRequest(req.id)}><Undo2 className="w-4 h-4" /></Button>}
+                        <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground" onClick={() => handleOpenDialog(req, 'delete')}><Trash2 className="w-4 h-4" /></Button>
+                      </div>
+                    </TableCell>
                   </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {resolvedRequests.map(req => (
-                    <TableRow key={req.id} className="opacity-80">
-                      <TableCell>
-                        <div className="flex items-center gap-2 text-sm">
-                          <PlayerAvatar url={req.perfis?.avatar_url || null} />
-                          <span>{req.perfis?.full_name || 'Removido'}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell><Badge className={`${statusConfig[req.status]?.color || 'bg-muted'} border-none`}>{statusConfig[req.status]?.label}</Badge></TableCell>
-                      <TableCell><div className="text-sm font-bold">{req.credits_granted || 0} de {req.credits_requested}</div></TableCell>
-                      <TableCell className="max-w-[200px] truncate">
-                        <button onClick={() => setConversationRequest(req)} className="text-[10px] text-primary/70 hover:text-primary transition-colors text-left font-bold flex items-center gap-1">
-                          <MessageSquare className="w-3 h-3" /> Ver conversa...
-                        </button>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-1.5">
-                          {req.status === 'rejected' && <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground" onClick={() => unblockCreditRequest(req.id)}><Undo2 className="w-4 h-4" /></Button>}
-                          <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground" onClick={() => handleOpenDialog(req, 'delete')}><Trash2 className="w-4 h-4" /></Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          </TabsContent>
-        </Tabs>
-      </main>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </TabsContent>
+      </Tabs>
 
       <Dialog open={!!conversationRequest} onOpenChange={(open) => !open && setConversationRequest(null)}>
         <DialogContent className="max-w-md h-[70vh] flex flex-col p-0">
@@ -327,9 +317,7 @@ const CreditRequestsAdmin = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      <Footer />
-    </div>
+    </>
   );
 };
 

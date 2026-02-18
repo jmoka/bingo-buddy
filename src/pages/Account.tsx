@@ -4,7 +4,6 @@ import { useAuth } from '@/contexts/AuthContext'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft } from 'lucide-react'
 import Avatar from '@/components/Avatar'
 import { Label } from '@/components/ui/label'
 import { toast } from 'sonner'
@@ -63,11 +62,11 @@ export default function Account() {
     setLoading(false)
   }
 
-  if (!session || !profile) return null
+  if (!session || !profile) return null;
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
-      <div className="card-container max-w-md w-full">
+    <div className="max-w-md mx-auto">
+      <div className="card-container w-full">
         <h1 className="font-heading text-2xl font-bold text-foreground mb-6 text-center">Meu Perfil</h1>
         <form onSubmit={updateProfile} className="space-y-4">
           <Avatar
@@ -125,10 +124,6 @@ export default function Account() {
         </form>
         <Button variant="outline" className="w-full mt-4" onClick={() => signOut()}>
           Sair
-        </Button>
-         <Button variant="ghost" className="w-full mt-2" onClick={() => navigate('/')}>
-          <ArrowLeft className="w-4 h-4 mr-2" />
-          Voltar ao Lobby
         </Button>
       </div>
     </div>

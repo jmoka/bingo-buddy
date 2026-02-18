@@ -2,9 +2,10 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { GameProvider } from "@/contexts/GameContext";
-import { AuthProvider } from "@/contexts/AuthContext";
+import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import { Layout } from "@/components/Layout";
 import Lobby from "./pages/Lobby";
 import Admin from "./pages/Admin";
 import Login from "./pages/Login";
@@ -15,8 +16,24 @@ import NotFound from "./pages/NotFound";
 import PlayersAdmin from "./pages/PlayersAdmin";
 import CreditRequestsAdmin from "./pages/CreditRequestsAdmin";
 import RedeemRequestsAdmin from "./pages/RedeemRequestsAdmin";
+import { Loader2 } from "lucide-react";
 
 const queryClient = new QueryClient();
+
+const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
+  const { session, loading } = useAuth();
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+  if (!session) {
+    return <Navigate to="/login" replace />;
+  }
+  return <Layout>{children}</Layout>;
+};
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -27,15 +44,15 @@ const App = () => (
           <Sonner />
           <BrowserRouter>
             <Routes>
-              <Route path="/" element={<Lobby />} />
               <Route path="/login" element={<Login />} />
-              <Route path="/account" element={<Account />} />
-              <Route path="/admin" element={<Admin />} />
-              <Route path="/admin/players" element={<PlayersAdmin />} />
-              <Route path="/admin/credit-requests" element={<CreditRequestsAdmin />} />
-              <Route path="/admin/redeem-requests" element={<RedeemRequestsAdmin />} />
-              <Route path="/match/:id" element={<MatchView />} />
-              <Route path="/print" element={<PrintView />} />
+              <Route path="/" element={<ProtectedRoute><Lobby /></ProtectedRoute>} />
+              <Route path="/account" element={<ProtectedRoute><Account /></ProtectedRoute>} />
+              <Route path="/admin" element={<ProtectedRoute><Admin /></ProtectedRoute>} />
+              <Route path="/admin/players" element={<ProtectedRoute><PlayersAdmin /></ProtectedRoute>} />
+              <Route path="/admin/credit-requests" element={<ProtectedRoute><CreditRequestsAdmin /></ProtectedRoute>} />
+              <Route path="/admin/redeem-requests" element={<ProtectedRoute><RedeemRequestsAdmin /></ProtectedRoute>} />
+              <Route path="/match/:id" element={<ProtectedRoute><MatchView /></ProtectedRoute>} />
+              <Route path="/print" element={<ProtectedRoute><PrintView /></ProtectedRoute>} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>
