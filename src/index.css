@@ -113,7 +113,7 @@
   }
 
   .bingo-cell {
-    @apply w-12 h-12 rounded-lg flex items-center justify-center text-lg font-semibold transition-all duration-200 cursor-pointer;
+    @apply w-full aspect-square rounded-lg flex items-center justify-center text-sm sm:text-lg font-semibold transition-all duration-200 cursor-pointer;
     background: hsl(var(--secondary));
     color: hsl(var(--foreground));
   }

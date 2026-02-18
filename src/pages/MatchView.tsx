@@ -139,13 +139,13 @@ const MatchView = () => {
       <h2 className="font-heading text-lg font-bold text-foreground mb-4">
         Minhas Cartelas ({myCards.length})
       </h2>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {myCards.map((card) => (
-          <div key={card.id} className="card-container">
-            <h3 className="font-heading font-semibold text-foreground mb-3">{card.name}</h3>
-            <div className="grid grid-cols-5 gap-1.5">
+          <div key={card.id} className="card-container max-w-sm mx-auto w-full">
+            <h3 className="font-heading font-semibold text-foreground mb-4">{card.name}</h3>
+            <div className="grid grid-cols-5 gap-1.5 sm:gap-2">
               {['B', 'I', 'N', 'G', 'O'].map(letter => (
-                <div key={letter} className="w-full aspect-square rounded-md flex items-center justify-center text-sm font-heading font-bold gradient-primary text-primary-foreground">
+                <div key={letter} className="w-full aspect-square rounded-lg flex items-center justify-center text-sm sm:text-lg font-heading font-bold gradient-primary text-primary-foreground shadow-sm">
                   {letter}
                 </div>
               ))}
