@@ -553,6 +553,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await supabase.from('perfis').update({ credits: profile.credits - gameSettings.custo_nova_cartela }).eq('id', user.id);
     const { data } = await supabase.from('cartelas_jogador').insert({ player_id: user.id, ...options, uses_left: 1 }).select().single();
     queryClient.invalidateQueries({ queryKey: ['profile'] });
+    queryClient.invalidateQueries({ queryKey: ['playerCards', user?.id] });
     return data as PlayerCard;
   };
 
