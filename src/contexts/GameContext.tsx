@@ -61,7 +61,7 @@ interface GameContextType {
   resolveRedeemRequest: (requestId: string, status: 'approved' | 'rejected', receiptFile?: File, notes?: string) => Promise<boolean>;
   unblockRedeemRequest: (requestId: string) => Promise<void>;
   deleteRedeemRequest: (requestId: string) => Promise<void>;
-  updatePlayerCredits: (playerId: string, amount: number) => Promise<void>;
+  updatePlayerCredits: (playerId: string, amount: number) => Promise<boolean>;
   getMatchCards: (matchId: string) => MatchCard[];
   getPlayerMatchCards: (matchId: string, playerId: string) => MatchCard[];
   fetchRequestMessages: (requestId: string) => Promise<CreditRequestMessage[]>;
@@ -601,9 +601,24 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     queryClient.invalidateQueries({ queryKey: ['creditRequests'] });
   };
 
-  const updatePlayerCredits = async (playerId: string, amount: number) => {
-    const { data: p } = await supabase.from('perfis').select('credits').eq('id', playerId).single();
-    if (p) await supabase.from('perfis').update({ credits: p.credits + amount }).eq('id', playerId);
+  const updatePlayerCredits = async (playerId: string, amount: number): Promise<boolean> => {
+    const { data: p, error: fetchError } = await supabase.from('perfis').select('credits').eq('id', playerId).single();
+    if (fetchError || !p) {
+        toast.error("Erro ao buscar perfil do jogador.", { description: fetchError?.message });
+        return false;
+    }
+    
+    const { error: updateError } = await supabase.from('perfis').update({ credits: p.credits + amount }).eq('id', playerId);
+    
+    if (updateError) {
+        toast.error("Erro ao atualizar créditos.", { description: updateError.message });
+        return false;
+    } else {
+        toast.success("Créditos atualizados com sucesso!");
+        queryClient.invalidateQueries({ queryKey: ['players'] });
+        queryClient.invalidateQueries({ queryKey: ['profile', playerId] });
+        return true;
+    }
   };
 
   const createPlayerCard = async (options: { name: string; numbers: number[][]; }) => {
@@ -666,6 +681,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       updateGameSettings, createPlayerCard, deletePlayerCard, toggleArchivePlayerCard, joinMatch, buyCardUses,
       requestCredits, resubmitCreditRequest, resolveCreditRequest, unblockCreditRequest, deleteCreditRequest, 
       requestRedeem, resubmitRedeemRequest, resolveRedeemRequest, unblockRedeemRequest, deleteRedeemRequest, 
+      updatePlayerCredits,
       getMatchCards, getPlayerMatchCards, fetchRequestMessages, fetchRedeemMessages
     }}>
       {children}

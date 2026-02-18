@@ -23,7 +23,7 @@ import {
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Coins, Edit, Zap, ZapOff, Trophy } from 'lucide-react';
+import { ArrowLeft, Coins, Edit, Zap, ZapOff, Trophy, Loader2 } from 'lucide-react';
 import { Footer } from '@/components/Footer';
 import PlayerAvatar from '@/components/PlayerAvatar';
 import { Profile } from '@/contexts/AuthContext';
@@ -45,6 +45,7 @@ const PlayersAdmin = () => {
   const [selectedPlayer, setSelectedPlayer] = useState<Profile | null>(null);
   const [creditAmount, setCreditAmount] = useState(0);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isUpdatingCredits, setIsUpdatingCredits] = useState(false);
 
   if (!profile || profile.role !== 'admin') {
     navigate('/');
@@ -57,9 +58,14 @@ const PlayersAdmin = () => {
     setIsDialogOpen(true);
   };
 
-  const handleUpdateCredits = (amount: number) => {
+  const handleUpdateCredits = async (amount: number) => {
     if (selectedPlayer && amount !== 0) {
-      updatePlayerCredits(selectedPlayer.id, amount);
+      setIsUpdatingCredits(true);
+      const success = await updatePlayerCredits(selectedPlayer.id, amount);
+      setIsUpdatingCredits(false);
+      if (success) {
+        setIsDialogOpen(false);
+      }
     }
   };
 
@@ -160,9 +166,9 @@ const PlayersAdmin = () => {
                 <DialogClose asChild>
                   <Button variant="ghost">Fechar</Button>
                 </DialogClose>
-                <Button onClick={() => { handleUpdateCredits(creditAmount); setIsDialogOpen(false); }}>
-                  <Coins className="w-4 h-4 mr-2" />
-                  Confirmar
+                <Button onClick={() => handleUpdateCredits(creditAmount)} disabled={isUpdatingCredits}>
+                  {isUpdatingCredits ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Coins className="w-4 h-4 mr-2" />}
+                  {isUpdatingCredits ? 'Salvando...' : 'Confirmar'}
                 </Button>
               </DialogFooter>
             </TabsContent>
