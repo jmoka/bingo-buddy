@@ -65,7 +65,7 @@ export const AppHeader = () => {
               <SheetHeader>
                 <SheetTitle className="font-heading">Menu</SheetTitle>
               </SheetHeader>
-              <div className="mt-6 flex flex-col h-full">
+              <div className="mt-6 flex flex-col h-full pb-10">
                 <div className="flex-grow space-y-1">
                   {menuItems.map((item, index) => (
                     item.dialog ? (
