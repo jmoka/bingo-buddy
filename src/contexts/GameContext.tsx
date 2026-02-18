@@ -105,38 +105,37 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Effect for auto-starting and auto-calling
   useEffect(() => {
     matches.forEach(match => {
-      // Auto-start logic
+      const processingKeyStart = `start_${match.id}`;
       if (
         match.is_auto_calling &&
         match.status === 'open' &&
-        now >= new Date(match.start_time).getTime()
+        now >= new Date(match.start_time).getTime() &&
+        !processingRef.current.has(processingKeyStart)
       ) {
-        const processingKey = `start_${match.id}`;
-        if (processingRef.current.has(processingKey)) return;
-        processingRef.current.add(processingKey);
+        processingRef.current.add(processingKeyStart);
         console.log(`Automatically starting match: ${match.name} (${match.id})`);
-        startMatch(match.id, true); // Force start, ignoring min players
+        startMatch(match.id, true);
       }
 
-      // Auto-call logic
+      const processingKeyCall = `call_${match.id}`;
       if (
         match.is_auto_calling &&
         match.status === 'in_progress' &&
         match.next_auto_call_timestamp &&
-        now >= new Date(match.next_auto_call_timestamp).getTime()
+        now >= new Date(match.next_auto_call_timestamp).getTime() &&
+        !processingRef.current.has(processingKeyCall)
       ) {
-        const processingKey = `call_${match.id}`;
-        if (processingRef.current.has(processingKey)) return;
-        processingRef.current.add(processingKey);
-        
+        processingRef.current.add(processingKeyCall);
         const availableNumbers = Array.from({ length: 75 }, (_, i) => i + 1).filter(num => !match.called_numbers.includes(num));
         if (availableNumbers.length > 0) {
           const randomIndex = Math.floor(Math.random() * availableNumbers.length);
-          callNumber(match.id, availableNumbers[randomIndex]);
+          callNumber(match.id, availableNumbers[randomIndex]).finally(() => {
+            setTimeout(() => processingRef.current.delete(processingKeyCall), 500);
+          });
         } else {
-          toggleAutoCall(match.id); // Turn off if no numbers left
+          toggleAutoCall(match.id);
+          processingRef.current.delete(processingKeyCall);
         }
-        setTimeout(() => processingRef.current.delete(processingKey), 1000);
       }
     });
   }, [now, matches]);
@@ -266,7 +265,8 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     const channel = supabase.channel('schema-db-changes')
-      .on('postgres_changes', { event: '*', schema: 'public' }, () => {
+      .on('postgres_changes', { event: '*', schema: 'public' }, (payload) => {
+        console.log('Change received!', payload);
         queryClient.invalidateQueries();
       }).subscribe();
     return () => { supabase.removeChannel(channel); };
@@ -275,62 +275,33 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const createMatch = async (data: any) => {
     const status = data.is_auto_calling ? 'open' : 'waiting';
     const { error } = await supabase.from('partidas').insert([{ ...data, status }]);
-    if (error) {
-      toast.error(error.message);
-    } else {
-      toast.success('Partida criada com sucesso!');
-      queryClient.invalidateQueries({ queryKey: ['matches'] });
-    }
+    if (error) toast.error(error.message);
+    else toast.success('Partida criada com sucesso!');
   };
 
   const updateMatch = async (matchId: string, data: Partial<Match>) => {
     const matchToUpdate = matches.find(m => m.id === matchId);
     if (!matchToUpdate) return;
-  
     const updatedData = { ...data };
-  
-    // If toggling auto-calling on for a waiting match, open it.
     if (data.is_auto_calling && matchToUpdate.status === 'waiting') {
       updatedData.status = 'open';
     }
-  
     const { error } = await supabase.from('partidas').update(updatedData).eq('id', matchId);
-    if (error) {
-      toast.error(error.message);
-    } else {
-      toast.success('Partida atualizada com sucesso!');
-      queryClient.invalidateQueries({ queryKey: ['matches'] });
-    }
+    if (error) toast.error(error.message);
+    else toast.success('Partida atualizada com sucesso!');
   };
 
   const updateMatchStatus = async (matchId: string, status: MatchStatus) => {
     await queryClient.cancelQueries({ queryKey: ['matches'] });
     const previousMatches = queryClient.getQueryData<Match[]>(['matches']);
-
     queryClient.setQueryData<Match[]>(['matches'], (old) =>
-      old
-        ? old.map((match) =>
-            match.id === matchId ? { ...match, status: status } : match
-          )
-        : []
+      old ? old.map((match) => match.id === matchId ? { ...match, status } : match) : []
     );
-
     const { error } = await supabase.from('partidas').update({ status }).eq('id', matchId);
-
     if (error) {
       queryClient.setQueryData(['matches'], previousMatches);
       toast.error(`Erro ao atualizar status: ${error.message}`);
-    } else {
-      const statusLabels = {
-        open: 'aberta',
-        in_progress: 'iniciada',
-        finished: 'finalizada',
-        waiting: 'movida para aguardando'
-      };
-      toast.success(`Partida ${statusLabels[status] || 'atualizada'} com sucesso!`);
     }
-
-    await queryClient.invalidateQueries({ queryKey: ['matches'] });
   };
 
   const openMatch = (matchId: string) => updateMatchStatus(matchId, 'open');
@@ -338,16 +309,13 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const startMatch = async (matchId: string, force = false) => {
     const match = matches.find(m => m.id === matchId);
     if (!match) return;
-
     const playersInMatch = new Set(matchCards.filter(mc => mc.match_id === matchId).map(mc => mc.player_id)).size;
-
     if (!force && playersInMatch < match.min_players) {
       toast.error('A partida não pode ser iniciada.', {
         description: `São necessários no mínimo ${match.min_players} jogadores, mas há apenas ${playersInMatch}.`
       });
       return;
     }
-    
     await updateMatchStatus(matchId, 'in_progress');
   };
 
@@ -355,96 +323,52 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
   
   const deleteMatch = async (matchId: string) => {
     const { error } = await supabase.from('partidas').delete().eq('id', matchId);
-    if (error) {
-      toast.error(error.message);
-    } else {
-      toast.success('Partida excluída.');
-      queryClient.invalidateQueries({ queryKey: ['matches'] });
-    }
+    if (error) toast.error(error.message);
+    else toast.success('Partida excluída.');
   };
 
   const toggleAutoCall = async (matchId: string) => {
     const match = matches.find(m => m.id === matchId);
     if (!match || !gameSettings) return;
     const isEnabling = !match.is_auto_calling;
-
     await queryClient.cancelQueries({ queryKey: ['matches'] });
     const previousMatches = queryClient.getQueryData<Match[]>(['matches']);
-
     queryClient.setQueryData<Match[]>(['matches'], (old) =>
-      old
-        ? old.map((m) =>
-            m.id === matchId
-              ? {
-                  ...m,
-                  is_auto_calling: isEnabling,
-                  next_auto_call_timestamp: isEnabling
-                    ? new Date(Date.now() + gameSettings.intervalo_sorteio_auto_seg * 1000).toISOString()
-                    : null,
-                }
-              : m
-          )
-        : []
+      old ? old.map((m) => m.id === matchId ? { ...m, is_auto_calling: isEnabling, next_auto_call_timestamp: isEnabling ? new Date(Date.now() + gameSettings.intervalo_sorteio_auto_seg * 1000).toISOString() : null } : m) : []
     );
-
     const { error } = await supabase.from('partidas').update({
       is_auto_calling: isEnabling,
       next_auto_call_timestamp: isEnabling ? new Date(Date.now() + gameSettings.intervalo_sorteio_auto_seg * 1000).toISOString() : null,
     }).eq('id', matchId);
-
     if (error) {
       toast.error('Erro ao alterar sorteio automático.');
       queryClient.setQueryData(['matches'], previousMatches);
     }
-    
-    await queryClient.invalidateQueries({ queryKey: ['matches'] });
   };
 
   const callNumber = async (matchId: string, num: number) => {
     await queryClient.cancelQueries({ queryKey: ['matches'] });
     await queryClient.cancelQueries({ queryKey: ['matchCards'] });
-
     const previousMatches = queryClient.getQueryData<Match[]>(['matches']);
     const previousMatchCards = queryClient.getQueryData<MatchCard[]>(['matchCards']);
-
-    // Optimistic update
     queryClient.setQueryData<Match[]>(['matches'], (old) =>
-      old
-        ? old.map((match) =>
-            match.id === matchId
-              ? { ...match, called_numbers: [...match.called_numbers, num] }
-              : match
-          )
-        : []
+      old ? old.map((match) => match.id === matchId ? { ...match, called_numbers: [...match.called_numbers, num] } : match) : []
     );
-
     queryClient.setQueryData<MatchCard[]>(['matchCards'], (old) =>
-      old
-        ? old.map((card) => {
-            if (card.match_id === matchId && card.numbers.flat().includes(num)) {
-              const newMarkedNumbers = new Set(card.marked_numbers);
-              newMarkedNumbers.add(num);
-              return { ...card, marked_numbers: newMarkedNumbers };
-            }
-            return card;
-          })
-        : []
+      old ? old.map((card) => {
+        if (card.match_id === matchId && card.numbers.flat().includes(num)) {
+          const newMarkedNumbers = new Set(card.marked_numbers);
+          newMarkedNumbers.add(num);
+          return { ...card, marked_numbers: newMarkedNumbers };
+        }
+        return card;
+      }) : []
     );
-
     try {
       const { error } = await supabase.functions.invoke('call-number', { body: { matchId, num } });
-      if (error) {
-        throw error;
-      }
-      // On success, invalidate to get the authoritative state from the server
-      await queryClient.invalidateQueries({ queryKey: ['matches'] });
-      await queryClient.invalidateQueries({ queryKey: ['matchCards'] });
-      await queryClient.invalidateQueries({ queryKey: ['wins'] });
-      await queryClient.invalidateQueries({ queryKey: ['allWins'] });
-
+      if (error) throw error;
     } catch (error) {
       toast.error("Erro ao sortear número.", { description: (error as Error).message });
-      // Rollback on error
       queryClient.setQueryData(['matches'], previousMatches);
       queryClient.setQueryData(['matchCards'], previousMatchCards);
     }
@@ -464,10 +388,6 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
         sender_id: user.id,
         message: `Nova solicitação: ${creditsRequested} créditos. Valor pago: R$ ${amountPaid.toFixed(2)}`
     });
-
-    queryClient.invalidateQueries({ queryKey: ['creditRequests'] });
-    queryClient.invalidateQueries({ queryKey: ['rawCreditRequests'] });
-
     await supabase.functions.invoke('notify-n8n', { body: { event: 'CREDIT_REQUEST', data: { requestId: newRequest.id, creditsRequested, amountPaid, userEmail: user.email } } });
     return true;
   };
@@ -475,44 +395,32 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const resubmitCreditRequest = async (requestId: string, file: File, message: string): Promise<boolean> => {
     if (!user) return false;
     const fileName = `${user.id}/${Date.now()}.${file.name.split('.').pop()}`;
-    
     const { error: uploadError } = await supabase.storage.from('receipts').upload(fileName, file);
     if (uploadError) { toast.error('Erro ao enviar comprovante.', { description: uploadError.message }); return false; }
-
     const { error } = await supabase.from('solicitacoes_credito').update({
       status: 'pending', receipt_url: fileName, resubmission_notes: message, resolved_at: null, resolved_by: null, notes: null, credits_granted: null,
     }).eq('id', requestId);
-
     if (error) {
       toast.error('Falha ao reenviar solicitação.', { description: error.message });
       await supabase.storage.from('receipts').remove([fileName]);
       return false;
     }
-
     await supabase.from('mensagens_solicitacao').insert({ credit_request_id: requestId, sender_id: user.id, message: message || "Reenvio de comprovante." });
-
-    queryClient.invalidateQueries({ queryKey: ['creditRequests'] });
-    queryClient.invalidateQueries({ queryKey: ['rawCreditRequests'] });
-
     await supabase.functions.invoke('notify-n8n', { body: { event: 'CREDIT_RESUBMISSION', data: { requestId, userEmail: user.email, message } } });
     return true;
   };
 
   const resolveCreditRequest = async (requestId: string, status: 'approved' | 'rejected', creditsGranted?: number, notes?: string): Promise<boolean> => {
     if (!profile || profile.role !== 'admin' || !user) return false;
-    
     const request = allCreditRequests.find(r => r.id === requestId);
     if (!request) return false;
-
     if (status === 'approved' && creditsGranted !== undefined) {
       await updatePlayerCredits(request.player_id, creditsGranted);
     }
-    
     await supabase.from('solicitacoes_credito').update({
       status, credits_granted: status === 'approved' ? creditsGranted : null,
       resolved_at: new Date().toISOString(), resolved_by: user.id, notes: notes || null,
     }).eq('id', requestId);
-
     if (notes) {
         await supabase.from('mensagens_solicitacao').insert({
             credit_request_id: requestId,
@@ -520,48 +428,31 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
             message: notes
         });
     }
-
-    queryClient.invalidateQueries({ queryKey: ['rawCreditRequests'] });
-    queryClient.invalidateQueries({ queryKey: ['creditRequests'] });
-    queryClient.invalidateQueries({ queryKey: ['profile'] });
-    queryClient.invalidateQueries({ queryKey: ['players'] });
-    
     return true;
   };
 
-  // Funções de Resgate
   const requestRedeem = async (credits: number, amount: number, message?: string): Promise<boolean> => {
     if (!user || !profile || profile.credits < credits) {
         toast.error('Créditos insuficientes!');
         return false;
     }
-
-    // Debita imediatamente
     await updatePlayerCredits(user.id, -credits);
-
     const { data: newRequest, error } = await supabase.from('solicitacoes_resgate').insert({
         player_id: user.id,
         credits_requested: credits,
         amount_to_receive: amount,
         status: 'pending'
     }).select().single();
-
     if (error) {
-        // Estorna em caso de erro na criação da solicitação
         await updatePlayerCredits(user.id, credits);
         toast.error(error.message);
         return false;
     }
-
     await supabase.from('mensagens_resgate').insert({
         redeem_request_id: newRequest.id,
         sender_id: user.id,
         message: message || `Nova solicitação de resgate: ${credits} créditos. Valor a receber: R$ ${amount.toFixed(2)}`
     });
-
-    queryClient.invalidateQueries({ queryKey: ['redeemRequests'] });
-    queryClient.invalidateQueries({ queryKey: ['profile'] });
-    
     await supabase.functions.invoke('notify-n8n', { body: { event: 'REDEEM_REQUEST', data: { requestId: newRequest.id, credits, amount, userEmail: user.email } } });
     return true;
   };
@@ -571,19 +462,12 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const { error } = await supabase.from('solicitacoes_resgate').update({
         status: 'pending', resubmission_notes: message, resolved_at: null, resolved_by: null, notes: null
     }).eq('id', requestId);
-
     if (error) {
         toast.error('Falha ao reenviar solicitação.', { description: error.message });
         return false;
     }
-
     await supabase.from('mensagens_resgate').insert({ redeem_request_id: requestId, sender_id: user.id, message });
-    
-    queryClient.invalidateQueries({ queryKey: ['redeemRequests'] });
-    queryClient.invalidateQueries({ queryKey: ['rawRedeemRequests'] });
-
     await supabase.functions.invoke('notify-n8n', { body: { event: 'REDEEM_RESUBMISSION', data: { requestId, userEmail: user.email, message } } });
-    
     return true;
   };
 
@@ -591,72 +475,52 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!profile || profile.role !== 'admin' || !user) return false;
     const request = allRedeemRequests.find(r => r.id === requestId);
     if (!request) return false;
-
     let receiptPath = null;
     if (status === 'approved' && receiptFile) {
         const fileName = `redeems/${requestId}/${Date.now()}.${receiptFile.name.split('.').pop()}`;
         await supabase.storage.from('receipts').upload(fileName, receiptFile);
         receiptPath = fileName;
     }
-
     if (status === 'rejected') {
         await updatePlayerCredits(request.player_id, request.credits_requested);
         toast.info(`${request.credits_requested} créditos foram estornados para o jogador.`);
     }
-
     await supabase.from('solicitacoes_resgate').update({
         status, receipt_url: receiptPath, notes: notes || null, resolved_at: new Date().toISOString(), resolved_by: user.id
     }).eq('id', requestId);
-
     if (notes) {
         await supabase.from('mensagens_resgate').insert({ redeem_request_id: requestId, sender_id: user.id, message: notes });
     }
-
-    queryClient.invalidateQueries({ queryKey: ['rawRedeemRequests'] });
-    queryClient.invalidateQueries({ queryKey: ['redeemRequests'] });
-    queryClient.invalidateQueries({ queryKey: ['players'] });
     return true;
   };
 
   const unblockRedeemRequest = async (requestId: string) => {
     const request = allRedeemRequests.find(r => r.id === requestId);
     if (!request) return;
-
     await updatePlayerCredits(request.player_id, -request.credits_requested);
     toast.info(`${request.credits_requested} créditos foram debitados novamente para reanálise.`);
-
     await supabase.from('solicitacoes_resgate').update({
         status: 'pending',
         notes: 'Solicitação reaberta pelo administrador.',
         resolved_at: null,
         resolved_by: null,
     }).eq('id', requestId);
-
-    queryClient.invalidateQueries({ queryKey: ['rawRedeemRequests'] });
-    queryClient.invalidateQueries({ queryKey: ['redeemRequests'] });
-    queryClient.invalidateQueries({ queryKey: ['players'] });
     toast.success('Solicitação de resgate reaberta.');
   };
 
   const deleteRedeemRequest = async (requestId: string) => {
     await supabase.from('solicitacoes_resgate').delete().eq('id', requestId);
-    queryClient.invalidateQueries({ queryKey: ['rawRedeemRequests'] });
-    queryClient.invalidateQueries({ queryKey: ['redeemRequests'] });
   };
 
   const unblockCreditRequest = async (requestId: string) => {
     await supabase.from('solicitacoes_credito').update({
       status: 'pending', notes: 'Solicitação reaberta pelo administrador.', resolved_at: null, resolved_by: null, credits_granted: null,
     }).eq('id', requestId);
-    queryClient.invalidateQueries({ queryKey: ['rawCreditRequests'] });
-    queryClient.invalidateQueries({ queryKey: ['creditRequests'] });
     toast.success('Solicitação reaberta');
   };
 
   const deleteCreditRequest = async (requestId: string) => { 
     await supabase.from('solicitacoes_credito').delete().eq('id', requestId); 
-    queryClient.invalidateQueries({ queryKey: ['rawCreditRequests'] });
-    queryClient.invalidateQueries({ queryKey: ['creditRequests'] });
   };
 
   const updatePlayerCredits = async (playerId: string, amount: number): Promise<boolean> => {
@@ -665,16 +529,12 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
         toast.error("Erro ao buscar perfil do jogador.", { description: fetchError?.message });
         return false;
     }
-    
     const { error: updateError } = await supabase.from('perfis').update({ credits: p.credits + amount }).eq('id', playerId);
-    
     if (updateError) {
         toast.error("Erro ao atualizar créditos.", { description: updateError.message });
         return false;
     } else {
         toast.success("Créditos atualizados com sucesso!");
-        queryClient.invalidateQueries({ queryKey: ['players'] });
-        queryClient.invalidateQueries({ queryKey: ['profile', playerId] });
         return true;
     }
   };
@@ -683,19 +543,13 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!user || !profile || !gameSettings || profile.credits < gameSettings.custo_nova_cartela) return null;
     await supabase.from('perfis').update({ credits: profile.credits - gameSettings.custo_nova_cartela }).eq('id', user.id);
     const { data } = await supabase.from('cartelas_jogador').insert({ player_id: user.id, ...options, uses_left: 1 }).select().single();
-    queryClient.invalidateQueries({ queryKey: ['profile'] });
-    queryClient.invalidateQueries({ queryKey: ['playerCards', user?.id] });
     return data as PlayerCard;
   };
 
   const deletePlayerCard = async (cardId: string) => {
     const { error } = await supabase.from('cartelas_jogador').delete().eq('id', cardId);
-    if (error) {
-      toast.error("Erro ao deletar cartela.", { description: error.message });
-    } else {
-      toast.success("Cartela deletada com sucesso.");
-      queryClient.invalidateQueries({ queryKey: ['playerCards', user?.id] });
-    }
+    if (error) toast.error("Erro ao deletar cartela.", { description: error.message });
+    else toast.success("Cartela deletada com sucesso.");
   };
   
   const toggleArchivePlayerCard = async (cardId: string, archive: boolean) => { await supabase.from('cartelas_jogador').update({ is_archived: archive }).eq('id', cardId); };
@@ -703,19 +557,14 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const joinMatch = async (matchId: string, playerCardIds: string[]): Promise<MatchCard[] | null> => {
     try {
       const { data, error } = await supabase.functions.invoke('join-match', { body: { matchId, playerCardIds } });
-      
       if (error) {
         let errorMessage = "Ocorreu um erro ao entrar na partida.";
-        // Supabase edge function errors often come in `error.context.text`
         if (error.context && typeof error.context.text === 'function') {
             const errorText = await error.context.text();
             try {
                 const errorJson = JSON.parse(errorText);
-                if (errorJson.error) {
-                    errorMessage = errorJson.error;
-                }
+                if (errorJson.error) errorMessage = errorJson.error;
             } catch (e) {
-                // Not a JSON error, use the text directly if it's not too long
                 errorMessage = errorText.length < 100 ? errorText : errorMessage;
             }
         } else {
@@ -724,13 +573,6 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
         toast.error(errorMessage);
         return null;
       }
-      
-      // On success, invalidate all relevant queries
-      await queryClient.invalidateQueries({ queryKey: ['profile'] });
-      await queryClient.invalidateQueries({ queryKey: ['matchCards'] });
-      await queryClient.invalidateQueries({ queryKey: ['playerCards', user?.id] });
-      await queryClient.invalidateQueries({ queryKey: ['matches'] });
-      
       return data as MatchCard[];
     } catch (e) {
       toast.error("Ocorreu um erro inesperado.", { description: (e as Error).message });
@@ -743,20 +585,17 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await supabase.from('perfis').update({ credits: profile.credits - gameSettings.custo_recarga_cartela }).eq('id', profile.id);
     const card = playerCards.find(c => c.id === playerCardId);
     if (card) await supabase.from('cartelas_jogador').update({ uses_left: card.uses_left + gameSettings.usos_por_recarga }).eq('id', playerCardId);
-    queryClient.invalidateQueries({ queryKey: ['profile'] });
     return true;
   };
 
   const updateGameSettings = async (newSettings: Partial<GameSettings>) => { await supabase.from('configuracoes').update(newSettings).eq('singleton', true); };
   const getMatchCards = (matchId: string) => matchCards.filter(c => c.match_id === matchId);
   const getPlayerMatchCards = (matchId: string, playerId: string) => matchCards.filter(c => c.match_id === matchId && c.player_id === playerId);
-
   const fetchRequestMessages = async (requestId: string) => {
     const { data, error } = await supabase.from('mensagens_solicitacao').select('*').eq('credit_request_id', requestId).order('created_at', { ascending: true });
     if (error) return [];
     return data as CreditRequestMessage[];
   };
-
   const fetchRedeemMessages = async (requestId: string) => {
     const { data, error } = await supabase.from('mensagens_resgate').select('*').eq('redeem_request_id', requestId).order('created_at', { ascending: true });
     if (error) return [];
