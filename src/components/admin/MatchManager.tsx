@@ -307,6 +307,15 @@ const MatchManager = () => {
     return `${h > 0 ? `${h.toString().padStart(2, '0')}:` : ''}${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
 
+  const getAutoCallCountdown = (nextCallTimestamp: string | null | undefined) => {
+    if (!nextCallTimestamp) return null;
+    const diff = new Date(nextCallTimestamp).getTime() - now;
+    if (diff <= 0) return '00:00';
+    const m = Math.floor((diff % 3600000) / 60000);
+    const s = Math.floor((diff % 60000) / 1000);
+    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  };
+
   const renderMatchList = (matchesToRender: Match[]) => {
     if (matchesToRender.length === 0) {
       return (
@@ -321,6 +330,8 @@ const MatchManager = () => {
           const playersInMatchCount = new Set(matchCards.filter(mc => mc.match_id === match.id).map(mc => mc.player_id)).size;
           const canStart = playersInMatchCount >= match.min_players;
           const countdown = (match.status === 'waiting' || match.status === 'open') ? getCountdown(match.start_time) : null;
+          const autoCallCountdown = match.is_auto_calling && match.status === 'in_progress' ? getAutoCallCountdown(match.next_auto_call_timestamp) : null;
+
           return (
             <div key={match.id} className="card-container">
               <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
@@ -376,6 +387,12 @@ const MatchManager = () => {
                     <div className="flex items-center justify-between">
                         <h4 className="font-heading font-semibold">Sorteio</h4>
                         <div className="flex items-center gap-2">
+                            {autoCallCountdown && (
+                              <Badge variant="outline" className="font-mono text-xs">
+                                <Clock className="w-3 h-3 mr-1.5" />
+                                {autoCallCountdown}
+                              </Badge>
+                            )}
                             <Label htmlFor={`auto-call-${match.id}`} className="text-xs">Sorteio Automático</Label>
                             <Switch
                                 id={`auto-call-${match.id}`}

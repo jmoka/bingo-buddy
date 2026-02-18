@@ -97,7 +97,19 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const channel = supabase.channel('schema-db-changes')
       .on('postgres_changes', { event: '*', schema: 'public' }, (payload) => {
         console.log('Change received!', payload);
-        queryClient.invalidateQueries();
+        // Invalidate all relevant queries to ensure data is fresh
+        queryClient.invalidateQueries({ queryKey: ['matches'] });
+        queryClient.invalidateQueries({ queryKey: ['matchCards'] });
+        queryClient.invalidateQueries({ queryKey: ['playerCards'] });
+        queryClient.invalidateQueries({ queryKey: ['profile'] });
+        queryClient.invalidateQueries({ queryKey: ['players'] });
+        queryClient.invalidateQueries({ queryKey: ['wins'] });
+        queryClient.invalidateQueries({ queryKey: ['allWins'] });
+        queryClient.invalidateQueries({ queryKey: ['creditRequests'] });
+        queryClient.invalidateQueries({ queryKey: ['rawCreditRequests'] });
+        queryClient.invalidateQueries({ queryKey: ['redeemRequests'] });
+        queryClient.invalidateQueries({ queryKey: ['rawRedeemRequests'] });
+        queryClient.invalidateQueries({ queryKey: ['gameSettings'] });
       }).subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [queryClient]);
