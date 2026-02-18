@@ -4,11 +4,11 @@ import { useGame } from '@/contexts/GameContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Match, MatchStatus } from '@/types/match';
+import { Match, MatchStatus, PlayerCard } from '@/types/match';
 import { gameTypeLabels } from '@/utils/bingoUtils';
 import { 
   Coins, Plus, Trophy, Users, Settings, 
-  Timer, DoorOpen, Ticket, Zap, ZapOff, Tv, Archive, Trash2
+  Timer, DoorOpen, Ticket, Zap, ZapOff, Tv, Archive, Trash2, RotateCcw
 } from 'lucide-react';
 import { 
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose, DialogDescription
@@ -56,6 +56,7 @@ const Lobby = () => {
 
   const myOwnedCards = profile ? playerCards.filter(c => c.player_id === profile.id) : [];
   const activeCards = myOwnedCards.filter(c => !c.is_archived);
+  const archivedCards = myOwnedCards.filter(c => c.is_archived);
 
   useEffect(() => {
     const interval = setInterval(() => setNow(Date.now()), 1000);
@@ -121,6 +122,95 @@ const Lobby = () => {
   const openMatches = sortedMatches.filter(m => m.status === 'open');
   const waitingMatches = sortedMatches.filter(m => m.status === 'waiting');
   const finishedMatches = sortedMatches.filter(m => m.status === 'finished');
+
+  const renderCardList = (cards: PlayerCard[]) => {
+    if (cards.length === 0) {
+      return (
+        <div className="card-container text-center py-8">
+          <p className="text-sm text-muted-foreground">Nenhuma cartela encontrada nesta categoria.</p>
+        </div>
+      );
+    }
+
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {cards.map(card => {
+          const activeMatchCard = matchCards.find(mc => mc.player_card_id === card.id && activeMatchIds.has(mc.match_id));
+          const markedNumbers = activeMatchCard ? activeMatchCard.marked_numbers : new Set<number>();
+          const winCount = wins.filter(w => w.player_card_id === card.id).length;
+          
+          return (
+            <div key={card.id} className={`card-container p-3 transition-opacity ${card.uses_left === 0 ? 'opacity-80' : ''}`}>
+              <div className="flex justify-between items-start mb-2">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-heading font-semibold text-sm md:text-base text-foreground">{card.name}</h3>
+                    {winCount > 0 && (
+                      <div className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-400/20 text-amber-600 border border-amber-400/30">
+                        <Trophy className="w-3 h-3" />
+                        <span>{winCount}x</span>
+                      </div>
+                    )}
+                  </div>
+                  <p className="text-[10px] text-muted-foreground font-mono">ID: ...{card.id.slice(-6).toUpperCase()}</p>
+                </div>
+                <div className="flex items-center gap-1">
+                  <div className={`flex items-center gap-1 text-[10px] font-medium px-2 py-1 rounded-full ${card.uses_left > 0 ? 'bg-success/10 text-success' : 'bg-destructive/10 text-destructive'}`}>
+                    {card.uses_left > 0 ? <Zap className="w-3 h-3" /> : <ZapOff className="w-3 h-3" />}
+                    <span>{card.uses_left} uso(s)</span>
+                  </div>
+                  
+                  {card.uses_left === 0 && !card.is_archived && (
+                    <Button size="sm" variant="outline" className="h-7 text-[10px] px-2" onClick={() => handleBuyUses(card.id)}>
+                      Recarregar <Coins className="w-3 h-3 ml-1" />
+                    </Button>
+                  )}
+
+                  <Button 
+                    size="icon" 
+                    variant="ghost" 
+                    className="text-muted-foreground h-7 w-7" 
+                    title={card.is_archived ? "Desarquivar" : "Arquivar"}
+                    onClick={() => toggleArchivePlayerCard(card.id, !card.is_archived)}
+                  >
+                    {card.is_archived ? <RotateCcw className="w-3.5 h-3.5" /> : <Archive className="w-3.5 h-3.5" />}
+                  </Button>
+
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button size="icon" variant="ghost" className="text-destructive/70 h-7 w-7">
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Excluir Cartela?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Você tem certeza que deseja excluir permanentemente a cartela "{card.name}"? 
+                          {winCount > 0 && " Esta cartela já foi vitoriosa no passado!"}
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                        <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={() => deletePlayerCard(card.id)}>
+                          Excluir Agora
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </div>
+              </div>
+              <div className="grid grid-cols-5 gap-1">
+                {card.numbers.flat().map((num, i) => (
+                  <BingoCell key={i} number={num} isMarked={markedNumbers.has(num)} isFreeSpace={i === 12} />
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
 
   const renderMatchList = (matchesToRender: Match[]) => {
     if (matchesToRender.length === 0) {
@@ -197,10 +287,16 @@ const Lobby = () => {
       )}
 
       <div className="mb-8">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="font-heading text-lg md:text-xl font-bold text-foreground flex items-center gap-2"><Ticket className="w-5 h-5 text-primary" /> Minhas Cartelas ({activeCards.length})</h2>
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 gap-4">
+          <h2 className="font-heading text-lg md:text-xl font-bold text-foreground flex items-center gap-2">
+            <Ticket className="w-5 h-5 text-primary" /> Minhas Cartelas
+          </h2>
           <Dialog open={isCreateCardOpen} onOpenChange={setCreateCardOpen}>
-              <DialogTrigger asChild><Button size="sm" className="gradient-primary shadow-button h-8 md:h-9 text-xs md:text-sm"><Plus className="w-4 h-4 mr-2" />Criar Cartela</Button></DialogTrigger>
+              <DialogTrigger asChild>
+                <Button size="sm" className="gradient-primary shadow-button h-8 md:h-9 text-xs md:text-sm w-full sm:w-auto">
+                  <Plus className="w-4 h-4 mr-2" />Criar Cartela
+                </Button>
+              </DialogTrigger>
               <DialogContent className="max-w-xl flex flex-col max-h-[90vh]">
                   <DialogHeader className="flex-shrink-0">
                     <DialogTitle className="font-heading">Criar Nova Cartela</DialogTitle>
@@ -219,47 +315,25 @@ const Lobby = () => {
               </DialogContent>
           </Dialog>
         </div>
-        {activeCards.length === 0 ? (
-          <div className="card-container text-center py-8"><p className="text-sm text-muted-foreground">Você não tem cartelas ativas. Crie uma para começar!</p></div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {activeCards.map(card => {
-              const activeMatchCard = matchCards.find(mc => mc.player_card_id === card.id && activeMatchIds.has(mc.match_id));
-              const markedNumbers = activeMatchCard ? activeMatchCard.marked_numbers : new Set<number>();
-              const winCount = wins.filter(w => w.player_card_id === card.id).length;
-              return (
-                <div key={card.id} className={`card-container p-3 transition-opacity ${card.uses_left === 0 ? 'opacity-60' : ''}`}>
-                  <div className="flex justify-between items-start mb-2">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <h3 className="font-heading font-semibold text-sm md:text-base text-foreground">{card.name}</h3>
-                        {winCount > 0 && <div className="flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-amber-400/20 text-amber-600"><Trophy className="w-3 h-3" /><span>{winCount}x</span></div>}
-                      </div>
-                      <p className="text-[10px] text-muted-foreground font-mono">ID: ...{card.id.slice(-6).toUpperCase()}</p>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <div className={`flex items-center gap-1 text-[10px] font-medium px-2 py-1 rounded-full ${card.uses_left > 0 ? 'bg-success/10 text-success' : 'bg-destructive/10 text-destructive'}`}>
-                        {card.uses_left > 0 ? <Zap className="w-3 h-3" /> : <ZapOff className="w-3 h-3" />}
-                        <span>{card.uses_left} uso(s)</span>
-                      </div>
-                      {card.uses_left === 0 && <Button size="sm" variant="outline" className="h-7 text-[10px]" onClick={() => handleBuyUses(card.id)}>Recarregar <Coins className="w-3 h-3 ml-1" /></Button>}
-                      <Button size="icon" variant="ghost" className="text-muted-foreground h-7 w-7" onClick={() => toggleArchivePlayerCard(card.id, true)}><Archive className="w-3.5 h-3.5" /></Button>
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild><Button size="icon" variant="ghost" disabled={winCount > 0} className="text-destructive/70 h-7 w-7"><Trash2 className="w-3.5 h-3.5" /></Button></AlertDialogTrigger>
-                        <AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Você tem certeza?</AlertDialogTitle><AlertDialogDescription>Esta ação não pode ser desfeita. Isso excluirá permanentemente a cartela "{card.name}".</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={() => deletePlayerCard(card.id)}>Excluir</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
-                      </AlertDialog>
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-5 gap-1">
-                    {card.numbers.flat().map((num, i) => (
-                      <BingoCell key={i} number={num} isMarked={markedNumbers.has(num)} isFreeSpace={i === 12} />
-                    ))}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
+
+        <Tabs defaultValue="active" className="w-full">
+          <TabsList className="grid w-full grid-cols-2 mb-4 h-10">
+            <TabsTrigger value="active" className="text-xs">
+              Ativas ({activeCards.length})
+            </TabsTrigger>
+            <TabsTrigger value="archived" className="text-xs">
+              Arquivadas ({archivedCards.length})
+            </TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="active" className="mt-0">
+            {renderCardList(activeCards)}
+          </TabsContent>
+          
+          <TabsContent value="archived" className="mt-0">
+            {renderCardList(archivedCards)}
+          </TabsContent>
+        </Tabs>
       </div>
 
       <h2 className="font-heading text-lg md:text-xl font-bold text-foreground mb-4 flex items-center gap-2"><DoorOpen className="w-5 h-5 text-accent" /> Partidas</h2>
