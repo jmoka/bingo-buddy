@@ -1,6 +1,6 @@
 # Welcome to your Lovable project
 
-# Versão 3
+# Versão 1 LTS
 
 ## Project info
 
