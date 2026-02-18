@@ -8,7 +8,7 @@ import { Match, MatchStatus, PlayerCard } from '@/types/match';
 import { gameTypeLabels } from '@/utils/bingoUtils';
 import { 
   Coins, Plus, Trophy, Users, Settings, 
-  Timer, DoorOpen, Ticket, Zap, ZapOff, Tv, Archive, Trash2, RotateCcw, Star, Loader2
+  Timer, DoorOpen, Ticket, Zap, ZapOff, Tv, Archive, Trash2, RotateCcw, Star, Loader2, History
 } from 'lucide-react';
 import { 
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose, DialogDescription
@@ -292,6 +292,44 @@ const Lobby = () => {
                     <span className="text-[10px] text-muted-foreground mt-1">{match.card_price} créditos por cartela</span>
                   </div>
                 </div>
+                {(alreadyJoined || match.status === 'in_progress') && (
+                  <div className="mt-4 pt-4 border-t border-border/50 space-y-3">
+                    {match.status === 'in_progress' && (
+                      <div>
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-1.5">
+                          <History className="w-3 h-3" />
+                          Últimos 5 Sorteados
+                        </p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {match.called_numbers.length > 0 ? (
+                            match.called_numbers.slice(-5).reverse().map((num, index) => (
+                              <span key={index} className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${index === 0 ? 'bg-accent text-accent-foreground shadow-md' : 'bg-secondary text-secondary-foreground'}`}>
+                                {num}
+                              </span>
+                            ))
+                          ) : (
+                            <p className="text-xs italic text-muted-foreground">Nenhum número sorteado ainda.</p>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                    {alreadyJoined && (
+                      <div>
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-1.5">
+                          <Ticket className="w-3 h-3" />
+                          Suas Cartelas na Partida ({myMatchCards.length})
+                        </p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {myMatchCards.map(card => (
+                            <Badge key={card.id} variant="outline" className="font-medium text-xs">
+                              {card.name}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           );
