@@ -23,19 +23,19 @@ const PrintView = () => {
 
   return (
     <div className="print-container p-8 bg-muted min-h-screen">
-      <header className="print-hide flex items-center justify-between mb-8">
-        <div>
+      <header className="print-hide flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+        <div className="text-center sm:text-left">
           <h1 className="text-3xl font-bold font-heading">Imprimir Cartelas</h1>
           <p className="text-muted-foreground">
             {myOwnedCards.length} cartela(s) pronta(s) para impressão.
           </p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={() => navigate('/')}>
+        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+          <Button variant="outline" onClick={() => navigate('/')} className="w-full sm:w-auto">
             <ArrowLeft className="w-4 h-4 mr-2" />
             Voltar ao Lobby
           </Button>
-          <Button onClick={handlePrint}>
+          <Button onClick={handlePrint} className="w-full sm:w-auto">
             <Printer className="w-4 h-4 mr-2" />
             Imprimir
           </Button>
