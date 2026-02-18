@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useGame } from '@/contexts/GameContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { GameType } from '@/types/bingo';
 import { PrizeType, MatchStatus, Match } from '@/types/match';
 import { gameTypeLabels } from '@/utils/bingoUtils';
-import { Plus, Trash2, Trophy, Edit, Shuffle, Clock } from 'lucide-react';
+import { Plus, Trash2, Trophy, Edit, Shuffle, Clock, Coins, Users, TrendingUp, Ticket, User } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { useToast } from '@/hooks/use-toast';
@@ -17,6 +17,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { cn } from '@/lib/utils';
 
 const statusLabels: Record<MatchStatus, string> = {
   waiting: 'Aguardando',
@@ -172,9 +173,9 @@ const MatchManager = () => {
     
     const matchData = {
         name: matchForm.name,
-        game_type: matchForm.gameType,
+        game_type: matchForm.game_type,
         max_cards_per_player: matchForm.maxCardsPerPlayer,
-        card_price: matchForm.cardPrice,
+        card_price: matchForm.card_price,
         prize: prizePayload,
         start_time: new Date(matchForm.startTime).toISOString(),
         prize_image_url: prizeImageUrl,
@@ -327,14 +328,22 @@ const MatchManager = () => {
     return (
       <div className="space-y-6">
         {matchesToRender.map(match => {
-          const playersInMatchCount = new Set(matchCards.filter(mc => mc.match_id === match.id).map(mc => mc.player_id)).size;
+          const cardsInMatch = matchCards.filter(mc => mc.match_id === match.id);
+          const playersInMatchCount = new Set(cardsInMatch.map(mc => mc.player_id)).size;
+          const totalCardsCount = cardsInMatch.length;
+          
+          const prizeValue = match.prize.type === 'percentage' 
+            ? Math.floor((match.pot * (match.prize.value || 0)) / 100) 
+            : (match.prize.value || 0);
+          
+          const profit = match.pot - prizeValue;
           const canStart = playersInMatchCount >= match.min_players;
           const countdown = (match.status === 'waiting' || match.status === 'open') ? getCountdown(match.start_time) : null;
           const autoCallCountdown = match.is_auto_calling && match.status === 'in_progress' ? getAutoCallCountdown(match.next_auto_call_timestamp) : null;
 
           return (
             <div key={match.id} className="card-container">
-              <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
+              <div className="flex flex-wrap items-start justify-between gap-3 mb-6">
                 <div>
                   <div className="flex items-center gap-2 mb-1">
                     <h3 className="font-heading font-bold text-lg text-foreground">{match.name}</h3>
@@ -382,10 +391,78 @@ const MatchManager = () => {
                 </div>
               </div>
 
+              {/* Dashboard Financeiro Admin */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+                <div className="p-3 rounded-lg bg-muted/30 border border-border/50">
+                  <div className="flex items-center gap-2 mb-1 text-muted-foreground">
+                    <Ticket className="w-3.5 h-3.5" />
+                    <span className="text-[10px] font-bold uppercase tracking-wider">Cartelas</span>
+                  </div>
+                  <p className="font-heading text-lg font-bold">{totalCardsCount}</p>
+                  <p className="text-[10px] text-muted-foreground">{playersInMatchCount} jogadores</p>
+                </div>
+                <div className="p-3 rounded-lg bg-primary/5 border border-primary/10">
+                  <div className="flex items-center gap-2 mb-1 text-primary">
+                    <Coins className="w-3.5 h-3.5" />
+                    <span className="text-[10px] font-bold uppercase tracking-wider">Aposta Total</span>
+                  </div>
+                  <p className="font-heading text-lg font-bold text-primary">{match.pot} cr.</p>
+                  <p className="text-[10px] text-muted-foreground">Pote acumulado</p>
+                </div>
+                <div className="p-3 rounded-lg bg-amber-500/5 border border-amber-500/10">
+                  <div className="flex items-center gap-2 mb-1 text-amber-600">
+                    <Trophy className="w-3.5 h-3.5" />
+                    <span className="text-[10px] font-bold uppercase tracking-wider">Valor Prêmio</span>
+                  </div>
+                  <p className="font-heading text-lg font-bold text-amber-600">{prizeValue} cr.</p>
+                  <p className="text-[10px] text-muted-foreground">{match.prize.type === 'percentage' ? `${match.prize.value}% do pote` : 'Valor fixo'}</p>
+                </div>
+                <div className={cn(
+                  "p-3 rounded-lg border",
+                  profit >= 0 ? "bg-success/5 border-success/10" : "bg-destructive/5 border-destructive/10"
+                )}>
+                  <div className={cn("flex items-center gap-2 mb-1", profit >= 0 ? "text-success" : "text-destructive")}>
+                    <TrendingUp className="w-3.5 h-3.5" />
+                    <span className="text-[10px] font-bold uppercase tracking-wider">Ganho Bingo</span>
+                  </div>
+                  <p className={cn("font-heading text-lg font-bold", profit >= 0 ? "text-success" : "text-destructive")}>
+                    {profit} cr.
+                  </p>
+                  <p className="text-[10px] text-muted-foreground">{profit >= 0 ? 'Lucro esperado' : 'Prejuízo atual'}</p>
+                </div>
+              </div>
+
+              {match.status === 'finished' && match.winners.length > 0 && (
+                <div className="mb-6 p-4 rounded-xl bg-success/5 border-2 border-dashed border-success/20 animate-slide-up">
+                  <h4 className="font-heading font-bold text-success flex items-center gap-2 mb-3">
+                    <Trophy className="w-5 h-5" /> Vencedor(es) da Partida
+                  </h4>
+                  <div className="space-y-3">
+                    {match.winners.map((winner, idx) => (
+                      <div key={idx} className="flex items-center justify-between p-2 rounded-lg bg-background/50 border border-success/10">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-full bg-success/10 flex items-center justify-center text-success font-bold text-xs">
+                            {idx + 1}
+                          </div>
+                          <div>
+                            <p className="text-sm font-bold flex items-center gap-2">
+                              <User className="w-3.5 h-3.5 text-muted-foreground" />
+                              {winner.playerName}
+                            </p>
+                            <p className="text-[10px] text-muted-foreground">com a cartela: <strong>{winner.cardName}</strong></p>
+                          </div>
+                        </div>
+                        <Badge variant="outline" className="text-success border-success/20 bg-success/5">BINGO!</Badge>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {match.status === 'in_progress' && (
                 <div className="mt-4 pt-4 border-t">
                     <div className="flex items-center justify-between">
-                        <h4 className="font-heading font-semibold">Sorteio</h4>
+                        <h4 className="font-heading font-semibold">Sorteio em Tempo Real</h4>
                         <div className="flex items-center gap-2">
                             {autoCallCountdown && (
                               <Badge variant="outline" className="font-mono text-xs">
@@ -414,7 +491,7 @@ const MatchManager = () => {
                         <Button variant="secondary" onClick={() => handleRandomCall(match.id)}><Shuffle className="w-4 h-4" /></Button>
                     </div>
                     <div className="mt-4">
-                        <p className="text-xs text-muted-foreground mb-2">Sorteados ({(match.called_numbers || []).length})</p>
+                        <p className="text-xs text-muted-foreground mb-2">Números chamados ({(match.called_numbers || []).length})</p>
                         <div className="flex flex-wrap gap-1.5">
                             {(match.called_numbers || []).map(num => (
                                 <span key={num} className="w-7 h-7 rounded-full bg-secondary text-secondary-foreground text-xs font-bold flex items-center justify-center">{num}</span>
@@ -438,7 +515,7 @@ const MatchManager = () => {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between mb-4">
-        <h2 className="font-heading text-xl font-bold text-foreground">Gerenciar Partidas</h2>
+        <h2 className="font-heading text-xl font-bold text-foreground">Gestão de Partidas</h2>
         <Dialog open={showCreate} onOpenChange={setShowCreate}>
           <DialogTrigger asChild><Button><Plus className="w-4 h-4 mr-2" />Nova Partida</Button></DialogTrigger>
           <DialogContent className="max-w-md flex flex-col max-h-[90vh]">
