@@ -351,9 +351,27 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await queryClient.cancelQueries({ queryKey: ['matchCards'] });
     const previousMatches = queryClient.getQueryData<Match[]>(['matches']);
     const previousMatchCards = queryClient.getQueryData<MatchCard[]>(['matchCards']);
+    
     queryClient.setQueryData<Match[]>(['matches'], (old) =>
-      old ? old.map((match) => match.id === matchId ? { ...match, called_numbers: [...match.called_numbers, num] } : match) : []
+      old
+        ? old.map((match) => {
+            if (match.id === matchId) {
+              const updatedMatch: Partial<Match> = {
+                ...match,
+                called_numbers: [...match.called_numbers, num],
+              };
+              if (match.is_auto_calling && gameSettings) {
+                updatedMatch.next_auto_call_timestamp = new Date(
+                  Date.now() + gameSettings.intervalo_sorteio_auto_seg * 1000
+                ).toISOString();
+              }
+              return updatedMatch as Match;
+            }
+            return match;
+          })
+        : []
     );
+
     queryClient.setQueryData<MatchCard[]>(['matchCards'], (old) =>
       old ? old.map((card) => {
         if (card.match_id === matchId && card.numbers.flat().includes(num)) {
