@@ -599,10 +599,36 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const buyCardUses = async (playerCardId: string) => {
-    if (!profile || !gameSettings || profile.credits < gameSettings.custo_recarga_cartela) return false;
-    await supabase.from('perfis').update({ credits: profile.credits - gameSettings.custo_recarga_cartela }).eq('id', profile.id);
+    if (!profile || !gameSettings || profile.credits < gameSettings.custo_recarga_cartela) {
+      toast.error('Créditos insuficientes para recarregar.');
+      return false;
+    }
+
+    const { error: profileError } = await supabase.from('perfis').update({ credits: profile.credits - gameSettings.custo_recarga_cartela }).eq('id', profile.id);
+    if (profileError) {
+      toast.error("Erro ao debitar créditos.", { description: profileError.message });
+      return false;
+    }
+
     const card = playerCards.find(c => c.id === playerCardId);
-    if (card) await supabase.from('cartelas_jogador').update({ uses_left: card.uses_left + gameSettings.usos_por_recarga }).eq('id', playerCardId);
+    if (card) {
+      const { error: cardError } = await supabase.from('cartelas_jogador').update({ uses_left: card.uses_left + gameSettings.usos_por_recarga }).eq('id', playerCardId);
+      if (cardError) {
+        // Revert credits if card update fails
+        await supabase.from('perfis').update({ credits: profile.credits }).eq('id', profile.id);
+        toast.error("Erro ao recarregar cartela.", { description: cardError.message });
+        return false;
+      }
+    } else {
+        // Revert credits if card not found (should not happen)
+        await supabase.from('perfis').update({ credits: profile.credits }).eq('id', profile.id);
+        toast.error("Cartela não encontrada para recarregar.");
+        return false;
+    }
+    
+    await queryClient.invalidateQueries({ queryKey: ['profile'] });
+    await queryClient.invalidateQueries({ queryKey: ['playerCards', user?.id] });
+
     return true;
   };
 
