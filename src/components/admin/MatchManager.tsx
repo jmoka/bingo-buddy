@@ -433,7 +433,7 @@ const MatchManager = () => {
       </div>
       
       <Tabs defaultValue="in_progress" className="w-full">
-        <TabsList className="grid w-full grid-cols-4 mb-4">
+        <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 mb-4">
           <TabsTrigger value="in_progress" className="flex items-center gap-2">
             Em Andamento
             {inProgressMatches.length > 0 && (
