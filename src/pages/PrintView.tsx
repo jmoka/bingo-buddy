@@ -47,7 +47,7 @@ const PrintView = () => {
           <p className="text-muted-foreground">Você não tem cartelas para imprimir.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+        <div className="flex flex-wrap justify-center gap-8">
           {myOwnedCards.map(card => (
             <PrintableBingoCard key={card.id} card={card} />
           ))}
