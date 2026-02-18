@@ -108,10 +108,12 @@ export const useMatches = () => {
     try {
       const { error } = await supabase.functions.invoke('call-number', { body: { matchId, num } });
       if (error) throw error;
+      // Força a atualização imediata para o usuário que chamou o número
+      queryClient.invalidateQueries({ queryKey: ['matches'] });
+      queryClient.invalidateQueries({ queryKey: ['matchCards'] });
     } catch (error) {
       toast.error("Erro ao sortear número.", { description: (error as Error).message });
     }
-    // Invalidation is handled by the real-time subscription
   };
 
   const getMatchCards = (matchId: string) => matchCards.filter(c => c.match_id === matchId);
