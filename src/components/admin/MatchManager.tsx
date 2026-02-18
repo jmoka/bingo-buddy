@@ -5,8 +5,8 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { GameType } from '@/types/bingo';
 import { PrizeType, MatchStatus, Match } from '@/types/match';
-import { gameTypeLabels } from '@/utils/bingoUtils';
-import { Plus, Trash2, Trophy, Edit, Shuffle, Clock, Coins, Users, TrendingUp, Ticket, User } from 'lucide-react';
+import { gameTypeLabels, calculateNumbersToWin } from '@/utils/bingoUtils';
+import { Plus, Trash2, Trophy, Edit, Shuffle, Clock, Coins, Users, TrendingUp, Ticket, User, Flame, Target } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { useToast } from '@/hooks/use-toast';
@@ -174,7 +174,7 @@ const MatchManager = () => {
     const matchData = {
         name: matchForm.name,
         game_type: matchForm.game_type,
-        max_cards_per_player: matchForm.maxCardsPerPlayer,
+        max_cards_per_player: matchForm.max_cards_per_player,
         card_price: matchForm.card_price,
         prize: prizePayload,
         start_time: new Date(matchForm.startTime).toISOString(),
@@ -341,6 +341,16 @@ const MatchManager = () => {
           const countdown = (match.status === 'waiting' || match.status === 'open') ? getCountdown(match.start_time) : null;
           const autoCallCountdown = match.is_auto_calling && match.status === 'in_progress' ? getAutoCallCountdown(match.next_auto_call_timestamp) : null;
 
+          const stats = { missing5: 0, missing3: 0, missing1: 0 };
+          if (match.status === 'in_progress') {
+              for (const card of cardsInMatch) {
+                  const needed = calculateNumbersToWin(card, match.game_type);
+                  if (needed <= 1) stats.missing1++;
+                  else if (needed <= 3) stats.missing3++;
+                  else if (needed <= 5) stats.missing5++;
+              }
+          }
+
           return (
             <div key={match.id} className="card-container">
               <div className="flex flex-wrap items-start justify-between gap-3 mb-6">
@@ -431,6 +441,29 @@ const MatchManager = () => {
                   <p className="text-[10px] text-muted-foreground">{profit >= 0 ? 'Lucro esperado' : 'Prejuízo atual'}</p>
                 </div>
               </div>
+
+              {match.status === 'in_progress' && (
+                <div className="mb-6 p-4 rounded-xl bg-muted/20 border border-border">
+                  <h4 className="text-center font-heading font-bold mb-3 text-sm text-foreground">Status da Partida: Quase lá!</h4>
+                  <div className="grid grid-cols-3 gap-2 text-center">
+                    <div className="flex flex-col items-center justify-center p-2 rounded-lg bg-muted/50 border border-border/50">
+                      <Target className="w-4 h-4 text-muted-foreground mb-1" />
+                      <span className="font-bold text-lg font-heading">{stats.missing5}</span>
+                      <span className="text-[9px] uppercase font-bold text-muted-foreground">Faltam 5</span>
+                    </div>
+                    <div className="flex flex-col items-center justify-center p-2 rounded-lg bg-accent/10 border border-accent/20">
+                      <Target className="w-4 h-4 text-accent mb-1" />
+                      <span className="font-bold text-lg font-heading text-accent">{stats.missing3}</span>
+                      <span className="text-[9px] uppercase font-bold text-accent/80">Faltam 3</span>
+                    </div>
+                    <div className="flex flex-col items-center justify-center p-2 rounded-lg bg-destructive/10 border border-destructive/20">
+                      <Flame className="w-4 h-4 text-destructive mb-1" />
+                      <span className="font-bold text-lg font-heading text-destructive">{stats.missing1}</span>
+                      <span className="text-[9px] uppercase font-bold text-destructive/80">Por 1!</span>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {match.status === 'finished' && match.winners.length > 0 && (
                 <div className="mb-6 p-4 rounded-xl bg-success/5 border-2 border-dashed border-success/20 animate-slide-up">
