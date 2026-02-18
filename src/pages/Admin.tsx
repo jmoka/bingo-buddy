@@ -481,6 +481,42 @@ const Admin = () => {
                       {(match.status === 'waiting' || match.status === 'finished') && <Button size="sm" variant="destructive" onClick={() => deleteMatch(match.id)}><Trash2 className="w-4 h-4" /></Button>}
                     </div>
                   </div>
+
+                  {match.status === 'in_progress' && (
+                    <div className="mt-4 pt-4 border-t">
+                        <div className="flex items-center justify-between">
+                            <h4 className="font-heading font-semibold">Sorteio</h4>
+                            <div className="flex items-center gap-2">
+                                <Label htmlFor={`auto-call-${match.id}`} className="text-xs">Sorteio Automático</Label>
+                                <Switch
+                                    id={`auto-call-${match.id}`}
+                                    checked={!!match.is_auto_calling}
+                                    onCheckedChange={() => toggleAutoCall(match.id)}
+                                />
+                            </div>
+                        </div>
+                        <div className="flex gap-2 mt-2">
+                            <Input
+                                placeholder="Nº"
+                                type="number"
+                                className="w-20"
+                                value={callerInput[match.id] || ''}
+                                onChange={e => setCallerInput(p => ({ ...p, [match.id]: e.target.value }))}
+                                onKeyDown={e => e.key === 'Enter' && handleCallNumber(match.id)}
+                            />
+                            <Button variant="outline" onClick={() => handleCallNumber(match.id)}>Sortear</Button>
+                            <Button variant="secondary" onClick={() => handleRandomCall(match.id)}><Shuffle className="w-4 h-4" /></Button>
+                        </div>
+                        <div className="mt-4">
+                            <p className="text-xs text-muted-foreground mb-2">Sorteados ({match.called_numbers.length})</p>
+                            <div className="flex flex-wrap gap-1.5">
+                                {match.called_numbers.map(num => (
+                                    <span key={num} className="w-7 h-7 rounded-full bg-secondary text-secondary-foreground text-xs font-bold flex items-center justify-center">{num}</span>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                  )}
                 </div>
               );
             })}
