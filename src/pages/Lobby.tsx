@@ -8,7 +8,7 @@ import { Match, MatchStatus, PlayerCard } from '@/types/match';
 import { gameTypeLabels } from '@/utils/bingoUtils';
 import { 
   Coins, Plus, Trophy, Users, Settings, 
-  Timer, DoorOpen, Ticket, Zap, ZapOff, Tv, Archive, Trash2, RotateCcw, Star
+  Timer, DoorOpen, Ticket, Zap, ZapOff, Tv, Archive, Trash2, RotateCcw, Star, Loader2
 } from 'lucide-react';
 import { 
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose, DialogDescription
@@ -50,6 +50,7 @@ const Lobby = () => {
   const [isJoinDialogOpen, setJoinDialogOpen] = useState(false);
   const [selectedMatch, setSelectedMatch] = useState<Match | null>(null);
   const [cardsToJoin, setCardsToJoin] = useState<Set<string>>(new Set());
+  const [isJoining, setIsJoining] = useState(false);
 
   useEffect(() => {
     if (!session) {
@@ -86,11 +87,16 @@ const Lobby = () => {
 
   const handleJoinMatch = async () => {
     if (!selectedMatch || cardsToJoin.size === 0) return;
-    const cardIds = Array.from(cardsToJoin);
-    const newMatchCards = await joinMatch(selectedMatch.id, cardIds);
-    if (newMatchCards && newMatchCards.length > 0) {
-      toast.success('🎉 Você entrou na partida!', { description: `${newMatchCards.length} cartela(s) inscrita(s).` });
-      setJoinDialogOpen(false);
+    setIsJoining(true);
+    try {
+      const cardIds = Array.from(cardsToJoin);
+      const newMatchCards = await joinMatch(selectedMatch.id, cardIds);
+      if (newMatchCards && newMatchCards.length > 0) {
+        toast.success('🎉 Você entrou na partida!', { description: `${newMatchCards.length} cartela(s) inscrita(s).` });
+        setJoinDialogOpen(false);
+      }
+    } finally {
+      setIsJoining(false);
     }
   };
 
@@ -262,15 +268,27 @@ const Lobby = () => {
                     </div>
                   </div>
                   <div className="flex flex-col items-start sm:items-end w-full sm:w-auto">
-                    { (alreadyJoined || match.status === 'in_progress') ? (
+                    <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                      {match.status === 'in_progress' && (
                         <Button size="sm" className="bg-success/10 text-success hover:bg-success/20 h-8 text-xs w-full sm:w-auto" onClick={() => navigate(`/match/${match.id}`)}><Tv className="w-3.5 h-3.5 mr-2" /> Acompanhar</Button>
-                    ) : match.status === 'open' ? (
-                        <Button size="sm" className="gradient-accent shadow-button h-8 text-xs w-full sm:w-auto" onClick={() => openJoinDialog(match)}>Entrar na Partida</Button>
-                    ) : match.status === 'waiting' ? (
+                      )}
+                      {match.status === 'open' && (
+                        <>
+                          {alreadyJoined && (
+                            <Button size="sm" variant="outline" className="h-8 text-xs w-full sm:w-auto" onClick={() => navigate(`/match/${match.id}`)}><Tv className="w-3.5 h-3.5 mr-2" /> Acompanhar</Button>
+                          )}
+                          <Button size="sm" className="gradient-accent shadow-button h-8 text-xs w-full sm:w-auto" onClick={() => openJoinDialog(match)}>
+                            {alreadyJoined ? 'Adicionar Cartelas' : 'Entrar na Partida'}
+                          </Button>
+                        </>
+                      )}
+                      {match.status === 'waiting' && (
                         <Button size="sm" disabled className="h-8 text-xs w-full sm:w-auto">Aguardando</Button>
-                    ) : (
+                      )}
+                      {match.status === 'finished' && (
                         <Button size="sm" disabled className="h-8 text-xs w-full sm:w-auto">Encerrada</Button>
-                    )}
+                      )}
+                    </div>
                     <span className="text-[10px] text-muted-foreground mt-1">{match.card_price} créditos por cartela</span>
                   </div>
                 </div>
@@ -436,7 +454,18 @@ const Lobby = () => {
                 );
             })}
           </div>
-          <DialogFooter><div className="w-full flex justify-between items-center"><span className="font-heading font-semibold text-base md:text-lg">Total: {cardsToJoin.size * (selectedMatch?.card_price || 0)} créditos</span><Button onClick={handleJoinMatch} disabled={cardsToJoin.size === 0}>Confirmar e Pagar</Button></div></DialogFooter>
+          <DialogFooter>
+            <div className="w-full flex justify-between items-center">
+              <span className="font-heading font-semibold text-base md:text-lg">Total: {cardsToJoin.size * (selectedMatch?.card_price || 0)} créditos</span>
+              <Button onClick={handleJoinMatch} disabled={cardsToJoin.size === 0 || isJoining}>
+                {isJoining ? (
+                  <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Confirmando...</>
+                ) : (
+                  'Confirmar e Pagar'
+                )}
+              </Button>
+            </div>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </>
