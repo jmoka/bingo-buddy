@@ -8,7 +8,7 @@ import { Match, MatchStatus, PlayerCard } from '@/types/match';
 import { gameTypeLabels } from '@/utils/bingoUtils';
 import { 
   Coins, Plus, Trophy, Users, Settings, 
-  Timer, DoorOpen, Ticket, Zap, ZapOff, Tv, Archive, Trash2, RotateCcw
+  Timer, DoorOpen, Ticket, Zap, ZapOff, Tv, Archive, Trash2, RotateCcw, Star
 } from 'lucide-react';
 import { 
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose, DialogDescription
@@ -29,6 +29,8 @@ import { CardCreator } from '@/components/CardCreator';
 import { BingoCell } from '@/components/BingoCell';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Label } from '@/components/ui/label';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 
 const Lobby = () => {
   const navigate = useNavigate();
@@ -43,6 +45,7 @@ const Lobby = () => {
   const [isCreateCardOpen, setCreateCardOpen] = useState(false);
   const [newCardName, setNewCardName] = useState('');
   const [newCardNumbers, setNewCardNumbers] = useState<number[][] | null>(null);
+  const [creditType, setCreditType] = useState<'real' | 'fake'>('real');
 
   const [isJoinDialogOpen, setJoinDialogOpen] = useState(false);
   const [selectedMatch, setSelectedMatch] = useState<Match | null>(null);
@@ -65,12 +68,13 @@ const Lobby = () => {
 
   const handleCreateCard = async () => {
     if (!newCardName.trim() || !newCardNumbers) return;
-    const card = await createPlayerCard({ name: newCardName, numbers: newCardNumbers });
+    const card = await createPlayerCard({ name: newCardName, numbers: newCardNumbers, creditType });
     if (card) {
       toast.success('Cartela criada!', { description: `A cartela "${card.name}" foi adicionada à sua coleção.` });
       setCreateCardOpen(false);
       setNewCardName('');
       setNewCardNumbers(null);
+      setCreditType('real');
     }
   };
 
@@ -138,6 +142,7 @@ const Lobby = () => {
           const activeMatchCard = matchCards.find(mc => mc.player_card_id === card.id && activeMatchIds.has(mc.match_id));
           const markedNumbers = activeMatchCard ? activeMatchCard.marked_numbers : new Set<number>();
           const winCount = wins.filter(w => w.player_card_id === card.id).length;
+          const isFake = (card as any).credit_type === 'fake';
           
           return (
             <div key={card.id} className={`card-container p-3 transition-opacity ${card.uses_left === 0 ? 'opacity-80' : ''}`}>
@@ -145,6 +150,7 @@ const Lobby = () => {
                 <div>
                   <div className="flex items-center gap-2">
                     <h3 className="font-heading font-semibold text-sm md:text-base text-foreground">{card.name}</h3>
+                    {isFake && <Badge variant="outline" className="text-[9px] h-4 border-amber-400 text-amber-600 bg-amber-400/5">Brincar</Badge>}
                     {winCount > 0 && (
                       <div className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-400/20 text-amber-600 border border-amber-400/30">
                         <Trophy className="w-3 h-3" />
@@ -300,17 +306,55 @@ const Lobby = () => {
               <DialogContent className="max-w-xl flex flex-col max-h-[90vh]">
                   <DialogHeader className="flex-shrink-0">
                     <DialogTitle className="font-heading">Criar Nova Cartela</DialogTitle>
-                    <DialogDescription>Escolha os números manualmente ou gere uma cartela aleatória.</DialogDescription>
+                    <DialogDescription>Escolha o tipo de crédito e os números da sua cartela.</DialogDescription>
                   </DialogHeader>
                   <div className="flex-grow overflow-y-auto -mx-6 px-6">
-                    <div className="space-y-4 py-4">
-                      <Input placeholder="Nome da cartela (ex: Sorte Pura)" value={newCardName} onChange={e => setNewCardName(e.target.value)} className="bg-secondary border-0" />
+                    <div className="space-y-6 py-4">
+                      <div className="space-y-2">
+                        <Label>Tipo de Crédito</Label>
+                        <RadioGroup
+                          value={creditType}
+                          onValueChange={(v: 'real' | 'fake') => setCreditType(v)}
+                          className="grid grid-cols-2 gap-4"
+                        >
+                          <div>
+                            <RadioGroupItem value="real" id="real" className="peer sr-only" />
+                            <Label
+                              htmlFor="real"
+                              className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary cursor-pointer"
+                            >
+                              <Coins className="mb-2 h-6 w-6" />
+                              <span className="text-xs font-bold uppercase">Reais</span>
+                              <span className="text-[10px] text-muted-foreground mt-1">{profile.credits} cr.</span>
+                            </Label>
+                          </div>
+                          <div>
+                            <RadioGroupItem value="fake" id="fake" className="peer sr-only" />
+                            <Label
+                              htmlFor="fake"
+                              className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary cursor-pointer"
+                            >
+                              <Star className="mb-2 h-6 w-6" />
+                              <span className="text-xs font-bold uppercase">Brincar</span>
+                              <span className="text-[10px] text-muted-foreground mt-1">{profile.fake_credits} cr.</span>
+                            </Label>
+                          </div>
+                        </RadioGroup>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label>Nome da Cartela</Label>
+                        <Input placeholder="Ex: Sorte Pura" value={newCardName} onChange={e => setNewCardName(e.target.value)} className="bg-secondary border-0" />
+                      </div>
+
                       <CardCreator onCardChange={setNewCardNumbers} />
                     </div>
                   </div>
                   <DialogFooter className="flex-shrink-0">
                     <DialogClose asChild><Button variant="ghost">Cancelar</Button></DialogClose>
-                    <Button onClick={handleCreateCard} disabled={!newCardName.trim() || !newCardNumbers}>Salvar</Button>
+                    <Button onClick={handleCreateCard} disabled={!newCardName.trim() || !newCardNumbers}>
+                      Salvar (Custa {useGame().gameSettings?.custo_nova_cartela || 10} cr.)
+                    </Button>
                   </DialogFooter>
               </DialogContent>
           </Dialog>

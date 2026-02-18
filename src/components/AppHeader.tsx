@@ -4,7 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useGame } from '@/contexts/GameContext';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
-import { Menu, User, Wallet, Plus, Banknote, History, Printer, LogOut } from 'lucide-react';
+import { Menu, User, Wallet, Plus, Banknote, History, Printer, LogOut, Star } from 'lucide-react';
 import { CreditRequestDialog } from './CreditRequestDialog';
 import { MyCreditRequestsDialog } from './MyCreditRequestsDialog';
 import { RedeemRequestDialog } from './RedeemRequestDialog';
@@ -48,10 +48,18 @@ export const AppHeader = () => {
           🎱 Bingo
         </a>
         <div className="flex items-center gap-1 sm:gap-2">
-          <div className="flex items-center gap-1 bg-muted rounded-full px-3 py-1.5">
-            <Wallet className="w-4 h-4 text-foreground" />
-            <span className="font-heading font-bold text-base text-foreground">{profile.credits}</span>
+          {/* Saldo Real */}
+          <div className="flex items-center gap-1 bg-muted rounded-full px-2 py-1.5 sm:px-3" title="Créditos Reais">
+            <Wallet className="w-3.5 h-3.5 text-foreground" />
+            <span className="font-heading font-bold text-sm sm:text-base text-foreground">{profile.credits}</span>
           </div>
+          
+          {/* Saldo de Brincar */}
+          <div className="flex items-center gap-1 bg-amber-400/10 rounded-full px-2 py-1.5 sm:px-3 border border-amber-400/20" title="Créditos de Brincar">
+            <Star className="w-3.5 h-3.5 text-amber-600" />
+            <span className="font-heading font-bold text-sm sm:text-base text-amber-600">{profile.fake_credits}</span>
+          </div>
+
           <Button size="icon" variant="ghost" onClick={() => navigate('/account')}>
             <User className="w-5 h-5" />
           </Button>
