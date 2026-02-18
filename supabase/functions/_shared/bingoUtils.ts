@@ -1,43 +1,60 @@
 import type { BingoCard, GameType, WinResult } from './types.ts';
 
+// Garante que o centro (2,2) seja sempre considerado marcado
+const isCellMarked = (card: BingoCard, row: number, col: number): boolean => {
+  if (row === 2 && col === 2) return true; // Espaço Livre
+  const num = card.numbers[row][col];
+  return card.markedNumbers.has(num);
+};
+
 export const checkHorizontalWin = (card: BingoCard): number[] | null => {
   for (let row = 0; row < 5; row++) {
-    const rowNumbers = card.numbers[row];
-    const allMarked = rowNumbers.every((num, col) => 
-      (row === 2 && col === 2) || card.markedNumbers.has(num)
-    );
-    if (allMarked) {
-      return rowNumbers;
+    let allMarked = true;
+    for (let col = 0; col < 5; col++) {
+      if (!isCellMarked(card, row, col)) {
+        allMarked = false;
+        break;
+      }
     }
+    if (allMarked) return card.numbers[row];
   }
   return null;
 };
 
 export const checkVerticalWin = (card: BingoCard): number[] | null => {
   for (let col = 0; col < 5; col++) {
-    const colNumbers = card.numbers.map(row => row[col]);
-    const allMarked = colNumbers.every((num, row) => 
-      (row === 2 && col === 2) || card.markedNumbers.has(num)
-    );
-    if (allMarked) {
-      return colNumbers;
+    let allMarked = true;
+    for (let row = 0; row < 5; row++) {
+      if (!isCellMarked(card, row, col)) {
+        allMarked = false;
+        break;
+      }
     }
+    if (allMarked) return card.numbers.map(r => r[col]);
   }
   return null;
 };
 
 export const checkDiagonalWin = (card: BingoCard): number[] | null => {
-  const mainDiag = [0, 1, 2, 3, 4].map(i => card.numbers[i][i]);
-  const mainDiagWin = mainDiag.every((num, i) => 
-    (i === 2) || card.markedNumbers.has(num)
-  );
-  if (mainDiagWin) return mainDiag;
+  // Principal
+  let mainDiagMarked = true;
+  for (let i = 0; i < 5; i++) {
+    if (!isCellMarked(card, i, i)) {
+      mainDiagMarked = false;
+      break;
+    }
+  }
+  if (mainDiagMarked) return [0, 1, 2, 3, 4].map(i => card.numbers[i][i]);
 
-  const antiDiag = [0, 1, 2, 3, 4].map(i => card.numbers[i][4 - i]);
-  const antiDiagWin = antiDiag.every((num, i) => 
-    (i === 2) || card.markedNumbers.has(num)
-  );
-  if (antiDiagWin) return antiDiag;
+  // Secundária
+  let antiDiagMarked = true;
+  for (let i = 0; i < 5; i++) {
+    if (!isCellMarked(card, i, 4 - i)) {
+      antiDiagMarked = false;
+      break;
+    }
+  }
+  if (antiDiagMarked) return [0, 1, 2, 3, 4].map(i => card.numbers[i][4 - i]);
 
   return null;
 };
@@ -46,12 +63,10 @@ export const checkFullCardWin = (card: BingoCard): number[] | null => {
   const allNumbers: number[] = [];
   for (let row = 0; row < 5; row++) {
     for (let col = 0; col < 5; col++) {
-      if (row === 2 && col === 2) continue;
-      const num = card.numbers[row][col];
-      if (!card.markedNumbers.has(num)) {
-        return null;
+      if (!isCellMarked(card, row, col)) return null;
+      if (!(row === 2 && col === 2)) {
+        allNumbers.push(card.numbers[row][col]);
       }
-      allNumbers.push(num);
     }
   }
   return allNumbers;
