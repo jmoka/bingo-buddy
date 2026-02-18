@@ -7,7 +7,7 @@ import { GameType } from '@/types/bingo';
 import { PrizeType, MatchStatus, Match } from '@/types/match';
 import { gameTypeLabels } from '@/utils/bingoUtils';
 import { Plus, Trash2, Trophy, Edit, Shuffle, Clock } from 'lucide-react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { useToast } from '@/hooks/use-toast';
 import { Switch } from '@/components/ui/switch';
@@ -207,7 +207,7 @@ const MatchManager = () => {
   };
 
   const matchDialogContent = (
-    <div className="space-y-4 pt-4">
+    <div className="space-y-4 py-4">
       <div><Label>Nome</Label><Input value={matchForm.name} onChange={e => setMatchForm(p => ({ ...p, name: e.target.value }))} /></div>
       <div><Label>Data/Hora Início</Label><Input type="datetime-local" value={matchForm.startTime} onChange={e => setMatchForm(p => ({ ...p, startTime: e.target.value }))} /></div>
       <div><Label>Tipo de Jogo</Label><Select value={matchForm.gameType} onValueChange={(v: GameType) => setMatchForm(p => ({ ...p, gameType: v }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{Object.entries(gameTypeLabels).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}</SelectContent></Select></div>
@@ -424,10 +424,18 @@ const MatchManager = () => {
         <h2 className="font-heading text-xl font-bold text-foreground">Gerenciar Partidas</h2>
         <Dialog open={showCreate} onOpenChange={setShowCreate}>
           <DialogTrigger asChild><Button><Plus className="w-4 h-4 mr-2" />Nova Partida</Button></DialogTrigger>
-          <DialogContent className="max-w-md">
-            <DialogHeader><DialogTitle className="font-heading">Criar Partida</DialogTitle><DialogDescription>Preencha os detalhes da nova partida.</DialogDescription></DialogHeader>
-            {matchDialogContent}
-            <Button className="w-full !mt-6" onClick={handleCreateMatch}>Criar Partida</Button>
+          <DialogContent className="max-w-md flex flex-col max-h-[90vh]">
+            <DialogHeader className="flex-shrink-0">
+              <DialogTitle className="font-heading">Criar Partida</DialogTitle>
+              <DialogDescription>Preencha os detalhes da nova partida.</DialogDescription>
+            </DialogHeader>
+            <div className="flex-grow overflow-y-auto -mx-6 px-6">
+              {matchDialogContent}
+            </div>
+            <DialogFooter className="flex-shrink-0 pt-4">
+              <DialogClose asChild><Button variant="ghost">Cancelar</Button></DialogClose>
+              <Button onClick={handleCreateMatch}>Criar Partida</Button>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
       </div>
@@ -474,10 +482,18 @@ const MatchManager = () => {
       </Tabs>
 
       <Dialog open={!!editingMatch} onOpenChange={(isOpen) => !isOpen && setEditingMatch(null)}>
-        <DialogContent className="max-w-md">
-          <DialogHeader><DialogTitle className="font-heading">Editar Partida</DialogTitle><DialogDescription>Ajuste os detalhes da partida.</DialogDescription></DialogHeader>
-          {matchDialogContent}
-          <Button className="w-full !mt-6" onClick={handleUpdateMatch}>Salvar Alterações</Button>
+        <DialogContent className="max-w-md flex flex-col max-h-[90vh]">
+          <DialogHeader className="flex-shrink-0">
+            <DialogTitle className="font-heading">Editar Partida</DialogTitle>
+            <DialogDescription>Ajuste os detalhes da partida.</DialogDescription>
+          </DialogHeader>
+          <div className="flex-grow overflow-y-auto -mx-6 px-6">
+            {matchDialogContent}
+          </div>
+          <DialogFooter className="flex-shrink-0 pt-4">
+            <DialogClose asChild><Button variant="ghost">Cancelar</Button></DialogClose>
+            <Button onClick={handleUpdateMatch}>Salvar Alterações</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
