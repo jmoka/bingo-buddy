@@ -556,7 +556,16 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return data as PlayerCard;
   };
 
-  const deletePlayerCard = async (cardId: string) => { await supabase.from('cartelas_jogador').delete().eq('id', cardId); };
+  const deletePlayerCard = async (cardId: string) => {
+    const { error } = await supabase.from('cartelas_jogador').delete().eq('id', cardId);
+    if (error) {
+      toast.error("Erro ao deletar cartela.", { description: error.message });
+    } else {
+      toast.success("Cartela deletada com sucesso.");
+      queryClient.invalidateQueries({ queryKey: ['playerCards', user?.id] });
+    }
+  };
+  
   const toggleArchivePlayerCard = async (cardId: string, archive: boolean) => { await supabase.from('cartelas_jogador').update({ is_archived: archive }).eq('id', cardId); };
 
   const joinMatch = async (matchId: string, playerCardIds: string[]) => {
