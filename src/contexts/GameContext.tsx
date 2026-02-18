@@ -642,10 +642,42 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
   
   const toggleArchivePlayerCard = async (cardId: string, archive: boolean) => { await supabase.from('cartelas_jogador').update({ is_archived: archive }).eq('id', cardId); };
 
-  const joinMatch = async (matchId: string, playerCardIds: string[]) => {
-    const { data } = await supabase.functions.invoke('join-match', { body: { matchId, playerCardIds } });
-    queryClient.invalidateQueries({ queryKey: ['profile'] });
-    return data as MatchCard[];
+  const joinMatch = async (matchId: string, playerCardIds: string[]): Promise<MatchCard[] | null> => {
+    try {
+      const { data, error } = await supabase.functions.invoke('join-match', { body: { matchId, playerCardIds } });
+      
+      if (error) {
+        let errorMessage = "Ocorreu um erro ao entrar na partida.";
+        // Supabase edge function errors often come in `error.context.text`
+        if (error.context && typeof error.context.text === 'function') {
+            const errorText = await error.context.text();
+            try {
+                const errorJson = JSON.parse(errorText);
+                if (errorJson.error) {
+                    errorMessage = errorJson.error;
+                }
+            } catch (e) {
+                // Not a JSON error, use the text directly if it's not too long
+                errorMessage = errorText.length < 100 ? errorText : errorMessage;
+            }
+        } else {
+            errorMessage = error.message || errorMessage;
+        }
+        toast.error(errorMessage);
+        return null;
+      }
+      
+      // On success, invalidate all relevant queries
+      await queryClient.invalidateQueries({ queryKey: ['profile'] });
+      await queryClient.invalidateQueries({ queryKey: ['matchCards'] });
+      await queryClient.invalidateQueries({ queryKey: ['playerCards', user?.id] });
+      await queryClient.invalidateQueries({ queryKey: ['matches'] });
+      
+      return data as MatchCard[];
+    } catch (e) {
+      toast.error("Ocorreu um erro inesperado.", { description: (e as Error).message });
+      return null;
+    }
   };
 
   const buyCardUses = async (playerCardId: string) => {
