@@ -433,7 +433,7 @@ const MatchManager = () => {
       </div>
       
       <Tabs defaultValue="in_progress" className="w-full">
-        <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4">
+        <TabsList className="grid w-full h-auto p-1 grid-cols-2 sm:grid-cols-4 mb-6">
           <TabsTrigger value="in_progress" className="flex items-center gap-2">
             Em Andamento
             {inProgressMatches.length > 0 && (
@@ -467,10 +467,10 @@ const MatchManager = () => {
             )}
           </TabsTrigger>
         </TabsList>
-        <TabsContent value="in_progress" className="mt-4">{renderMatchList(inProgressMatches)}</TabsContent>
-        <TabsContent value="open" className="mt-4">{renderMatchList(openMatches)}</TabsContent>
-        <TabsContent value="waiting" className="mt-4">{renderMatchList(waitingMatches)}</TabsContent>
-        <TabsContent value="finished" className="mt-4">{renderMatchList(finishedMatches)}</TabsContent>
+        <TabsContent value="in_progress" className="mt-2">{renderMatchList(inProgressMatches)}</TabsContent>
+        <TabsContent value="open" className="mt-2">{renderMatchList(openMatches)}</TabsContent>
+        <TabsContent value="waiting" className="mt-2">{renderMatchList(waitingMatches)}</TabsContent>
+        <TabsContent value="finished" className="mt-2">{renderMatchList(finishedMatches)}</TabsContent>
       </Tabs>
 
       <Dialog open={!!editingMatch} onOpenChange={(isOpen) => !isOpen && setEditingMatch(null)}>
