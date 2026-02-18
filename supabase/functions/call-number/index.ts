@@ -24,13 +24,25 @@ serve(async (req) => {
       .eq('id', matchId)
       .single()
 
-    if (matchError) throw matchError
-    if (!match || match.called_numbers.includes(num) || match.status !== 'in_progress') {
-      console.log('[call-number] Invalid request: Match not found, number already called, or match not in progress.');
-      return new Response(JSON.stringify({ error: 'Invalid number or match state.' }), {
+    if (matchError) throw matchError;
+
+    // Se a partida não estiver em andamento, é um erro.
+    if (!match || match.status !== 'in_progress') {
+      console.log('[call-number] Invalid request: Match not found or not in progress.');
+      return new Response(JSON.stringify({ error: 'Partida não encontrada ou não está em andamento.' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 400,
-      })
+      });
+    }
+
+    // Se o número já foi sorteado, não é um erro, apenas ignoramos a chamada.
+    // Isso evita que chamadas rápidas em sequência (race conditions) quebrem o fluxo.
+    if (match.called_numbers.includes(num)) {
+      console.log(`[call-number] Number ${num} already called for match ${matchId}. Ignoring.`);
+      return new Response(JSON.stringify({ success: true, message: 'Number already called.' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200,
+      });
     }
 
     const { data: matchCards, error: cardsError } = await supabaseAdmin
