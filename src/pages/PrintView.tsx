@@ -1,19 +1,21 @@
 import { useNavigate } from 'react-router-dom';
 import { useGame } from '@/contexts/GameContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { PrintableBingoCard } from '@/components/PrintableBingoCard';
 import { ArrowLeft, Printer } from 'lucide-react';
 
 const PrintView = () => {
   const navigate = useNavigate();
-  const { currentPlayer, playerCards } = useGame();
+  const { playerCards } = useGame();
+  const { profile } = useAuth();
 
-  if (!currentPlayer) {
+  if (!profile) {
     navigate('/');
     return null;
   }
 
-  const myOwnedCards = playerCards.filter(c => c.playerId === currentPlayer.id);
+  const myOwnedCards = playerCards.filter(c => c.player_id === profile.id);
 
   const handlePrint = () => {
     window.print();
