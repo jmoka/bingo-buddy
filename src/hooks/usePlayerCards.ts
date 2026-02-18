@@ -78,33 +78,57 @@ export const usePlayerCards = () => {
     if (!card) return false;
 
     const isFake = (card as any).credit_type === 'fake';
-    const cost = isFake ? 0 : gameSettings.custo_recarga_cartela;
-    
-    if (!isFake && profile.credits < cost) {
-      toast.error(`Saldo insuficiente para recarregar esta cartela.`);
-      return false;
-    }
+    const cost = gameSettings.custo_recarga_cartela; // Use the same cost for both
 
-    // Se for real, debita
-    if (!isFake && cost > 0) {
+    if (isFake) {
+      // Handle fake credits
+      if ((profile.fake_credits || 0) < cost) {
+        toast.error(`Saldo de brincar insuficiente para recarregar.`);
+        return false;
+      }
+      
       const { error: profileError } = await supabase
         .from('perfis')
-        .update({ credits: profile.credits - cost })
+        .update({ fake_credits: (profile.fake_credits || 0) - cost })
         .eq('id', profile.id);
 
       if (profileError) {
-        toast.error("Erro ao debitar créditos.");
+        toast.error("Erro ao debitar créditos de brincar.");
         return false;
+      }
+    } else {
+      // Handle real credits
+      if (profile.credits < cost) {
+        toast.error(`Saldo de créditos reais insuficiente para recarregar.`);
+        return false;
+      }
+
+      if (cost > 0) {
+        const { error: profileError } = await supabase
+          .from('perfis')
+          .update({ credits: profile.credits - cost })
+          .eq('id', profile.id);
+
+        if (profileError) {
+          toast.error("Erro ao debitar créditos reais.");
+          return false;
+        }
       }
     }
 
+    // Update uses_left for the card
     const { error: cardError } = await supabase
       .from('cartelas_jogador')
       .update({ uses_left: card.uses_left + gameSettings.usos_por_recarga })
       .eq('id', playerCardId);
 
+    // If card update fails, revert the credit change
     if (cardError) {
-      if (!isFake) await supabase.from('perfis').update({ credits: profile.credits }).eq('id', profile.id);
+      if (isFake) {
+        await supabase.from('perfis').update({ fake_credits: profile.fake_credits }).eq('id', profile.id);
+      } else {
+        await supabase.from('perfis').update({ credits: profile.credits }).eq('id', profile.id);
+      }
       toast.error("Erro ao recarregar cartela.");
       return false;
     }
