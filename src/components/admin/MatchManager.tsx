@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { GameType } from '@/types/bingo';
 import { PrizeType, MatchStatus, Match } from '@/types/match';
 import { gameTypeLabels } from '@/utils/bingoUtils';
-import { Plus, Trash2, Trophy, Edit, Shuffle } from 'lucide-react';
+import { Plus, Trash2, Trophy, Edit, Shuffle, Clock } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { useToast } from '@/hooks/use-toast';
@@ -52,11 +52,11 @@ const MatchManager = () => {
     startTime: '',
     prizeImageFile: null as File | null,
     min_players: 1,
+    is_auto_calling: false,
   });
   
   const [callerInput, setCallerInput] = useState<Record<string, string>>({});
   const [now, setNow] = useState(Date.now());
-  const processingRef = useRef(new Set());
 
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 1000);
@@ -73,23 +73,6 @@ const MatchManager = () => {
       setMatchForm(p => ({ ...p, min_players: 1 }));
     }
   }, [matchForm.prizeType, matchForm.prizeValue, matchForm.cardPrice]);
-
-  useEffect(() => {
-    matches.forEach(match => {
-      if (match.is_auto_calling && match.status === 'in_progress' && match.next_auto_call_timestamp && now >= new Date(match.next_auto_call_timestamp).getTime()) {
-        if (processingRef.current.has(match.id)) return;
-        processingRef.current.add(match.id);
-        const availableNumbers = Array.from({ length: 75 }, (_, i) => i + 1).filter(num => !match.called_numbers.includes(num));
-        if (availableNumbers.length > 0) {
-          const randomIndex = Math.floor(Math.random() * availableNumbers.length);
-          callNumber(match.id, availableNumbers[randomIndex]);
-        } else {
-          toggleAutoCall(match.id);
-        }
-        setTimeout(() => processingRef.current.delete(match.id), 500);
-      }
-    });
-  }, [now, matches, callNumber, toggleAutoCall]);
 
   const handleCreateMatch = async () => {
     if (!matchForm.name.trim() || !matchForm.startTime) return;
@@ -128,6 +111,7 @@ const MatchManager = () => {
         start_time: new Date(matchForm.startTime).toISOString(),
         prize_image_url: prizeImageUrl,
         min_players: matchForm.min_players,
+        is_auto_calling: matchForm.is_auto_calling,
     };
 
     await createMatch(matchData);
@@ -143,6 +127,7 @@ const MatchManager = () => {
         startTime: '',
         prizeImageFile: null,
         min_players: 1,
+        is_auto_calling: false,
     });
   };
 
@@ -159,6 +144,7 @@ const MatchManager = () => {
       startTime: format(new Date(match.start_time), "yyyy-MM-dd'T'HH:mm"),
       prizeImageFile: null,
       min_players: match.min_players,
+      is_auto_calling: match.is_auto_calling || false,
     });
   };
 
@@ -192,6 +178,7 @@ const MatchManager = () => {
         start_time: new Date(matchForm.startTime).toISOString(),
         prize_image_url: prizeImageUrl,
         min_players: matchForm.min_players,
+        is_auto_calling: matchForm.is_auto_calling,
     };
 
     await updateMatch(editingMatch.id, matchData);
@@ -295,8 +282,29 @@ const MatchManager = () => {
           <p className="text-[10px] text-muted-foreground mt-1">Calculado: {Math.ceil(matchForm.prizeValue / matchForm.cardPrice) || 1} jogadores para cobrir o prêmio.</p>
         </div>
       )}
+      <div className="flex items-center justify-between rounded-lg border p-3 shadow-sm mt-4">
+        <div className="space-y-0.5">
+            <Label>Início e Sorteio Automáticos</Label>
+            <p className="text-xs text-muted-foreground">
+                A partida iniciará e sorteará os números sozinha.
+            </p>
+        </div>
+        <Switch
+            checked={matchForm.is_auto_calling}
+            onCheckedChange={(checked) => setMatchForm(p => ({ ...p, is_auto_calling: checked }))}
+        />
+      </div>
     </div>
   );
+
+  const getCountdown = (startTime: string) => {
+    const diff = new Date(startTime).getTime() - now;
+    if (diff <= 0) return null;
+    const h = Math.floor(diff / 3600000);
+    const m = Math.floor((diff % 3600000) / 60000);
+    const s = Math.floor((diff % 60000) / 1000);
+    return `${h > 0 ? `${h.toString().padStart(2, '0')}:` : ''}${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  };
 
   return (
     <div className="space-y-6">
@@ -314,6 +322,7 @@ const MatchManager = () => {
       {matches.map(match => {
         const playersInMatchCount = new Set(matchCards.filter(mc => mc.match_id === match.id).map(mc => mc.player_id)).size;
         const canStart = playersInMatchCount >= match.min_players;
+        const countdown = (match.status === 'waiting' || match.status === 'open') ? getCountdown(match.start_time) : null;
         return (
           <div key={match.id} className="card-container">
             <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
@@ -321,6 +330,12 @@ const MatchManager = () => {
                 <div className="flex items-center gap-2 mb-1">
                   <h3 className="font-heading font-bold text-lg text-foreground">{match.name}</h3>
                   <Badge className={statusColors[match.status]}>{statusLabels[match.status]}</Badge>
+                  {countdown && (
+                    <Badge variant="outline" className="font-mono text-xs">
+                        <Clock className="w-3 h-3 mr-1.5" />
+                        {countdown}
+                    </Badge>
+                  )}
                 </div>
                 <div className="text-sm text-muted-foreground flex gap-3"><span className="flex items-center gap-1"><Trophy className="w-3.5 h-3.5" />{gameTypeLabels[match.game_type]}</span></div>
               </div>

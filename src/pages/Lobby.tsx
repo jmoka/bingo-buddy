@@ -144,11 +144,11 @@ const Lobby = () => {
 
   const getCountdown = (startTime: string) => {
     const diff = new Date(startTime).getTime() - now;
-    if (diff <= 0) return 'Iniciando...';
+    if (diff <= 0) return null;
     const h = Math.floor(diff / 3600000);
     const m = Math.floor((diff % 3600000) / 60000);
     const s = Math.floor((diff % 60000) / 1000);
-    return `${h > 0 ? `${h}h ` : ''}${m > 0 ? `${m}m ` : ''}${s}s`;
+    return `${h > 0 ? `${h.toString().padStart(2, '0')}:` : ''}${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
 
   const sortedMatches = [...matches].sort((a, b) => {
@@ -306,6 +306,7 @@ const Lobby = () => {
               const playersInMatchCount = new Set(matchCards.filter(mc => mc.match_id === match.id).map(mc => mc.player_id)).size;
               const myMatchCards = getPlayerMatchCards(match.id, profile.id);
               const alreadyJoined = myMatchCards.length > 0;
+              const countdown = (match.status === 'waiting' || match.status === 'open') ? getCountdown(match.start_time) : null;
               return (
                 <div key={match.id} className={`card-container relative p-0 overflow-hidden ${match.status === 'in_progress' ? 'ring-2 ring-accent' : ''} ${match.status === 'finished' ? 'opacity-70' : ''}`}>
                   {match.prize.type === 'product' && match.prize_image_url && (
@@ -320,6 +321,12 @@ const Lobby = () => {
                           {match.status === 'open' && <Badge variant="secondary" className="text-primary text-[10px] h-5">Aberto</Badge>}
                           {match.status === 'in_progress' && <Badge variant="destructive" className="animate-pulse text-[10px] h-5">AO VIVO</Badge>}
                           {match.status === 'finished' && <Badge variant="outline" className="text-[10px] h-5">Finalizada</Badge>}
+                          {countdown && (
+                            <Badge variant="outline" className="font-mono text-[10px] h-5">
+                                <Timer className="w-3 h-3 mr-1" />
+                                {countdown}
+                            </Badge>
+                          )}
                         </div>
                         <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
                           <span className="flex items-center gap-1"><Trophy className="w-3.5 h-3.5" />{gameTypeLabels[match.game_type]}</span>

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useMemo } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useState, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './AuthContext';
@@ -73,8 +73,16 @@ const GameContext = createContext<GameContextType | null>(null);
 export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, profile } = useAuth();
   const queryClient = useQueryClient();
+  const [now, setNow] = useState(Date.now());
+  const processingRef = useRef(new Set());
 
   const isAdmin = profile?.role === 'admin';
+
+  // Timer for countdowns and auto-actions
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 1000); // Update every second
+    return () => clearInterval(timer);
+  }, []);
 
   const { data: gameSettings } = useQuery({
     queryKey: ['gameSettings'],
@@ -93,6 +101,45 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return data as Match[];
     },
   });
+
+  // Effect for auto-starting and auto-calling
+  useEffect(() => {
+    matches.forEach(match => {
+      // Auto-start logic
+      if (
+        match.is_auto_calling &&
+        match.status === 'open' &&
+        now >= new Date(match.start_time).getTime()
+      ) {
+        const processingKey = `start_${match.id}`;
+        if (processingRef.current.has(processingKey)) return;
+        processingRef.current.add(processingKey);
+        console.log(`Automatically starting match: ${match.name} (${match.id})`);
+        startMatch(match.id, true); // Force start, ignoring min players
+      }
+
+      // Auto-call logic
+      if (
+        match.is_auto_calling &&
+        match.status === 'in_progress' &&
+        match.next_auto_call_timestamp &&
+        now >= new Date(match.next_auto_call_timestamp).getTime()
+      ) {
+        const processingKey = `call_${match.id}`;
+        if (processingRef.current.has(processingKey)) return;
+        processingRef.current.add(processingKey);
+        
+        const availableNumbers = Array.from({ length: 75 }, (_, i) => i + 1).filter(num => !match.called_numbers.includes(num));
+        if (availableNumbers.length > 0) {
+          const randomIndex = Math.floor(Math.random() * availableNumbers.length);
+          callNumber(match.id, availableNumbers[randomIndex]);
+        } else {
+          toggleAutoCall(match.id); // Turn off if no numbers left
+        }
+        setTimeout(() => processingRef.current.delete(processingKey), 1000);
+      }
+    });
+  }, [now, matches]);
 
   const { data: playerCards = [] } = useQuery({
     queryKey: ['playerCards', user?.id],
