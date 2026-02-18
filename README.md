@@ -1,75 +1,110 @@
-# Welcome to your Lovable project
+# Bingo App
 
-# Versão 1 LTS
+Este é um aplicativo completo de Bingo em tempo real, construído com React, TypeScript e Supabase. Ele oferece uma experiência de jogo multiplayer, gerenciamento de créditos, um painel de administração robusto e muito mais.
 
-## Project info
+## ✨ Principais Funcionalidades
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+O sistema é dividido em duas áreas principais: a interface do jogador e o painel de administração.
 
-## How can I edit this code?
+### Para Jogadores
 
-There are several ways of editing your application.
+-   **🎟️ Lobby de Partidas:** Visualize partidas em andamento, abertas para inscrição, futuras e já finalizadas.
+-   **🃏 Gerenciamento de Cartelas:** Crie suas próprias cartelas personalizadas (escolhendo os números) ou gere cartelas aleatórias. Recarregue os usos de suas cartelas favoritas.
+-   **💰 Sistema de Créditos:**
+    -   Compre créditos fazendo um PIX para a chave do sistema e enviando o comprovante.
+    -   Use créditos para comprar cartelas e entrar nas partidas.
+    -   Resgate seus créditos por dinheiro, solicitando um PIX para o administrador.
+-   **🎮 Jogo em Tempo Real:** Acompanhe as partidas ao vivo, veja os números sendo sorteados e suas cartelas sendo marcadas automaticamente.
+-   **👤 Perfil de Usuário:** Gerencie suas informações pessoais, como nome, avatar, CPF e chave PIX para resgates.
+-   **🖨️ Impressão:** Imprima suas cartelas para jogar em eventos físicos.
 
-**Use Lovable**
+### Para Administradores
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+-   **⚙️ Painel de Controle:** Uma área central para gerenciar todos os aspectos do jogo.
+-   **🛠️ Gerenciamento de Partidas:** Crie novas partidas, defina preços, prêmios (porcentagem, valor fixo ou produto), e configure o modo de jogo. Inicie, finalize e controle o sorteio de números (manual ou automático).
+-   **💸 Gerenciamento Financeiro:**
+    -   **Aprovação de Créditos:** Revise os comprovantes de PIX enviados pelos jogadores e aprove/rejeite as solicitações de crédito.
+    -   **Processamento de Resgates:** Gerencie as solicitações de resgate dos jogadores, realize os pagamentos e envie os comprovantes.
+-   **👥 Gerenciamento de Jogadores:** Visualize todos os jogadores cadastrados, verifique seus saldos e adicione ou remova créditos manualmente.
+-   **🔧 Configurações do Sistema:** Ajuste as regras de negócio, como o custo de novas cartelas, o valor de cada crédito em Reais, e configure chaves PIX e integrações.
 
-Changes made via Lovable will be committed automatically to this repo.
+## 🚀 Tecnologias Utilizadas
 
-**Use your preferred IDE**
+-   **Frontend:** React, Vite, TypeScript, Tailwind CSS
+-   **Componentes UI:** shadcn/ui
+-   **Roteamento:** React Router
+-   **Gerenciamento de Estado:** React Context & TanStack Query
+-   **Backend & Banco de Dados:** Supabase (Auth, Postgres, Storage, Edge Functions)
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+---
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+## 🔧 Instalação e Configuração
 
-Follow these steps:
+Siga os passos abaixo para configurar e rodar o projeto localmente.
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+### 1. Pré-requisitos
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+-   [Node.js](https://nodejs.org/) (versão 18 ou superior)
+-   [Git](https://git-scm.com/)
+-   Uma conta no [Supabase](https://supabase.com/)
 
-# Step 3: Install the necessary dependencies.
-npm i
+### 2. Configuração do Frontend
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
+```bash
+# 1. Clone o repositório
+git clone <URL_DO_SEU_REPOSITORIO>
+
+# 2. Navegue até o diretório do projeto
+cd <NOME_DO_PROJETO>
+
+# 3. Instale as dependências
+npm install
+
+# 4. Inicie o servidor de desenvolvimento
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+O aplicativo estará rodando em `http://localhost:8080`.
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+### 3. Configuração do Supabase
 
-**Use GitHub Codespaces**
+O backend do projeto é totalmente gerenciado pelo Supabase.
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+#### a. Crie um Projeto no Supabase
 
-## What technologies are used for this project?
+1.  Acesse sua conta no Supabase e crie um novo projeto.
+2.  Guarde a **URL do Projeto** e a chave **`anon` (public)**.
 
-This project is built with:
+#### b. Configure o Cliente Supabase no Código
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+Abra o arquivo `src/integrations/supabase/client.ts` e substitua os valores das constantes `SUPABASE_URL` e `SUPABASE_PUBLISHABLE_KEY` pelos dados do seu projeto.
 
-## How can I deploy this project?
+#### c. Execute as Migrações do Banco de Dados
 
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
+As migrações contêm toda a estrutura de tabelas, funções e políticas de segurança necessárias.
 
-## Can I connect a custom domain to my Lovable project?
+1.  No painel do seu projeto Supabase, vá para **SQL Editor**.
+2.  Clique em **New query**.
+3.  Navegue até a pasta `supabase/migrations/` neste repositório.
+4.  **Copie e cole o conteúdo de CADA arquivo `.sql`**, um de cada vez, na ordem numérica, e execute no SQL Editor.
 
-Yes, you can!
+> **Importante:** Execute os scripts na ordem correta (ex: `0001_...`, `0002_...`, etc.) para evitar erros de dependência.
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+#### d. Configure o Supabase Storage
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+O sistema precisa de dois "buckets" para armazenar arquivos.
+
+1.  No painel do Supabase, vá para **Storage**.
+2.  Crie um novo bucket chamado `avatars`. Marque-o como **Public**.
+3.  Crie outro bucket chamado `receipts`. Marque-o como **Public**.
+4.  Crie um último bucket chamado `prizes`. Marque-o como **Public**.
+
+#### e. Implante as Edge Functions
+
+As funções de backend estão na pasta `supabase/functions/`. Para que elas funcionem em seu projeto, você precisa implantá-las.
+
+A implantação de Edge Functions geralmente é feita através da [Supabase CLI](https://supabase.com/docs/guides/cli). Siga a documentação oficial para fazer o deploy das funções contidas no projeto.
+
+---
+
+Pronto! Com o frontend rodando e o backend Supabase configurado, o sistema estará totalmente funcional.
