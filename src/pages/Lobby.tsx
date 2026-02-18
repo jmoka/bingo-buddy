@@ -244,11 +244,13 @@ const Lobby = () => {
                     <DialogTitle className="font-heading">Criar Nova Cartela</DialogTitle>
                     <DialogDescription>Escolha os números manualmente ou gere uma cartela aleatória.</DialogDescription>
                     </DialogHeader>
-                    <div className="space-y-4 pt-4">
-                    <Input placeholder="Nome da cartela (ex: Sorte Pura)" value={newCardName} onChange={e => setNewCardName(e.target.value)} className="bg-secondary border-0" />
-                    <CardCreator onCardChange={setNewCardNumbers} />
+                    <div className="max-h-[60vh] overflow-y-auto pr-4">
+                      <div className="space-y-4 pt-4">
+                        <Input placeholder="Nome da cartela (ex: Sorte Pura)" value={newCardName} onChange={e => setNewCardName(e.target.value)} className="bg-secondary border-0" />
+                        <CardCreator onCardChange={setNewCardNumbers} />
+                      </div>
                     </div>
-                    <DialogFooter>
+                    <DialogFooter className="pt-4">
                     <DialogClose asChild><Button variant="ghost">Cancelar</Button></DialogClose>
                     <Button onClick={handleCreateCard} disabled={!newCardName.trim() || !newCardNumbers}>Salvar</Button>
                     </DialogFooter>
