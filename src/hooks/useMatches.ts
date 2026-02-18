@@ -31,7 +31,7 @@ export const useMatches = () => {
     const { error } = await supabase.from('partidas').insert([{ ...data, status }]);
     if (error) toast.error(error.message);
     else toast.success('Partida criada com sucesso!');
-    await queryClient.refetchQueries({ queryKey: ['matches'] });
+    await queryClient.invalidateQueries({ queryKey: ['matches'] });
   };
 
   const updateMatch = async (matchId: string, data: Partial<Match>) => {
@@ -44,13 +44,13 @@ export const useMatches = () => {
     const { error } = await supabase.from('partidas').update(updatedData).eq('id', matchId);
     if (error) toast.error(error.message);
     else toast.success('Partida atualizada com sucesso!');
-    await queryClient.refetchQueries({ queryKey: ['matches'] });
+    await queryClient.invalidateQueries({ queryKey: ['matches'] });
   };
 
   const updateMatchStatus = async (matchId: string, status: MatchStatus) => {
     const { error } = await supabase.from('partidas').update({ status }).eq('id', matchId);
     if (error) toast.error(`Erro ao atualizar status: ${error.message}`);
-    await queryClient.refetchQueries({ queryKey: ['matches'] });
+    await queryClient.invalidateQueries({ queryKey: ['matches'] });
   };
 
   const openMatch = (matchId: string) => updateMatchStatus(matchId, 'open');
@@ -71,7 +71,7 @@ export const useMatches = () => {
         toast.warning('Sorteio automático desativado.', {
           description: `A partida "${match.name}" não pôde ser iniciada por falta de jogadores.`
         });
-        await queryClient.refetchQueries({ queryKey: ['matches'] });
+        await queryClient.invalidateQueries({ queryKey: ['matches'] });
       }
       return;
     }
@@ -96,7 +96,7 @@ export const useMatches = () => {
     if (error) {
       toast.error(`Erro ao iniciar partida: ${error.message}`);
     }
-    await queryClient.refetchQueries({ queryKey: ['matches'] });
+    await queryClient.invalidateQueries({ queryKey: ['matches'] });
   };
 
   const finishMatch = (matchId: string) => updateMatchStatus(matchId, 'finished');
@@ -105,7 +105,7 @@ export const useMatches = () => {
     const { error } = await supabase.from('partidas').delete().eq('id', matchId);
     if (error) toast.error(error.message);
     else toast.success('Partida excluída.');
-    await queryClient.refetchQueries({ queryKey: ['matches'] });
+    await queryClient.invalidateQueries({ queryKey: ['matches'] });
   };
 
   const toggleAutoCall = async (matchId: string) => {
@@ -117,16 +117,16 @@ export const useMatches = () => {
       next_auto_call_timestamp: isEnabling ? new Date(Date.now() + gameSettings.intervalo_sorteio_auto_seg * 1000).toISOString() : null,
     }).eq('id', matchId);
     if (error) toast.error('Erro ao alterar sorteio automático.');
-    await queryClient.refetchQueries({ queryKey: ['matches'] });
+    await queryClient.invalidateQueries({ queryKey: ['matches'] });
   };
 
   const callNumber = async (matchId: string, num: number) => {
     try {
       const { error } = await supabase.functions.invoke('call-number', { body: { matchId, num } });
       if (error) throw error;
-      // Refetch imediato após o sorteio
-      await queryClient.refetchQueries({ queryKey: ['matches'] });
-      await queryClient.refetchQueries({ queryKey: ['matchCards'] });
+      // Invalidate queries to refetch data
+      await queryClient.invalidateQueries({ queryKey: ['matches'] });
+      await queryClient.invalidateQueries({ queryKey: ['matchCards'] });
     } catch (error) {
       toast.error("Erro ao sortear número.", { description: (error as Error).message });
     }
