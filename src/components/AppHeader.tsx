@@ -69,7 +69,7 @@ export const AppHeader = () => {
                 <div className="flex-grow space-y-1">
                   {menuItems.map((item, index) => (
                     item.dialog ? (
-                      <div key={index} onClick={() => setIsSheetOpen(false)}>{item.dialog}</div>
+                      <div key={index}>{item.dialog}</div>
                     ) : (
                       <Button
                         key={index}
