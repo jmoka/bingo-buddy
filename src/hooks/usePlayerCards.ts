@@ -164,10 +164,15 @@ export const usePlayerCards = () => {
         return false;
       }
       toast.success("Você saiu da partida.", { description: "Seus créditos foram estornados." });
-      queryClient.invalidateQueries({ queryKey: ['profile', user?.id] });
-      queryClient.invalidateQueries({ queryKey: ['playerCards', user?.id] });
-      queryClient.invalidateQueries({ queryKey: ['matchCards'] });
-      queryClient.invalidateQueries({ queryKey: ['matches'] });
+      
+      // Força a atualização dos dados na tela
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['profile'] }),
+        queryClient.invalidateQueries({ queryKey: ['playerCards'] }),
+        queryClient.invalidateQueries({ queryKey: ['matchCards'] }),
+        queryClient.invalidateQueries({ queryKey: ['matches'] })
+      ]);
+
       return true;
     } catch (e: any) {
       toast.error("Erro inesperado ao sair da partida.", { description: e.message });
