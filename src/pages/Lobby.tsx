@@ -51,6 +51,7 @@ const Lobby = () => {
   const [selectedMatch, setSelectedMatch] = useState<Match | null>(null);
   const [cardsToJoin, setCardsToJoin] = useState<Set<string>>(new Set());
   const [isJoining, setIsJoining] = useState(false);
+  const [rechargingCardId, setRechargingCardId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!session) {
@@ -105,6 +106,15 @@ const Lobby = () => {
     if (success) {
       toast.success('Cartela Recarregada!', { description: `Você comprou mais usos para sua cartela.` });
     }
+  };
+
+  const handleRechargeInDialog = async (cardId: string) => {
+    setRechargingCardId(cardId);
+    const success = await buyCardUses(cardId);
+    if (success) {
+      toast.success('Cartela Recarregada!', { description: `Agora você pode selecioná-la para a partida.` });
+    }
+    setRechargingCardId(null);
   };
 
   const getCountdown = (startTime: string) => {
@@ -485,9 +495,29 @@ const Lobby = () => {
             {profile && activeCards.filter(card => !new Set(getPlayerMatchCards(selectedMatch?.id || '', profile.id).map(c => c.player_card_id)).has(card.id)).map(card => {
                 const isSelected = cardsToJoin.has(card.id);
                 const isDisabled = card.uses_left === 0;
+                const isRechargingThisCard = rechargingCardId === card.id;
                 return (
-                  <div key={card.id} onClick={() => !isDisabled && setCardsToJoin(prev => { const next = new Set(prev); if (isSelected) next.delete(card.id); else next.add(card.id); return next; })} className={`p-3 rounded-lg border-2 ${isDisabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'} ${isSelected ? 'border-primary bg-primary/5' : 'border-transparent bg-secondary'}`}>
-                    <div className="flex justify-between items-center"><h3 className="font-heading font-semibold text-sm">{card.name}</h3>{isDisabled && <span className="text-[10px] text-destructive font-medium">Sem usos</span>}</div>
+                  <div 
+                    key={card.id} 
+                    onClick={() => !isDisabled && !isRechargingThisCard && setCardsToJoin(prev => { const next = new Set(prev); if (isSelected) next.delete(card.id); else next.add(card.id); return next; })} 
+                    className={`p-3 rounded-lg border-2 transition-all ${isDisabled ? 'opacity-60' : 'cursor-pointer'} ${isSelected ? 'border-primary bg-primary/5' : 'border-transparent bg-secondary'}`}
+                  >
+                    <div className="flex justify-between items-center">
+                      <h3 className="font-heading font-semibold text-sm">{card.name}</h3>
+                      {isDisabled ? (
+                        <Button 
+                          size="sm" 
+                          variant="outline" 
+                          className="h-7 text-xs px-2"
+                          onClick={(e) => { e.stopPropagation(); handleRechargeInDialog(card.id); }}
+                          disabled={isRechargingThisCard}
+                        >
+                          {isRechargingThisCard ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Coins className="w-3 h-3 mr-1" /> Recarregar</>}
+                        </Button>
+                      ) : (
+                        <Badge variant="outline" className="text-xs">{card.uses_left} uso(s)</Badge>
+                      )}
+                    </div>
                   </div>
                 );
             })}
