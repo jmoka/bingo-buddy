@@ -358,6 +358,9 @@ const MatchManager = () => {
                   <div className="flex items-center gap-2 mb-1">
                     <h3 className="font-heading font-bold text-lg text-foreground">{match.name}</h3>
                     <Badge className={statusColors[match.status]}>{statusLabels[match.status]}</Badge>
+                    {match.prize.returnedReason === 'NO_PLAYERS' && match.status === 'waiting' && (
+                      <Badge variant="destructive" className="text-[10px] h-5">Retornada</Badge>
+                    )}
                     {countdown && (
                       <Badge variant="outline" className="font-mono text-xs">
                           <Clock className="w-3 h-3 mr-1.5" />

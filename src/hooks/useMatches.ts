@@ -53,26 +53,45 @@ export const useMatches = () => {
     await queryClient.invalidateQueries({ queryKey: ['matches'] });
   };
 
-  const openMatch = (matchId: string) => updateMatchStatus(matchId, 'open');
+  const openMatch = async (matchId: string) => {
+    const match = matches.find(m => m.id === matchId);
+    if (!match) return;
+
+    const prizeUpdate = { ...match.prize };
+    if ('returnedReason' in prizeUpdate) {
+      delete (prizeUpdate as any).returnedReason;
+    }
+
+    const { error } = await supabase.from('partidas').update({ status: 'open', prize: prizeUpdate }).eq('id', matchId);
+    if (error) toast.error(`Erro ao abrir partida: ${error.message}`);
+    await queryClient.invalidateQueries({ queryKey: ['matches'] });
+  };
   
   const startMatch = async (matchId: string, force = false) => {
     const match = matches.find(m => m.id === matchId);
     if (!match) return;
     const playersInMatch = new Set(matchCards.filter(mc => mc.match_id === matchId).map(mc => mc.player_id)).size;
 
-    // Hard rule: must have at least 1 player to start.
     if (playersInMatch < 1) {
       toast.error('A partida não pode ser iniciada sem jogadores.', {
-        description: 'É necessário que pelo menos 1 jogador entre na partida para que ela comece.'
+        description: 'Retornando a partida para o status "Aguardando".'
       });
-      // If it was an auto-start attempt, disable it to prevent loops.
+      
+      const newPrize = { ...match.prize, returnedReason: 'NO_PLAYERS' as const };
+      
+      await supabase.from('partidas').update({ 
+        status: 'waiting', 
+        is_auto_calling: false,
+        prize: newPrize
+      }).eq('id', matchId);
+      
       if (match.is_auto_calling) {
-        await supabase.from('partidas').update({ is_auto_calling: false }).eq('id', matchId);
         toast.warning('Sorteio automático desativado.', {
-          description: `A partida "${match.name}" não pôde ser iniciada por falta de jogadores.`
+          description: `A partida "${match.name}" não tinha jogadores no horário de início.`
         });
-        await queryClient.invalidateQueries({ queryKey: ['matches'] });
       }
+      
+      await queryClient.invalidateQueries({ queryKey: ['matches'] });
       return;
     }
 
