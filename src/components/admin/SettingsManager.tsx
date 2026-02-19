@@ -4,11 +4,22 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { Save, Settings, Check, Loader2, Bot, Link as LinkIcon } from 'lucide-react';
+import { Save, Settings, Check, Loader2, Bot, Link as LinkIcon, DollarSign, RefreshCw } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 const SettingsManager = () => {
-  const { gameSettings, updateGameSettings } = useGame();
+  const { gameSettings, updateGameSettings, resetAdminProfit } = useGame();
   const [currentSettings, setCurrentSettings] = useState({
     custo_nova_cartela: 10,
     custo_recarga_cartela: 5,
@@ -109,6 +120,40 @@ const SettingsManager = () => {
                 <SelectItem value="production">Produção</SelectItem>
               </SelectContent>
             </Select>
+          </div>
+        </div>
+
+        <div className="space-y-6 md:col-span-2">
+          <h3 className="font-heading font-bold text-primary border-b pb-2 flex items-center gap-2"><DollarSign className="w-4 h-4" /> Caixa do Admin</h3>
+          <div className="p-4 bg-muted rounded-lg flex items-center justify-between">
+            <div>
+              <Label>Lucro Total Acumulado</Label>
+              <p className="text-2xl font-bold font-heading text-success">
+                {gameSettings?.admin_profit || 0} créditos
+              </p>
+            </div>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="destructive" size="sm">
+                  <RefreshCw className="w-4 h-4 mr-2" />
+                  Zerar Lucro
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Zerar o lucro acumulado?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Esta ação é irreversível. Ela registrará o lucro atual como "sacado" e reiniciará a contagem. Use isso para controle do seu caixa.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                  <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={resetAdminProfit}>
+                    Confirmar e Zerar
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </div>
         </div>
       </div>
