@@ -34,6 +34,7 @@ export interface Match {
   next_auto_call_timestamp?: number;
   winners: Winner[];
   min_players: number;
+  admin_profit_from_match?: number;
 }
 
 export interface PlayerCard {

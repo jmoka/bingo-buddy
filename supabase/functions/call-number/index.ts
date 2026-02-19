@@ -16,158 +16,86 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // 1. Busca a partida e verifica se ela ainda está em andamento
     const { data: match, error: matchError } = await supabaseAdmin
       .from('partidas')
       .select('*')
       .eq('id', matchId)
       .single()
 
-    if (matchError || !match) {
-      throw new Error("Partida não encontrada.");
-    }
+    if (matchError || !match) throw new Error("Partida não encontrada.");
+    if (match.status === 'finished') return new Response(JSON.stringify({ success: true, message: 'Partida já finalizada.' }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    if (match.called_numbers.includes(num)) return new Response(JSON.stringify({ success: true }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
-    // Se a partida já acabou, não faz nada e retorna sucesso
-    if (match.status === 'finished') {
-       return new Response(JSON.stringify({ success: true, message: 'Partida já finalizada.' }), { 
-        status: 200, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-      });
-    }
-
-    // Se o número já foi chamado, ignora
-    if (match.called_numbers.includes(num)) {
-      return new Response(JSON.stringify({ success: true }), { 
-        status: 200, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-      });
-    }
-
-    // 2. Busca todas as cartelas da partida
-    const { data: matchCards, error: cardsError } = await supabaseAdmin
-      .from('cartelas_partida')
-      .select('*')
-      .eq('match_id', matchId)
-    
+    const { data: matchCards, error: cardsError } = await supabaseAdmin.from('cartelas_partida').select('*').eq('match_id', matchId)
     if (cardsError) throw cardsError
 
-    // 3. Atualiza as marcações nas cartelas que possuem o número
-    const cardsToUpdate = (matchCards || []).filter(c =>
-      c.numbers.flat().includes(num) &&
-      !(c.marked_numbers || []).includes(num)
-    )
-
+    const cardsToUpdate = (matchCards || []).filter(c => c.numbers.flat().includes(num) && !(c.marked_numbers || []).includes(num))
     if (cardsToUpdate.length > 0) {
-      const updatePromises = cardsToUpdate.map(card => {
-        const newMarkedNumbers = [...(card.marked_numbers || []), num]
-        return supabaseAdmin
-          .from('cartelas_partida')
-          .update({ marked_numbers: newMarkedNumbers })
-          .eq('id', card.id)
-      })
+      const updatePromises = cardsToUpdate.map(card => supabaseAdmin.from('cartelas_partida').update({ marked_numbers: [...(card.marked_numbers || []), num] }).eq('id', card.id))
       await Promise.all(updatePromises)
     }
 
-    // 4. Busca cartelas atualizadas para verificar vencedores
-    const { data: freshMatchCards } = await supabaseAdmin
-      .from('cartelas_partida')
-      .select('*')
-      .eq('match_id', matchId)
-
+    const { data: freshMatchCards } = await supabaseAdmin.from('cartelas_partida').select('*').eq('match_id', matchId)
     const foundWinners = []
     for (const card of freshMatchCards || []) {
-      const tempBingoCard: BingoCard = {
-        id: card.id,
-        name: card.name,
-        numbers: card.numbers,
-        markedNumbers: new Set(card.marked_numbers || []),
-      };
+      const tempBingoCard: BingoCard = { id: card.id, name: card.name, numbers: card.numbers, markedNumbers: new Set(card.marked_numbers || []) };
       const winResult = checkWin(tempBingoCard, match.game_type);
-      if (winResult) {
-        foundWinners.push({ card, result: winResult });
-      }
+      if (winResult) foundWinners.push({ card, result: winResult });
     }
 
     const newCalledNumbers = [...(match.called_numbers || []), num]
     let matchUpdatePayload: any = { called_numbers: newCalledNumbers }
 
-    // Lógica de próximo sorteio (apenas se não houver vencedor)
     if (match.is_auto_calling && foundWinners.length === 0) {
       const { data: settings } = await supabaseAdmin.from('configuracoes').select('intervalo_sorteio_auto_seg').single();
       const interval = settings?.intervalo_sorteio_auto_seg || 120;
       matchUpdatePayload.next_auto_call_timestamp = new Date(Date.now() + interval * 1000).toISOString();
     }
 
-    // 5. Se houver vencedores, FINALIZA IMEDIATAMENTE
     if (foundWinners.length > 0) {
       const { data: allProfiles } = await supabaseAdmin.from('perfis').select('id, full_name');
-      
-      const winnerData: Winner[] = foundWinners.map(fw => ({
-        playerId: fw.card.player_id,
-        playerName: allProfiles?.find(p => p.id === fw.card.player_id)?.full_name || 'Jogador',
-        cardId: fw.card.id,
-        cardName: fw.card.name,
-      }));
+      const winnerData: Winner[] = foundWinners.map(fw => ({ playerId: fw.card.player_id, playerName: allProfiles?.find(p => p.id === fw.card.player_id)?.full_name || 'Jogador', cardId: fw.card.id, cardName: fw.card.name }));
 
       const realWinners = foundWinners.filter(fw => fw.card.credit_type === 'real');
       let prizeAmountPerRealWinner = 0;
-      
+      let adminProfit = 0;
+
       if (realWinners.length > 0) {
         if (match.prize.type === 'fixed') {
           prizeAmountPerRealWinner = Number(match.prize.value || 0);
+          adminProfit = match.pot - (prizeAmountPerRealWinner * realWinners.length);
         } else if (match.prize.type === 'percentage') {
-          const totalPrize = (match.pot * (Number(match.prize.value) || 0)) / 100;
-          prizeAmountPerRealWinner = Math.floor(totalPrize / realWinners.length);
+          const totalPrizeToWinners = Math.floor((match.pot * (Number(match.prize.value) || 0)) / 100);
+          adminProfit = match.pot - totalPrizeToWinners;
+          prizeAmountPerRealWinner = Math.floor(totalPrizeToWinners / realWinners.length);
         }
+      } else {
+        adminProfit = match.pot;
+      }
+
+      if (adminProfit > 0) {
+        await supabaseAdmin.rpc('increment_admin_profit', { amount: adminProfit });
       }
 
       for (const fw of foundWinners) {
-        const isReal = fw.card.credit_type === 'real';
-        if (isReal) {
-            await supabaseAdmin.from('vitorias').insert({
-              match_id: match.id,
-              player_id: fw.card.player_id,
-              player_card_id: fw.card.player_card_id,
-              match_card_id: fw.card.id,
-              prize_details: match.prize,
-            });
-
-            if (prizeAmountPerRealWinner > 0) {
-              const { data: prof } = await supabaseAdmin.from('perfis').select('credits').eq('id', fw.card.player_id).single();
-              if (prof) {
-                await supabaseAdmin.from('perfis').update({ credits: prof.credits + prizeAmountPerRealWinner }).eq('id', fw.card.player_id);
-              }
-            }
+        if (fw.card.credit_type === 'real') {
+          await supabaseAdmin.from('vitorias').insert({ match_id: match.id, player_id: fw.card.player_id, player_card_id: fw.card.player_card_id, match_card_id: fw.card.id, prize_details: match.prize });
+          if (prizeAmountPerRealWinner > 0) {
+            const { data: prof } = await supabaseAdmin.from('perfis').select('credits').eq('id', fw.card.player_id).single();
+            if (prof) await supabaseAdmin.from('perfis').update({ credits: prof.credits + prizeAmountPerRealWinner }).eq('id', fw.card.player_id);
+          }
         }
       }
 
-      // Payload de finalização forçada
-      matchUpdatePayload = {
-        ...matchUpdatePayload,
-        status: 'finished',
-        winners: winnerData,
-        is_auto_calling: false,
-        next_auto_call_timestamp: null,
-      };
+      matchUpdatePayload = { ...matchUpdatePayload, status: 'finished', winners: winnerData, is_auto_calling: false, next_auto_call_timestamp: null, admin_profit_from_match: adminProfit };
     }
 
-    // 6. Atualiza a partida no banco
-    const { error: finalUpdateError } = await supabaseAdmin
-        .from('partidas')
-        .update(matchUpdatePayload)
-        .eq('id', matchId)
-
+    const { error: finalUpdateError } = await supabaseAdmin.from('partidas').update(matchUpdatePayload).eq('id', matchId)
     if (finalUpdateError) throw finalUpdateError;
 
-    return new Response(JSON.stringify({ success: true, winners: foundWinners.length }), { 
-      status: 200, 
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-    })
+    return new Response(JSON.stringify({ success: true, winners: foundWinners.length }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
   } catch (error) {
     console.error(`[call-number] Erro fatal: ${error.message}`);
-    return new Response(JSON.stringify({ error: error.message }), { 
-      status: 200, // Retornamos 200 com o erro no body para evitar falhas de CORS no navegador
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-    })
+    return new Response(JSON.stringify({ error: error.message }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
   }
 })
