@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useGame } from '@/contexts/GameContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -23,7 +23,7 @@ import {
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Coins, Edit, Zap, ZapOff, Loader2 } from 'lucide-react';
+import { ArrowLeft, Coins, Edit, Zap, ZapOff, Loader2, DollarSign } from 'lucide-react';
 import PlayerAvatar from '@/components/PlayerAvatar';
 import { Profile } from '@/contexts/AuthContext';
 import { format } from 'date-fns';
@@ -40,11 +40,20 @@ const formatPrize = (prize: Prize) => {
 const PlayersAdmin = () => {
   const navigate = useNavigate();
   const { profile } = useAuth();
-  const { players, allPlayerCards, updatePlayerCredits, allWins, matches } = useGame();
+  const { players, allPlayerCards, updatePlayerCredits, allWins, matches, gameSettings } = useGame();
   const [selectedPlayer, setSelectedPlayer] = useState<Profile | null>(null);
   const [creditAmount, setCreditAmount] = useState(0);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isUpdatingCredits, setIsUpdatingCredits] = useState(false);
+
+  const totalCreditsInPlay = useMemo(() => {
+    return players.reduce((acc, player) => acc + player.credits, 0);
+  }, [players]);
+
+  const totalValueInReais = useMemo(() => {
+    const valorPorCredito = gameSettings?.valor_por_credito || 1;
+    return totalCreditsInPlay * valorPorCredito;
+  }, [totalCreditsInPlay, gameSettings]);
 
   if (!profile || profile.role !== 'admin') {
     navigate('/');
@@ -79,6 +88,29 @@ const PlayersAdmin = () => {
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <h1 className="font-heading text-2xl md:text-3xl font-bold text-foreground">Gerenciar Jogadores</h1>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+        <div className="card-container p-4">
+          <div className="flex items-center text-muted-foreground mb-2">
+            <Coins className="w-4 h-4 mr-2" />
+            <h3 className="text-sm font-semibold">Total de Créditos em Jogo</h3>
+          </div>
+          <p className="text-2xl font-bold font-heading">{totalCreditsInPlay} cr.</p>
+          <p className="text-xs text-muted-foreground">Soma dos saldos de todos os jogadores.</p>
+        </div>
+        <div className="card-container p-4">
+          <div className="flex items-center text-muted-foreground mb-2">
+            <DollarSign className="w-4 h-4 mr-2" />
+            <h3 className="text-sm font-semibold">Valor Correspondente</h3>
+          </div>
+          <p className="text-2xl font-bold font-heading text-primary">
+            R$ {totalValueInReais.toFixed(2).replace('.', ',')}
+          </p>
+          <p className="text-xs text-muted-foreground">
+            Baseado em R$ {gameSettings?.valor_por_credito?.toFixed(2).replace('.', ',')} por crédito.
+          </p>
         </div>
       </div>
 
