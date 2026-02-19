@@ -20,19 +20,32 @@ export const useGameSettings = () => {
     queryClient.invalidateQueries({ queryKey: ['gameSettings'] });
   };
 
-  const resetAdminProfit = async () => {
-    const { error } = await supabase.rpc('reset_admin_profit');
+  const withdrawAdminProfit = async (amount: number): Promise<boolean> => {
+    if (!gameSettings) return false;
+    if (amount <= 0) {
+      toast.error("O valor da retirada deve ser positivo.");
+      return false;
+    }
+    if (amount > gameSettings.admin_profit) {
+      toast.error("Você não pode retirar mais do que o lucro acumulado.");
+      return false;
+    }
+
+    const { error } = await supabase.rpc('withdraw_admin_profit', { amount_to_withdraw: amount });
+    
     if (error) {
-      toast.error("Erro ao zerar o lucro.");
+      toast.error("Erro ao retirar o lucro.", { description: error.message });
+      return false;
     } else {
-      toast.success("Lucro do admin zerado com sucesso!");
+      toast.success(`${amount} créditos retirados com sucesso!`);
       queryClient.invalidateQueries({ queryKey: ['gameSettings'] });
+      return true;
     }
   };
 
   return {
     gameSettings,
     updateGameSettings,
-    resetAdminProfit,
+    withdrawAdminProfit,
   };
 };

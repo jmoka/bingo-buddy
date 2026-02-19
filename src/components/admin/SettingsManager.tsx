@@ -4,22 +4,21 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { Save, Settings, Check, Loader2, Bot, Link as LinkIcon, DollarSign, RefreshCw } from 'lucide-react';
+import { Save, Settings, Check, Loader2, Bot, Link as LinkIcon, DollarSign, Banknote } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogClose
+} from "@/components/ui/dialog";
 
 const SettingsManager = () => {
-  const { gameSettings, updateGameSettings, resetAdminProfit } = useGame();
+  const { gameSettings, updateGameSettings, withdrawAdminProfit } = useGame();
   const [currentSettings, setCurrentSettings] = useState({
     custo_nova_cartela: 10,
     custo_recarga_cartela: 5,
@@ -34,6 +33,9 @@ const SettingsManager = () => {
   });
   const [isSaving, setIsSaving] = useState(false);
   const [justSaved, setJustSaved] = useState(false);
+  const [withdrawAmount, setWithdrawAmount] = useState(0);
+  const [isWithdrawDialogOpen, setIsWithdrawDialogOpen] = useState(false);
+  const [isWithdrawing, setIsWithdrawing] = useState(false);
 
   useEffect(() => {
     if (gameSettings) {
@@ -77,6 +79,18 @@ const SettingsManager = () => {
       setJustSaved(false);
     }, 2000);
   };
+
+  const handleWithdraw = async () => {
+    setIsWithdrawing(true);
+    const success = await withdrawAdminProfit(withdrawAmount);
+    if (success) {
+      setIsWithdrawDialogOpen(false);
+      setWithdrawAmount(0);
+    }
+    setIsWithdrawing(false);
+  };
+
+  const adminProfitInReais = (gameSettings?.admin_profit || 0) * (gameSettings?.valor_por_credito || 1);
 
   return (
     <div className="card-container">
@@ -131,29 +145,50 @@ const SettingsManager = () => {
               <p className="text-2xl font-bold font-heading text-success">
                 {gameSettings?.admin_profit || 0} créditos
               </p>
+              <p className="text-sm font-medium text-muted-foreground">
+                (R$ {adminProfitInReais.toFixed(2).replace('.', ',')})
+              </p>
             </div>
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button variant="destructive" size="sm">
-                  <RefreshCw className="w-4 h-4 mr-2" />
-                  Zerar Lucro
+            <Dialog open={isWithdrawDialogOpen} onOpenChange={setIsWithdrawDialogOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline">
+                  <Banknote className="w-4 h-4 mr-2" />
+                  Retirar Lucro
                 </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Zerar o lucro acumulado?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    Esta ação é irreversível. Ela registrará o lucro atual como "sacado" e reiniciará a contagem. Use isso para controle do seu caixa.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                  <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={resetAdminProfit}>
-                    Confirmar e Zerar
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Retirar Lucro do Caixa</DialogTitle>
+                  <DialogDescription>
+                    Insira a quantidade de créditos que deseja retirar. Este valor será subtraído do lucro total acumulado.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="py-4 space-y-4">
+                  <div className="p-3 bg-muted rounded-lg">
+                    <p className="text-xs text-muted-foreground">Lucro disponível</p>
+                    <p className="text-lg font-bold">{gameSettings?.admin_profit || 0} créditos</p>
+                  </div>
+                  <div>
+                    <Label htmlFor="withdraw-amount">Créditos a Retirar</Label>
+                    <Input
+                      id="withdraw-amount"
+                      type="number"
+                      value={withdrawAmount || ''}
+                      onChange={(e) => setWithdrawAmount(parseInt(e.target.value, 10) || 0)}
+                      max={gameSettings?.admin_profit || 0}
+                      placeholder="Ex: 100"
+                    />
+                  </div>
+                </div>
+                <DialogFooter>
+                  <DialogClose asChild><Button variant="ghost">Cancelar</Button></DialogClose>
+                  <Button onClick={handleWithdraw} disabled={isWithdrawing || !withdrawAmount || withdrawAmount <= 0}>
+                    {isWithdrawing && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                    Confirmar Retirada
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
           </div>
         </div>
       </div>
