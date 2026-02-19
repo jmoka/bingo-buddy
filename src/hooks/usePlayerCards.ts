@@ -156,6 +156,25 @@ export const usePlayerCards = () => {
     }
   };
 
+  const leaveMatch = async (matchId: string): Promise<boolean> => {
+    try {
+      const { error } = await supabase.functions.invoke('leave-match', { body: { matchId } });
+      if (error) {
+        toast.error("Erro ao sair da partida.", { description: error.message });
+        return false;
+      }
+      toast.success("Você saiu da partida.", { description: "Seus créditos foram estornados." });
+      queryClient.invalidateQueries({ queryKey: ['profile', user?.id] });
+      queryClient.invalidateQueries({ queryKey: ['playerCards', user?.id] });
+      queryClient.invalidateQueries({ queryKey: ['matchCards'] });
+      queryClient.invalidateQueries({ queryKey: ['matches'] });
+      return true;
+    } catch (e: any) {
+      toast.error("Erro inesperado ao sair da partida.", { description: e.message });
+      return false;
+    }
+  };
+
   return {
     playerCards,
     createPlayerCard,
@@ -163,5 +182,6 @@ export const usePlayerCards = () => {
     toggleArchivePlayerCard,
     buyCardUses,
     joinMatch,
+    leaveMatch,
   };
 };

@@ -8,7 +8,7 @@ import { Match, MatchStatus, PlayerCard } from '@/types/match';
 import { gameTypeLabels } from '@/utils/bingoUtils';
 import { 
   Coins, Plus, Trophy, Users, Settings, 
-  Timer, DoorOpen, Ticket, Zap, ZapOff, Tv, Archive, Trash2, RotateCcw, Star, Loader2, History
+  Timer, DoorOpen, Ticket, Zap, ZapOff, Tv, Archive, Trash2, RotateCcw, Star, Loader2, History, LogOut
 } from 'lucide-react';
 import { 
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose, DialogDescription
@@ -38,7 +38,7 @@ const Lobby = () => {
   const { 
     matches, joinMatch, getPlayerMatchCards, playerCards, 
     buyCardUses, createPlayerCard, deletePlayerCard,
-    toggleArchivePlayerCard, matchCards, wins
+    toggleArchivePlayerCard, matchCards, wins, leaveMatch
   } = useGame();
 
   const [now, setNow] = useState(Date.now());
@@ -285,7 +285,26 @@ const Lobby = () => {
                       {match.status === 'open' && (
                         <>
                           {alreadyJoined && (
-                            <Button size="sm" variant="outline" className="h-8 text-xs w-full sm:w-auto" onClick={() => navigate(`/match/${match.id}`)}><Tv className="w-3.5 h-3.5 mr-2" /> Acompanhar</Button>
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button size="sm" variant="destructive" className="h-8 text-xs w-full sm:w-auto">
+                                  <LogOut className="w-3.5 h-3.5 mr-2" />
+                                  Sair da Partida
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Sair da Partida?</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    Suas cartelas serão removidas e os créditos de entrada serão estornados para sua conta.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                  <AlertDialogAction onClick={() => leaveMatch(match.id)}>Confirmar Saída</AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
                           )}
                           <Button size="sm" className="gradient-accent shadow-button h-8 text-xs w-full sm:w-auto" onClick={() => openJoinDialog(match)}>
                             {alreadyJoined ? 'Adicionar Cartelas' : 'Entrar na Partida'}
