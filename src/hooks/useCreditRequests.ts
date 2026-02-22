@@ -38,6 +38,23 @@ export const useCreditRequests = () => {
     return true;
   };
 
+  const buyCreditsAutomatically = async (credits: number, amount: number): Promise<boolean> => {
+    if (!user) return false;
+    try {
+      const { data, error } = await supabase.functions.invoke('process-payment', {
+        body: { credits, amount }
+      });
+      if (error) throw error;
+      
+      queryClient.invalidateQueries({ queryKey: ['creditRequests', user.id] });
+      queryClient.invalidateQueries({ queryKey: ['profile', user.id] });
+      return true;
+    } catch (e: any) {
+      toast.error("Erro ao processar compra automática.", { description: e.message });
+      return false;
+    }
+  };
+
   const resubmitCreditRequest = async (requestId: string, file: File, message: string): Promise<boolean> => {
     if (!user) return false;
     const fileName = `${user.id}/${Date.now()}.${file.name.split('.').pop()}`;
@@ -60,6 +77,7 @@ export const useCreditRequests = () => {
   return {
     creditRequests,
     requestCredits,
+    buyCreditsAutomatically,
     resubmitCreditRequest,
   };
 };

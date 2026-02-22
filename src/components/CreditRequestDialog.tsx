@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { GameSettings } from '@/types/match';
 import { QRCodeSVG as QRCode } from 'qrcode.react';
 import { toast } from 'sonner';
-import { Copy, Upload, Loader2, Minus, Plus } from 'lucide-react';
+import { Copy, Upload, Loader2, Minus, Plus, Zap } from 'lucide-react';
 import { QrCodePix } from 'qrcode-pix';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -17,14 +17,14 @@ interface CreditRequestDialogProps {
 }
 
 export const CreditRequestDialog = ({ gameSettings, children }: CreditRequestDialogProps) => {
-  const { requestCredits } = useGame();
+  const { requestCredits, buyCreditsAutomatically } = useGame();
   const { profile } = useAuth();
   const [file, setFile] = useState<File | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isAutoLoading, setIsAutoLoading] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   const [credits, setCredits] = useState<number>(10);
 
-  // Valor total em reais baseado na quantidade de créditos e no valor unitário configurado
   const amount = credits * (gameSettings?.valor_por_credito || 1);
 
   const pixPayload = useMemo(() => {
@@ -72,6 +72,21 @@ export const CreditRequestDialog = ({ gameSettings, children }: CreditRequestDia
       }
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleAutoBuy = async () => {
+    setIsAutoLoading(true);
+    try {
+      const success = await buyCreditsAutomatically(credits, amount);
+      if (success) {
+        toast.success('Compra concluída!', {
+          description: `${credits} créditos foram adicionados à sua conta instantaneamente.`,
+        });
+        setIsOpen(false);
+      }
+    } finally {
+      setIsAutoLoading(false);
     }
   };
 
@@ -128,15 +143,43 @@ export const CreditRequestDialog = ({ gameSettings, children }: CreditRequestDia
                 <Copy className="w-4 h-4" />
               </Button>
             </div>
-            <div>
-              <Label htmlFor="receipt" className="sr-only">Comprovante</Label>
-              <Input
-                id="receipt"
-                type="file"
-                accept="image/*,application/pdf"
-                onChange={(e) => setFile(e.target.files ? e.target.files[0] : null)}
-                className="file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20"
-              />
+
+            <div className="border-t pt-4 space-y-3">
+              <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Escolha como prosseguir</p>
+              
+              <Button 
+                className="w-full h-12 gradient-primary shadow-button font-bold" 
+                onClick={handleAutoBuy}
+                disabled={isAutoLoading || isLoading}
+              >
+                {isAutoLoading ? <Loader2 className="w-5 h-5 mr-2 animate-spin" /> : <Zap className="w-5 h-5 mr-2" />}
+                PAGAMENTO AUTOMÁTICO (PIX)
+              </Button>
+
+              <div className="relative py-2">
+                <div className="absolute inset-0 flex items-center"><span className="w-full border-t" /></div>
+                <div className="relative flex justify-center text-xs uppercase"><span className="bg-background px-2 text-muted-foreground">Ou manual com comprovante</span></div>
+              </div>
+
+              <div className="space-y-2 text-left">
+                <Label htmlFor="receipt" className="text-xs">Anexar Comprovante</Label>
+                <Input
+                  id="receipt"
+                  type="file"
+                  accept="image/*,application/pdf"
+                  onChange={(e) => setFile(e.target.files ? e.target.files[0] : null)}
+                  className="file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20"
+                />
+                <Button 
+                  variant="outline" 
+                  className="w-full h-10" 
+                  onClick={handleSubmit} 
+                  disabled={!file || isLoading || isAutoLoading}
+                >
+                  {isLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Upload className="w-4 h-4 mr-2" />}
+                  Enviar para Revisão Admin
+                </Button>
+              </div>
             </div>
           </div>
         ) : (
@@ -146,12 +189,6 @@ export const CreditRequestDialog = ({ gameSettings, children }: CreditRequestDia
         )}
         <DialogFooter>
           <DialogClose asChild><Button variant="ghost">Fechar</Button></DialogClose>
-          {gameSettings?.pix_key && (
-            <Button onClick={handleSubmit} disabled={!file || isLoading}>
-              {isLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Upload className="w-4 h-4 mr-2" />}
-              Enviar Comprovante
-            </Button>
-          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>
