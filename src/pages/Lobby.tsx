@@ -169,7 +169,7 @@ const Lobby = () => {
   const waitingMatches = sortedMatches.filter(m => m.status === 'waiting');
   const finishedMatches = sortedMatches.filter(m => m.status === 'finished');
 
-  const totalPot = matches.filter(m => m.status !== 'finished').reduce((acc, m) => acc + m.pot, 0);
+  const totalPot = matches.filter(m => m.status !== 'finished').reduce((acc, m) => acc + Number(m.pot || 0), 0);
   const totalPlayers = new Set(matchCards.filter(mc => {
     const m = matches.find(match => match.id === mc.match_id);
     return m && m.status !== 'finished';
@@ -288,8 +288,8 @@ const Lobby = () => {
           const winChance = totalCardsInMatch > 0 ? (myMatchCards.length / totalCardsInMatch) * 100 : 0;
 
           const prizeValue = match.prize.type === 'percentage' 
-            ? Math.floor((match.pot * (match.prize.value || 0)) / 100) 
-            : (match.prize.value || 0);
+            ? (Number(match.pot || 0) * (Number(match.prize.value) || 0)) / 100 
+            : (Number(match.prize.value) || 0);
 
           return (
             <div key={match.id} className={cn(
@@ -349,7 +349,7 @@ const Lobby = () => {
                       <span className="text-[10px] font-bold uppercase tracking-widest text-primary mb-1">Pote Total</span>
                       <div className="flex items-center gap-1">
                         <Coins className="w-4 h-4 text-primary" />
-                        <span className="text-xl font-bold font-heading">{match.pot}</span>
+                        <span className="text-xl font-bold font-heading">{Number(match.pot || 0).toFixed(2)}</span>
                       </div>
                     </div>
 
@@ -357,7 +357,7 @@ const Lobby = () => {
                       <span className="text-[10px] font-bold uppercase tracking-widest text-success mb-1">Prêmio Estimado</span>
                       <div className="flex items-center gap-1">
                         <Trophy className="w-4 h-4 text-success" />
-                        <span className="text-xl font-bold font-heading text-success">{prizeValue}</span>
+                        <span className="text-xl font-bold font-heading text-success">{Number(prizeValue).toFixed(2)}</span>
                       </div>
                     </div>
 
@@ -375,7 +375,7 @@ const Lobby = () => {
                   <div className="flex items-center gap-3">
                     <div className="text-center sm:text-left">
                       <p className="text-[10px] font-bold uppercase text-muted-foreground tracking-tighter">Custo de Entrada</p>
-                      <p className="text-lg font-bold text-foreground">{match.card_price} créditos <span className="text-xs font-normal text-muted-foreground">/ cartela</span></p>
+                      <p className="text-lg font-bold text-foreground">{Number(match.card_price || 0).toFixed(2)} créditos <span className="text-xs font-normal text-muted-foreground">/ cartela</span></p>
                     </div>
                   </div>
 
@@ -452,7 +452,7 @@ const Lobby = () => {
           <Coins className="absolute -right-4 -bottom-4 w-32 h-32 text-white/10 rotate-12 group-hover:scale-110 transition-transform duration-500" />
           <div>
             <p className="text-xs font-bold uppercase tracking-widest opacity-80 mb-1">Pote Acumulado Total</p>
-            <h2 className="text-4xl font-bold font-heading">{totalPot} <span className="text-lg font-normal opacity-70">cr.</span></h2>
+            <h2 className="text-4xl font-bold font-heading">{Number(totalPot).toFixed(2)} <span className="text-lg font-normal opacity-70">cr.</span></h2>
           </div>
           <div className="mt-4 flex items-center gap-2 text-sm font-medium bg-white/10 w-fit px-3 py-1 rounded-full backdrop-blur-sm">
             <TrendingUp className="w-4 h-4" />
@@ -614,7 +614,7 @@ const Lobby = () => {
                                     >
                                     <Coins className="mb-2 h-6 w-6" />
                                     <span className="text-xs font-bold uppercase">Reais</span>
-                                    <span className="text-[10px] text-muted-foreground mt-1">{profile.credits} cr.</span>
+                                    <span className="text-[10px] text-muted-foreground mt-1">{Number(profile.credits || 0).toFixed(2)} cr.</span>
                                     </Label>
                                 </div>
                                 <div>
@@ -625,7 +625,7 @@ const Lobby = () => {
                                     >
                                     <Star className="mb-2 h-6 w-6" />
                                     <span className="text-xs font-bold uppercase">Brincar</span>
-                                    <span className="text-[10px] text-muted-foreground mt-1">{profile.fake_credits} cr.</span>
+                                    <span className="text-[10px] text-muted-foreground mt-1">{Number(profile.fake_credits || 0).toFixed(2)} cr.</span>
                                     </Label>
                                 </div>
                                 </RadioGroup>
@@ -642,7 +642,7 @@ const Lobby = () => {
                         <DialogFooter className="flex-shrink-0">
                             <DialogClose asChild><Button variant="ghost">Cancelar</Button></DialogClose>
                             <Button onClick={handleCreateCard} disabled={!newCardName.trim() || !newCardNumbers}>
-                            Salvar (Custa {useGame().gameSettings?.custo_nova_cartela || 10} cr.)
+                            Salvar (Custa {Number(useGame().gameSettings?.custo_nova_cartela || 10).toFixed(2)} cr.)
                             </Button>
                         </DialogFooter>
                     </DialogContent>
@@ -707,7 +707,7 @@ const Lobby = () => {
           </div>
           <DialogFooter>
             <div className="w-full flex justify-between items-center">
-              <span className="font-heading font-semibold text-base md:text-lg">Total: {cardsToJoin.size * (selectedMatch?.card_price || 0)} créditos</span>
+              <span className="font-heading font-semibold text-base md:text-lg">Total: {Number(cardsToJoin.size * (selectedMatch?.card_price || 0)).toFixed(2)} créditos</span>
               <Button onClick={handleJoinMatch} disabled={cardsToJoin.size === 0 || isJoining}>
                 {isJoining ? (
                   <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Confirmando...</>

@@ -9,8 +9,8 @@ interface MatchStatsProps {
 
 const getPrizeDisplay = (match: Match) => {
   if (match.prize.type === 'product') return `🎁 ${match.prize.productName || 'Produto'}`;
-  if (match.prize.type === 'fixed') return `💰 ${match.prize.value} cr.`;
-  if (match.prize.type === 'percentage') return `📊 ${match.prize.value}% (${Math.floor(match.pot * (match.prize.value || 0) / 100)} cr.)`;
+  if (match.prize.type === 'fixed') return `💰 ${Number(match.prize.value || 0).toFixed(2)} cr.`;
+  if (match.prize.type === 'percentage') return `📊 ${match.prize.value}% (${Number(match.pot * (match.prize.value || 0) / 100).toFixed(2)} cr.)`;
   return 'N/A';
 };
 
@@ -71,13 +71,13 @@ export const MatchStats = ({ match, allMatchCards }: MatchStatsProps) => {
               <span className="text-[9px] sm:text-sm text-muted-foreground">Faltam 5</span>
             </div>
             <div className="flex flex-col items-center justify-center p-2 sm:p-4 rounded-lg bg-accent/10 border border-accent/20">
-              <Target className="w-4 h-4 sm:w-6 sm:h-6 text-accent mb-1" />
-              <span className="font-bold text-lg sm:text-2xl font-heading text-accent">{stats.missing3}</span>
+              <Target className="w-4 h-4 text-accent mb-1" />
+              <span className="font-bold text-lg font-heading text-accent">{stats.missing3}</span>
               <span className="text-[9px] sm:text-sm text-accent/80">Faltam 3</span>
             </div>
             <div className="flex flex-col items-center justify-center p-2 sm:p-4 rounded-lg bg-destructive/10 border border-destructive/20">
-              <Flame className="w-4 h-4 sm:w-6 sm:h-6 text-destructive mb-1" />
-              <span className="font-bold text-lg sm:text-2xl font-heading text-destructive">{stats.missing1}</span>
+              <Flame className="w-4 h-4 text-destructive mb-1" />
+              <span className="font-bold text-lg font-heading text-destructive">{stats.missing1}</span>
               <span className="text-[9px] sm:text-sm text-destructive/80">Por 1!</span>
             </div>
           </div>
