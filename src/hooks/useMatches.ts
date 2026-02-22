@@ -46,6 +46,7 @@ export const useMatches = () => {
       if (error) throw error;
       return data as Match[];
     },
+    refetchInterval: 3000, // Atualiza a cada 3 segundos para garantir instantaneidade
   });
 
   const { data: matchCards = [], isLoading: isLoadingCards } = useQuery({
@@ -55,6 +56,7 @@ export const useMatches = () => {
       if (error) throw error;
       return data.map(c => ({ ...c, marked_numbers: new Set(c.marked_numbers || []) })) as MatchCard[];
     },
+    refetchInterval: 2000, // Cartelas atualizam ainda mais rápido para marcações
   });
 
   const triggerAutoEngine = async () => {
@@ -83,7 +85,6 @@ export const useMatches = () => {
       updatedData.status = 'open';
     }
     updateMatchMutation.mutate({ matchId, updates: updatedData });
-    toast.success('Partida atualizada com sucesso!');
   };
 
   const openMatch = async (matchId: string) => {

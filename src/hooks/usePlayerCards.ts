@@ -19,6 +19,7 @@ export const usePlayerCards = () => {
       return data as PlayerCard[];
     },
     enabled: !!user,
+    refetchInterval: 5000, // Atualiza a cada 5 segundos
   });
 
   const createPlayerCard = async (options: { name: string; numbers: number[][]; creditType: 'real' | 'fake' }) => {
@@ -78,10 +79,9 @@ export const usePlayerCards = () => {
     if (!card) return false;
 
     const isFake = (card as any).credit_type === 'fake';
-    const cost = gameSettings.custo_recarga_cartela; // Use the same cost for both
+    const cost = gameSettings.custo_recarga_cartela;
 
     if (isFake) {
-      // Handle fake credits
       if ((profile.fake_credits || 0) < cost) {
         toast.error(`Saldo de brincar insuficiente para recarregar.`);
         return false;
@@ -97,7 +97,6 @@ export const usePlayerCards = () => {
         return false;
       }
     } else {
-      // Handle real credits
       if (profile.credits < cost) {
         toast.error(`Saldo de créditos reais insuficiente para recarregar.`);
         return false;
@@ -116,13 +115,11 @@ export const usePlayerCards = () => {
       }
     }
 
-    // Update uses_left for the card
     const { error: cardError } = await supabase
       .from('cartelas_jogador')
       .update({ uses_left: card.uses_left + gameSettings.usos_por_recarga })
       .eq('id', playerCardId);
 
-    // If card update fails, revert the credit change
     if (cardError) {
       if (isFake) {
         await supabase.from('perfis').update({ fake_credits: profile.fake_credits }).eq('id', profile.id);
@@ -165,7 +162,6 @@ export const usePlayerCards = () => {
       }
       toast.success("Você saiu da partida.", { description: "Seus créditos foram estornados." });
       
-      // Força a atualização dos dados na tela
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['profile'] }),
         queryClient.invalidateQueries({ queryKey: ['playerCards'] }),
