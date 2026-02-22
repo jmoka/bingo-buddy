@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useGame } from '@/contexts/GameContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -8,7 +8,7 @@ import { Match, MatchStatus, PlayerCard } from '@/types/match';
 import { gameTypeLabels } from '@/utils/bingoUtils';
 import { 
   Coins, Plus, Trophy, Users, Settings, 
-  Timer, DoorOpen, Ticket, Zap, ZapOff, Tv, Archive, Trash2, RotateCcw, Star, Loader2, History, LogOut, TrendingUp, Target, Flame, Bot
+  Timer, DoorOpen, Ticket, Zap, ZapOff, Tv, Archive, Trash2, RotateCcw, Star, Loader2, History, LogOut, TrendingUp, Target, Flame, Bot, CalendarDays, Clock
 } from 'lucide-react';
 import { 
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose, DialogDescription
@@ -32,6 +32,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { cn } from '@/lib/utils';
+import { format, addMinutes } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 
 const Lobby = () => {
   const navigate = useNavigate();
@@ -68,6 +70,35 @@ const Lobby = () => {
     const interval = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(interval);
   }, []);
+
+  // Cálculo das próximas 24 partidas
+  const schedule = useMemo(() => {
+    if (!gameSettings?.auto_engine_enabled) return [];
+    
+    const interval = gameSettings.auto_engine_interval_mins || 60;
+    const lastMatch = matches.find(m => m.is_auto_calling) || matches[0];
+    let baseTime = lastMatch ? new Date(lastMatch.created_at).getTime() : Date.now();
+    
+    const times = [];
+    for (let i = 1; i <= 24; i++) {
+        const nextTime = addMinutes(new Date(baseTime), i * interval);
+        // Só mostra se for no futuro
+        if (nextTime.getTime() > now) {
+            times.push(nextTime);
+        }
+    }
+    return times;
+  }, [gameSettings, matches, now]);
+
+  const nextMatchTime = schedule[0] || null;
+  const countdown = useMemo(() => {
+    if (!nextMatchTime) return null;
+    const diff = nextMatchTime.getTime() - now;
+    if (diff <= 0) return "00:00";
+    const m = Math.floor((diff % 3600000) / 60000);
+    const s = Math.floor((diff % 60000) / 1000);
+    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  }, [nextMatchTime, now]);
 
   const handleCreateCard = async () => {
     if (!newCardName.trim() || !newCardNumbers) return;
@@ -118,7 +149,7 @@ const Lobby = () => {
     setRechargingCardId(null);
   };
 
-  const getCountdown = (startTime: string) => {
+  const getMatchCountdown = (startTime: string) => {
     const diff = new Date(startTime).getTime() - now;
     if (diff <= 0) return null;
     const h = Math.floor(diff / 3600000);
@@ -144,26 +175,11 @@ const Lobby = () => {
   const waitingMatches = sortedMatches.filter(m => m.status === 'waiting');
   const finishedMatches = sortedMatches.filter(m => m.status === 'finished');
 
-  // Estatísticas Globais para o Dashboard do Topo
   const totalPot = matches.filter(m => m.status !== 'finished').reduce((acc, m) => acc + m.pot, 0);
   const totalPlayers = new Set(matchCards.filter(mc => {
     const m = matches.find(match => match.id === mc.match_id);
     return m && m.status !== 'finished';
   }).map(mc => mc.player_id)).size;
-
-  // Cálculo da próxima partida automática
-  const lastMatch = matches[0]; // A primeira do array ordenado por start_time desc
-  let nextAutoMatchTime = null;
-  if (gameSettings?.auto_engine_enabled && lastMatch) {
-      const intervalMs = (gameSettings.auto_engine_interval_mins || 60) * 60 * 1000;
-      const nextTime = new Date(lastMatch.created_at).getTime() + intervalMs;
-      if (nextTime > now) {
-          const diff = nextTime - now;
-          const m = Math.floor((diff % 3600000) / 60000);
-          const s = Math.floor((diff % 60000) / 1000);
-          nextAutoMatchTime = `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-      }
-  }
 
   const renderCardList = (cards: PlayerCard[]) => {
     if (cards.length === 0) {
@@ -273,12 +289,10 @@ const Lobby = () => {
           
           const myMatchCards = getPlayerMatchCards(match.id, profile.id);
           const alreadyJoined = myMatchCards.length > 0;
-          const countdown = (match.status === 'waiting' || match.status === 'open') ? getCountdown(match.start_time) : null;
+          const countdownMatch = (match.status === 'waiting' || match.status === 'open') ? getMatchCountdown(match.start_time) : null;
 
-          // Cálculo de Probabilidade
           const winChance = totalCardsInMatch > 0 ? (myMatchCards.length / totalCardsInMatch) * 100 : 0;
 
-          // Cálculo do Prêmio Real
           const prizeValue = match.prize.type === 'percentage' 
             ? Math.floor((match.pot * (match.prize.value || 0)) / 100) 
             : (match.prize.value || 0);
@@ -289,7 +303,6 @@ const Lobby = () => {
               match.status === 'in_progress' ? 'border-accent ring-4 ring-accent/20' : 'border-transparent',
               match.status === 'finished' ? 'opacity-75 grayscale-[0.5]' : ''
             )}>
-              {/* Imagem do Prêmio ou Header Colorido */}
               {match.prize.type === 'product' && match.prize_image_url ? (
                 <div className="relative h-40 w-full">
                   <img src={match.prize_image_url} alt={match.prize.productName || 'Prêmio'} className="w-full h-full object-cover" />
@@ -308,16 +321,15 @@ const Lobby = () => {
 
               <div className="p-5">
                 <div className="flex flex-col lg:flex-row gap-6">
-                  {/* Coluna 1: Info Principal */}
                   <div className="flex-grow space-y-4">
                     <div className="flex items-center flex-wrap gap-2">
                       <h3 className="font-heading font-bold text-xl md:text-2xl text-foreground">{match.name}</h3>
                       {match.status === 'in_progress' && <Badge variant="destructive" className="animate-pulse px-3 py-1">AO VIVO</Badge>}
                       {match.status === 'open' && <Badge className="bg-success text-white px-3 py-1">INSCRIÇÕES ABERTAS</Badge>}
-                      {countdown && (
+                      {countdownMatch && (
                         <Badge variant="outline" className="font-mono text-sm border-primary/30 text-primary bg-primary/5">
                             <Timer className="w-4 h-4 mr-2" />
-                            {countdown}
+                            {countdownMatch}
                         </Badge>
                       )}
                     </div>
@@ -338,7 +350,6 @@ const Lobby = () => {
                     </div>
                   </div>
 
-                  {/* Coluna 2: Dashboard de Ganhos */}
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 min-w-[300px]">
                     <div className="flex flex-col items-center justify-center p-3 rounded-2xl bg-primary/5 border border-primary/10">
                       <span className="text-[10px] font-bold uppercase tracking-widest text-primary mb-1">Pote Total</span>
@@ -366,7 +377,6 @@ const Lobby = () => {
                   </div>
                 </div>
 
-                {/* Rodapé do Card: Ações */}
                 <div className="mt-6 pt-5 border-t border-border/50 flex flex-col sm:flex-row items-center justify-between gap-4">
                   <div className="flex items-center gap-3">
                     <div className="text-center sm:text-left">
@@ -411,7 +421,6 @@ const Lobby = () => {
                   </div>
                 </div>
 
-                {/* Barra de Progresso de Inscrição (Visual) */}
                 {match.status === 'open' && match.min_players > 1 && (
                   <div className="mt-4">
                     <div className="flex justify-between text-[10px] font-bold uppercase text-muted-foreground mb-1">
@@ -444,7 +453,6 @@ const Lobby = () => {
         </div>
       )}
 
-      {/* SUPER DASHBOARD DE DESTAQUE - NO TOPO */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-10">
         <div className="card-container bg-gradient-to-br from-primary to-primary/80 text-white border-none p-6 flex flex-col justify-between relative overflow-hidden group">
           <Coins className="absolute -right-4 -bottom-4 w-32 h-32 text-white/10 rotate-12 group-hover:scale-110 transition-transform duration-500" />
@@ -483,154 +491,194 @@ const Lobby = () => {
         </div>
       </div>
 
-      {/* AVISO DE PRÓXIMA PARTIDA AUTOMÁTICA */}
-      {nextAutoMatchTime && openMatches.length === 0 && inProgressMatches.length === 0 && (
-        <div className="mb-8 p-4 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-between animate-slide-up">
-            <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
-                    <Bot className="w-6 h-6 text-primary" />
-                </div>
-                <div>
-                    <p className="text-sm font-bold text-foreground">Motor de Partidas Ativo</p>
-                    <p className="text-xs text-muted-foreground">O sistema criará uma nova partida automaticamente em breve.</p>
-                </div>
-            </div>
-            <div className="text-right">
-                <p className="text-[10px] font-bold uppercase text-primary tracking-widest">Próxima em</p>
-                <p className="text-xl font-bold font-mono text-primary">{nextAutoMatchTime}</p>
-            </div>
-        </div>
-      )}
-
-      {/* SEÇÃO DE PARTIDAS */}
-      <div className="mb-12">
-        <h2 className="font-heading text-xl md:text-2xl font-bold text-foreground mb-6 flex items-center gap-2">
-          <DoorOpen className="w-6 h-6 text-accent" /> Partidas Disponíveis
-        </h2>
-        <Tabs defaultValue="in_progress" className="w-full">
-          <TabsList className="grid w-full h-auto p-1 grid-cols-2 sm:grid-cols-4 mb-6 bg-muted/50">
-            <TabsTrigger value="in_progress" className="flex items-center gap-2 py-3">
-              Ao Vivo
-              {inProgressMatches.length > 0 && (
-                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-[10px] font-bold text-white">
-                  {inProgressMatches.length}
-                </span>
-              )}
-            </TabsTrigger>
-            <TabsTrigger value="open" className="flex items-center gap-2 py-3">
-              Abertas
-              {openMatches.length > 0 && (
-                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-accent text-[10px] font-bold text-white">
-                  {openMatches.length}
-                </span>
-              )}
-            </TabsTrigger>
-            <TabsTrigger value="waiting" className="flex items-center gap-2 py-3">
-              Aguardando
-              {waitingMatches.length > 0 && (
-                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-amber-500 text-[10px] font-bold text-white">
-                  {waitingMatches.length}
-                </span>
-              )}
-            </TabsTrigger>
-            <TabsTrigger value="finished" className="flex items-center gap-2 py-3">
-              Finalizadas
-            </TabsTrigger>
-          </TabsList>
-          <TabsContent value="in_progress" className="mt-2">{renderMatchList(inProgressMatches)}</TabsContent>
-          <TabsContent value="open" className="mt-2">{renderMatchList(openMatches)}</TabsContent>
-          <TabsContent value="waiting" className="mt-2">{renderMatchList(waitingMatches)}</TabsContent>
-          <TabsContent value="finished" className="mt-2">{renderMatchList(finishedMatches)}</TabsContent>
-        </Tabs>
-      </div>
-
-      {/* SEÇÃO DE CARTELAS */}
-      <div className="mb-8">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
-          <h2 className="font-heading text-xl md:text-2xl font-bold text-foreground flex items-center gap-2">
-            <Ticket className="w-6 h-6 text-primary" /> Minhas Cartelas
-          </h2>
-          <Dialog open={isCreateCardOpen} onOpenChange={setCreateCardOpen}>
-              <DialogTrigger asChild>
-                <Button className="gradient-primary shadow-button h-11 px-6 font-bold w-full sm:w-auto">
-                  <Plus className="w-5 h-5 mr-2" />CRIAR NOVA CARTELA
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-xl flex flex-col max-h-[90vh]">
-                  <DialogHeader className="flex-shrink-0">
-                    <DialogTitle className="font-heading">Criar Nova Cartela</DialogTitle>
-                    <DialogDescription>Escolha o tipo de crédito e os números da sua cartela.</DialogDescription>
-                  </DialogHeader>
-                  <div className="flex-grow overflow-y-auto -mx-6 px-6">
-                    <div className="space-y-6 py-4">
-                      <div className="space-y-2">
-                        <Label>Tipo de Crédito</Label>
-                        <RadioGroup
-                          value={creditType}
-                          onValueChange={(v: 'real' | 'fake') => setCreditType(v)}
-                          className="grid grid-cols-2 gap-4"
-                        >
-                          <div>
-                            <RadioGroupItem value="real" id="real" className="peer sr-only" />
-                            <Label
-                              htmlFor="real"
-                              className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary cursor-pointer"
-                            >
-                              <Coins className="mb-2 h-6 w-6" />
-                              <span className="text-xs font-bold uppercase">Reais</span>
-                              <span className="text-[10px] text-muted-foreground mt-1">{profile.credits} cr.</span>
-                            </Label>
-                          </div>
-                          <div>
-                            <RadioGroupItem value="fake" id="fake" className="peer sr-only" />
-                            <Label
-                              htmlFor="fake"
-                              className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary cursor-pointer"
-                            >
-                              <Star className="mb-2 h-6 w-6" />
-                              <span className="text-xs font-bold uppercase">Brincar</span>
-                              <span className="text-[10px] text-muted-foreground mt-1">{profile.fake_credits} cr.</span>
-                            </Label>
-                          </div>
-                        </RadioGroup>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label>Nome da Cartela</Label>
-                        <Input placeholder="Ex: Sorte Pura" value={newCardName} onChange={e => setNewCardName(e.target.value)} className="bg-secondary border-0" />
-                      </div>
-
-                      <CardCreator onCardChange={setNewCardNumbers} />
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+        {/* LATERAL ESQUERDA: AGENDA (Apenas se motor ativo) */}
+        {gameSettings?.auto_engine_enabled && (
+            <div className="lg:col-span-3 space-y-6">
+                <div className="card-container p-5 border-2 border-primary/20 bg-primary/5">
+                    <h3 className="font-heading font-bold text-lg flex items-center gap-2 mb-4 text-primary">
+                        <CalendarDays className="w-5 h-5" /> Agenda de Hoje
+                    </h3>
+                    <div className="space-y-2 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
+                        {schedule.map((time, idx) => (
+                            <div key={idx} className="flex items-center justify-between p-3 rounded-xl bg-background border border-border/50 shadow-sm group hover:border-primary/30 transition-colors">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-[10px] font-bold text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary transition-colors">
+                                        #{idx + 1}
+                                    </div>
+                                    <span className="text-sm font-bold font-mono">{format(time, 'HH:mm')}</span>
+                                </div>
+                                <Badge variant="outline" className="text-[9px] uppercase tracking-tighter opacity-60">Automático</Badge>
+                            </div>
+                        ))}
+                        {schedule.length === 0 && (
+                            <p className="text-xs text-muted-foreground text-center py-4 italic">Nenhuma partida agendada para as próximas horas.</p>
+                        )}
                     </div>
-                  </div>
-                  <DialogFooter className="flex-shrink-0">
-                    <DialogClose asChild><Button variant="ghost">Cancelar</Button></DialogClose>
-                    <Button onClick={handleCreateCard} disabled={!newCardName.trim() || !newCardNumbers}>
-                      Salvar (Custa {useGame().gameSettings?.custo_nova_cartela || 10} cr.)
-                    </Button>
-                  </DialogFooter>
-              </DialogContent>
-          </Dialog>
-        </div>
+                    <p className="text-[10px] text-muted-foreground mt-4 text-center leading-tight">
+                        * Horários baseados no intervalo de {gameSettings.auto_engine_interval_mins} min.
+                    </p>
+                </div>
+            </div>
+        )}
 
-        <Tabs defaultValue="active" className="w-full">
-          <TabsList className="grid w-full grid-cols-2 mb-4 h-10 bg-muted/30">
-            <TabsTrigger value="active" className="text-xs">
-              Ativas ({activeCards.length})
-            </TabsTrigger>
-            <TabsTrigger value="archived" className="text-xs">
-              Arquivadas ({archivedCards.length})
-            </TabsTrigger>
-          </TabsList>
-          
-          <TabsContent value="active" className="mt-0">
-            {renderCardList(activeCards)}
-          </TabsContent>
-          
-          <TabsContent value="archived" className="mt-0">
-            {renderCardList(archivedCards)}
-          </TabsContent>
-        </Tabs>
+        {/* CONTEÚDO PRINCIPAL */}
+        <div className={cn(
+            "space-y-12",
+            gameSettings?.auto_engine_enabled ? "lg:col-span-9" : "lg:col-span-12"
+        )}>
+            
+            {/* CARD DE PRÓXIMA PARTIDA (Destaque quando não há abertas/ao vivo) */}
+            {gameSettings?.auto_engine_enabled && openMatches.length === 0 && inProgressMatches.length === 0 && nextMatchTime && (
+                <div className="card-container bg-gradient-to-r from-primary/10 to-accent/10 border-2 border-dashed border-primary/30 p-8 text-center animate-slide-up relative overflow-hidden">
+                    <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary via-accent to-primary animate-pulse" />
+                    <Bot className="w-12 h-12 text-primary mx-auto mb-4 opacity-50" />
+                    <h2 className="font-heading text-2xl md:text-3xl font-bold text-foreground mb-2">Preparando a Próxima Rodada!</h2>
+                    <p className="text-muted-foreground mb-8 max-w-md mx-auto">O motor automático está ativo. Uma nova partida será aberta em instantes para inscrições.</p>
+                    
+                    <div className="flex flex-col items-center gap-4">
+                        <div className="flex items-center gap-3 bg-background px-8 py-4 rounded-3xl shadow-xl border border-primary/20">
+                            <Clock className="w-6 h-6 text-primary animate-bounce" />
+                            <span className="text-4xl md:text-5xl font-bold font-mono tracking-tighter text-primary">
+                                {countdown}
+                            </span>
+                        </div>
+                        <p className="text-sm font-bold text-primary/60 uppercase tracking-widest">Inicia às {format(nextMatchTime, 'HH:mm')}</p>
+                    </div>
+                </div>
+            )}
+
+            {/* SEÇÃO DE PARTIDAS */}
+            <div>
+                <h2 className="font-heading text-xl md:text-2xl font-bold text-foreground mb-6 flex items-center gap-2">
+                <DoorOpen className="w-6 h-6 text-accent" /> Partidas Disponíveis
+                </h2>
+                <Tabs defaultValue="in_progress" className="w-full">
+                <TabsList className="grid w-full h-auto p-1 grid-cols-2 sm:grid-cols-4 mb-6 bg-muted/50">
+                    <TabsTrigger value="in_progress" className="flex items-center gap-2 py-3">
+                    Ao Vivo
+                    {inProgressMatches.length > 0 && (
+                        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-[10px] font-bold text-white">
+                        {inProgressMatches.length}
+                        </span>
+                    )}
+                    </TabsTrigger>
+                    <TabsTrigger value="open" className="flex items-center gap-2 py-3">
+                    Abertas
+                    {openMatches.length > 0 && (
+                        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-accent text-[10px] font-bold text-white">
+                        {openMatches.length}
+                        </span>
+                    )}
+                    </TabsTrigger>
+                    <TabsTrigger value="waiting" className="flex items-center gap-2 py-3">
+                    Aguardando
+                    {waitingMatches.length > 0 && (
+                        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-amber-500 text-[10px] font-bold text-white">
+                        {waitingMatches.length}
+                        </span>
+                    )}
+                    </TabsTrigger>
+                    <TabsTrigger value="finished" className="flex items-center gap-2 py-3">
+                    Finalizadas
+                    </TabsTrigger>
+                </TabsList>
+                <TabsContent value="in_progress" className="mt-2">{renderMatchList(inProgressMatches)}</TabsContent>
+                <TabsContent value="open" className="mt-2">{renderMatchList(openMatches)}</TabsContent>
+                <TabsContent value="waiting" className="mt-2">{renderMatchList(waitingMatches)}</TabsContent>
+                <TabsContent value="finished" className="mt-2">{renderMatchList(finishedMatches)}</TabsContent>
+                </Tabs>
+            </div>
+
+            {/* SEÇÃO DE CARTELAS */}
+            <div>
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
+                <h2 className="font-heading text-xl md:text-2xl font-bold text-foreground flex items-center gap-2">
+                    <Ticket className="w-6 h-6 text-primary" /> Minhas Cartelas
+                </h2>
+                <Dialog open={isCreateCardOpen} onOpenChange={setCreateCardOpen}>
+                    <DialogTrigger asChild>
+                        <Button className="gradient-primary shadow-button h-11 px-6 font-bold w-full sm:w-auto">
+                        <Plus className="w-5 h-5 mr-2" />CRIAR NOVA CARTELA
+                        </Button>
+                    </DialogTrigger>
+                    <DialogContent className="max-w-xl flex flex-col max-h-[90vh]">
+                        <DialogHeader className="flex-shrink-0">
+                            <DialogTitle className="font-heading">Criar Nova Cartela</DialogTitle>
+                            <DialogDescription>Escolha o tipo de crédito e os números da sua cartela.</DialogDescription>
+                        </DialogHeader>
+                        <div className="flex-grow overflow-y-auto -mx-6 px-6">
+                            <div className="space-y-6 py-4">
+                            <div className="space-y-2">
+                                <Label>Tipo de Crédito</Label>
+                                <RadioGroup
+                                value={creditType}
+                                onValueChange={(v: 'real' | 'fake') => setCreditType(v)}
+                                className="grid grid-cols-2 gap-4"
+                                >
+                                <div>
+                                    <RadioGroupItem value="real" id="real" className="peer sr-only" />
+                                    <Label
+                                    htmlFor="real"
+                                    className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary cursor-pointer"
+                                    >
+                                    <Coins className="mb-2 h-6 w-6" />
+                                    <span className="text-xs font-bold uppercase">Reais</span>
+                                    <span className="text-[10px] text-muted-foreground mt-1">{profile.credits} cr.</span>
+                                    </Label>
+                                </div>
+                                <div>
+                                    <RadioGroupItem value="fake" id="fake" className="peer sr-only" />
+                                    <Label
+                                    htmlFor="fake"
+                                    className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary cursor-pointer"
+                                    >
+                                    <Star className="mb-2 h-6 w-6" />
+                                    <span className="text-xs font-bold uppercase">Brincar</span>
+                                    <span className="text-[10px] text-muted-foreground mt-1">{profile.fake_credits} cr.</span>
+                                    </Label>
+                                </div>
+                                </RadioGroup>
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label>Nome da Cartela</Label>
+                                <Input placeholder="Ex: Sorte Pura" value={newCardName} onChange={e => setNewCardName(e.target.value)} className="bg-secondary border-0" />
+                            </div>
+
+                            <CardCreator onCardChange={setNewCardNumbers} />
+                            </div>
+                        </div>
+                        <DialogFooter className="flex-shrink-0">
+                            <DialogClose asChild><Button variant="ghost">Cancelar</Button></DialogClose>
+                            <Button onClick={handleCreateCard} disabled={!newCardName.trim() || !newCardNumbers}>
+                            Salvar (Custa {useGame().gameSettings?.custo_nova_cartela || 10} cr.)
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
+                </div>
+
+                <Tabs defaultValue="active" className="w-full">
+                <TabsList className="grid w-full grid-cols-2 mb-4 h-10 bg-muted/30">
+                    <TabsTrigger value="active" className="text-xs">
+                    Ativas ({activeCards.length})
+                    </TabsTrigger>
+                    <TabsTrigger value="archived" className="text-xs">
+                    Arquivadas ({archivedCards.length})
+                    </TabsTrigger>
+                </TabsList>
+                
+                <TabsContent value="active" className="mt-0">
+                    {renderCardList(activeCards)}
+                </TabsContent>
+                
+                <TabsContent value="archived" className="mt-0">
+                    {renderCardList(archivedCards)}
+                </TabsContent>
+                </Tabs>
+            </div>
+        </div>
       </div>
 
       <Dialog open={isJoinDialogOpen} onOpenChange={setJoinDialogOpen}>
