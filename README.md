@@ -1,6 +1,6 @@
 # Bingo App - Documentação Técnica Completa
 
-## 1. Visão Geral do Sistema
+## 1. Visão Geral do Sistema 1.0
 
 Este documento fornece uma análise técnica detalhada do Bingo App. O sistema é uma aplicação web real-time para jogos de bingo, com gerenciamento de partidas, jogadores, cartelas e um sistema financeiro robusto baseado em **créditos decimais** (suporte a centavos/frações).
 
