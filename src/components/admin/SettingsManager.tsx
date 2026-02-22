@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { Save, Settings, Check, Loader2, Bot, Link as LinkIcon, DollarSign, Banknote, Play, CalendarDays } from 'lucide-react';
+import { Save, Settings, Check, Loader2, Bot, Link as LinkIcon, DollarSign, Banknote, Play, CalendarDays, Clock } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { supabase } from '@/integrations/supabase/client';
@@ -176,6 +176,21 @@ const SettingsManager = () => {
             <div><Label>Recarga (cr)</Label><Input name="custo_recarga_cartela" type="number" value={currentSettings.custo_recarga_cartela} onChange={handleSettingsChange} /></div>
             <div><Label>Usos por Recarga</Label><Input name="usos_por_recarga" type="number" value={currentSettings.usos_por_recarga} onChange={handleSettingsChange} /></div>
             <div><Label>R$ por Crédito</Label><Input name="valor_por_credito" type="number" step="0.01" value={currentSettings.valor_por_credito} onChange={handleSettingsChange} /></div>
+          </div>
+        </div>
+
+        <div className="space-y-6">
+          <h3 className="font-heading font-bold text-primary border-b pb-2 flex items-center gap-2"><Clock className="w-4 h-4" /> Regras de Partida</h3>
+          <div>
+            <Label>Intervalo entre Números (segundos)</Label>
+            <Input 
+              name="intervalo_sorteio_auto_seg" 
+              type="number" 
+              value={currentSettings.intervalo_sorteio_auto_seg} 
+              onChange={handleSettingsChange} 
+              placeholder="Ex: 20"
+            />
+            <p className="text-[10px] text-muted-foreground mt-1">Tempo de espera entre cada bola sorteada no modo automático.</p>
           </div>
         </div>
 
