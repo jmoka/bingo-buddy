@@ -28,37 +28,56 @@ serve(async (req) => {
       });
     }
 
-    // Verificar limite diário
+    // 1. Determinar o próximo número da partida (evitando duplicatas)
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const { count } = await supabaseAdmin.from('partidas').select('*', { count: 'exact', head: true }).gte('created_at', today.toISOString());
+    
+    const { data: todayMatches } = await supabaseAdmin
+      .from('partidas')
+      .select('name')
+      .gte('created_at', today.toISOString());
+    
+    let nextNumber = 1;
+    if (todayMatches && todayMatches.length > 0) {
+      const numbers = todayMatches
+        .map(m => {
+          const match = m.name.match(/#(\d+)/);
+          return match ? parseInt(match[1], 10) : 0;
+        })
+        .filter(n => n > 0);
+      
+      if (numbers.length > 0) {
+        nextNumber = Math.max(...numbers) + 1;
+      } else {
+        nextNumber = todayMatches.length + 1;
+      }
+    }
 
-    if (count !== null && count >= settings.auto_engine_matches_per_day) {
-      return new Response(JSON.stringify({ message: "Limite diário atingido." }), {
+    // Verificar limite diário
+    if (nextNumber > settings.auto_engine_matches_per_day) {
+      return new Response(JSON.stringify({ message: "Limite diário de partidas atingido." }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200,
       });
     }
 
-    // Lógica de Slots Fixos (Alinhamento com o Relógio)
+    // 2. Lógica de Slots Fixos
     const now = new Date();
     const startHour = settings.auto_engine_start_hour || 0;
     const interval = settings.auto_engine_interval_mins || 60;
     
-    // Referência: Início do dia + Hora de Início configurada
     const reference = new Date();
     reference.setHours(startHour, 0, 0, 0);
     
-    // Encontra o próximo slot disponível
-    // Reduzi a margem para 10 segundos para garantir que o próximo slot seja pego mesmo logo após o início da anterior
     let nextSlot = reference.getTime();
+    // Encontra o primeiro slot no futuro (com margem de 10s)
     while (nextSlot <= now.getTime() + (10 * 1000)) { 
       nextSlot += interval * 60 * 1000;
     }
 
     const nextStartTime = new Date(nextSlot);
 
-    // Verificar se já existe uma partida agendada para este slot específico
+    // 3. Verificar se já existe uma partida para este slot específico
     const { data: existing } = await supabaseAdmin
       .from('partidas')
       .select('id')
@@ -74,7 +93,7 @@ serve(async (req) => {
     }
 
     const newMatch = {
-      name: `Bingo Automático #${(count || 0) + 1}`,
+      name: `Bingo Automático #${nextNumber}`,
       game_type: settings.auto_engine_game_type,
       max_cards_per_player: 3,
       card_price: settings.auto_engine_card_price,
@@ -88,12 +107,15 @@ serve(async (req) => {
     const { data: created, error: createError } = await supabaseAdmin.from('partidas').insert(newMatch).select().single();
     if (createError) throw createError;
 
+    console.log(`[auto-engine] Partida criada: ${newMatch.name} para ${newMatch.start_time}`);
+
     return new Response(JSON.stringify({ success: true, match: created }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
     });
 
   } catch (error) {
+    console.error(`[auto-engine] Erro: ${error.message}`);
     return new Response(JSON.stringify({ error: error.message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 500,
