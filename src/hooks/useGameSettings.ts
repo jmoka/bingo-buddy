@@ -9,36 +9,8 @@ export const useGameSettings = () => {
   const { data: gameSettings } = useQuery({
     queryKey: ['gameSettings'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('configuracoes').select('*').eq('singleton', true).single();
-      
-      if (error) {
-        if (error.code === 'PGRST116') { // "The result contains 0 rows"
-          console.warn("Nenhuma configuração encontrada. Criando uma configuração padrão...");
-          
-          // A linha de configuração não existe, vamos criar uma com valores padrão.
-          const { data: newSettings, error: insertError } = await supabase
-            .from('configuracoes')
-            .insert({ singleton: true }) // A maioria das colunas tem valores padrão no DB
-            .select()
-            .single();
-
-          if (insertError) {
-            console.error("FATAL: Falha ao criar configuração padrão:", insertError);
-            toast.error("Erro crítico ao configurar o sistema.", {
-              description: "Não foi possível criar a linha de configurações padrão.",
-              duration: 10000,
-            });
-            return null;
-          }
-          
-          toast.success("Configuração inicial do sistema criada com sucesso!");
-          return newSettings as GameSettings;
-
-        } else {
-          console.error("Erro ao buscar configurações do jogo:", error);
-          return null;
-        }
-      }
+      const { data, error } = await supabase.from('configuracoes').select('*').limit(1).single();
+      if (error) return { custo_nova_cartela: 10, custo_recarga_cartela: 5, usos_por_recarga: 1, intervalo_sorteio_auto_seg: 120, valor_por_credito: 1, admin_profit: 0 } as GameSettings;
       return data as GameSettings;
     }
   });
