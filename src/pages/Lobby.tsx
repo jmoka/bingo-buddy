@@ -32,7 +32,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { cn } from '@/lib/utils';
-import { format, addMinutes, isAfter } from 'date-fns';
+import { format, addMinutes, startOfDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 const Lobby = () => {
@@ -71,30 +71,27 @@ const Lobby = () => {
     return () => clearInterval(interval);
   }, []);
 
-  // Cálculo das próximas 24 partidas (Lógica corrigida)
+  // Cálculo das próximas 24 partidas (Lógica de horários fixos)
   const schedule = useMemo(() => {
     if (!gameSettings?.auto_engine_enabled) return [];
     
     const interval = gameSettings.auto_engine_interval_mins || 60;
     const times = [];
     
-    // Pegamos a última partida automática criada para manter o alinhamento do horário
-    const lastAutoMatch = matches.find(m => m.is_auto_calling);
-    let baseTime = lastAutoMatch ? new Date(lastAutoMatch.created_at).getTime() : Date.now();
-    
-    // Encontra o primeiro horário no futuro
-    let nextTime = baseTime;
-    while (nextTime <= now) {
-        nextTime = addMinutes(new Date(nextTime), interval).getTime();
-    }
+    // Começa do início do dia atual
+    let checkTime = startOfDay(new Date()).getTime();
+    const limit = addMinutes(new Date(), 24 * 60).getTime();
 
-    // Gera as próximas 24 a partir desse ponto
-    for (let i = 0; i < 24; i++) {
-        times.push(new Date(nextTime + (i * interval * 60 * 1000)));
+    while (checkTime < limit) {
+      if (checkTime > now) {
+        times.push(new Date(checkTime));
+      }
+      checkTime += interval * 60 * 1000;
+      if (times.length >= 24) break;
     }
     
     return times;
-  }, [gameSettings, matches, now]);
+  }, [gameSettings, now]);
 
   const nextMatchTime = schedule[0] || null;
   const countdown = useMemo(() => {

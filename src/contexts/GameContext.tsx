@@ -61,15 +61,20 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     matchesHook.matches.forEach(match => {
       // Auto-start logic
       const processingKeyStart = `start_${match.id}`;
+      const startTime = new Date(match.start_time).getTime();
+      
       if (
         match.is_auto_calling &&
         match.status === 'open' &&
-        now >= new Date(match.start_time).getTime() &&
+        now >= startTime &&
         !processingRef.current.has(processingKeyStart)
       ) {
         processingRef.current.add(processingKeyStart);
+        console.log(`[Bingo] Iniciando partida automática: ${match.name}`);
+        
         matchesHook.startMatch(match.id, true).finally(() => {
-           setTimeout(() => processingRef.current.delete(processingKeyStart), 5000);
+           // Limpa a trava após 3 segundos para permitir novas ações se necessário
+           setTimeout(() => processingRef.current.delete(processingKeyStart), 3000);
         });
       }
 
@@ -79,7 +84,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       if (
         match.is_auto_calling &&
-        match.status === 'in_progress' && // SÓ sorteia se estiver em progresso
+        match.status === 'in_progress' && 
         nextTimestamp &&
         now >= new Date(nextTimestamp).getTime() &&
         !processingRef.current.has(processingKeyCall) &&
@@ -96,8 +101,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (availableNumbers.length > 0) {
           const randomIndex = Math.floor(Math.random() * availableNumbers.length);
           matchesHook.callNumber(match.id, availableNumbers[randomIndex]).finally(() => {
-            // Pequeno delay para o banco de dados atualizar antes de liberar a próxima chamada
-            setTimeout(() => processingRef.current.delete(processingKeyCall), 3000);
+            setTimeout(() => processingRef.current.delete(processingKeyCall), 2000);
           });
         } else {
           processingRef.current.delete(processingKeyCall);
