@@ -8,7 +8,7 @@ import { Match, MatchStatus, PlayerCard } from '@/types/match';
 import { gameTypeLabels } from '@/utils/bingoUtils';
 import { 
   Coins, Plus, Trophy, Users, Settings, 
-  Timer, DoorOpen, Ticket, Zap, ZapOff, Tv, Archive, Trash2, RotateCcw, Star, Loader2, History, LogOut, TrendingUp, Target, Flame, Bot, CalendarDays, Clock, Crown
+  Timer, DoorOpen, Ticket, Zap, ZapOff, Tv, Archive, Trash2, RotateCcw, Star, Loader2, History, LogOut, TrendingUp, Target, Flame, Bot, CalendarDays, Clock, Crown, ChevronDown, ChevronUp
 } from 'lucide-react';
 import { 
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose, DialogDescription
@@ -55,6 +55,7 @@ const Lobby = () => {
   const [cardsToJoin, setCardsToJoin] = useState<Set<string>>(new Set());
   const [isJoining, setIsJoining] = useState(false);
   const [rechargingCardId, setRechargingCardId] = useState<string | null>(null);
+  const [isAgendaOpen, setIsAgendaOpen] = useState(false);
 
   useEffect(() => {
     if (!session) {
@@ -71,26 +72,18 @@ const Lobby = () => {
     return () => clearInterval(interval);
   }, []);
 
-  // Cálculo das próximas 24 partidas (Lógica de horários fixos baseada na configuração)
   const schedule = useMemo(() => {
     if (!gameSettings?.auto_engine_enabled) return [];
-    
     const interval = gameSettings.auto_engine_interval_mins || 60;
     const startHour = gameSettings.auto_engine_start_hour || 0;
     const times = [];
-    
-    // Começa do início do dia atual + hora de início configurada
     let checkTime = startOfDay(new Date()).getTime() + (startHour * 3600000);
     const limit = addMinutes(new Date(), 24 * 60).getTime();
-
     while (checkTime < limit) {
-      if (checkTime > now) {
-        times.push(new Date(checkTime));
-      }
+      if (checkTime > now) times.push(new Date(checkTime));
       checkTime += interval * 60 * 1000;
       if (times.length >= 24) break;
     }
-    
     return times;
   }, [gameSettings, now]);
 
@@ -98,11 +91,10 @@ const Lobby = () => {
     if (!newCardName.trim() || !newCardNumbers) return;
     const card = await createPlayerCard({ name: newCardName, numbers: newCardNumbers, creditType });
     if (card) {
-      toast.success('Cartela criada!', { description: `A cartela "${card.name}" foi adicionada à sua coleção.` });
+      toast.success('Cartela criada!');
       setCreateCardOpen(false);
       setNewCardName('');
       setNewCardNumbers(null);
-      setCreditType('real');
     }
   };
 
@@ -119,7 +111,7 @@ const Lobby = () => {
       const cardIds = Array.from(cardsToJoin);
       const newMatchCards = await joinMatch(selectedMatch.id, cardIds);
       if (newMatchCards && newMatchCards.length > 0) {
-        toast.success('🎉 Você entrou na partida!', { description: `${newMatchCards.length} cartela(s) inscrita(s).` });
+        toast.success('🎉 Você entrou na partida!');
         setJoinDialogOpen(false);
       }
     } finally {
@@ -129,17 +121,13 @@ const Lobby = () => {
 
   const handleBuyUses = async (cardId: string) => {
     const success = await buyCardUses(cardId);
-    if (success) {
-      toast.success('Cartela Recarregada!', { description: `Você comprou mais usos para sua cartela.` });
-    }
+    if (success) toast.success('Cartela Recarregada!');
   };
 
   const handleRechargeInDialog = async (cardId: string) => {
     setRechargingCardId(cardId);
     const success = await buyCardUses(cardId);
-    if (success) {
-      toast.success('Cartela Recarregada!', { description: `Agora você pode selecioná-la para a partida.` });
-    }
+    if (success) toast.success('Cartela Recarregada!');
     setRechargingCardId(null);
   };
 
@@ -154,16 +142,12 @@ const Lobby = () => {
 
   const sortedMatches = [...matches].sort((a, b) => {
     const statusOrder: Record<MatchStatus, number> = { 'in_progress': 1, 'open': 2, 'waiting': 3, 'finished': 4 };
-    const orderA = statusOrder[a.status];
-    const orderB = statusOrder[b.status];
-    if (orderA !== orderB) return orderA - orderB;
-    return new Date(b.start_time).getTime() - new Date(a.start_time).getTime();
+    return statusOrder[a.status] - statusOrder[b.status];
   });
 
   if (!profile) return null;
 
   const activeMatchIds = new Set(matches.filter(m => m.status === 'in_progress').map(m => m.id));
-  
   const inProgressMatches = sortedMatches.filter(m => m.status === 'in_progress');
   const openMatches = sortedMatches.filter(m => m.status === 'open');
   const waitingMatches = sortedMatches.filter(m => m.status === 'waiting');
@@ -176,14 +160,7 @@ const Lobby = () => {
   }).map(mc => mc.player_id)).size;
 
   const renderCardList = (cards: PlayerCard[]) => {
-    if (cards.length === 0) {
-      return (
-        <div className="card-container text-center py-8">
-          <p className="text-sm text-muted-foreground">Nenhuma cartela encontrada nesta categoria.</p>
-        </div>
-      );
-    }
-
+    if (cards.length === 0) return <div className="card-container text-center py-8"><p className="text-sm text-muted-foreground">Nenhuma cartela encontrada.</p></div>;
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {cards.map(card => {
@@ -191,67 +168,24 @@ const Lobby = () => {
           const markedNumbers = activeMatchCard ? activeMatchCard.marked_numbers : new Set<number>();
           const winCount = wins.filter(w => w.player_card_id === card.id).length;
           const isFake = (card as any).credit_type === 'fake';
-          
           return (
-            <div key={card.id} className={`card-container p-3 transition-opacity ${card.uses_left === 0 ? 'opacity-80' : ''}`}>
-              <div className="flex justify-between items-start mb-2">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h3 className="font-heading font-semibold text-sm md:text-base text-foreground">{card.name}</h3>
-                    {isFake && <Badge variant="outline" className="text-[9px] h-4 border-amber-400 text-amber-600 bg-amber-400/5">Brincar</Badge>}
-                    {winCount > 0 && (
-                      <div className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-400/20 text-amber-600 border border-amber-400/30">
-                        <Trophy className="w-3 h-3" />
-                        <span>{winCount}x</span>
-                      </div>
-                    )}
+            <div key={card.id} className={cn("card-container p-3", card.uses_left === 0 && 'opacity-80')}>
+              <div className="flex justify-between items-start mb-2 gap-2">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <h3 className="font-heading font-semibold text-sm truncate">{card.name}</h3>
+                    {isFake && <Badge variant="outline" className="text-[8px] h-3.5 border-amber-400 text-amber-600">Brincar</Badge>}
+                    {winCount > 0 && <Badge className="bg-amber-400/20 text-amber-600 text-[8px] h-3.5 border-none"><Trophy className="w-2 h-2 mr-0.5" />{winCount}x</Badge>}
                   </div>
-                  <p className="text-[10px] text-muted-foreground font-mono">ID: ...{card.id.slice(-6).toUpperCase()}</p>
+                  <p className="text-[9px] text-muted-foreground font-mono">...{card.id.slice(-6).toUpperCase()}</p>
                 </div>
-                <div className="flex items-center gap-1">
-                  <div className={`flex items-center gap-1 text-[10px] font-medium px-2 py-1 rounded-full ${card.uses_left > 0 ? 'bg-success/10 text-success' : 'bg-destructive/10 text-destructive'}`}>
-                    {card.uses_left > 0 ? <Zap className="w-3 h-3" /> : <ZapOff className="w-3 h-3" />}
-                    <span>{card.uses_left} uso(s)</span>
-                  </div>
-                  
-                  {card.uses_left === 0 && !card.is_archived && (
-                    <Button size="sm" variant="outline" className="h-7 text-[10px] px-2" onClick={() => handleBuyUses(card.id)}>
-                      Recarregar <Coins className="w-3 h-3 ml-1" />
-                    </Button>
-                  )}
-
-                  <Button 
-                    size="icon" 
-                    variant="ghost" 
-                    className="text-muted-foreground h-7 w-7" 
-                    title={card.is_archived ? "Desarquivar" : "Arquivar"}
-                    onClick={() => toggleArchivePlayerCard(card.id, !card.is_archived)}
-                  >
+                <div className="flex items-center gap-1 shrink-0">
+                  <Badge variant={card.uses_left > 0 ? "success" : "destructive"} className="text-[9px] h-5 px-1.5">
+                    {card.uses_left} uso(s)
+                  </Badge>
+                  <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => toggleArchivePlayerCard(card.id, !card.is_archived)}>
                     {card.is_archived ? <RotateCcw className="w-3.5 h-3.5" /> : <Archive className="w-3.5 h-3.5" />}
                   </Button>
-
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button size="icon" variant="ghost" className="text-destructive/70 h-7 w-7">
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Excluir Cartela?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          Você tem certeza que deseja excluir permanentemente a cartela "{card.name}"? 
-                          {winCount > 0 && " Esta cartela já foi vitoriosa no passado!"}
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                        <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={() => deletePlayerCard(card.id)}>
-                          Excluir Agora
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
                 </div>
               </div>
               <div className="grid grid-cols-5 gap-1">
@@ -267,168 +201,61 @@ const Lobby = () => {
   };
 
   const renderMatchList = (matchesToRender: Match[]) => {
-    if (matchesToRender.length === 0) {
-      return (
-        <div className="card-container text-center py-12">
-          <p className="text-sm text-muted-foreground">Nenhuma partida nesta categoria.</p>
-        </div>
-      );
-    }
+    if (matchesToRender.length === 0) return <div className="card-container text-center py-12"><p className="text-sm text-muted-foreground">Nenhuma partida disponível.</p></div>;
     return (
-      <div className="space-y-6">
+      <div className="space-y-4">
         {matchesToRender.map(match => {
           const allCardsInMatch = matchCards.filter(mc => mc.match_id === match.id);
           const playersInMatchCount = new Set(allCardsInMatch.map(mc => mc.player_id)).size;
-          const totalCardsInMatch = allCardsInMatch.length;
-          
           const myMatchCards = getPlayerMatchCards(match.id, profile.id);
           const alreadyJoined = myMatchCards.length > 0;
           const countdownMatch = (match.status === 'waiting' || match.status === 'open') ? getMatchCountdown(match.start_time) : null;
-
-          const winChance = totalCardsInMatch > 0 ? (myMatchCards.length / totalCardsInMatch) * 100 : 0;
-
-          const prizeValue = match.prize.type === 'percentage' 
-            ? (Number(match.pot || 0) * (Number(match.prize.value) || 0)) / 100 
-            : (Number(match.prize.value) || 0);
+          const prizeValue = match.prize.type === 'percentage' ? (Number(match.pot || 0) * (Number(match.prize.value) || 0)) / 100 : (Number(match.prize.value) || 0);
 
           return (
-            <div key={match.id} className={cn(
-              "card-container relative p-0 overflow-hidden border-2 transition-all duration-500",
-              match.status === 'in_progress' ? 'border-accent ring-4 ring-accent/20' : 'border-transparent',
-              match.status === 'finished' ? 'opacity-75 grayscale-[0.5]' : ''
-            )}>
-              {match.prize.type === 'product' && match.prize_image_url ? (
-                <div className="relative h-40 w-full">
-                  <img src={match.prize_image_url} alt={match.prize.productName || 'Prêmio'} className="w-full h-full object-cover" />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
-                  <div className="absolute bottom-3 left-4">
-                    <Badge className="bg-accent text-white border-none mb-1">PRÊMIO ESPECIAL</Badge>
-                    <h3 className="font-heading font-bold text-xl text-white drop-shadow-md">{match.prize.productName}</h3>
+            <div key={match.id} className={cn("card-container p-0 overflow-hidden border-2 transition-all", match.status === 'in_progress' ? 'border-accent ring-2 ring-accent/10' : 'border-transparent')}>
+              <div className="p-4">
+                <div className="flex flex-col sm:flex-row justify-between gap-4">
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className="font-heading font-bold text-lg">{match.name}</h3>
+                      {match.status === 'in_progress' && <Badge variant="destructive" className="animate-pulse text-[10px]">AO VIVO</Badge>}
+                      {countdownMatch && <Badge variant="outline" className="text-[10px] font-mono"><Timer className="w-3 h-3 mr-1" />{countdownMatch}</Badge>}
+                    </div>
+                    <div className="flex flex-wrap gap-3 text-[11px] text-muted-foreground font-medium">
+                      <span className="flex items-center gap-1"><Trophy className="w-3 h-3" />{gameTypeLabels[match.game_type]}</span>
+                      <span className="flex items-center gap-1"><Users className="w-3 h-3" />{playersInMatchCount} Jogadores</span>
+                      <span className="flex items-center gap-1"><Ticket className="w-3 h-3" />{allCardsInMatch.length} Cartelas</span>
+                    </div>
+                  </div>
+                  <div className="flex gap-2 sm:flex-col items-end justify-between sm:justify-center">
+                    <div className="text-right">
+                      <p className="text-[10px] font-bold uppercase text-muted-foreground">Prêmio</p>
+                      <p className="text-lg font-bold text-success leading-none">{Number(prizeValue).toFixed(2)} cr.</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-[10px] font-bold uppercase text-muted-foreground">Entrada</p>
+                      <p className="text-sm font-bold leading-none">{Number(match.card_price).toFixed(2)} cr.</p>
+                    </div>
                   </div>
                 </div>
-              ) : (
-                <div className={cn(
-                  "h-2 w-full",
-                  match.status === 'in_progress' ? 'bg-accent' : 'bg-primary'
-                )} />
-              )}
-
-              <div className="p-5">
-                <div className="flex flex-col lg:flex-row gap-6">
-                  <div className="flex-grow space-y-4">
-                    <div className="flex items-center flex-wrap gap-2">
-                      <h3 className="font-heading font-bold text-xl md:text-2xl text-foreground">{match.name}</h3>
-                      {match.status === 'in_progress' && <Badge variant="destructive" className="animate-pulse px-3 py-1">AO VIVO</Badge>}
-                      {match.status === 'open' && <Badge className="bg-success text-white px-3 py-1">INSCRIÇÕES ABERTAS</Badge>}
-                      {countdownMatch && (
-                        <Badge variant="outline" className="font-mono text-sm border-primary/30 text-primary bg-primary/5">
-                            <Timer className="w-4 h-4 mr-2" />
-                            {countdownMatch}
-                        </Badge>
+                <div className="mt-4 pt-4 border-t flex flex-wrap gap-2 justify-end">
+                  {match.status === 'in_progress' && (
+                    <Button size="sm" className="bg-accent hover:bg-accent/90 text-white font-bold" onClick={() => navigate(`/match/${match.id}`)}>
+                      <Tv className="w-4 h-4 mr-2" /> ASSISTIR
+                    </Button>
+                  )}
+                  {match.status === 'open' && (
+                    <>
+                      {alreadyJoined && (
+                        <Button variant="ghost" size="sm" className="text-destructive" onClick={() => leaveMatch(match.id)}>Sair</Button>
                       )}
-                    </div>
-
-                    <div className="flex flex-wrap gap-4">
-                      <div className="flex items-center gap-2 text-muted-foreground">
-                        <Trophy className="w-4 h-4 text-amber-500" />
-                        <span className="text-sm font-medium">{gameTypeLabels[match.game_type]}</span>
-                      </div>
-                      <div className="flex items-center gap-2 text-muted-foreground">
-                        <Users className="w-4 h-4 text-blue-500" />
-                        <span className="text-sm font-medium">{playersInMatchCount} Jogadores</span>
-                      </div>
-                      <div className="flex items-center gap-2 text-muted-foreground">
-                        <Ticket className="w-4 h-4 text-purple-500" />
-                        <span className="text-sm font-medium">{totalCardsInMatch} Cartelas em jogo</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 min-w-[300px]">
-                    <div className="flex flex-col items-center justify-center p-3 rounded-2xl bg-primary/5 border border-primary/10">
-                      <span className="text-[10px] font-bold uppercase tracking-widest text-primary mb-1">Pote Total</span>
-                      <div className="flex items-center gap-1">
-                        <Coins className="w-4 h-4 text-primary" />
-                        <span className="text-xl font-bold font-heading">{Number(match.pot || 0).toFixed(2)}</span>
-                      </div>
-                    </div>
-
-                    <div className="flex flex-col items-center justify-center p-3 rounded-2xl bg-success/5 border border-success/10">
-                      <span className="text-[10px] font-bold uppercase tracking-widest text-success mb-1">Prêmio Estimado</span>
-                      <div className="flex items-center gap-1">
-                        <Trophy className="w-4 h-4 text-success" />
-                        <span className="text-xl font-bold font-heading text-success">{Number(prizeValue).toFixed(2)}</span>
-                      </div>
-                    </div>
-
-                    <div className="flex flex-col items-center justify-center p-3 rounded-2xl bg-accent/5 border border-accent/10 col-span-2 sm:col-span-1">
-                      <span className="text-[10px] font-bold uppercase tracking-widest text-accent mb-1">Sua Chance</span>
-                      <div className="flex items-center gap-1">
-                        <Target className="w-4 h-4 text-accent" />
-                        <span className="text-xl font-bold font-heading text-accent">{winChance.toFixed(1)}%</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mt-6 pt-5 border-t border-border/50 flex flex-col sm:flex-row items-center justify-between gap-4">
-                  <div className="flex items-center gap-3">
-                    <div className="text-center sm:text-left">
-                      <p className="text-[10px] font-bold uppercase text-muted-foreground tracking-tighter">Custo de Entrada</p>
-                      <p className="text-lg font-bold text-foreground">{Number(match.card_price || 0).toFixed(2)} créditos <span className="text-xs font-normal text-muted-foreground">/ cartela</span></p>
-                    </div>
-                  </div>
-
-                  <div className="flex gap-3 w-full sm:w-auto">
-                    {match.status === 'in_progress' && (
-                      <Button className="flex-grow sm:flex-grow-0 bg-accent hover:bg-accent/90 text-white font-bold px-8 h-12 rounded-xl shadow-lg shadow-accent/20" onClick={() => navigate(`/match/${match.id}`)}>
-                        <Tv className="w-5 h-5 mr-2" /> ASSISTIR AO VIVO
+                      <Button size="sm" className="gradient-accent text-white font-bold" onClick={() => openJoinDialog(match)}>
+                        {alreadyJoined ? 'ADICIONAR MAIS' : 'ENTRAR'}
                       </Button>
-                    )}
-                    
-                    {match.status === 'open' && (
-                      <>
-                        {alreadyJoined && (
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button variant="ghost" className="text-destructive hover:bg-destructive/5 h-12 px-4">
-                                <LogOut className="w-5 h-5 mr-2" /> Sair
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Sair da Partida?</AlertDialogTitle>
-                                <AlertDialogDescription>Suas cartelas serão removidas e os créditos estornados.</AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => leaveMatch(match.id)}>Confirmar Saída</AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                        )}
-                        <Button className="flex-grow sm:flex-grow-0 gradient-accent hover:opacity-90 text-white font-bold px-10 h-12 rounded-xl shadow-lg shadow-accent/30 text-base" onClick={() => openJoinDialog(match)}>
-                          {alreadyJoined ? 'ADICIONAR MAIS CARTELAS' : 'ENTRAR NA PARTIDA AGORA'}
-                        </Button>
-                      </>
-                    )}
-                  </div>
+                    </>
+                  )}
                 </div>
-
-                {match.status === 'open' && match.min_players > 1 && (
-                  <div className="mt-4">
-                    <div className="flex justify-between text-[10px] font-bold uppercase text-muted-foreground mb-1">
-                      <span>Progresso de Jogadores</span>
-                      <span>{playersInMatchCount} / {match.min_players} Mínimo</span>
-                    </div>
-                    <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
-                      <div 
-                        className="h-full bg-primary transition-all duration-1000" 
-                        style={{ width: `${Math.min(100, (playersInMatchCount / match.min_players) * 100)}%` }} 
-                      />
-                    </div>
-                  </div>
-                )}
               </div>
             </div>
           );
@@ -438,303 +265,190 @@ const Lobby = () => {
   };
 
   return (
-    <>
+    <div className="space-y-6">
       {profile.role === 'admin' && (
-        <div className="mb-6">
-          <Button className="w-full" variant="outline" onClick={() => navigate('/admin')}>
-            <Settings className="w-4 h-4 mr-2" /> Acessar Painel de Admin
-          </Button>
-        </div>
+        <Button className="w-full h-9 text-xs" variant="outline" onClick={() => navigate('/admin')}>
+          <Settings className="w-3.5 h-3.5 mr-2" /> Painel Administrativo
+        </Button>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-10">
-        <div className="card-container bg-gradient-to-br from-primary to-primary/80 text-white border-none p-6 flex flex-col justify-between relative overflow-hidden group">
-          <Coins className="absolute -right-4 -bottom-4 w-32 h-32 text-white/10 rotate-12 group-hover:scale-110 transition-transform duration-500" />
-          <div>
-            <p className="text-xs font-bold uppercase tracking-widest opacity-80 mb-1">Pote Acumulado Total</p>
-            <h2 className="text-4xl font-bold font-heading">{Number(totalPot).toFixed(2)} <span className="text-lg font-normal opacity-70">cr.</span></h2>
-          </div>
-          <div className="mt-4 flex items-center gap-2 text-sm font-medium bg-white/10 w-fit px-3 py-1 rounded-full backdrop-blur-sm">
-            <TrendingUp className="w-4 h-4" />
-            <span>Crescendo em tempo real!</span>
-          </div>
+      {/* Estatísticas Compactas - 4 Colunas no Mobile */}
+      <div className="grid grid-cols-4 gap-1.5 sm:gap-4">
+        <div className="card-container p-2 sm:p-4 bg-primary text-white border-none flex flex-col items-center text-center justify-center">
+          <Coins className="w-4 h-4 sm:w-6 sm:h-6 mb-1 opacity-80" />
+          <p className="text-[9px] sm:text-xs font-bold uppercase opacity-70 leading-tight">Pote</p>
+          <p className="text-xs sm:text-xl font-bold font-heading truncate w-full">{Number(totalPot).toFixed(0)}</p>
         </div>
-
-        <div 
-          className="card-container bg-gradient-to-br from-accent to-accent/80 text-white border-none p-6 flex flex-col justify-between relative overflow-hidden group cursor-pointer"
-          onClick={() => navigate('/active-players')}
-        >
-          <Users className="absolute -right-4 -bottom-4 w-32 h-32 text-white/10 -rotate-12 group-hover:scale-110 transition-transform duration-500" />
-          <div>
-            <p className="text-xs font-bold uppercase tracking-widest opacity-80 mb-1">Jogadores Ativos</p>
-            <h2 className="text-4xl font-bold font-heading">{totalPlayers} <span className="text-lg font-normal opacity-70">online</span></h2>
-          </div>
-          <div className="mt-4 flex items-center gap-2 text-sm font-medium bg-white/10 w-fit px-3 py-1 rounded-full backdrop-blur-sm">
-            <Flame className="w-4 h-4" />
-            <span>A rodada está quente!</span>
-          </div>
+        <div className="card-container p-2 sm:p-4 bg-accent text-white border-none flex flex-col items-center text-center justify-center" onClick={() => navigate('/active-players')}>
+          <Users className="w-4 h-4 sm:w-6 sm:h-6 mb-1 opacity-80" />
+          <p className="text-[9px] sm:text-xs font-bold uppercase opacity-70 leading-tight">Ativos</p>
+          <p className="text-xs sm:text-xl font-bold font-heading truncate w-full">{totalPlayers}</p>
         </div>
-
-        <div 
-          className="card-container bg-gradient-to-br from-amber-500 to-amber-600 text-white border-none p-6 flex flex-col justify-between relative overflow-hidden group cursor-pointer"
-          onClick={() => navigate('/trophies')}
-        >
-          <Trophy className="absolute -right-4 -bottom-4 w-32 h-32 text-white/10 rotate-6 group-hover:scale-110 transition-transform duration-500" />
-          <div>
-            <p className="text-xs font-bold uppercase tracking-widest opacity-80 mb-1">Suas Vitórias</p>
-            <h2 className="text-4xl font-bold font-heading">{wins.length} <span className="text-lg font-normal opacity-70">troféus</span></h2>
-          </div>
-          <div className="mt-4 flex items-center gap-2 text-sm font-medium bg-white/10 w-fit px-3 py-1 rounded-full backdrop-blur-sm">
-            <Star className="w-4 h-4" />
-            <span>Rumo ao próximo Bingo!</span>
-          </div>
+        <div className="card-container p-2 sm:p-4 bg-amber-500 text-white border-none flex flex-col items-center text-center justify-center" onClick={() => navigate('/trophies')}>
+          <Trophy className="w-4 h-4 sm:w-6 sm:h-6 mb-1 opacity-80" />
+          <p className="text-[9px] sm:text-xs font-bold uppercase opacity-70 leading-tight">Troféus</p>
+          <p className="text-xs sm:text-xl font-bold font-heading truncate w-full">{wins.length}</p>
         </div>
-
-        <div 
-          className="card-container bg-gradient-to-br from-yellow-500 to-yellow-600 text-white border-none p-6 flex flex-col justify-between relative overflow-hidden group cursor-pointer"
-          onClick={() => navigate('/ranking')}
-        >
-          <Crown className="absolute -right-4 -bottom-4 w-32 h-32 text-white/10 rotate-12 group-hover:scale-110 transition-transform duration-500" />
-          <div>
-            <p className="text-xs font-bold uppercase tracking-widest opacity-80 mb-1">Hall da Fama</p>
-            <h2 className="text-4xl font-bold font-heading">Ranking</h2>
-          </div>
-          <div className="mt-4 flex items-center gap-2 text-sm font-medium bg-white/10 w-fit px-3 py-1 rounded-full backdrop-blur-sm">
-            <Trophy className="w-4 h-4" />
-            <span>Veja os melhores!</span>
-          </div>
+        <div className="card-container p-2 sm:p-4 bg-yellow-500 text-white border-none flex flex-col items-center text-center justify-center" onClick={() => navigate('/ranking')}>
+          <Crown className="w-4 h-4 sm:w-6 sm:h-6 mb-1 opacity-80" />
+          <p className="text-[9px] sm:text-xs font-bold uppercase opacity-70 leading-tight">Ranking</p>
+          <p className="text-xs sm:text-xl font-bold font-heading truncate w-full">Top</p>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-        {/* LATERAL ESQUERDA: AGENDA (Apenas se motor ativo) */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        {/* Agenda Recolhível */}
         {gameSettings?.auto_engine_enabled && (
-            <div className="lg:col-span-3 space-y-6">
-                <div className="card-container p-5 border-2 border-primary/20 bg-primary/5">
-                    <h3 className="font-heading font-bold text-lg flex items-center gap-2 mb-4 text-primary">
-                        <CalendarDays className="w-5 h-5" /> Agenda de Hoje
-                    </h3>
-                    <div className="space-y-2 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
-                        {schedule.map((time, idx) => {
-                          const diff = time.getTime() - now;
-                          const countdownString = diff > 0 
-                              ? `${Math.floor((diff % 3600000) / 60000).toString().padStart(2, '0')}:${Math.floor((diff % 60000) / 1000).toString().padStart(2, '0')}`
-                              : "Iniciando...";
-
-                          return (
-                            <div key={idx} className="flex items-center justify-between p-3 rounded-xl bg-background border border-border/50 shadow-sm group hover:border-primary/30 transition-colors">
-                                <div className="flex items-center gap-3">
-                                    <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center text-sm font-bold text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary transition-colors">
-                                        {format(time, 'HH:mm')}
-                                    </div>
-                                    <span className="text-xs font-bold text-muted-foreground">Próxima Partida</span>
-                                </div>
-                                <Badge variant="outline" className="font-mono text-xs">
-                                    <Clock className="w-3 h-3 mr-1.5" />
-                                    {countdownString}
-                                </Badge>
-                            </div>
-                          );
-                        })}
-                        {schedule.length === 0 && (
-                            <p className="text-xs text-muted-foreground text-center py-4 italic">Nenhuma partida agendada para as próximas horas.</p>
-                        )}
+          <div className="lg:col-span-3 order-2 lg:order-1">
+            <div className="card-container p-0 border-2 border-primary/20 overflow-hidden">
+              <button 
+                onClick={() => setIsAgendaOpen(!isAgendaOpen)}
+                className="w-full p-4 flex items-center justify-between bg-primary/5 hover:bg-primary/10 transition-colors"
+              >
+                <h3 className="font-heading font-bold text-sm flex items-center gap-2 text-primary">
+                  <CalendarDays className="w-4 h-4" /> Agenda de Hoje
+                </h3>
+                {isAgendaOpen ? <ChevronUp className="w-4 h-4 text-primary" /> : <ChevronDown className="w-4 h-4 text-primary" />}
+              </button>
+              
+              <div className={cn(
+                "transition-all duration-300 ease-in-out overflow-hidden",
+                isAgendaOpen ? "max-height-[1000px] opacity-100 p-4" : "max-height-0 opacity-0"
+              )}>
+                <div className="space-y-2 max-h-[400px] overflow-y-auto pr-1 custom-scrollbar">
+                  {schedule.map((time, idx) => (
+                    <div key={idx} className="flex items-center justify-between p-2 rounded-lg bg-background border border-border/50 text-[11px]">
+                      <span className="font-bold text-primary">{format(time, 'HH:mm')}</span>
+                      <Badge variant="outline" className="text-[9px] h-4 font-mono">
+                        {getMatchCountdown(time.toISOString()) || 'Agora'}
+                      </Badge>
                     </div>
-                    <p className="text-[10px] text-muted-foreground mt-4 text-center leading-tight">
-                        * Horários baseados no intervalo de {gameSettings.auto_engine_interval_mins} min.
-                    </p>
+                  ))}
                 </div>
+              </div>
             </div>
+          </div>
         )}
 
-        {/* CONTEÚDO PRINCIPAL */}
-        <div className={cn(
-            "space-y-12",
-            gameSettings?.auto_engine_enabled ? "lg:col-span-9" : "lg:col-span-12"
-        )}>
-            
-            {/* SEÇÃO DE PARTIDAS */}
-            <div>
-                <h2 className="font-heading text-xl md:text-2xl font-bold text-foreground mb-6 flex items-center gap-2">
-                <DoorOpen className="w-6 h-6 text-accent" /> Partidas Disponíveis
-                </h2>
-                <Tabs defaultValue="in_progress" className="w-full">
-                <TabsList className="grid w-full h-auto p-1 grid-cols-2 sm:grid-cols-4 mb-6 bg-muted/50">
-                    <TabsTrigger value="in_progress" className="flex items-center gap-2 py-3">
-                    Ao Vivo
-                    {inProgressMatches.length > 0 && (
-                        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-[10px] font-bold text-white">
-                        {inProgressMatches.length}
-                        </span>
-                    )}
-                    </TabsTrigger>
-                    <TabsTrigger value="open" className="flex items-center gap-2 py-3">
-                    Abertas
-                    {openMatches.length > 0 && (
-                        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-accent text-[10px] font-bold text-white">
-                        {openMatches.length}
-                        </span>
-                    )}
-                    </TabsTrigger>
-                    <TabsTrigger value="waiting" className="flex items-center gap-2 py-3">
-                    Aguardando
-                    {waitingMatches.length > 0 && (
-                        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-amber-500 text-[10px] font-bold text-white">
-                        {waitingMatches.length}
-                        </span>
-                    )}
-                    </TabsTrigger>
-                    <TabsTrigger value="finished" className="flex items-center gap-2 py-3">
-                    Finalizadas
-                    </TabsTrigger>
-                </TabsList>
-                <TabsContent value="in_progress" className="mt-2">{renderMatchList(inProgressMatches)}</TabsContent>
-                <TabsContent value="open" className="mt-2">{renderMatchList(openMatches)}</TabsContent>
-                <TabsContent value="waiting" className="mt-2">{renderMatchList(waitingMatches)}</TabsContent>
-                <TabsContent value="finished" className="mt-2">{renderMatchList(finishedMatches)}</TabsContent>
-                </Tabs>
+        {/* Conteúdo Principal: Partidas e Cartelas */}
+        <div className={cn("space-y-8 order-1 lg:order-2", gameSettings?.auto_engine_enabled ? "lg:col-span-9" : "lg:col-span-12")}>
+          
+          {/* Seção de Partidas */}
+          <section>
+            <div className="flex items-center gap-2 mb-4">
+              <DoorOpen className="w-5 h-5 text-accent" />
+              <h2 className="font-heading text-lg font-bold">Partidas</h2>
+            </div>
+            <Tabs defaultValue="in_progress" className="w-full">
+              <TabsList className="grid w-full grid-cols-4 h-9 bg-muted/50 p-1 mb-4">
+                <TabsTrigger value="in_progress" className="text-[10px] sm:text-xs">Ao Vivo</TabsTrigger>
+                <TabsTrigger value="open" className="text-[10px] sm:text-xs">Abertas</TabsTrigger>
+                <TabsTrigger value="waiting" className="text-[10px] sm:text-xs">Espera</TabsTrigger>
+                <TabsTrigger value="finished" className="text-[10px] sm:text-xs">Fim</TabsTrigger>
+              </TabsList>
+              <TabsContent value="in_progress" className="mt-0">{renderMatchList(inProgressMatches)}</TabsContent>
+              <TabsContent value="open" className="mt-0">{renderMatchList(openMatches)}</TabsContent>
+              <TabsContent value="waiting" className="mt-0">{renderMatchList(waitingMatches)}</TabsContent>
+              <TabsContent value="finished" className="mt-0">{renderMatchList(finishedMatches)}</TabsContent>
+            </Tabs>
+          </section>
+
+          {/* Seção de Cartelas */}
+          <section>
+            <div className="flex items-center justify-between mb-4 gap-2">
+              <div className="flex items-center gap-2">
+                <Ticket className="w-5 h-5 text-primary" />
+                <h2 className="font-heading text-lg font-bold">Minhas Cartelas</h2>
+              </div>
+              <Dialog open={isCreateCardOpen} onOpenChange={setCreateCardOpen}>
+                <DialogTrigger asChild>
+                  <Button size="sm" className="gradient-primary font-bold h-8 text-[11px] px-3">
+                    <Plus className="w-3.5 h-3.5 mr-1" /> NOVA
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
+                  <DialogHeader>
+                    <DialogTitle>Criar Cartela</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4 py-2">
+                    <div className="space-y-2">
+                      <Label className="text-xs">Tipo de Crédito</Label>
+                      <RadioGroup value={creditType} onValueChange={(v: 'real' | 'fake') => setCreditType(v)} className="grid grid-cols-2 gap-2">
+                        <Label htmlFor="real" className="flex flex-col items-center p-3 border-2 rounded-lg cursor-pointer peer-data-[state=checked]:border-primary">
+                          <RadioGroupItem value="real" id="real" className="sr-only" />
+                          <Coins className="w-5 h-5 mb-1" />
+                          <span className="text-[10px] font-bold">REAIS</span>
+                        </Label>
+                        <Label htmlFor="fake" className="flex flex-col items-center p-3 border-2 rounded-lg cursor-pointer peer-data-[state=checked]:border-primary">
+                          <RadioGroupItem value="fake" id="fake" className="sr-only" />
+                          <Star className="w-5 h-5 mb-1" />
+                          <span className="text-[10px] font-bold">BRINCAR</span>
+                        </Label>
+                      </RadioGroup>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Nome</Label>
+                      <Input placeholder="Ex: Sorte" value={newCardName} onChange={e => setNewCardName(e.target.value)} />
+                    </div>
+                    <CardCreator onCardChange={setNewCardNumbers} />
+                  </div>
+                  <DialogFooter>
+                    <Button size="sm" onClick={handleCreateCard} disabled={!newCardName.trim() || !newCardNumbers} className="w-full">
+                      Salvar Cartela
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
             </div>
 
-            {/* SEÇÃO DE CARTELAS */}
-            <div>
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
-                <h2 className="font-heading text-xl md:text-2xl font-bold text-foreground flex items-center gap-2">
-                    <Ticket className="w-6 h-6 text-primary" /> Minhas Cartelas
-                </h2>
-                <Dialog open={isCreateCardOpen} onOpenChange={setCreateCardOpen}>
-                    <DialogTrigger asChild>
-                        <Button className="gradient-primary shadow-button h-11 px-6 font-bold w-full sm:w-auto">
-                        <Plus className="w-5 h-5 mr-2" />CRIAR NOVA CARTELA
-                        </Button>
-                    </DialogTrigger>
-                    <DialogContent className="max-w-xl flex flex-col max-h-[90vh]">
-                        <DialogHeader className="flex-shrink-0">
-                            <DialogTitle className="font-heading">Criar Nova Cartela</DialogTitle>
-                            <DialogDescription>Escolha o tipo de crédito e os números da sua cartela.</DialogDescription>
-                        </DialogHeader>
-                        <div className="flex-grow overflow-y-auto -mx-6 px-6">
-                            <div className="space-y-6 py-4">
-                            <div className="space-y-2">
-                                <Label>Tipo de Crédito</Label>
-                                <RadioGroup
-                                value={creditType}
-                                onValueChange={(v: 'real' | 'fake') => setCreditType(v)}
-                                className="grid grid-cols-2 gap-4"
-                                >
-                                <div>
-                                    <RadioGroupItem value="real" id="real" className="peer sr-only" />
-                                    <Label
-                                    htmlFor="real"
-                                    className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary cursor-pointer"
-                                    >
-                                    <Coins className="mb-2 h-6 w-6" />
-                                    <span className="text-xs font-bold uppercase">Reais</span>
-                                    <span className="text-[10px] text-muted-foreground mt-1">{Number(profile.credits || 0).toFixed(2)} cr.</span>
-                                    </Label>
-                                </div>
-                                <div>
-                                    <RadioGroupItem value="fake" id="fake" className="peer sr-only" />
-                                    <Label
-                                    htmlFor="fake"
-                                    className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary cursor-pointer"
-                                    >
-                                    <Star className="mb-2 h-6 w-6" />
-                                    <span className="text-xs font-bold uppercase">Brincar</span>
-                                    <span className="text-[10px] text-muted-foreground mt-1">{Number(profile.fake_credits || 0).toFixed(2)} cr.</span>
-                                    </Label>
-                                </div>
-                                </RadioGroup>
-                            </div>
-
-                            <div className="space-y-2">
-                                <Label>Nome da Cartela</Label>
-                                <Input placeholder="Ex: Sorte Pura" value={newCardName} onChange={e => setNewCardName(e.target.value)} className="bg-secondary border-0" />
-                            </div>
-
-                            <CardCreator onCardChange={setNewCardNumbers} />
-                            </div>
-                        </div>
-                        <DialogFooter className="flex-shrink-0">
-                            <DialogClose asChild><Button variant="ghost">Cancelar</Button></DialogClose>
-                            <Button onClick={handleCreateCard} disabled={!newCardName.trim() || !newCardNumbers}>
-                            Salvar (Custa {Number(useGame().gameSettings?.custo_nova_cartela || 10).toFixed(2)} cr.)
-                            </Button>
-                        </DialogFooter>
-                    </DialogContent>
-                </Dialog>
-                </div>
-
-                <Tabs defaultValue="active" className="w-full">
-                <TabsList className="grid w-full grid-cols-2 mb-4 h-10 bg-muted/30">
-                    <TabsTrigger value="active" className="text-xs">
-                    Ativas ({activeCards.length})
-                    </TabsTrigger>
-                    <TabsTrigger value="archived" className="text-xs">
-                    Arquivadas ({archivedCards.length})
-                    </TabsTrigger>
-                </TabsList>
-                
-                <TabsContent value="active" className="mt-0">
-                    {renderCardList(activeCards)}
-                </TabsContent>
-                
-                <TabsContent value="archived" className="mt-0">
-                    {renderCardList(archivedCards)}
-                </TabsContent>
-                </Tabs>
-            </div>
+            <Tabs defaultValue="active" className="w-full">
+              <TabsList className="grid w-full grid-cols-2 h-8 bg-muted/30 mb-4">
+                <TabsTrigger value="active" className="text-[10px]">Ativas ({activeCards.length})</TabsTrigger>
+                <TabsTrigger value="archived" className="text-[10px]">Arquivadas ({archivedCards.length})</TabsTrigger>
+              </TabsList>
+              <TabsContent value="active" className="mt-0">{renderCardList(activeCards)}</TabsContent>
+              <TabsContent value="archived" className="mt-0">{renderCardList(archivedCards)}</TabsContent>
+            </Tabs>
+          </section>
         </div>
       </div>
 
+      {/* Diálogo de Inscrição */}
       <Dialog open={isJoinDialogOpen} onOpenChange={setJoinDialogOpen}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader><DialogTitle className="font-heading">Entrar na Partida</DialogTitle><DialogDescription>Selecione as cartelas que deseja usar.</DialogDescription></DialogHeader>
-          <div className="max-h-[60vh] overflow-y-auto p-1 space-y-3">
-            {profile && activeCards.filter(card => !new Set(getPlayerMatchCards(selectedMatch?.id || '', profile.id).map(c => c.player_card_id)).has(card.id)).map(card => {
-                const isSelected = cardsToJoin.has(card.id);
-                const isDisabled = card.uses_left === 0;
-                const isRechargingThisCard = rechargingCardId === card.id;
-                return (
-                  <div 
-                    key={card.id} 
-                    onClick={() => !isDisabled && !isRechargingThisCard && setCardsToJoin(prev => { const next = new Set(prev); if (isSelected) next.delete(card.id); else next.add(card.id); return next; })} 
-                    className={`p-3 rounded-lg border-2 transition-all ${isDisabled ? 'opacity-60' : 'cursor-pointer'} ${isSelected ? 'border-primary bg-primary/5' : 'border-transparent bg-secondary'}`}
-                  >
-                    <div className="flex justify-between items-center">
-                      <h3 className="font-heading font-semibold text-sm">{card.name}</h3>
-                      {isDisabled ? (
-                        <Button 
-                          size="sm" 
-                          variant="outline" 
-                          className="h-7 text-xs px-2"
-                          onClick={(e) => { e.stopPropagation(); handleRechargeInDialog(card.id); }}
-                          disabled={isRechargingThisCard}
-                        >
-                          {isRechargingThisCard ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Coins className="w-3 h-3 mr-1" /> Recarregar</>}
-                        </Button>
-                      ) : (
-                        <Badge variant="outline" className="text-xs">{card.uses_left} uso(s)</Badge>
-                      )}
-                    </div>
-                  </div>
-                );
+        <DialogContent className="max-w-md max-h-[80vh] overflow-y-auto">
+          <DialogHeader><DialogTitle>Entrar na Partida</DialogTitle></DialogHeader>
+          <div className="space-y-3 py-2">
+            {activeCards.filter(card => !new Set(getPlayerMatchCards(selectedMatch?.id || '', profile.id).map(c => c.player_card_id)).has(card.id)).map(card => {
+              const isSelected = cardsToJoin.has(card.id);
+              const isDisabled = card.uses_left === 0;
+              return (
+                <div 
+                  key={card.id} 
+                  onClick={() => !isDisabled && setCardsToJoin(prev => { const next = new Set(prev); if (isSelected) next.delete(card.id); else next.add(card.id); return next; })} 
+                  className={cn("p-3 rounded-lg border-2 transition-all flex justify-between items-center", isSelected ? 'border-primary bg-primary/5' : 'border-transparent bg-secondary', isDisabled && 'opacity-50')}
+                >
+                  <span className="text-sm font-bold">{card.name}</span>
+                  {isDisabled ? (
+                    <Button size="sm" variant="outline" className="h-7 text-[10px]" onClick={(e) => { e.stopPropagation(); handleRechargeInDialog(card.id); }}>Recarregar</Button>
+                  ) : (
+                    <Badge variant="outline" className="text-[10px]">{card.uses_left} usos</Badge>
+                  )}
+                </div>
+              );
             })}
           </div>
-          <DialogFooter>
-            <div className="w-full flex justify-between items-center">
-              <span className="font-heading font-semibold text-base md:text-lg">Total: {Number(cardsToJoin.size * (selectedMatch?.card_price || 0)).toFixed(2)} créditos</span>
-              <Button onClick={handleJoinMatch} disabled={cardsToJoin.size === 0 || isJoining}>
-                {isJoining ? (
-                  <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Confirmando...</>
-                ) : (
-                  'Confirmar e Pagar'
-                )}
-              </Button>
+          <DialogFooter className="flex-col sm:flex-row gap-3">
+            <div className="text-center sm:text-left">
+              <p className="text-xs text-muted-foreground">Total</p>
+              <p className="text-lg font-bold">{Number(cardsToJoin.size * (selectedMatch?.card_price || 0)).toFixed(2)} cr.</p>
             </div>
+            <Button onClick={handleJoinMatch} disabled={cardsToJoin.size === 0 || isJoining} className="w-full sm:w-auto">
+              {isJoining ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Confirmar'}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </>
+    </div>
   );
 };
 
