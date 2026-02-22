@@ -59,24 +59,35 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Effect for auto-starting and auto-calling
   useEffect(() => {
-    // Heartbeat: Verifica se precisa criar uma nova partida a cada 30 segundos
+    // Heartbeat: Verifica se precisa preencher a agenda a cada 30 segundos
     if (
       gameSettingsHook.gameSettings?.auto_engine_enabled && 
       now - lastHeartbeatRef.current > 30000
     ) {
       lastHeartbeatRef.current = now;
-      const hasOpenMatch = matchesHook.matches.some(m => m.status === 'open');
-      if (!hasOpenMatch) {
-        console.log("[Bingo] Heartbeat: Nenhuma partida aberta encontrada. Chamando motor...");
-        supabase.functions.invoke('auto-match-engine');
-      }
+      supabase.functions.invoke('auto-match-engine');
     }
 
     matchesHook.matches.forEach(match => {
-      // Auto-start logic
-      const processingKeyStart = `start_${match.id}`;
       const startTime = new Date(match.start_time).getTime();
-      
+
+      // Lógica para abrir a partida: 'waiting' -> 'open'
+      const processingKeyOpen = `open_${match.id}`;
+      if (
+        match.is_auto_calling &&
+        match.status === 'waiting' &&
+        now >= startTime &&
+        !processingRef.current.has(processingKeyOpen)
+      ) {
+        processingRef.current.add(processingKeyOpen);
+        console.log(`[Bingo] Abrindo partida automática: ${match.name}`);
+        matchesHook.openMatch(match.id).finally(() => {
+           setTimeout(() => processingRef.current.delete(processingKeyOpen), 3000);
+        });
+      }
+
+      // Lógica para iniciar a partida: 'open' -> 'in_progress'
+      const processingKeyStart = `start_${match.id}`;
       if (
         match.is_auto_calling &&
         match.status === 'open' &&
@@ -85,17 +96,14 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       ) {
         processingRef.current.add(processingKeyStart);
         console.log(`[Bingo] Iniciando partida automática: ${match.name}`);
-        
         matchesHook.startMatch(match.id, true).finally(() => {
-           // Limpa a trava após 3 segundos para permitir novas ações se necessário
            setTimeout(() => processingRef.current.delete(processingKeyStart), 3000);
         });
       }
 
-      // Auto-call logic (Proteção contra chamadas extras)
+      // Lógica para sortear números
       const processingKeyCall = `call_${match.id}`;
       const nextTimestamp = match.next_auto_call_timestamp;
-      
       if (
         match.is_auto_calling &&
         match.status === 'in_progress' && 
@@ -106,8 +114,6 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       ) {
         lastProcessedTimestampRef.current.set(match.id, nextTimestamp);
         processingRef.current.add(processingKeyCall);
-        
-        console.log(`[Bingo] Chamando número automático para: ${match.name}`);
         
         const availableNumbers = Array.from({ length: 75 }, (_, i) => i + 1)
           .filter(num => !(match.called_numbers || []).includes(num));
@@ -152,7 +158,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
   return (
     <GameContext.Provider value={value}>
       {children}
-    </GameContext.Provider>
+    </Game-context.Provider>
   );
 };
 

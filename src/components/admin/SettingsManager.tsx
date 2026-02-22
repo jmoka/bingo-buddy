@@ -111,11 +111,13 @@ const SettingsManager = () => {
     setIsSaving(false);
 
     if (success && name === 'auto_engine_enabled' && checked) {
-        toast.info("Motor ativado! Tentando criar a primeira partida...");
+        toast.info("Motor ativado! Gerando a agenda de partidas do dia...");
         try {
-            const { data } = await supabase.functions.invoke('auto-match-engine', { body: { force: true } });
-            if (data?.success) {
-                toast.success(`Partida criada: ${data.match.name}`);
+            const { data } = await supabase.functions.invoke('auto-match-engine');
+            if (data?.createdCount > 0) {
+                toast.success(`${data.createdCount} partidas foram agendadas!`);
+            } else {
+                toast.info("A agenda de hoje já está completa.");
             }
         } catch (e) {}
     }
@@ -154,12 +156,12 @@ const SettingsManager = () => {
   const handleTestEngine = async () => {
     setIsTestingEngine(true);
     try {
-      const { data, error } = await supabase.functions.invoke('auto-match-engine', { body: { force: true } });
+      const { data, error } = await supabase.functions.invoke('auto-match-engine');
       if (error) throw error;
-      if (data.success) {
-        toast.success('Motor executado!', { description: `Nova partida criada: ${data.match.name}` });
+      if (data.createdCount > 0) {
+        toast.success('Motor executado!', { description: `${data.createdCount} partidas agendadas.` });
       } else {
-        toast.info('Motor executado, mas nenhuma partida foi criada.', { description: data.message });
+        toast.info('Motor executado, mas nenhuma partida nova foi criada.', { description: 'A agenda já está completa para hoje.' });
       }
     } catch (e: any) {
       toast.error('Erro ao testar motor', { description: e.message });
