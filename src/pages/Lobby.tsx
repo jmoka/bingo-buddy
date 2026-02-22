@@ -8,7 +8,7 @@ import { Match, MatchStatus, PlayerCard } from '@/types/match';
 import { gameTypeLabels } from '@/utils/bingoUtils';
 import { 
   Coins, Plus, Trophy, Users, Settings, 
-  Timer, DoorOpen, Ticket, Zap, ZapOff, Tv, Archive, Trash2, RotateCcw, Star, Loader2, History, LogOut
+  Timer, DoorOpen, Ticket, Zap, ZapOff, Tv, Archive, Trash2, RotateCcw, Star, Loader2, History, LogOut, TrendingUp, Target
 } from 'lucide-react';
 import { 
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose, DialogDescription
@@ -31,6 +31,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { cn } from '@/lib/utils';
 
 const Lobby = () => {
   const navigate = useNavigate();
@@ -243,120 +244,165 @@ const Lobby = () => {
       );
     }
     return (
-      <div className="space-y-4">
+      <div className="space-y-6">
         {matchesToRender.map(match => {
-          const playersInMatchCount = new Set(matchCards.filter(mc => mc.match_id === match.id).map(mc => mc.player_id)).size;
+          const allCardsInMatch = matchCards.filter(mc => mc.match_id === match.id);
+          const playersInMatchCount = new Set(allCardsInMatch.map(mc => mc.player_id)).size;
+          const totalCardsInMatch = allCardsInMatch.length;
+          
           const myMatchCards = getPlayerMatchCards(match.id, profile.id);
           const alreadyJoined = myMatchCards.length > 0;
           const countdown = (match.status === 'waiting' || match.status === 'open') ? getCountdown(match.start_time) : null;
+
+          // Cálculo de Probabilidade
+          const winChance = totalCardsInMatch > 0 ? (myMatchCards.length / totalCardsInMatch) * 100 : 0;
+
+          // Cálculo do Prêmio Real
+          const prizeValue = match.prize.type === 'percentage' 
+            ? Math.floor((match.pot * (match.prize.value || 0)) / 100) 
+            : (match.prize.value || 0);
+
           return (
-            <div key={match.id} className={`card-container relative p-0 overflow-hidden ${match.status === 'in_progress' ? 'ring-2 ring-accent' : ''} ${match.status === 'finished' ? 'opacity-70' : ''}`}>
-              {match.prize.type === 'product' && match.prize_image_url && (
-                <img src={match.prize_image_url} alt={match.prize.productName || 'Prêmio'} className="w-full h-32 object-cover" />
+            <div key={match.id} className={cn(
+              "card-container relative p-0 overflow-hidden border-2 transition-all duration-500",
+              match.status === 'in_progress' ? 'border-accent ring-4 ring-accent/20' : 'border-transparent',
+              match.status === 'finished' ? 'opacity-75 grayscale-[0.5]' : ''
+            )}>
+              {/* Imagem do Prêmio ou Header Colorido */}
+              {match.prize.type === 'product' && match.prize_image_url ? (
+                <div className="relative h-40 w-full">
+                  <img src={match.prize_image_url} alt={match.prize.productName || 'Prêmio'} className="w-full h-full object-cover" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+                  <div className="absolute bottom-3 left-4">
+                    <Badge className="bg-accent text-white border-none mb-1">PRÊMIO ESPECIAL</Badge>
+                    <h3 className="font-heading font-bold text-xl text-white drop-shadow-md">{match.prize.productName}</h3>
+                  </div>
+                </div>
+              ) : (
+                <div className={cn(
+                  "h-2 w-full",
+                  match.status === 'in_progress' ? 'bg-accent' : 'bg-primary'
+                )} />
               )}
-              <div className="p-4">
-                <div className="flex flex-col sm:flex-row items-start justify-between gap-3">
-                  <div>
-                    <div className="flex items-center flex-wrap gap-2 mb-1">
-                      <h3 className={`font-heading font-bold text-base md:text-lg text-foreground ${match.status === 'finished' ? 'line-through' : ''}`}>{match.name}</h3>
-                      {match.status === 'waiting' && <Badge variant="outline" className="text-[10px] h-5">Aguardando</Badge>}
-                      {match.status === 'open' && <Badge variant="secondary" className="text-primary text-[10px] h-5">Aberto</Badge>}
-                      {match.status === 'in_progress' && <Badge variant="destructive" className="animate-pulse text-[10px] h-5">AO VIVO</Badge>}
-                      {match.status === 'finished' && <Badge variant="outline" className="text-[10px] h-5">Finalizada</Badge>}
+
+              <div className="p-5">
+                <div className="flex flex-col lg:flex-row gap-6">
+                  {/* Coluna 1: Info Principal */}
+                  <div className="flex-grow space-y-4">
+                    <div className="flex items-center flex-wrap gap-2">
+                      <h3 className="font-heading font-bold text-xl md:text-2xl text-foreground">{match.name}</h3>
+                      {match.status === 'in_progress' && <Badge variant="destructive" className="animate-pulse px-3 py-1">AO VIVO</Badge>}
+                      {match.status === 'open' && <Badge className="bg-success text-white px-3 py-1">INSCRIÇÕES ABERTAS</Badge>}
                       {countdown && (
-                        <Badge variant="outline" className="font-mono text-[10px] h-5">
-                            <Timer className="w-3 h-3 mr-1" />
+                        <Badge variant="outline" className="font-mono text-sm border-primary/30 text-primary bg-primary/5">
+                            <Timer className="w-4 h-4 mr-2" />
                             {countdown}
                         </Badge>
                       )}
                     </div>
-                    <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
-                      <span className="flex items-center gap-1"><Trophy className="w-3.5 h-3.5" />{gameTypeLabels[match.game_type]}</span>
-                      <span className="flex items-center gap-1"><Users className="w-3.5 h-3.5" />{playersInMatchCount}</span>
-                      {match.min_players > 1 && <span className="flex items-center gap-1"><Users className="w-3.5 h-3.5" />{match.min_players} min</span>}
-                      <span className="flex items-center gap-1"><Coins className="w-3.5 h-3.5" />Pote: {match.pot}</span>
+
+                    <div className="flex flex-wrap gap-4">
+                      <div className="flex items-center gap-2 text-muted-foreground">
+                        <Trophy className="w-4 h-4 text-amber-500" />
+                        <span className="text-sm font-medium">{gameTypeLabels[match.game_type]}</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-muted-foreground">
+                        <Users className="w-4 h-4 text-blue-500" />
+                        <span className="text-sm font-medium">{playersInMatchCount} Jogadores</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-muted-foreground">
+                        <Ticket className="w-4 h-4 text-purple-500" />
+                        <span className="text-sm font-medium">{totalCardsInMatch} Cartelas em jogo</span>
+                      </div>
                     </div>
                   </div>
-                  <div className="flex flex-col items-start sm:items-end w-full sm:w-auto">
-                    <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-                      {match.status === 'in_progress' && (
-                        <Button size="sm" className="bg-success/10 text-success hover:bg-success/20 h-8 text-xs w-full sm:w-auto" onClick={() => navigate(`/match/${match.id}`)}><Tv className="w-3.5 h-3.5 mr-2" /> Acompanhar</Button>
-                      )}
-                      {match.status === 'open' && (
-                        <>
-                          {alreadyJoined && (
-                            <AlertDialog>
-                              <AlertDialogTrigger asChild>
-                                <Button size="sm" variant="destructive" className="h-8 text-xs w-full sm:w-auto">
-                                  <LogOut className="w-3.5 h-3.5 mr-2" />
-                                  Sair da Partida
-                                </Button>
-                              </AlertDialogTrigger>
-                              <AlertDialogContent>
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle>Sair da Partida?</AlertDialogTitle>
-                                  <AlertDialogDescription>
-                                    Suas cartelas serão removidas e os créditos de entrada serão estornados para sua conta.
-                                  </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                  <AlertDialogAction onClick={() => leaveMatch(match.id)}>Confirmar Saída</AlertDialogAction>
-                                </AlertDialogFooter>
-                              </AlertDialogContent>
-                            </AlertDialog>
-                          )}
-                          <Button size="sm" className="gradient-accent shadow-button h-8 text-xs w-full sm:w-auto" onClick={() => openJoinDialog(match)}>
-                            {alreadyJoined ? 'Adicionar Cartelas' : 'Entrar na Partida'}
-                          </Button>
-                        </>
-                      )}
-                      {match.status === 'waiting' && (
-                        <Button size="sm" disabled className="h-8 text-xs w-full sm:w-auto">Aguardando</Button>
-                      )}
-                      {match.status === 'finished' && (
-                        <Button size="sm" disabled className="h-8 text-xs w-full sm:w-auto">Encerrada</Button>
-                      )}
+
+                  {/* Coluna 2: Dashboard de Ganhos (O que importa!) */}
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 min-w-[300px]">
+                    <div className="flex flex-col items-center justify-center p-3 rounded-2xl bg-primary/5 border border-primary/10">
+                      <span className="text-[10px] font-bold uppercase tracking-widest text-primary mb-1">Pote Total</span>
+                      <div className="flex items-center gap-1">
+                        <Coins className="w-4 h-4 text-primary" />
+                        <span className="text-xl font-bold font-heading">{match.pot}</span>
+                      </div>
                     </div>
-                    <span className="text-[10px] text-muted-foreground mt-1">{match.card_price} créditos por cartela</span>
+
+                    <div className="flex flex-col items-center justify-center p-3 rounded-2xl bg-success/5 border border-success/10">
+                      <span className="text-[10px] font-bold uppercase tracking-widest text-success mb-1">Prêmio Estimado</span>
+                      <div className="flex items-center gap-1">
+                        <Trophy className="w-4 h-4 text-success" />
+                        <span className="text-xl font-bold font-heading text-success">{prizeValue}</span>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col items-center justify-center p-3 rounded-2xl bg-accent/5 border border-accent/10 col-span-2 sm:col-span-1">
+                      <span className="text-[10px] font-bold uppercase tracking-widest text-accent mb-1">Sua Chance</span>
+                      <div className="flex items-center gap-1">
+                        <Target className="w-4 h-4 text-accent" />
+                        <span className="text-xl font-bold font-heading text-accent">{winChance.toFixed(1)}%</span>
+                      </div>
+                    </div>
                   </div>
                 </div>
-                {(alreadyJoined || match.status === 'in_progress') && (
-                  <div className="mt-4 pt-4 border-t border-border/50 space-y-3">
+
+                {/* Rodapé do Card: Ações */}
+                <div className="mt-6 pt-5 border-t border-border/50 flex flex-col sm:flex-row items-center justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="text-center sm:text-left">
+                      <p className="text-[10px] font-bold uppercase text-muted-foreground tracking-tighter">Custo de Entrada</p>
+                      <p className="text-lg font-bold text-foreground">{match.card_price} créditos <span className="text-xs font-normal text-muted-foreground">/ cartela</span></p>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-3 w-full sm:w-auto">
                     {match.status === 'in_progress' && (
-                      <div>
-                        <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-1.5">
-                          <History className="w-3 h-3" />
-                          Últimos 5 Sorteados
-                        </p>
-                        <div className="flex flex-wrap gap-1.5">
-                          {match.called_numbers.length > 0 ? (
-                            match.called_numbers.slice(-5).reverse().map((num, index) => (
-                              <span key={index} className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${index === 0 ? 'bg-accent text-accent-foreground shadow-md' : 'bg-secondary text-secondary-foreground'}`}>
-                                {num}
-                              </span>
-                            ))
-                          ) : (
-                            <p className="text-xs italic text-muted-foreground">Nenhum número sorteado ainda.</p>
-                          )}
-                        </div>
-                      </div>
+                      <Button className="flex-grow sm:flex-grow-0 bg-accent hover:bg-accent/90 text-white font-bold px-8 h-12 rounded-xl shadow-lg shadow-accent/20" onClick={() => navigate(`/match/${match.id}`)}>
+                        <Tv className="w-5 h-5 mr-2" /> ASSISTIR AO VIVO
+                      </Button>
                     )}
-                    {alreadyJoined && (
-                      <div>
-                        <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-1.5">
-                          <Ticket className="w-3 h-3" />
-                          Suas Cartelas na Partida ({myMatchCards.length})
-                        </p>
-                        <div className="flex flex-wrap gap-1.5">
-                          {myMatchCards.map(card => (
-                            <Badge key={card.id} variant="outline" className="font-medium text-xs">
-                              {card.name}
-                            </Badge>
-                          ))}
-                        </div>
-                      </div>
+                    
+                    {match.status === 'open' && (
+                      <>
+                        {alreadyJoined && (
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button variant="ghost" className="text-destructive hover:bg-destructive/5 h-12 px-4">
+                                <LogOut className="w-5 h-5 mr-2" /> Sair
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Sair da Partida?</AlertDialogTitle>
+                                <AlertDialogDescription>Suas cartelas serão removidas e os créditos estornados.</AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                <AlertDialogAction onClick={() => leaveMatch(match.id)}>Confirmar Saída</AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        )}
+                        <Button className="flex-grow sm:flex-grow-0 gradient-accent hover:opacity-90 text-white font-bold px-10 h-12 rounded-xl shadow-lg shadow-accent/30 text-base" onClick={() => openJoinDialog(match)}>
+                          {alreadyJoined ? 'ADICIONAR MAIS CARTELAS' : 'ENTRAR NA PARTIDA AGORA'}
+                        </Button>
+                      </>
                     )}
+                  </div>
+                </div>
+
+                {/* Barra de Progresso de Inscrição (Visual) */}
+                {match.status === 'open' && match.min_players > 1 && (
+                  <div className="mt-4">
+                    <div className="flex justify-between text-[10px] font-bold uppercase text-muted-foreground mb-1">
+                      <span>Progresso de Jogadores</span>
+                      <span>{playersInMatchCount} / {match.min_players} Mínimo</span>
+                    </div>
+                    <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
+                      <div 
+                        className="h-full bg-primary transition-all duration-1000" 
+                        style={{ width: `${Math.min(100, (playersInMatchCount / match.min_players) * 100)}%` }} 
+                      />
+                    </div>
                   </div>
                 )}
               </div>
