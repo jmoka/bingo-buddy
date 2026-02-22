@@ -1,12 +1,43 @@
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Match, MatchCard, MatchStatus } from '@/types/match';
 import { toast } from 'sonner';
 import { useGameSettings } from './useGameSettings';
 
+// Helper para mutações otimistas de partidas
+const useUpdateMatchMutation = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ matchId, updates }: { matchId: string; updates: Partial<Match> }) => {
+      const { error } = await supabase.from('partidas').update(updates).eq('id', matchId);
+      if (error) throw error;
+    },
+    onMutate: async ({ matchId, updates }) => {
+      await queryClient.cancelQueries({ queryKey: ['matches'] });
+      const previousMatches = queryClient.getQueryData<Match[]>(['matches']);
+      
+      queryClient.setQueryData<Match[]>(['matches'], (old) =>
+        old?.map((match) => (match.id === matchId ? { ...match, ...updates } : match))
+      );
+
+      return { previousMatches };
+    },
+    onError: (err, variables, context) => {
+      if (context?.previousMatches) {
+        queryClient.setQueryData(['matches'], context.previousMatches);
+      }
+      toast.error("Ocorreu um erro.", { description: (err as Error).message });
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['matches'] });
+    },
+  });
+};
+
 export const useMatches = () => {
   const queryClient = useQueryClient();
   const { gameSettings } = useGameSettings();
+  const updateMatchMutation = useUpdateMatchMutation();
 
   const { data: matches = [] } = useQuery({
     queryKey: ['matches'],
@@ -51,16 +82,8 @@ export const useMatches = () => {
     if (data.is_auto_calling && matchToUpdate.status === 'waiting') {
       updatedData.status = 'open';
     }
-    const { error } = await supabase.from('partidas').update(updatedData).eq('id', matchId);
-    if (error) toast.error(error.message);
-    else toast.success('Partida atualizada com sucesso!');
-    await queryClient.invalidateQueries({ queryKey: ['matches'] });
-  };
-
-  const updateMatchStatus = async (matchId: string, status: MatchStatus) => {
-    const { error } = await supabase.from('partidas').update({ status }).eq('id', matchId);
-    if (error) toast.error(`Erro ao atualizar status: ${error.message}`);
-    await queryClient.invalidateQueries({ queryKey: ['matches'] });
+    updateMatchMutation.mutate({ matchId, updates: updatedData });
+    toast.success('Partida atualizada com sucesso!');
   };
 
   const openMatch = async (matchId: string) => {
@@ -71,10 +94,7 @@ export const useMatches = () => {
     if ('returnedReason' in prizeUpdate) {
       delete (prizeUpdate as any).returnedReason;
     }
-
-    const { error } = await supabase.from('partidas').update({ status: 'open', prize: prizeUpdate }).eq('id', matchId);
-    if (error) toast.error(`Erro ao abrir partida: ${error.message}`);
-    await queryClient.invalidateQueries({ queryKey: ['matches'] });
+    updateMatchMutation.mutate({ matchId, updates: { status: 'open', prize: prizeUpdate } });
   };
   
   const startMatch = async (matchId: string, force = false) => {
@@ -84,58 +104,35 @@ export const useMatches = () => {
 
     if (playersInMatch < 1) {
       if (match.is_auto_calling) {
-        // Se for automática e não tiver ninguém, deleta imediatamente
         await supabase.from('partidas').delete().eq('id', matchId);
-        toast.warning(`Partida automática "${match.name}" excluída.`, {
-          description: 'Nenhum jogador se inscreveu a tempo.'
-        });
-        // O heartbeat no GameContext irá chamar o triggerAutoEngine se necessário.
+        toast.warning(`Partida automática "${match.name}" excluída.`, { description: 'Nenhum jogador se inscreveu a tempo.' });
       } else {
-        // Se for manual, mantém o comportamento de retornar para aguardando
-        toast.error('A partida não pode ser iniciada sem jogadores.', {
-          description: 'Retornando a partida para o status "Aguardando".'
-        });
-        
+        toast.error('A partida não pode ser iniciada sem jogadores.', { description: 'Retornando a partida para o status "Aguardando".' });
         const newPrize = { ...match.prize, returnedReason: 'NO_PLAYERS' as const };
-        
-        await supabase.from('partidas').update({ 
-          status: 'waiting', 
-          is_auto_calling: false,
-          prize: newPrize
-        }).eq('id', matchId);
+        await supabase.from('partidas').update({ status: 'waiting', is_auto_calling: false, prize: newPrize }).eq('id', matchId);
       }
-      
       await queryClient.invalidateQueries({ queryKey: ['matches'] });
       return;
     }
 
     if (!force && playersInMatch < match.min_players) {
-      toast.error('A partida não pode ser iniciada.', {
-        description: `São necessários no mínimo ${match.min_players} jogadores, mas há apenas ${playersInMatch}.`
-      });
+      toast.error('A partida não pode ser iniciada.', { description: `São necessários no mínimo ${match.min_players} jogadores, mas há apenas ${playersInMatch}.` });
       return;
     }
     
-    const updatePayload: Partial<Match> = {
-      status: 'in_progress',
-    };
-
+    const updatePayload: Partial<Match> = { status: 'in_progress' };
     if (match.is_auto_calling && gameSettings) {
       const intervalInMs = (gameSettings.intervalo_sorteio_auto_seg || 120) * 1000;
       updatePayload.next_auto_call_timestamp = new Date(Date.now() + intervalInMs).toISOString();
     }
-
-    const { error } = await supabase.from('partidas').update(updatePayload).eq('id', matchId);
-    if (error) {
-      toast.error(`Erro ao iniciar partida: ${error.message}`);
-    } else {
-      // Se iniciou com sucesso, dispara o motor para criar a próxima da agenda
-      triggerAutoEngine();
-    }
-    await queryClient.invalidateQueries({ queryKey: ['matches'] });
+    
+    updateMatchMutation.mutate({ matchId, updates: updatePayload });
+    triggerAutoEngine();
   };
 
-  const finishMatch = (matchId: string) => updateMatchStatus(matchId, 'finished');
+  const finishMatch = (matchId: string) => {
+    updateMatchMutation.mutate({ matchId, updates: { status: 'finished' } });
+  };
   
   const deleteMatch = async (matchId: string) => {
     const { error } = await supabase.from('partidas').delete().eq('id', matchId);
@@ -143,7 +140,6 @@ export const useMatches = () => {
       toast.error(error.message);
     } else {
       toast.success('Partida excluída.');
-      // Dispara o motor para preencher o slot vazio
       triggerAutoEngine();
     }
     await queryClient.invalidateQueries({ queryKey: ['matches'] });
@@ -153,19 +149,18 @@ export const useMatches = () => {
     const match = matches.find(m => m.id === matchId);
     if (!match || !gameSettings) return;
     const isEnabling = !match.is_auto_calling;
-    const { error } = await supabase.from('partidas').update({
+    const updates = {
       is_auto_calling: isEnabling,
       next_auto_call_timestamp: isEnabling ? new Date(Date.now() + gameSettings.intervalo_sorteio_auto_seg * 1000).toISOString() : null,
-    }).eq('id', matchId);
-    if (error) toast.error('Erro ao alterar sorteio automático.');
-    await queryClient.invalidateQueries({ queryKey: ['matches'] });
+    };
+    updateMatchMutation.mutate({ matchId, updates });
   };
 
   const callNumber = async (matchId: string, num: number) => {
     try {
       const { error } = await supabase.functions.invoke('call-number', { body: { matchId, num } });
       if (error) throw error;
-      // Invalidate queries to refetch data
+      // A invalidação já é feita pelo onSettled da mutação e pelo listener de DB, mas uma extra aqui pode ajudar na percepção de velocidade.
       await queryClient.invalidateQueries({ queryKey: ['matches'] });
       await queryClient.invalidateQueries({ queryKey: ['matchCards'] });
     } catch (error) {
