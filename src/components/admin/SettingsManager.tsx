@@ -4,9 +4,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { Save, Settings, Check, Loader2, Bot, Link as LinkIcon, DollarSign, Banknote } from 'lucide-react';
+import { Save, Settings, Check, Loader2, Bot, Link as LinkIcon, DollarSign, Banknote, Play } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 import {
   Dialog,
   DialogContent,
@@ -41,6 +43,7 @@ const SettingsManager = () => {
   });
   const [isSaving, setIsSaving] = useState(false);
   const [justSaved, setJustSaved] = useState(false);
+  const [isTestingEngine, setIsTestingEngine] = useState(false);
   const [withdrawAmount, setWithdrawAmount] = useState(0);
   const [isWithdrawDialogOpen, setIsWithdrawDialogOpen] = useState(false);
   const [isWithdrawing, setIsWithdrawing] = useState(false);
@@ -103,6 +106,24 @@ const SettingsManager = () => {
     }, 2000);
   };
 
+  const handleTestEngine = async () => {
+    setIsTestingEngine(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('auto-match-engine');
+      if (error) throw error;
+      
+      if (data.success) {
+        toast.success('Motor executado!', { description: `Nova partida criada: ${data.match.name}` });
+      } else {
+        toast.info('Motor executado, mas nenhuma partida foi criada.', { description: data.message });
+      }
+    } catch (e: any) {
+      toast.error('Erro ao testar motor', { description: e.message });
+    } finally {
+      setIsTestingEngine(false);
+    }
+  };
+
   const handleWithdraw = async () => {
     setIsWithdrawing(true);
     const success = await withdrawAdminProfit(withdrawAmount);
@@ -149,6 +170,18 @@ const SettingsManager = () => {
                 onCheckedChange={(checked) => handleToggleChange('auto_engine_enabled', checked)}
               />
             </div>
+
+            {currentSettings.auto_engine_enabled && (
+              <Button 
+                variant="outline" 
+                className="w-full border-primary/30 text-primary hover:bg-primary/5"
+                onClick={handleTestEngine}
+                disabled={isTestingEngine}
+              >
+                {isTestingEngine ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Play className="w-4 h-4 mr-2" />}
+                Testar Motor Agora
+              </Button>
+            )}
             
             <div className="grid grid-cols-2 gap-4">
               <div>
