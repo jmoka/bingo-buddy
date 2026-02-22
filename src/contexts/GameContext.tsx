@@ -31,6 +31,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [now, setNow] = useState(Date.now());
   const processingRef = useRef(new Set<string>());
   const lastProcessedTimestampRef = useRef(new Map<string, string>());
+  const lastHeartbeatRef = useRef(0);
 
   const gameSettingsHook = useGameSettings();
   const matchesHook = useMatches();
@@ -58,6 +59,19 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Effect for auto-starting and auto-calling
   useEffect(() => {
+    // Heartbeat: Verifica se precisa criar uma nova partida a cada 30 segundos
+    if (
+      gameSettingsHook.gameSettings?.auto_engine_enabled && 
+      now - lastHeartbeatRef.current > 30000
+    ) {
+      lastHeartbeatRef.current = now;
+      const hasOpenMatch = matchesHook.matches.some(m => m.status === 'open');
+      if (!hasOpenMatch) {
+        console.log("[Bingo] Heartbeat: Nenhuma partida aberta encontrada. Chamando motor...");
+        supabase.functions.invoke('auto-match-engine');
+      }
+    }
+
     matchesHook.matches.forEach(match => {
       // Auto-start logic
       const processingKeyStart = `start_${match.id}`;
@@ -108,7 +122,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       }
     });
-  }, [now, matchesHook.matches]);
+  }, [now, matchesHook.matches, gameSettingsHook.gameSettings]);
 
   useEffect(() => {
     const channel = supabase.channel('schema-db-changes')

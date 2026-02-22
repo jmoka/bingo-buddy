@@ -49,9 +49,10 @@ serve(async (req) => {
     const reference = new Date();
     reference.setHours(startHour, 0, 0, 0);
     
-    // Se agora for antes da hora de início, o primeiro slot é a hora de início
+    // Encontra o próximo slot disponível
+    // Reduzi a margem para 10 segundos para garantir que o próximo slot seja pego mesmo logo após o início da anterior
     let nextSlot = reference.getTime();
-    while (nextSlot <= now.getTime() + (2 * 60 * 1000)) { // Garante pelo menos 2 min de antecedência
+    while (nextSlot <= now.getTime() + (10 * 1000)) { 
       nextSlot += interval * 60 * 1000;
     }
 
