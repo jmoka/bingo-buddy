@@ -21,7 +21,6 @@ serve(async (req) => {
 
     if (settingsError || !settings) throw new Error("Configurações não encontradas.");
 
-    // Se não estiver forçando, verifica se o motor está habilitado
     if (!settings.auto_engine_enabled && !force) {
       return new Response(JSON.stringify({ message: "Motor desativado." }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -41,23 +40,36 @@ serve(async (req) => {
       });
     }
 
-    // Verificar intervalo (pula se for 'force')
-    if (!force) {
-      const { data: lastMatch } = await supabaseAdmin.from('partidas').select('created_at').order('created_at', { ascending: false }).limit(1).single();
-      if (lastMatch) {
-        const diffMins = (new Date().getTime() - new Date(lastMatch.created_at).getTime()) / (1000 * 60);
-        if (diffMins < settings.auto_engine_interval_mins) {
-          return new Response(JSON.stringify({ message: "Intervalo não atingido.", nextIn: Math.round(settings.auto_engine_interval_mins - diffMins) }), {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 200,
-          });
-        }
-      }
+    // Lógica de Slots Fixos (Alinhamento com o Relógio)
+    const now = new Date();
+    const startHour = settings.auto_engine_start_hour || 0;
+    const interval = settings.auto_engine_interval_mins || 60;
+    
+    // Referência: Início do dia + Hora de Início configurada
+    const reference = new Date();
+    reference.setHours(startHour, 0, 0, 0);
+    
+    // Se agora for antes da hora de início, o primeiro slot é a hora de início
+    let nextSlot = reference.getTime();
+    while (nextSlot <= now.getTime() + (2 * 60 * 1000)) { // Garante pelo menos 2 min de antecedência
+      nextSlot += interval * 60 * 1000;
     }
 
-    // Criar a nova partida
-    const nextStartTime = new Date();
-    nextStartTime.setMinutes(nextStartTime.getMinutes() + 5);
+    const nextStartTime = new Date(nextSlot);
+
+    // Verificar se já existe uma partida aberta ou em andamento para este slot ou próxima
+    const { data: existing } = await supabaseAdmin
+      .from('partidas')
+      .select('id')
+      .eq('status', 'open')
+      .limit(1);
+
+    if (existing && existing.length > 0 && !force) {
+      return new Response(JSON.stringify({ message: "Já existe uma partida aberta aguardando jogadores." }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200,
+      });
+    }
 
     const newMatch = {
       name: `Bingo Automático #${(count || 0) + 1}`,

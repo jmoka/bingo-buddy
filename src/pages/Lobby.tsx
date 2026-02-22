@@ -71,15 +71,16 @@ const Lobby = () => {
     return () => clearInterval(interval);
   }, []);
 
-  // Cálculo das próximas 24 partidas (Lógica de horários fixos)
+  // Cálculo das próximas 24 partidas (Lógica de horários fixos baseada na configuração)
   const schedule = useMemo(() => {
     if (!gameSettings?.auto_engine_enabled) return [];
     
     const interval = gameSettings.auto_engine_interval_mins || 60;
+    const startHour = gameSettings.auto_engine_start_hour || 0;
     const times = [];
     
-    // Começa do início do dia atual
-    let checkTime = startOfDay(new Date()).getTime();
+    // Começa do início do dia atual + hora de início configurada
+    let checkTime = startOfDay(new Date()).getTime() + (startHour * 3600000);
     const limit = addMinutes(new Date(), 24 * 60).getTime();
 
     while (checkTime < limit) {

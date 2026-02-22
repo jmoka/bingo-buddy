@@ -1,14 +1,15 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useGame } from '@/contexts/GameContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { Save, Settings, Check, Loader2, Bot, Link as LinkIcon, DollarSign, Banknote, Play } from 'lucide-react';
+import { Save, Settings, Check, Loader2, Bot, Link as LinkIcon, DollarSign, Banknote, Play, CalendarDays } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { format, startOfDay } from 'date-fns';
 import {
   Dialog,
   DialogContent,
@@ -40,6 +41,7 @@ const SettingsManager = () => {
     auto_engine_card_price: 10,
     auto_engine_prize_type: 'percentage' as any,
     auto_engine_prize_value: 80,
+    auto_engine_start_hour: 0,
   });
   const [isSaving, setIsSaving] = useState(false);
   const [justSaved, setJustSaved] = useState(false);
@@ -68,9 +70,23 @@ const SettingsManager = () => {
         auto_engine_card_price: gameSettings.auto_engine_card_price || 10,
         auto_engine_prize_type: gameSettings.auto_engine_prize_type || 'percentage',
         auto_engine_prize_value: gameSettings.auto_engine_prize_value || 80,
+        auto_engine_start_hour: gameSettings.auto_engine_start_hour || 0,
       });
     }
   }, [gameSettings]);
+
+  const schedulePreview = useMemo(() => {
+    const times = [];
+    let checkTime = startOfDay(new Date()).getTime() + (currentSettings.auto_engine_start_hour * 3600000);
+    const limit = checkTime + (24 * 3600000);
+    const interval = currentSettings.auto_engine_interval_mins * 60000;
+
+    while (checkTime < limit && times.length < currentSettings.auto_engine_matches_per_day) {
+      times.push(new Date(checkTime));
+      checkTime += interval;
+    }
+    return times;
+  }, [currentSettings.auto_engine_start_hour, currentSettings.auto_engine_interval_mins, currentSettings.auto_engine_matches_per_day]);
 
   const handleSettingsChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -79,13 +95,10 @@ const SettingsManager = () => {
 
   const handleToggleChange = async (name: string, checked: boolean) => {
     setCurrentSettings(prev => ({ ...prev, [name]: checked }));
-    
-    // Se estiver ligando o motor, salva e já tenta criar a primeira partida
     if (name === 'auto_engine_enabled' && checked) {
         setIsSaving(true);
         await updateGameSettings({ ...currentSettings, auto_engine_enabled: true });
         setIsSaving(false);
-        
         toast.info("Motor ativado! Tentando criar a primeira partida...");
         try {
             const { data } = await supabase.functions.invoke('auto-match-engine', { body: { force: true } });
@@ -113,6 +126,7 @@ const SettingsManager = () => {
       auto_engine_matches_per_day: parseInt(currentSettings.auto_engine_matches_per_day as any, 10),
       auto_engine_card_price: parseInt(currentSettings.auto_engine_card_price as any, 10),
       auto_engine_prize_value: parseInt(currentSettings.auto_engine_prize_value as any, 10),
+      auto_engine_start_hour: parseInt(currentSettings.auto_engine_start_hour as any, 10),
     });
     setIsSaving(false);
     setJustSaved(true);
@@ -126,7 +140,6 @@ const SettingsManager = () => {
     try {
       const { data, error } = await supabase.functions.invoke('auto-match-engine', { body: { force: true } });
       if (error) throw error;
-      
       if (data.success) {
         toast.success('Motor executado!', { description: `Nova partida criada: ${data.match.name}` });
       } else {
@@ -186,6 +199,40 @@ const SettingsManager = () => {
               />
             </div>
 
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Hora de Início (0-23h)</Label>
+                <Input name="auto_engine_start_hour" type="number" min="0" max="23" value={currentSettings.auto_engine_start_hour} onChange={handleSettingsChange} />
+              </div>
+              <div>
+                <Label>Intervalo (min)</Label>
+                <Input name="auto_engine_interval_mins" type="number" value={currentSettings.auto_engine_interval_mins} onChange={handleSettingsChange} />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Partidas por Dia (Máx)</Label>
+                <Input name="auto_engine_matches_per_day" type="number" value={currentSettings.auto_engine_matches_per_day} onChange={handleSettingsChange} />
+              </div>
+              <div>
+                <Label>Preço da Cartela (cr)</Label>
+                <Input name="auto_engine_card_price" type="number" value={currentSettings.auto_engine_card_price} onChange={handleSettingsChange} />
+              </div>
+            </div>
+
+            <div className="p-4 bg-muted/30 rounded-xl border border-border/50">
+                <Label className="flex items-center gap-2 mb-3"><CalendarDays className="w-4 h-4" /> Agenda Programada (Slots)</Label>
+                <div className="grid grid-cols-4 gap-2">
+                    {schedulePreview.map((time, i) => (
+                        <div key={i} className="text-[10px] font-bold font-mono bg-background border rounded p-1 text-center">
+                            {format(time, 'HH:mm')}
+                        </div>
+                    ))}
+                </div>
+                <p className="text-[9px] text-muted-foreground mt-2 italic">* As partidas serão criadas nestes horários cravados.</p>
+            </div>
+
             {currentSettings.auto_engine_enabled && (
               <Button 
                 variant="outline" 
@@ -197,58 +244,6 @@ const SettingsManager = () => {
                 Testar Motor Agora
               </Button>
             )}
-            
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label>Intervalo entre Partidas (min)</Label>
-                <Input name="auto_engine_interval_mins" type="number" value={currentSettings.auto_engine_interval_mins} onChange={handleSettingsChange} />
-              </div>
-              <div>
-                <Label>Partidas por Dia (Máx)</Label>
-                <Input name="auto_engine_matches_per_day" type="number" value={currentSettings.auto_engine_matches_per_day} onChange={handleSettingsChange} />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label>Tipo de Jogo</Label>
-                <Select value={currentSettings.auto_engine_game_type} onValueChange={(v) => handleSelectChange('auto_engine_game_type', v)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="full">Cartela Cheia</SelectItem>
-                    <SelectItem value="horizontal">Linha Horizontal</SelectItem>
-                    <SelectItem value="vertical">Linha Vertical</SelectItem>
-                    <SelectItem value="diagonal">Linha Diagonal</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label>Preço da Cartela (cr)</Label>
-                <Input name="auto_engine_card_price" type="number" value={currentSettings.auto_engine_card_price} onChange={handleSettingsChange} />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label>Tipo de Prêmio</Label>
-                <Select value={currentSettings.auto_engine_prize_type} onValueChange={(v) => handleSelectChange('auto_engine_prize_type', v)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="percentage">Porcentagem do Pote</SelectItem>
-                    <SelectItem value="fixed">Valor Fixo (Créditos)</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label>{currentSettings.auto_engine_prize_type === 'percentage' ? 'Porcentagem (%)' : 'Valor Fixo (cr)'}</Label>
-                <Input name="auto_engine_prize_value" type="number" value={currentSettings.auto_engine_prize_value} onChange={handleSettingsChange} />
-              </div>
-            </div>
-
-            <div>
-              <Label>Intervalo Sorteio Auto (segundos)</Label>
-              <Input name="intervalo_sorteio_auto_seg" type="number" value={currentSettings.intervalo_sorteio_auto_seg} onChange={handleSettingsChange} />
-            </div>
           </div>
         </div>
 

@@ -85,6 +85,7 @@ export interface GameSettings {
   auto_engine_card_price: number;
   auto_engine_prize_type: PrizeType;
   auto_engine_prize_value: number;
+  auto_engine_start_hour: number;
 }
 
 export interface CreditRequestMessage {
@@ -115,7 +116,6 @@ export interface CreditRequest {
   mensagens?: CreditRequestMessage[];
 }
 
-// Novos tipos para Resgate
 export interface RedeemRequestMessage {
   id: string;
   redeem_request_id: string;

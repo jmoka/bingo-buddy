@@ -1,0 +1,1 @@
+ALTER TABLE public.configuracoes ADD COLUMN auto_engine_start_hour INTEGER DEFAULT 0;
