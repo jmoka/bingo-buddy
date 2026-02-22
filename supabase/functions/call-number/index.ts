@@ -66,9 +66,9 @@ serve(async (req) => {
           prizeAmountPerRealWinner = Number(match.prize.value || 0);
           adminProfit = match.pot - (prizeAmountPerRealWinner * realWinners.length);
         } else if (match.prize.type === 'percentage') {
-          const totalPrizeToWinners = Math.floor((match.pot * (Number(match.prize.value) || 0)) / 100);
+          const totalPrizeToWinners = (match.pot * (Number(match.prize.value) || 0)) / 100;
           adminProfit = match.pot - totalPrizeToWinners;
-          prizeAmountPerRealWinner = Math.floor(totalPrizeToWinners / realWinners.length);
+          prizeAmountPerRealWinner = totalPrizeToWinners / realWinners.length;
         }
       } else {
         adminProfit = match.pot;

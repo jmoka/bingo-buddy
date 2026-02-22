@@ -20,6 +20,9 @@ import {
   DialogTrigger,
   DialogClose
 } from "@/components/ui/dialog";
+import { GameType, PrizeType } from '@/types/match';
+import { gameTypeLabels } from '@/utils/bingoUtils';
+import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
 
 const SettingsManager = () => {
   const { gameSettings, updateGameSettings, withdrawAdminProfit } = useGame();
@@ -249,6 +252,45 @@ const SettingsManager = () => {
               <div>
                 <Label>Preço da Cartela (cr)</Label>
                 <Input name="auto_engine_card_price" type="number" value={currentSettings.auto_engine_card_price} onChange={handleSettingsChange} />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Tipo de Jogo Padrão</Label>
+              <Select value={currentSettings.auto_engine_game_type} onValueChange={(v: GameType) => handleSelectChange('auto_engine_game_type', v)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>{Object.entries(gameTypeLabels).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Prêmio Padrão</Label>
+              <div className="flex gap-2">
+                <RadioGroup
+                  value={currentSettings.auto_engine_prize_type}
+                  onValueChange={(v: PrizeType) => handleSelectChange('auto_engine_prize_type', v)}
+                  className="grid grid-cols-2 gap-2 flex-grow"
+                >
+                  <div>
+                    <RadioGroupItem value="percentage" id="auto_percentage" className="peer sr-only" />
+                    <Label htmlFor="auto_percentage" className="flex text-xs items-center justify-center rounded-md border-2 border-muted bg-popover p-3 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary">
+                      % do Pote
+                    </Label>
+                  </div>
+                  <div>
+                    <RadioGroupItem value="fixed" id="auto_fixed" className="peer sr-only" />
+                    <Label htmlFor="auto_fixed" className="flex text-xs items-center justify-center rounded-md border-2 border-muted bg-popover p-3 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary">
+                      Valor Fixo
+                    </Label>
+                  </div>
+                </RadioGroup>
+                <Input 
+                  name="auto_engine_prize_value" 
+                  type="number" 
+                  value={currentSettings.auto_engine_prize_value} 
+                  onChange={handleSettingsChange} 
+                  className="w-24"
+                />
               </div>
             </div>
 
