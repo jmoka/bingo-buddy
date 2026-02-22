@@ -9,8 +9,21 @@ export const useGameSettings = () => {
   const { data: gameSettings } = useQuery({
     queryKey: ['gameSettings'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('configuracoes').select('*').limit(1).single();
-      if (error) return { custo_nova_cartela: 10, custo_recarga_cartela: 5, usos_por_recarga: 1, intervalo_sorteio_auto_seg: 120, valor_por_credito: 1, admin_profit: 0 } as GameSettings;
+      // Garante que estamos buscando a única linha de configuração correta
+      const { data, error } = await supabase.from('configuracoes').select('*').eq('singleton', true).single();
+      
+      if (error) {
+        if (error.code === 'PGRST116') { // "The result contains 0 rows"
+          console.error("FATAL: Nenhuma linha de configuração encontrada no banco de dados. O sistema pode não funcionar corretamente.");
+          toast.error("Configurações do sistema não encontradas!", {
+            description: "Verifique se a configuração inicial foi inserida no banco de dados.",
+            duration: 10000,
+          });
+        } else {
+          console.error("Erro ao buscar configurações do jogo:", error);
+        }
+        return null;
+      }
       return data as GameSettings;
     }
   });
