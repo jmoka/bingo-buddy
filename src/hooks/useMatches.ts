@@ -26,6 +26,16 @@ export const useMatches = () => {
     },
   });
 
+  const triggerAutoEngine = async () => {
+    if (gameSettings?.auto_engine_enabled) {
+      try {
+        await supabase.functions.invoke('auto-match-engine');
+      } catch (e) {
+        console.error("Erro ao disparar motor automático:", e);
+      }
+    }
+  };
+
   const createMatch = async (data: any) => {
     const status = data.is_auto_calling ? 'open' : 'waiting';
     const { error } = await supabase.from('partidas').insert([{ ...data, status }]);
@@ -79,6 +89,8 @@ export const useMatches = () => {
         toast.warning(`Partida automática "${match.name}" excluída.`, {
           description: 'Nenhum jogador se inscreveu a tempo.'
         });
+        // Dispara o motor para criar a próxima, já que esta foi excluída
+        triggerAutoEngine();
       } else {
         // Se for manual, mantém o comportamento de retornar para aguardando
         toast.error('A partida não pode ser iniciada sem jogadores.', {
@@ -117,6 +129,9 @@ export const useMatches = () => {
     const { error } = await supabase.from('partidas').update(updatePayload).eq('id', matchId);
     if (error) {
       toast.error(`Erro ao iniciar partida: ${error.message}`);
+    } else {
+      // Se iniciou com sucesso, dispara o motor para criar a próxima da agenda
+      triggerAutoEngine();
     }
     await queryClient.invalidateQueries({ queryKey: ['matches'] });
   };
@@ -125,8 +140,13 @@ export const useMatches = () => {
   
   const deleteMatch = async (matchId: string) => {
     const { error } = await supabase.from('partidas').delete().eq('id', matchId);
-    if (error) toast.error(error.message);
-    else toast.success('Partida excluída.');
+    if (error) {
+      toast.error(error.message);
+    } else {
+      toast.success('Partida excluída.');
+      // Dispara o motor para preencher o slot vazio
+      triggerAutoEngine();
+    }
     await queryClient.invalidateQueries({ queryKey: ['matches'] });
   };
 
