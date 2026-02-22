@@ -319,9 +319,9 @@ const Lobby = () => {
                   {schedule.map((time, idx) => (
                     <div key={idx} className="flex items-center justify-between p-2 rounded-lg bg-background border border-border/50 text-[11px]">
                       <span className="font-bold text-primary">{format(time, 'HH:mm')}</span>
-                      <Badge variant="outline" className="text-[9px] h-4 font-mono">
+                      <span className="text-[9px] font-mono text-muted-foreground">
                         {getMatchCountdown(time.toISOString()) || 'Agora'}
-                      </Badge>
+                      </span>
                     </div>
                   ))}
                 </div>
@@ -341,10 +341,18 @@ const Lobby = () => {
             </div>
             <Tabs defaultValue="in_progress" className="w-full">
               <TabsList className="grid w-full grid-cols-4 h-9 bg-muted/50 p-1 mb-4">
-                <TabsTrigger value="in_progress" className="text-[10px] sm:text-xs">Ao Vivo</TabsTrigger>
-                <TabsTrigger value="open" className="text-[10px] sm:text-xs">Abertas</TabsTrigger>
-                <TabsTrigger value="waiting" className="text-[10px] sm:text-xs">Espera</TabsTrigger>
-                <TabsTrigger value="finished" className="text-[10px] sm:text-xs">Fim</TabsTrigger>
+                <TabsTrigger value="in_progress" className="text-[10px] sm:text-xs flex items-center gap-1">
+                  Ao Vivo {inProgressMatches.length > 0 && <span className="flex h-3.5 w-3.5 items-center justify-center rounded-full bg-destructive text-[8px] font-bold text-white">{inProgressMatches.length}</span>}
+                </TabsTrigger>
+                <TabsTrigger value="open" className="text-[10px] sm:text-xs flex items-center gap-1">
+                  Abertas {openMatches.length > 0 && <span className="flex h-3.5 w-3.5 items-center justify-center rounded-full bg-accent text-[8px] font-bold text-white">{openMatches.length}</span>}
+                </TabsTrigger>
+                <TabsTrigger value="waiting" className="text-[10px] sm:text-xs flex items-center gap-1">
+                  Espera {waitingMatches.length > 0 && <span className="flex h-3.5 w-3.5 items-center justify-center rounded-full bg-amber-500 text-[8px] font-bold text-white">{waitingMatches.length}</span>}
+                </TabsTrigger>
+                <TabsTrigger value="finished" className="text-[10px] sm:text-xs flex items-center gap-1">
+                  Fim {finishedMatches.length > 0 && <span className="flex h-3.5 w-3.5 items-center justify-center rounded-full bg-success text-[8px] font-bold text-white">{finishedMatches.length}</span>}
+                </TabsTrigger>
               </TabsList>
               <TabsContent value="in_progress" className="mt-0">{renderMatchList(inProgressMatches)}</TabsContent>
               <TabsContent value="open" className="mt-0">{renderMatchList(openMatches)}</TabsContent>
