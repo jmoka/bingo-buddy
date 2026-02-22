@@ -39,7 +39,7 @@ export const useMatches = () => {
   const { gameSettings } = useGameSettings();
   const updateMatchMutation = useUpdateMatchMutation();
 
-  const { data: matches = [] } = useQuery({
+  const { data: matches = [], isLoading: isLoadingMatches } = useQuery({
     queryKey: ['matches'],
     queryFn: async () => {
       const { data, error } = await supabase.from('partidas').select('*').order('start_time', { ascending: false });
@@ -48,7 +48,7 @@ export const useMatches = () => {
     },
   });
 
-  const { data: matchCards = [] } = useQuery({
+  const { data: matchCards = [], isLoading: isLoadingCards } = useQuery({
     queryKey: ['matchCards'],
     queryFn: async () => {
       const { data, error } = await supabase.from('cartelas_partida').select('*');
@@ -160,7 +160,6 @@ export const useMatches = () => {
     try {
       const { error } = await supabase.functions.invoke('call-number', { body: { matchId, num } });
       if (error) throw error;
-      // A invalidação já é feita pelo onSettled da mutação e pelo listener de DB, mas uma extra aqui pode ajudar na percepção de velocidade.
       await queryClient.invalidateQueries({ queryKey: ['matches'] });
       await queryClient.invalidateQueries({ queryKey: ['matchCards'] });
     } catch (error) {
@@ -174,6 +173,7 @@ export const useMatches = () => {
   return {
     matches,
     matchCards,
+    isLoading: isLoadingMatches || isLoadingCards,
     createMatch,
     updateMatch,
     openMatch,

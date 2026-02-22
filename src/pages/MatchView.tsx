@@ -3,7 +3,7 @@ import { useGame } from '@/contexts/GameContext';
 import { BingoCell } from '@/components/BingoCell';
 import { Button } from '@/components/ui/button';
 import { gameTypeLabels } from '@/utils/bingoUtils';
-import { ArrowLeft, Coins, Users, Bot } from 'lucide-react';
+import { ArrowLeft, Coins, Users, Bot, Loader2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { playNotificationSound } from '@/utils/soundUtils';
@@ -15,7 +15,7 @@ const MatchView = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { profile } = useAuth();
-  const { matches, getPlayerMatchCards, matchCards } = useGame();
+  const { matches, getPlayerMatchCards, matchCards, isLoading } = useGame();
   const [lastCalledNumber, setLastCalledNumber] = useState<number | null>(null);
   const [now, setNow] = useState(Date.now());
 
@@ -59,11 +59,23 @@ const MatchView = () => {
     prevCalledNumbersRef.current = currentNumbers;
   }, [match]);
 
+  // Se estiver carregando os dados iniciais, mostra um spinner em vez de "não encontrada"
+  if (isLoading && !match) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
+        <Loader2 className="w-10 h-10 animate-spin text-primary" />
+        <p className="text-muted-foreground font-heading">Carregando partida...</p>
+      </div>
+    );
+  }
+
   if (!match) {
     return (
-      <div className="card-container text-center">
-        <p className="text-muted-foreground">Partida não encontrada.</p>
-        <Button className="mt-4" onClick={() => navigate('/')}>Voltar</Button>
+      <div className="card-container text-center py-20">
+        <p className="text-muted-foreground text-lg">Partida não encontrada ou já finalizada.</p>
+        <Button className="mt-6 gradient-primary" onClick={() => navigate('/')}>
+          <ArrowLeft className="w-4 h-4 mr-2" /> Voltar ao Lobby
+        </Button>
       </div>
     );
   }
@@ -85,7 +97,7 @@ const MatchView = () => {
               <div className="flex flex-wrap gap-x-3 gap-y-1 text-primary-foreground/70 text-xs">
                 <span>{gameTypeLabels[match.game_type]}</span>
                 <span className="flex items-center gap-1"><Users className="w-3 h-3" />{playersInMatchCount}</span>
-                <span className="flex items-center gap-1"><Coins className="w-3 h-3" />Pote: {match.pot}</span>
+                <span className="flex items-center gap-1"><Coins className="w-3 h-3" />Pote: {Number(match.pot || 0).toFixed(2)}</span>
               </div>
             </div>
           </div>
