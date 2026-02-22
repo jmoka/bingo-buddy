@@ -8,7 +8,7 @@ import { Match, MatchStatus, PlayerCard } from '@/types/match';
 import { gameTypeLabels } from '@/utils/bingoUtils';
 import { 
   Coins, Plus, Trophy, Users, Settings, 
-  Timer, DoorOpen, Ticket, Zap, ZapOff, Tv, Archive, Trash2, RotateCcw, Star, Loader2, History, LogOut, TrendingUp, Target, Flame, Bot, CalendarDays, Clock
+  Timer, DoorOpen, Ticket, Zap, ZapOff, Tv, Archive, Trash2, RotateCcw, Star, Loader2, History, LogOut, TrendingUp, Target, Flame, Bot, CalendarDays, Clock, Crown
 } from 'lucide-react';
 import { 
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose, DialogDescription
@@ -447,7 +447,7 @@ const Lobby = () => {
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-10">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-10">
         <div className="card-container bg-gradient-to-br from-primary to-primary/80 text-white border-none p-6 flex flex-col justify-between relative overflow-hidden group">
           <Coins className="absolute -right-4 -bottom-4 w-32 h-32 text-white/10 rotate-12 group-hover:scale-110 transition-transform duration-500" />
           <div>
@@ -487,6 +487,21 @@ const Lobby = () => {
           <div className="mt-4 flex items-center gap-2 text-sm font-medium bg-white/10 w-fit px-3 py-1 rounded-full backdrop-blur-sm">
             <Star className="w-4 h-4" />
             <span>Rumo ao próximo Bingo!</span>
+          </div>
+        </div>
+
+        <div 
+          className="card-container bg-gradient-to-br from-yellow-500 to-yellow-600 text-white border-none p-6 flex flex-col justify-between relative overflow-hidden group cursor-pointer"
+          onClick={() => navigate('/ranking')}
+        >
+          <Crown className="absolute -right-4 -bottom-4 w-32 h-32 text-white/10 rotate-12 group-hover:scale-110 transition-transform duration-500" />
+          <div>
+            <p className="text-xs font-bold uppercase tracking-widest opacity-80 mb-1">Hall da Fama</p>
+            <h2 className="text-4xl font-bold font-heading">Ranking</h2>
+          </div>
+          <div className="mt-4 flex items-center gap-2 text-sm font-medium bg-white/10 w-fit px-3 py-1 rounded-full backdrop-blur-sm">
+            <Trophy className="w-4 h-4" />
+            <span>Veja os melhores!</span>
           </div>
         </div>
       </div>

@@ -3,7 +3,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { GameProvider } from "@/contexts/GameContext";
+import { GameProvider } from "@/contexts/GameProvider";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { Layout } from "@/components/Layout";
 import Lobby from "./pages/Lobby";
@@ -18,6 +18,7 @@ import CreditRequestsAdmin from "./pages/CreditRequestsAdmin";
 import RedeemRequestsAdmin from "./pages/RedeemRequestsAdmin";
 import ActivePlayers from "./pages/ActivePlayers";
 import Trophies from "./pages/Trophies";
+import Ranking from "./pages/Ranking";
 import { Loader2 } from "lucide-react";
 
 const queryClient = new QueryClient();
@@ -57,6 +58,7 @@ const App = () => (
               <Route path="/print" element={<ProtectedRoute><PrintView /></ProtectedRoute>} />
               <Route path="/active-players" element={<ProtectedRoute><ActivePlayers /></ProtectedRoute>} />
               <Route path="/trophies" element={<ProtectedRoute><Trophies /></ProtectedRoute>} />
+              <Route path="/ranking" element={<ProtectedRoute><Ranking /></ProtectedRoute>} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>
