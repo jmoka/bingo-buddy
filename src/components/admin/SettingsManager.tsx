@@ -6,6 +6,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Save, Settings, Check, Loader2, Bot, Link as LinkIcon, DollarSign, Banknote } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
 import {
   Dialog,
   DialogContent,
@@ -69,9 +70,12 @@ const SettingsManager = () => {
   }, [gameSettings]);
 
   const handleSettingsChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value, type } = e.target as HTMLInputElement;
-    const val = type === 'checkbox' ? (e.target as HTMLInputElement).checked : value;
-    setCurrentSettings(prev => ({ ...prev, [name]: val }));
+    const { name, value } = e.target;
+    setCurrentSettings(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleToggleChange = (name: string, checked: boolean) => {
+    setCurrentSettings(prev => ({ ...prev, [name]: checked }));
   };
 
   const handleSelectChange = (name: string, value: string) => {
@@ -133,17 +137,16 @@ const SettingsManager = () => {
         </div>
 
         <div className="space-y-6">
-          <h3 className="font-heading font-bold text-primary border-b pb-2 flex items-center gap-2"><Bot className="w-4 h-4" /> Automação</h3>
+          <h3 className="font-heading font-bold text-primary border-b pb-2 flex items-center gap-2"><Bot className="w-4 h-4" /> Automação (Motor)</h3>
           <div className="space-y-4">
-            <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
-              <Label htmlFor="auto_engine_enabled" className="cursor-pointer">Ativar Motor de Automação</Label>
-              <input
-                id="auto_engine_enabled"
-                name="auto_engine_enabled"
-                type="checkbox"
-                className="w-5 h-5 accent-primary cursor-pointer"
-                checked={currentSettings.auto_engine_enabled}
-                onChange={handleSettingsChange}
+            <div className="flex items-center justify-between p-4 bg-primary/5 border border-primary/20 rounded-xl">
+              <div className="space-y-0.5">
+                <Label className="text-base font-bold">Status do Motor</Label>
+                <p className="text-xs text-muted-foreground">Ligue para criar partidas automaticamente.</p>
+              </div>
+              <Switch 
+                checked={currentSettings.auto_engine_enabled} 
+                onCheckedChange={(checked) => handleToggleChange('auto_engine_enabled', checked)}
               />
             </div>
             
