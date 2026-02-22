@@ -125,16 +125,28 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [now, matchesHook.matches, gameSettingsHook.gameSettings]);
 
   useEffect(() => {
-    const channel = supabase.channel('schema-db-changes')
-      .on('postgres_changes', { event: '*', schema: 'public' }, () => {
+    const channel = supabase
+      .channel('db-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'partidas' }, () => {
         queryClient.invalidateQueries({ queryKey: ['matches'] });
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'cartelas_partida' }, () => {
         queryClient.invalidateQueries({ queryKey: ['matchCards'] });
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'perfis' }, () => {
         queryClient.invalidateQueries({ queryKey: ['profile'] });
         queryClient.invalidateQueries({ queryKey: ['players'] });
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'vitorias' }, () => {
         queryClient.invalidateQueries({ queryKey: ['wins'] });
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'solicitacoes_credito' }, () => {
         queryClient.invalidateQueries({ queryKey: ['creditRequests'] });
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'configuracoes' }, () => {
         queryClient.invalidateQueries({ queryKey: ['gameSettings'] });
-      }).subscribe();
+      })
+      .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [queryClient]);
 

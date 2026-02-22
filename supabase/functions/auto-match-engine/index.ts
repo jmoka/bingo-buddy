@@ -58,15 +58,16 @@ serve(async (req) => {
 
     const nextStartTime = new Date(nextSlot);
 
-    // Verificar se já existe uma partida aberta ou em andamento para este slot ou próxima
+    // Verificar se já existe uma partida agendada para este slot específico
     const { data: existing } = await supabaseAdmin
       .from('partidas')
       .select('id')
-      .eq('status', 'open')
+      .eq('start_time', nextStartTime.toISOString())
+      .in('status', ['open', 'in_progress', 'waiting'])
       .limit(1);
 
     if (existing && existing.length > 0 && !force) {
-      return new Response(JSON.stringify({ message: "Já existe uma partida aberta aguardando jogadores." }), {
+      return new Response(JSON.stringify({ message: "Slot já ocupado para este horário." }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200,
       });

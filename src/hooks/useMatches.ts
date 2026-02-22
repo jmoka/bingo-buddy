@@ -89,8 +89,7 @@ export const useMatches = () => {
         toast.warning(`Partida automática "${match.name}" excluída.`, {
           description: 'Nenhum jogador se inscreveu a tempo.'
         });
-        // Dispara o motor para criar a próxima, já que esta foi excluída
-        triggerAutoEngine();
+        // O heartbeat no GameContext irá chamar o triggerAutoEngine se necessário.
       } else {
         // Se for manual, mantém o comportamento de retornar para aguardando
         toast.error('A partida não pode ser iniciada sem jogadores.', {
