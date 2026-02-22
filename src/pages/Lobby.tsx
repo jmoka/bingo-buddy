@@ -8,7 +8,7 @@ import { Match, MatchStatus, PlayerCard } from '@/types/match';
 import { gameTypeLabels } from '@/utils/bingoUtils';
 import { 
   Coins, Plus, Trophy, Users, Settings, 
-  Timer, DoorOpen, Ticket, Zap, ZapOff, Tv, Archive, Trash2, RotateCcw, Star, Loader2, History, LogOut, TrendingUp, Target
+  Timer, DoorOpen, Ticket, Zap, ZapOff, Tv, Archive, Trash2, RotateCcw, Star, Loader2, History, LogOut, TrendingUp, Target, Flame
 } from 'lucide-react';
 import { 
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose, DialogDescription
@@ -143,6 +143,13 @@ const Lobby = () => {
   const openMatches = sortedMatches.filter(m => m.status === 'open');
   const waitingMatches = sortedMatches.filter(m => m.status === 'waiting');
   const finishedMatches = sortedMatches.filter(m => m.status === 'finished');
+
+  // Estatísticas Globais para o Dashboard do Topo
+  const totalPot = matches.filter(m => m.status !== 'finished').reduce((acc, m) => acc + m.pot, 0);
+  const totalPlayers = new Set(matchCards.filter(mc => {
+    const m = matches.find(match => match.id === mc.match_id);
+    return m && m.status !== 'finished';
+  }).map(mc => mc.player_id)).size;
 
   const renderCardList = (cards: PlayerCard[]) => {
     if (cards.length === 0) {
@@ -317,7 +324,7 @@ const Lobby = () => {
                     </div>
                   </div>
 
-                  {/* Coluna 2: Dashboard de Ganhos (O que importa!) */}
+                  {/* Coluna 2: Dashboard de Ganhos */}
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 min-w-[300px]">
                     <div className="flex flex-col items-center justify-center p-3 rounded-2xl bg-primary/5 border border-primary/10">
                       <span className="text-[10px] font-bold uppercase tracking-widest text-primary mb-1">Pote Total</span>
@@ -423,15 +430,97 @@ const Lobby = () => {
         </div>
       )}
 
+      {/* SUPER DASHBOARD DE DESTAQUE - NO TOPO */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-10">
+        <div className="card-container bg-gradient-to-br from-primary to-primary/80 text-white border-none p-6 flex flex-col justify-between relative overflow-hidden group">
+          <Coins className="absolute -right-4 -bottom-4 w-32 h-32 text-white/10 rotate-12 group-hover:scale-110 transition-transform duration-500" />
+          <div>
+            <p className="text-xs font-bold uppercase tracking-widest opacity-80 mb-1">Pote Acumulado Total</p>
+            <h2 className="text-4xl font-bold font-heading">{totalPot} <span className="text-lg font-normal opacity-70">cr.</span></h2>
+          </div>
+          <div className="mt-4 flex items-center gap-2 text-sm font-medium bg-white/10 w-fit px-3 py-1 rounded-full backdrop-blur-sm">
+            <TrendingUp className="w-4 h-4" />
+            <span>Crescendo em tempo real!</span>
+          </div>
+        </div>
+
+        <div className="card-container bg-gradient-to-br from-accent to-accent/80 text-white border-none p-6 flex flex-col justify-between relative overflow-hidden group">
+          <Users className="absolute -right-4 -bottom-4 w-32 h-32 text-white/10 -rotate-12 group-hover:scale-110 transition-transform duration-500" />
+          <div>
+            <p className="text-xs font-bold uppercase tracking-widest opacity-80 mb-1">Jogadores Ativos</p>
+            <h2 className="text-4xl font-bold font-heading">{totalPlayers} <span className="text-lg font-normal opacity-70">online</span></h2>
+          </div>
+          <div className="mt-4 flex items-center gap-2 text-sm font-medium bg-white/10 w-fit px-3 py-1 rounded-full backdrop-blur-sm">
+            <Flame className="w-4 h-4" />
+            <span>A rodada está quente!</span>
+          </div>
+        </div>
+
+        <div className="card-container bg-gradient-to-br from-amber-500 to-amber-600 text-white border-none p-6 flex flex-col justify-between relative overflow-hidden group">
+          <Trophy className="absolute -right-4 -bottom-4 w-32 h-32 text-white/10 rotate-6 group-hover:scale-110 transition-transform duration-500" />
+          <div>
+            <p className="text-xs font-bold uppercase tracking-widest opacity-80 mb-1">Suas Vitórias</p>
+            <h2 className="text-4xl font-bold font-heading">{wins.length} <span className="text-lg font-normal opacity-70">troféus</span></h2>
+          </div>
+          <div className="mt-4 flex items-center gap-2 text-sm font-medium bg-white/10 w-fit px-3 py-1 rounded-full backdrop-blur-sm">
+            <Star className="w-4 h-4" />
+            <span>Rumo ao próximo Bingo!</span>
+          </div>
+        </div>
+      </div>
+
+      {/* SEÇÃO DE PARTIDAS - AGORA NO TOPO */}
+      <div className="mb-12">
+        <h2 className="font-heading text-xl md:text-2xl font-bold text-foreground mb-6 flex items-center gap-2">
+          <DoorOpen className="w-6 h-6 text-accent" /> Partidas Disponíveis
+        </h2>
+        <Tabs defaultValue="in_progress" className="w-full">
+          <TabsList className="grid w-full h-auto p-1 grid-cols-2 sm:grid-cols-4 mb-6 bg-muted/50">
+            <TabsTrigger value="in_progress" className="flex items-center gap-2 py-3">
+              Ao Vivo
+              {inProgressMatches.length > 0 && (
+                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-[10px] font-bold text-white">
+                  {inProgressMatches.length}
+                </span>
+              )}
+            </TabsTrigger>
+            <TabsTrigger value="open" className="flex items-center gap-2 py-3">
+              Abertas
+              {openMatches.length > 0 && (
+                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-accent text-[10px] font-bold text-white">
+                  {openMatches.length}
+                </span>
+              )}
+            </TabsTrigger>
+            <TabsTrigger value="waiting" className="flex items-center gap-2 py-3">
+              Aguardando
+              {waitingMatches.length > 0 && (
+                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-amber-500 text-[10px] font-bold text-white">
+                  {waitingMatches.length}
+                </span>
+              )}
+            </TabsTrigger>
+            <TabsTrigger value="finished" className="flex items-center gap-2 py-3">
+              Finalizadas
+            </TabsTrigger>
+          </TabsList>
+          <TabsContent value="in_progress" className="mt-2">{renderMatchList(inProgressMatches)}</TabsContent>
+          <TabsContent value="open" className="mt-2">{renderMatchList(openMatches)}</TabsContent>
+          <TabsContent value="waiting" className="mt-2">{renderMatchList(waitingMatches)}</TabsContent>
+          <TabsContent value="finished" className="mt-2">{renderMatchList(finishedMatches)}</TabsContent>
+        </Tabs>
+      </div>
+
+      {/* SEÇÃO DE CARTELAS - AGORA ABAIXO DAS PARTIDAS */}
       <div className="mb-8">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 gap-4">
-          <h2 className="font-heading text-lg md:text-xl font-bold text-foreground flex items-center gap-2">
-            <Ticket className="w-5 h-5 text-primary" /> Minhas Cartelas
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
+          <h2 className="font-heading text-xl md:text-2xl font-bold text-foreground flex items-center gap-2">
+            <Ticket className="w-6 h-6 text-primary" /> Minhas Cartelas
           </h2>
           <Dialog open={isCreateCardOpen} onOpenChange={setCreateCardOpen}>
               <DialogTrigger asChild>
-                <Button size="sm" className="gradient-primary shadow-button h-8 md:h-9 text-xs md:text-sm w-full sm:w-auto">
-                  <Plus className="w-4 h-4 mr-2" />Criar Cartela
+                <Button className="gradient-primary shadow-button h-11 px-6 font-bold w-full sm:w-auto">
+                  <Plus className="w-5 h-5 mr-2" />CRIAR NOVA CARTELA
                 </Button>
               </DialogTrigger>
               <DialogContent className="max-w-xl flex flex-col max-h-[90vh]">
@@ -492,7 +581,7 @@ const Lobby = () => {
         </div>
 
         <Tabs defaultValue="active" className="w-full">
-          <TabsList className="grid w-full grid-cols-2 mb-4 h-10">
+          <TabsList className="grid w-full grid-cols-2 mb-4 h-10 bg-muted/30">
             <TabsTrigger value="active" className="text-xs">
               Ativas ({activeCards.length})
             </TabsTrigger>
@@ -510,48 +599,6 @@ const Lobby = () => {
           </TabsContent>
         </Tabs>
       </div>
-
-      <h2 className="font-heading text-lg md:text-xl font-bold text-foreground mb-4 flex items-center gap-2"><DoorOpen className="w-5 h-5 text-accent" /> Partidas</h2>
-      <Tabs defaultValue="in_progress" className="w-full">
-        <TabsList className="grid w-full h-auto p-1 grid-cols-2 sm:grid-cols-4 mb-6">
-          <TabsTrigger value="in_progress" className="flex items-center gap-2">
-            Ao Vivo
-            {inProgressMatches.length > 0 && (
-              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-[10px] font-bold text-white">
-                {inProgressMatches.length}
-              </span>
-            )}
-          </TabsTrigger>
-          <TabsTrigger value="open" className="flex items-center gap-2">
-            Abertas
-            {openMatches.length > 0 && (
-              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-accent text-[10px] font-bold text-white">
-                {openMatches.length}
-              </span>
-            )}
-          </TabsTrigger>
-          <TabsTrigger value="waiting" className="flex items-center gap-2">
-            Aguardando
-            {waitingMatches.length > 0 && (
-              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-amber-500 text-[10px] font-bold text-white">
-                {waitingMatches.length}
-              </span>
-            )}
-          </TabsTrigger>
-          <TabsTrigger value="finished" className="flex items-center gap-2">
-            Finalizadas
-            {finishedMatches.length > 0 && (
-              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-success text-[10px] font-bold text-white">
-                {finishedMatches.length}
-              </span>
-            )}
-          </TabsTrigger>
-        </TabsList>
-        <TabsContent value="in_progress" className="mt-2">{renderMatchList(inProgressMatches)}</TabsContent>
-        <TabsContent value="open" className="mt-2">{renderMatchList(openMatches)}</TabsContent>
-        <TabsContent value="waiting" className="mt-2">{renderMatchList(waitingMatches)}</TabsContent>
-        <TabsContent value="finished" className="mt-2">{renderMatchList(finishedMatches)}</TabsContent>
-      </Tabs>
 
       <Dialog open={isJoinDialogOpen} onOpenChange={setJoinDialogOpen}>
         <DialogContent className="max-w-2xl">
