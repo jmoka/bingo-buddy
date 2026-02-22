@@ -94,16 +94,6 @@ const Lobby = () => {
     return times;
   }, [gameSettings, now]);
 
-  const nextMatchTime = schedule[0] || null;
-  const countdown = useMemo(() => {
-    if (!nextMatchTime) return null;
-    const diff = nextMatchTime.getTime() - now;
-    if (diff <= 0) return "00:00";
-    const m = Math.floor((diff % 3600000) / 60000);
-    const s = Math.floor((diff % 60000) / 1000);
-    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-  }, [nextMatchTime, now]);
-
   const handleCreateCard = async () => {
     if (!newCardName.trim() || !newCardNumbers) return;
     const card = await createPlayerCard({ name: newCardName, numbers: newCardNumbers, creditType });
@@ -504,17 +494,27 @@ const Lobby = () => {
                         <CalendarDays className="w-5 h-5" /> Agenda de Hoje
                     </h3>
                     <div className="space-y-2 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
-                        {schedule.map((time, idx) => (
+                        {schedule.map((time, idx) => {
+                          const diff = time.getTime() - now;
+                          const countdownString = diff > 0 
+                              ? `${Math.floor((diff % 3600000) / 60000).toString().padStart(2, '0')}:${Math.floor((diff % 60000) / 1000).toString().padStart(2, '0')}`
+                              : "Iniciando...";
+
+                          return (
                             <div key={idx} className="flex items-center justify-between p-3 rounded-xl bg-background border border-border/50 shadow-sm group hover:border-primary/30 transition-colors">
                                 <div className="flex items-center gap-3">
-                                    <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-[10px] font-bold text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary transition-colors">
-                                        #{idx + 1}
+                                    <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center text-sm font-bold text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary transition-colors">
+                                        {format(time, 'HH:mm')}
                                     </div>
-                                    <span className="text-sm font-bold font-mono">{format(time, 'HH:mm')}</span>
+                                    <span className="text-xs font-bold text-muted-foreground">Próxima Partida</span>
                                 </div>
-                                <Badge variant="outline" className="text-[9px] uppercase tracking-tighter opacity-60">Automático</Badge>
+                                <Badge variant="outline" className="font-mono text-xs">
+                                    <Clock className="w-3 h-3 mr-1.5" />
+                                    {countdownString}
+                                </Badge>
                             </div>
-                        ))}
+                          );
+                        })}
                         {schedule.length === 0 && (
                             <p className="text-xs text-muted-foreground text-center py-4 italic">Nenhuma partida agendada para as próximas horas.</p>
                         )}
@@ -532,26 +532,6 @@ const Lobby = () => {
             gameSettings?.auto_engine_enabled ? "lg:col-span-9" : "lg:col-span-12"
         )}>
             
-            {/* CARD DE PRÓXIMA PARTIDA (Destaque quando não há abertas/ao vivo) */}
-            {gameSettings?.auto_engine_enabled && openMatches.length === 0 && inProgressMatches.length === 0 && nextMatchTime && (
-                <div className="card-container bg-gradient-to-r from-primary/10 to-accent/10 border-2 border-dashed border-primary/30 p-8 text-center animate-slide-up relative overflow-hidden">
-                    <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary via-accent to-primary animate-pulse" />
-                    <Bot className="w-12 h-12 text-primary mx-auto mb-4 opacity-50" />
-                    <h2 className="font-heading text-2xl md:text-3xl font-bold text-foreground mb-2">Preparando a Próxima Rodada!</h2>
-                    <p className="text-muted-foreground mb-8 max-w-md mx-auto">O motor automático está ativo. Uma nova partida será aberta em instantes para inscrições.</p>
-                    
-                    <div className="flex flex-col items-center gap-4">
-                        <div className="flex items-center gap-3 bg-background px-8 py-4 rounded-3xl shadow-xl border border-primary/20">
-                            <Clock className="w-6 h-6 text-primary animate-bounce" />
-                            <span className="text-4xl md:text-5xl font-bold font-mono tracking-tighter text-primary">
-                                {countdown}
-                            </span>
-                        </div>
-                        <p className="text-sm font-bold text-primary/60 uppercase tracking-widest">Inicia às {format(nextMatchTime, 'HH:mm')}</p>
-                    </div>
-                </div>
-            )}
-
             {/* SEÇÃO DE PARTIDAS */}
             <div>
                 <h2 className="font-heading text-xl md:text-2xl font-bold text-foreground mb-6 flex items-center gap-2">
