@@ -77,8 +77,23 @@ const SettingsManager = () => {
     setCurrentSettings(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleToggleChange = (name: string, checked: boolean) => {
+  const handleToggleChange = async (name: string, checked: boolean) => {
     setCurrentSettings(prev => ({ ...prev, [name]: checked }));
+    
+    // Se estiver ligando o motor, salva e já tenta criar a primeira partida
+    if (name === 'auto_engine_enabled' && checked) {
+        setIsSaving(true);
+        await updateGameSettings({ ...currentSettings, auto_engine_enabled: true });
+        setIsSaving(false);
+        
+        toast.info("Motor ativado! Tentando criar a primeira partida...");
+        try {
+            const { data } = await supabase.functions.invoke('auto-match-engine', { body: { force: true } });
+            if (data?.success) {
+                toast.success(`Partida criada: ${data.match.name}`);
+            }
+        } catch (e) {}
+    }
   };
 
   const handleSelectChange = (name: string, value: string) => {
@@ -109,7 +124,7 @@ const SettingsManager = () => {
   const handleTestEngine = async () => {
     setIsTestingEngine(true);
     try {
-      const { data, error } = await supabase.functions.invoke('auto-match-engine');
+      const { data, error } = await supabase.functions.invoke('auto-match-engine', { body: { force: true } });
       if (error) throw error;
       
       if (data.success) {
@@ -140,7 +155,7 @@ const SettingsManager = () => {
     <div className="card-container">
       <h2 className="font-heading text-xl font-bold text-foreground mb-6 flex items-center gap-2"><Settings className="w-5 h-5" /> Ajustes do Sistema</h2>
       
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-10">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-10">
         <div className="space-y-6">
           <h3 className="font-heading font-bold text-primary border-b pb-2">Economia</h3>
           <div className="grid grid-cols-2 gap-4">

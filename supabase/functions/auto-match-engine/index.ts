@@ -8,72 +8,55 @@ serve(async (req) => {
   }
 
   try {
+    const { force = false } = await req.json().catch(() => ({}));
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // 1. Buscar configurações
     const { data: settings, error: settingsError } = await supabaseAdmin
       .from('configuracoes')
       .select('*')
       .single();
 
-    if (settingsError || !settings) {
-      throw new Error("Configurações não encontradas.");
-    }
+    if (settingsError || !settings) throw new Error("Configurações não encontradas.");
 
-    if (!settings.auto_engine_enabled) {
+    // Se não estiver forçando, verifica se o motor está habilitado
+    if (!settings.auto_engine_enabled && !force) {
       return new Response(JSON.stringify({ message: "Motor desativado." }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200,
       });
     }
 
-    // 2. Verificar limite diário
+    // Verificar limite diário
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    
-    const { count, error: countError } = await supabaseAdmin
-      .from('partidas')
-      .select('*', { count: 'exact', head: true })
-      .gte('created_at', today.toISOString());
-
-    if (countError) throw countError;
+    const { count } = await supabaseAdmin.from('partidas').select('*', { count: 'exact', head: true }).gte('created_at', today.toISOString());
 
     if (count !== null && count >= settings.auto_engine_matches_per_day) {
-      console.log(`[auto-match-engine] Limite diário atingido: ${count}/${settings.auto_engine_matches_per_day}`);
       return new Response(JSON.stringify({ message: "Limite diário atingido." }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200,
       });
     }
 
-    // 3. Verificar intervalo desde a última partida
-    const { data: lastMatch, error: lastMatchError } = await supabaseAdmin
-      .from('partidas')
-      .select('created_at')
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .single();
-
-    if (!lastMatchError && lastMatch) {
-      const lastCreated = new Date(lastMatch.created_at).getTime();
-      const now = new Date().getTime();
-      const diffMins = (now - lastCreated) / (1000 * 60);
-
-      if (diffMins < settings.auto_engine_interval_mins) {
-        console.log(`[auto-match-engine] Aguardando intervalo. Faltam ${Math.round(settings.auto_engine_interval_mins - diffMins)} min.`);
-        return new Response(JSON.stringify({ message: "Intervalo não atingido." }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 200,
-        });
+    // Verificar intervalo (pula se for 'force')
+    if (!force) {
+      const { data: lastMatch } = await supabaseAdmin.from('partidas').select('created_at').order('created_at', { ascending: false }).limit(1).single();
+      if (lastMatch) {
+        const diffMins = (new Date().getTime() - new Date(lastMatch.created_at).getTime()) / (1000 * 60);
+        if (diffMins < settings.auto_engine_interval_mins) {
+          return new Response(JSON.stringify({ message: "Intervalo não atingido.", nextIn: Math.round(settings.auto_engine_interval_mins - diffMins) }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 200,
+          });
+        }
       }
     }
 
-    // 4. Criar a nova partida
+    // Criar a nova partida
     const nextStartTime = new Date();
-    // Adiciona 5 minutos para dar tempo dos jogadores entrarem
     nextStartTime.setMinutes(nextStartTime.getMinutes() + 5);
 
     const newMatch = {
@@ -81,27 +64,15 @@ serve(async (req) => {
       game_type: settings.auto_engine_game_type,
       max_cards_per_player: 3,
       card_price: settings.auto_engine_card_price,
-      prize: {
-        type: settings.auto_engine_prize_type,
-        value: settings.auto_engine_prize_value
-      },
+      prize: { type: settings.auto_engine_prize_type, value: settings.auto_engine_prize_value },
       start_time: nextStartTime.toISOString(),
       status: 'open',
       is_auto_calling: true,
-      min_players: settings.auto_engine_prize_type === 'fixed' 
-        ? Math.ceil(settings.auto_engine_prize_value / settings.auto_engine_card_price)
-        : 1
+      min_players: settings.auto_engine_prize_type === 'fixed' ? Math.ceil(settings.auto_engine_prize_value / settings.auto_engine_card_price) : 1
     };
 
-    const { data: created, error: createError } = await supabaseAdmin
-      .from('partidas')
-      .insert(newMatch)
-      .select()
-      .single();
-
+    const { data: created, error: createError } = await supabaseAdmin.from('partidas').insert(newMatch).select().single();
     if (createError) throw createError;
-
-    console.log(`[auto-match-engine] Nova partida criada: ${created.name}`);
 
     return new Response(JSON.stringify({ success: true, match: created }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -109,7 +80,6 @@ serve(async (req) => {
     });
 
   } catch (error) {
-    console.error(`[auto-match-engine] Erro: ${error.message}`);
     return new Response(JSON.stringify({ error: error.message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 500,

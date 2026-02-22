@@ -8,7 +8,7 @@ import { Match, MatchStatus, PlayerCard } from '@/types/match';
 import { gameTypeLabels } from '@/utils/bingoUtils';
 import { 
   Coins, Plus, Trophy, Users, Settings, 
-  Timer, DoorOpen, Ticket, Zap, ZapOff, Tv, Archive, Trash2, RotateCcw, Star, Loader2, History, LogOut, TrendingUp, Target, Flame
+  Timer, DoorOpen, Ticket, Zap, ZapOff, Tv, Archive, Trash2, RotateCcw, Star, Loader2, History, LogOut, TrendingUp, Target, Flame, Bot
 } from 'lucide-react';
 import { 
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose, DialogDescription
@@ -39,7 +39,7 @@ const Lobby = () => {
   const { 
     matches, joinMatch, getPlayerMatchCards, playerCards, 
     buyCardUses, createPlayerCard, deletePlayerCard,
-    toggleArchivePlayerCard, matchCards, wins, leaveMatch
+    toggleArchivePlayerCard, matchCards, wins, leaveMatch, gameSettings
   } = useGame();
 
   const [now, setNow] = useState(Date.now());
@@ -150,6 +150,20 @@ const Lobby = () => {
     const m = matches.find(match => match.id === mc.match_id);
     return m && m.status !== 'finished';
   }).map(mc => mc.player_id)).size;
+
+  // Cálculo da próxima partida automática
+  const lastMatch = matches[0]; // A primeira do array ordenado por start_time desc
+  let nextAutoMatchTime = null;
+  if (gameSettings?.auto_engine_enabled && lastMatch) {
+      const intervalMs = (gameSettings.auto_engine_interval_mins || 60) * 60 * 1000;
+      const nextTime = new Date(lastMatch.created_at).getTime() + intervalMs;
+      if (nextTime > now) {
+          const diff = nextTime - now;
+          const m = Math.floor((diff % 3600000) / 60000);
+          const s = Math.floor((diff % 60000) / 1000);
+          nextAutoMatchTime = `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+      }
+  }
 
   const renderCardList = (cards: PlayerCard[]) => {
     if (cards.length === 0) {
@@ -469,7 +483,26 @@ const Lobby = () => {
         </div>
       </div>
 
-      {/* SEÇÃO DE PARTIDAS - AGORA NO TOPO */}
+      {/* AVISO DE PRÓXIMA PARTIDA AUTOMÁTICA */}
+      {nextAutoMatchTime && openMatches.length === 0 && inProgressMatches.length === 0 && (
+        <div className="mb-8 p-4 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-between animate-slide-up">
+            <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
+                    <Bot className="w-6 h-6 text-primary" />
+                </div>
+                <div>
+                    <p className="text-sm font-bold text-foreground">Motor de Partidas Ativo</p>
+                    <p className="text-xs text-muted-foreground">O sistema criará uma nova partida automaticamente em breve.</p>
+                </div>
+            </div>
+            <div className="text-right">
+                <p className="text-[10px] font-bold uppercase text-primary tracking-widest">Próxima em</p>
+                <p className="text-xl font-bold font-mono text-primary">{nextAutoMatchTime}</p>
+            </div>
+        </div>
+      )}
+
+      {/* SEÇÃO DE PARTIDAS */}
       <div className="mb-12">
         <h2 className="font-heading text-xl md:text-2xl font-bold text-foreground mb-6 flex items-center gap-2">
           <DoorOpen className="w-6 h-6 text-accent" /> Partidas Disponíveis
@@ -511,7 +544,7 @@ const Lobby = () => {
         </Tabs>
       </div>
 
-      {/* SEÇÃO DE CARTELAS - AGORA ABAIXO DAS PARTIDAS */}
+      {/* SEÇÃO DE CARTELAS */}
       <div className="mb-8">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
           <h2 className="font-heading text-xl md:text-2xl font-bold text-foreground flex items-center gap-2">
