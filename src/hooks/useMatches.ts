@@ -73,22 +73,25 @@ export const useMatches = () => {
     const playersInMatch = new Set(matchCards.filter(mc => mc.match_id === matchId).map(mc => mc.player_id)).size;
 
     if (playersInMatch < 1) {
-      toast.error('A partida não pode ser iniciada sem jogadores.', {
-        description: 'Retornando a partida para o status "Aguardando".'
-      });
-      
-      const newPrize = { ...match.prize, returnedReason: 'NO_PLAYERS' as const };
-      
-      await supabase.from('partidas').update({ 
-        status: 'waiting', 
-        is_auto_calling: false,
-        prize: newPrize
-      }).eq('id', matchId);
-      
       if (match.is_auto_calling) {
-        toast.warning('Sorteio automático desativado.', {
-          description: `A partida "${match.name}" não tinha jogadores no horário de início.`
+        // Se for automática e não tiver ninguém, deleta imediatamente
+        await supabase.from('partidas').delete().eq('id', matchId);
+        toast.warning(`Partida automática "${match.name}" excluída.`, {
+          description: 'Nenhum jogador se inscreveu a tempo.'
         });
+      } else {
+        // Se for manual, mantém o comportamento de retornar para aguardando
+        toast.error('A partida não pode ser iniciada sem jogadores.', {
+          description: 'Retornando a partida para o status "Aguardando".'
+        });
+        
+        const newPrize = { ...match.prize, returnedReason: 'NO_PLAYERS' as const };
+        
+        await supabase.from('partidas').update({ 
+          status: 'waiting', 
+          is_auto_calling: false,
+          prize: newPrize
+        }).eq('id', matchId);
       }
       
       await queryClient.invalidateQueries({ queryKey: ['matches'] });
