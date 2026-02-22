@@ -20,10 +20,10 @@ const Admin = () => {
   }, [profile, navigate]);
 
   const totalUserCredits = useMemo(() => {
-    return (players || []).reduce((acc, player) => acc + player.credits, 0);
+    return (players || []).reduce((acc, player) => acc + Number(player.credits || 0), 0);
   }, [players]);
 
-  const adminProfit = gameSettings?.admin_profit || 0;
+  const adminProfit = Number(gameSettings?.admin_profit || 0);
   const totalCredits = totalUserCredits + adminProfit;
 
   if (!profile || profile.role !== 'admin') {
@@ -45,21 +45,21 @@ const Admin = () => {
             <Users className="w-4 h-4 mr-2" />
             <h3 className="text-sm font-semibold">Saldo Jogadores</h3>
           </div>
-          <p className="text-2xl font-bold font-heading">{totalUserCredits} cr.</p>
+          <p className="text-2xl font-bold font-heading">{totalUserCredits.toFixed(2)} cr.</p>
         </div>
         <div className="card-container p-4">
           <div className="flex items-center text-muted-foreground mb-2">
             <ShieldCheck className="w-4 h-4 mr-2" />
             <h3 className="text-sm font-semibold">Caixa Admin</h3>
           </div>
-          <p className="text-2xl font-bold font-heading text-success">{adminProfit} cr.</p>
+          <p className="text-2xl font-bold font-heading text-success">{adminProfit.toFixed(2)} cr.</p>
         </div>
         <div className="card-container p-4">
           <div className="flex items-center text-muted-foreground mb-2">
             <Coins className="w-4 h-4 mr-2" />
             <h3 className="text-sm font-semibold">Total em Jogo</h3>
           </div>
-          <p className="text-2xl font-bold font-heading text-primary">{totalCredits} cr.</p>
+          <p className="text-2xl font-bold font-heading text-primary">{totalCredits.toFixed(2)} cr.</p>
         </div>
       </div>
 

@@ -22,7 +22,7 @@ export const CreditRequestDialog = ({ gameSettings, children }: CreditRequestDia
   const [file, setFile] = useState<File | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
-  const [credits, setCredits] = useState(10);
+  const [credits, setCredits] = useState<number>(10);
 
   // Valor total em reais baseado na quantidade de créditos e no valor unitário configurado
   const amount = credits * (gameSettings?.valor_por_credito || 1);
@@ -90,17 +90,18 @@ export const CreditRequestDialog = ({ gameSettings, children }: CreditRequestDia
             <div className="p-4 bg-muted rounded-lg space-y-3">
               <Label htmlFor="credits-input">Quantidade de Créditos</Label>
               <div className="flex items-center justify-center gap-2">
-                <Button size="icon" variant="outline" onClick={() => setCredits(c => Math.max(1, c - 10))}>
+                <Button size="icon" variant="outline" onClick={() => setCredits(c => Math.max(0.01, Number((c - 1).toFixed(2))))}>
                   <Minus className="w-4 h-4" />
                 </Button>
                 <Input
                   id="credits-input"
                   type="number"
+                  step="0.01"
                   className="w-24 text-center text-lg font-bold"
                   value={credits}
-                  onChange={(e) => setCredits(parseInt(e.target.value, 10) || 1)}
+                  onChange={(e) => setCredits(Number(e.target.value) || 0)}
                 />
-                <Button size="icon" variant="outline" onClick={() => setCredits(c => c + 10)}>
+                <Button size="icon" variant="outline" onClick={() => setCredits(c => Number((c + 1).toFixed(2)))}>
                   <Plus className="w-4 h-4" />
                 </Button>
               </div>

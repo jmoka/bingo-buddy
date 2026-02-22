@@ -62,13 +62,13 @@ export const AppHeader = () => {
           {/* Saldo Real */}
           <div className="flex items-center gap-1 bg-muted rounded-full px-2 py-1.5 sm:px-3" title="Créditos Reais">
             <Wallet className="w-3.5 h-3.5 text-foreground" />
-            <span className="font-heading font-bold text-sm sm:text-base text-foreground">{profile.credits}</span>
+            <span className="font-heading font-bold text-sm sm:text-base text-foreground">{Number(profile.credits || 0).toFixed(2)}</span>
           </div>
           
           {/* Saldo de Brincar com Botão de Recarga */}
           <div className="flex items-center gap-1 bg-amber-400/10 rounded-full pl-2 pr-1 py-1 sm:pl-3 border border-amber-400/20" title="Créditos de Brincar">
             <Star className="w-3.5 h-3.5 text-amber-600" />
-            <span className="font-heading font-bold text-sm sm:text-base text-amber-600 mr-1">{profile.fake_credits || 0}</span>
+            <span className="font-heading font-bold text-sm sm:text-base text-amber-600 mr-1">{Number(profile.fake_credits || 0).toFixed(2)}</span>
             <Button 
                 variant="ghost" 
                 size="icon" 

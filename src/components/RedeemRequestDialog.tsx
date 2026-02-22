@@ -16,7 +16,7 @@ interface RedeemRequestDialogProps {
 export const RedeemRequestDialog = ({ children }: RedeemRequestDialogProps) => {
   const { requestRedeem, gameSettings } = useGame();
   const { profile } = useAuth();
-  const [credits, setCredits] = useState(50);
+  const [credits, setCredits] = useState<number>(50);
   const [message, setMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
@@ -67,16 +67,17 @@ export const RedeemRequestDialog = ({ children }: RedeemRequestDialogProps) => {
           <div className="p-4 bg-muted rounded-xl space-y-4 text-center">
             <Label>Quantidade para Resgate</Label>
             <div className="flex items-center justify-center gap-3">
-              <Button size="icon" variant="outline" onClick={() => setCredits(c => Math.max(10, c - 10))}>
+              <Button size="icon" variant="outline" onClick={() => setCredits(c => Math.max(0.01, Number((c - 10).toFixed(2))))}>
                 <Minus className="w-4 h-4" />
               </Button>
               <Input
                 type="number"
+                step="0.01"
                 className="w-28 text-center text-xl font-bold bg-background"
                 value={credits}
-                onChange={(e) => setCredits(parseInt(e.target.value, 10) || 0)}
+                onChange={(e) => setCredits(Number(e.target.value) || 0)}
               />
-              <Button size="icon" variant="outline" onClick={() => setCredits(c => c + 10)}>
+              <Button size="icon" variant="outline" onClick={() => setCredits(c => Number((c + 10).toFixed(2)))}>
                 <Plus className="w-4 h-4" />
               </Button>
             </div>
@@ -89,7 +90,7 @@ export const RedeemRequestDialog = ({ children }: RedeemRequestDialogProps) => {
                 <div className="flex flex-col p-2 bg-muted rounded-lg border border-border">
                     <span className="text-[10px] uppercase font-bold text-muted-foreground">Saldo Restante</span>
                     <span className={`text-lg font-bold font-heading ${remainingCredits < 0 ? 'text-destructive' : 'text-foreground'}`}>
-                        {remainingCredits} cr.
+                        {remainingCredits.toFixed(2)} cr.
                     </span>
                 </div>
             </div>

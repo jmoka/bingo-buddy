@@ -42,12 +42,12 @@ const PlayersAdmin = () => {
   const { profile } = useAuth();
   const { players, allPlayerCards, updatePlayerCredits, allWins, matches, gameSettings } = useGame();
   const [selectedPlayer, setSelectedPlayer] = useState<Profile | null>(null);
-  const [creditAmount, setCreditAmount] = useState(0);
+  const [creditAmount, setCreditAmount] = useState<number>(0);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isUpdatingCredits, setIsUpdatingCredits] = useState(false);
 
   const totalCreditsInPlay = useMemo(() => {
-    return players.reduce((acc, player) => acc + player.credits, 0);
+    return (players || []).reduce((acc, player) => acc + Number(player.credits || 0), 0);
   }, [players]);
 
   const totalValueInReais = useMemo(() => {
@@ -97,7 +97,7 @@ const PlayersAdmin = () => {
             <Coins className="w-4 h-4 mr-2" />
             <h3 className="text-sm font-semibold">Total de Créditos em Jogo</h3>
           </div>
-          <p className="text-2xl font-bold font-heading">{totalCreditsInPlay} cr.</p>
+          <p className="text-2xl font-bold font-heading">{totalCreditsInPlay.toFixed(2)} cr.</p>
           <p className="text-xs text-muted-foreground">Soma dos saldos de todos os jogadores.</p>
         </div>
         <div className="card-container p-4">
@@ -139,7 +139,7 @@ const PlayersAdmin = () => {
                   </TableCell>
                   <TableCell>{player.cpf || '-'}</TableCell>
                   <TableCell>{player.whatsapp || '-'}</TableCell>
-                  <TableCell className="text-center font-mono">{player.credits}</TableCell>
+                  <TableCell className="text-center font-mono">{Number(player.credits || 0).toFixed(2)}</TableCell>
                   <TableCell className="text-center font-mono">{playerCardsCount}</TableCell>
                   <TableCell className="text-right">
                     <Button variant="outline" size="sm" onClick={() => handleOpenDialog(player)}>
@@ -177,15 +177,16 @@ const PlayersAdmin = () => {
             </TabsList>
             <TabsContent value="credits">
               <div className="py-4 space-y-4">
-                <p>Saldo atual: <strong className="font-mono">{selectedPlayer?.credits}</strong> créditos</p>
+                <p>Saldo atual: <strong className="font-mono">{Number(selectedPlayer?.credits || 0).toFixed(2)}</strong> créditos</p>
                 <div>
                   <label htmlFor="creditAmount" className="text-sm font-medium">Valor a adicionar/remover</label>
                   <Input
                     id="creditAmount"
                     type="number"
+                    step="0.01"
                     value={creditAmount === 0 ? '' : creditAmount}
-                    onChange={(e) => setCreditAmount(parseInt(e.target.value, 10) || 0)}
-                    placeholder="Ex: 50 ou -20"
+                    onChange={(e) => setCreditAmount(Number(e.target.value) || 0)}
+                    placeholder="Ex: 50.50 ou -20.00"
                   />
                 </div>
               </div>

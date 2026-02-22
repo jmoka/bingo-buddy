@@ -49,7 +49,7 @@ const SettingsManager = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [justSaved, setJustSaved] = useState(false);
   const [isTestingEngine, setIsTestingEngine] = useState(false);
-  const [withdrawAmount, setWithdrawAmount] = useState(0);
+  const [withdrawAmount, setWithdrawAmount] = useState<number>(0);
   const [isWithdrawDialogOpen, setIsWithdrawDialogOpen] = useState(false);
   const [isWithdrawing, setIsWithdrawing] = useState(false);
 
@@ -104,7 +104,6 @@ const SettingsManager = () => {
     const success = await updateGameSettings({ 
         ...currentSettings, 
         [name]: checked,
-        // Garante que os números sejam números ao salvar via switch também
         auto_engine_interval_mins: Number(currentSettings.auto_engine_interval_mins),
         auto_engine_matches_per_day: Number(currentSettings.auto_engine_matches_per_day),
         auto_engine_card_price: Number(currentSettings.auto_engine_card_price),
@@ -132,15 +131,15 @@ const SettingsManager = () => {
     setIsSaving(true);
     const success = await updateGameSettings({
       ...currentSettings,
-      custo_nova_cartela: parseInt(currentSettings.custo_nova_cartela as any, 10),
-      custo_recarga_cartela: parseInt(currentSettings.custo_recarga_cartela as any, 10),
+      custo_nova_cartela: Number(currentSettings.custo_nova_cartela),
+      custo_recarga_cartela: Number(currentSettings.custo_recarga_cartela),
       usos_por_recarga: parseInt(currentSettings.usos_por_recarga as any, 10),
       intervalo_sorteio_auto_seg: parseInt(currentSettings.intervalo_sorteio_auto_seg as any, 10),
-      valor_por_credito: parseFloat(currentSettings.valor_por_credito as any),
+      valor_por_credito: Number(currentSettings.valor_por_credito),
       auto_engine_interval_mins: parseInt(currentSettings.auto_engine_interval_mins as any, 10),
       auto_engine_matches_per_day: parseInt(currentSettings.auto_engine_matches_per_day as any, 10),
-      auto_engine_card_price: parseInt(currentSettings.auto_engine_card_price as any, 10),
-      auto_engine_prize_value: parseInt(currentSettings.auto_engine_prize_value as any, 10),
+      auto_engine_card_price: Number(currentSettings.auto_engine_card_price),
+      auto_engine_prize_value: Number(currentSettings.auto_engine_prize_value),
       auto_engine_start_hour: parseInt(currentSettings.auto_engine_start_hour as any, 10),
     });
     
@@ -191,8 +190,8 @@ const SettingsManager = () => {
         <div className="space-y-6">
           <h3 className="font-heading font-bold text-primary border-b pb-2">Economia</h3>
           <div className="grid grid-cols-2 gap-4">
-            <div><Label>Nova Cartela (cr)</Label><Input name="custo_nova_cartela" type="number" value={currentSettings.custo_nova_cartela} onChange={handleSettingsChange} /></div>
-            <div><Label>Recarga (cr)</Label><Input name="custo_recarga_cartela" type="number" value={currentSettings.custo_recarga_cartela} onChange={handleSettingsChange} /></div>
+            <div><Label>Nova Cartela (cr)</Label><Input name="custo_nova_cartela" type="number" step="0.01" value={currentSettings.custo_nova_cartela} onChange={handleSettingsChange} /></div>
+            <div><Label>Recarga (cr)</Label><Input name="custo_recarga_cartela" type="number" step="0.01" value={currentSettings.custo_recarga_cartela} onChange={handleSettingsChange} /></div>
             <div><Label>Usos por Recarga</Label><Input name="usos_por_recarga" type="number" value={currentSettings.usos_por_recarga} onChange={handleSettingsChange} /></div>
             <div><Label>R$ por Crédito</Label><Input name="valor_por_credito" type="number" step="0.01" value={currentSettings.valor_por_credito} onChange={handleSettingsChange} /></div>
           </div>
@@ -251,7 +250,7 @@ const SettingsManager = () => {
               </div>
               <div>
                 <Label>Preço da Cartela (cr)</Label>
-                <Input name="auto_engine_card_price" type="number" value={currentSettings.auto_engine_card_price} onChange={handleSettingsChange} />
+                <Input name="auto_engine_card_price" type="number" step="0.01" value={currentSettings.auto_engine_card_price} onChange={handleSettingsChange} />
               </div>
             </div>
 
@@ -287,6 +286,7 @@ const SettingsManager = () => {
                 <Input 
                   name="auto_engine_prize_value" 
                   type="number" 
+                  step="0.01"
                   value={currentSettings.auto_engine_prize_value} 
                   onChange={handleSettingsChange} 
                   className="w-24"
@@ -342,7 +342,7 @@ const SettingsManager = () => {
             <div>
               <Label>Lucro Total Acumulado</Label>
               <p className="text-2xl font-bold font-heading text-success">
-                {gameSettings?.admin_profit || 0} créditos
+                {Number(gameSettings?.admin_profit || 0).toFixed(2)} créditos
               </p>
               <p className="text-sm font-medium text-muted-foreground">
                 (R$ {adminProfitInReais.toFixed(2).replace('.', ',')})
@@ -365,17 +365,18 @@ const SettingsManager = () => {
                 <div className="py-4 space-y-4">
                   <div className="p-3 bg-muted rounded-lg">
                     <p className="text-xs text-muted-foreground">Lucro disponível</p>
-                    <p className="text-lg font-bold">{gameSettings?.admin_profit || 0} créditos</p>
+                    <p className="text-lg font-bold">{Number(gameSettings?.admin_profit || 0).toFixed(2)} créditos</p>
                   </div>
                   <div>
                     <Label htmlFor="withdraw-amount">Créditos a Retirar</Label>
                     <Input
                       id="withdraw-amount"
                       type="number"
+                      step="0.01"
                       value={withdrawAmount || ''}
-                      onChange={(e) => setWithdrawAmount(parseInt(e.target.value, 10) || 0)}
+                      onChange={(e) => setWithdrawAmount(Number(e.target.value) || 0)}
                       max={gameSettings?.admin_profit || 0}
-                      placeholder="Ex: 100"
+                      placeholder="Ex: 100.50"
                     />
                   </div>
                 </div>
