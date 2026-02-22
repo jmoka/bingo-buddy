@@ -9,20 +9,35 @@ export const useGameSettings = () => {
   const { data: gameSettings } = useQuery({
     queryKey: ['gameSettings'],
     queryFn: async () => {
-      // Garante que estamos buscando a única linha de configuração correta
       const { data, error } = await supabase.from('configuracoes').select('*').eq('singleton', true).single();
       
       if (error) {
         if (error.code === 'PGRST116') { // "The result contains 0 rows"
-          console.error("FATAL: Nenhuma linha de configuração encontrada no banco de dados. O sistema pode não funcionar corretamente.");
-          toast.error("Configurações do sistema não encontradas!", {
-            description: "Verifique se a configuração inicial foi inserida no banco de dados.",
-            duration: 10000,
-          });
+          console.warn("Nenhuma configuração encontrada. Criando uma configuração padrão...");
+          
+          // A linha de configuração não existe, vamos criar uma com valores padrão.
+          const { data: newSettings, error: insertError } = await supabase
+            .from('configuracoes')
+            .insert({ singleton: true }) // A maioria das colunas tem valores padrão no DB
+            .select()
+            .single();
+
+          if (insertError) {
+            console.error("FATAL: Falha ao criar configuração padrão:", insertError);
+            toast.error("Erro crítico ao configurar o sistema.", {
+              description: "Não foi possível criar a linha de configurações padrão.",
+              duration: 10000,
+            });
+            return null;
+          }
+          
+          toast.success("Configuração inicial do sistema criada com sucesso!");
+          return newSettings as GameSettings;
+
         } else {
           console.error("Erro ao buscar configurações do jogo:", error);
+          return null;
         }
-        return null;
       }
       return data as GameSettings;
     }
