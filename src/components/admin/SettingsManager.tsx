@@ -77,11 +77,11 @@ const SettingsManager = () => {
 
   const schedulePreview = useMemo(() => {
     const times = [];
-    let checkTime = startOfDay(new Date()).getTime() + (currentSettings.auto_engine_start_hour * 3600000);
+    let checkTime = startOfDay(new Date()).getTime() + (Number(currentSettings.auto_engine_start_hour) * 3600000);
     const limit = checkTime + (24 * 3600000);
-    const interval = currentSettings.auto_engine_interval_mins * 60000;
+    const interval = Number(currentSettings.auto_engine_interval_mins) * 60000;
 
-    while (checkTime < limit && times.length < currentSettings.auto_engine_matches_per_day) {
+    while (checkTime < limit && times.length < Number(currentSettings.auto_engine_matches_per_day)) {
       times.push(new Date(checkTime));
       checkTime += interval;
     }
@@ -95,10 +95,22 @@ const SettingsManager = () => {
 
   const handleToggleChange = async (name: string, checked: boolean) => {
     setCurrentSettings(prev => ({ ...prev, [name]: checked }));
-    if (name === 'auto_engine_enabled' && checked) {
-        setIsSaving(true);
-        await updateGameSettings({ ...currentSettings, auto_engine_enabled: true });
-        setIsSaving(false);
+    
+    // Salva imediatamente a alteração do switch para evitar confusão
+    setIsSaving(true);
+    const success = await updateGameSettings({ 
+        ...currentSettings, 
+        [name]: checked,
+        // Garante que os números sejam números ao salvar via switch também
+        auto_engine_interval_mins: Number(currentSettings.auto_engine_interval_mins),
+        auto_engine_matches_per_day: Number(currentSettings.auto_engine_matches_per_day),
+        auto_engine_card_price: Number(currentSettings.auto_engine_card_price),
+        auto_engine_prize_value: Number(currentSettings.auto_engine_prize_value),
+        auto_engine_start_hour: Number(currentSettings.auto_engine_start_hour),
+    });
+    setIsSaving(false);
+
+    if (success && name === 'auto_engine_enabled' && checked) {
         toast.info("Motor ativado! Tentando criar a primeira partida...");
         try {
             const { data } = await supabase.functions.invoke('auto-match-engine', { body: { force: true } });
@@ -115,7 +127,7 @@ const SettingsManager = () => {
 
   const handleSaveSettings = async () => {
     setIsSaving(true);
-    await updateGameSettings({
+    const success = await updateGameSettings({
       ...currentSettings,
       custo_nova_cartela: parseInt(currentSettings.custo_nova_cartela as any, 10),
       custo_recarga_cartela: parseInt(currentSettings.custo_recarga_cartela as any, 10),
@@ -128,11 +140,15 @@ const SettingsManager = () => {
       auto_engine_prize_value: parseInt(currentSettings.auto_engine_prize_value as any, 10),
       auto_engine_start_hour: parseInt(currentSettings.auto_engine_start_hour as any, 10),
     });
+    
     setIsSaving(false);
-    setJustSaved(true);
-    setTimeout(() => {
-      setJustSaved(false);
-    }, 2000);
+    if (success) {
+        setJustSaved(true);
+        toast.success("Configurações salvas com sucesso!");
+        setTimeout(() => {
+          setJustSaved(false);
+        }, 2000);
+    }
   };
 
   const handleTestEngine = async () => {

@@ -15,9 +15,17 @@ export const useGameSettings = () => {
     }
   });
 
-  const updateGameSettings = async (newSettings: Partial<GameSettings>) => {
-    await supabase.from('configuracoes').update(newSettings).eq('singleton', true);
-    queryClient.invalidateQueries({ queryKey: ['gameSettings'] });
+  const updateGameSettings = async (newSettings: Partial<GameSettings>): Promise<boolean> => {
+    const { error } = await supabase.from('configuracoes').update(newSettings).eq('singleton', true);
+    
+    if (error) {
+      console.error("Erro ao salvar configurações:", error);
+      toast.error("Erro ao salvar no banco de dados: " + error.message);
+      return false;
+    }
+
+    await queryClient.invalidateQueries({ queryKey: ['gameSettings'] });
+    return true;
   };
 
   const withdrawAdminProfit = async (amount: number): Promise<boolean> => {
