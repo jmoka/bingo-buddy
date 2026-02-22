@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose, DialogDescription } from '@/components/ui/dialog';
-import { GameSettings } from '@/contexts/GameContext';
+import { GameSettings } from '@/types/match';
 import { QRCodeSVG as QRCode } from 'qrcode.react';
 import { toast } from 'sonner';
 import { Copy, Upload, Loader2, Minus, Plus } from 'lucide-react';

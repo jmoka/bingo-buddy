@@ -30,6 +30,13 @@ const SettingsManager = () => {
     n8n_env: 'test' as 'test' | 'production',
     pix_key: '',
     credit_request_text: '',
+    auto_engine_enabled: false,
+    auto_engine_interval_mins: 60,
+    auto_engine_matches_per_day: 24,
+    auto_engine_game_type: 'full' as any,
+    auto_engine_card_price: 10,
+    auto_engine_prize_type: 'percentage' as any,
+    auto_engine_prize_value: 80,
   });
   const [isSaving, setIsSaving] = useState(false);
   const [justSaved, setJustSaved] = useState(false);
@@ -50,13 +57,21 @@ const SettingsManager = () => {
         n8n_env: (gameSettings.n8n_env as 'test' | 'production') || 'test',
         pix_key: gameSettings.pix_key || '',
         credit_request_text: gameSettings.credit_request_text || '',
+        auto_engine_enabled: gameSettings.auto_engine_enabled || false,
+        auto_engine_interval_mins: gameSettings.auto_engine_interval_mins || 60,
+        auto_engine_matches_per_day: gameSettings.auto_engine_matches_per_day || 24,
+        auto_engine_game_type: gameSettings.auto_engine_game_type || 'full',
+        auto_engine_card_price: gameSettings.auto_engine_card_price || 10,
+        auto_engine_prize_type: gameSettings.auto_engine_prize_type || 'percentage',
+        auto_engine_prize_value: gameSettings.auto_engine_prize_value || 80,
       });
     }
   }, [gameSettings]);
 
   const handleSettingsChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
-    setCurrentSettings(prev => ({ ...prev, [name]: value }));
+    const { name, value, type } = e.target as HTMLInputElement;
+    const val = type === 'checkbox' ? (e.target as HTMLInputElement).checked : value;
+    setCurrentSettings(prev => ({ ...prev, [name]: val }));
   };
 
   const handleSelectChange = (name: string, value: string) => {
@@ -72,6 +87,10 @@ const SettingsManager = () => {
       usos_por_recarga: parseInt(currentSettings.usos_por_recarga as any, 10),
       intervalo_sorteio_auto_seg: parseInt(currentSettings.intervalo_sorteio_auto_seg as any, 10),
       valor_por_credito: parseFloat(currentSettings.valor_por_credito as any),
+      auto_engine_interval_mins: parseInt(currentSettings.auto_engine_interval_mins as any, 10),
+      auto_engine_matches_per_day: parseInt(currentSettings.auto_engine_matches_per_day as any, 10),
+      auto_engine_card_price: parseInt(currentSettings.auto_engine_card_price as any, 10),
+      auto_engine_prize_value: parseInt(currentSettings.auto_engine_prize_value as any, 10),
     });
     setIsSaving(false);
     setJustSaved(true);
@@ -115,9 +134,70 @@ const SettingsManager = () => {
 
         <div className="space-y-6">
           <h3 className="font-heading font-bold text-primary border-b pb-2 flex items-center gap-2"><Bot className="w-4 h-4" /> Automação</h3>
-          <div>
-            <Label>Intervalo Sorteio Auto (segundos)</Label>
-            <Input name="intervalo_sorteio_auto_seg" type="number" value={currentSettings.intervalo_sorteio_auto_seg} onChange={handleSettingsChange} />
+          <div className="space-y-4">
+            <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
+              <Label htmlFor="auto_engine_enabled" className="cursor-pointer">Ativar Motor de Automação</Label>
+              <input
+                id="auto_engine_enabled"
+                name="auto_engine_enabled"
+                type="checkbox"
+                className="w-5 h-5 accent-primary cursor-pointer"
+                checked={currentSettings.auto_engine_enabled}
+                onChange={handleSettingsChange}
+              />
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Intervalo entre Partidas (min)</Label>
+                <Input name="auto_engine_interval_mins" type="number" value={currentSettings.auto_engine_interval_mins} onChange={handleSettingsChange} />
+              </div>
+              <div>
+                <Label>Partidas por Dia (Máx)</Label>
+                <Input name="auto_engine_matches_per_day" type="number" value={currentSettings.auto_engine_matches_per_day} onChange={handleSettingsChange} />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Tipo de Jogo</Label>
+                <Select value={currentSettings.auto_engine_game_type} onValueChange={(v) => handleSelectChange('auto_engine_game_type', v)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="full">Cartela Cheia</SelectItem>
+                    <SelectItem value="horizontal">Linha Horizontal</SelectItem>
+                    <SelectItem value="vertical">Linha Vertical</SelectItem>
+                    <SelectItem value="diagonal">Linha Diagonal</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Preço da Cartela (cr)</Label>
+                <Input name="auto_engine_card_price" type="number" value={currentSettings.auto_engine_card_price} onChange={handleSettingsChange} />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Tipo de Prêmio</Label>
+                <Select value={currentSettings.auto_engine_prize_type} onValueChange={(v) => handleSelectChange('auto_engine_prize_type', v)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="percentage">Porcentagem do Pote</SelectItem>
+                    <SelectItem value="fixed">Valor Fixo (Créditos)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>{currentSettings.auto_engine_prize_type === 'percentage' ? 'Porcentagem (%)' : 'Valor Fixo (cr)'}</Label>
+                <Input name="auto_engine_prize_value" type="number" value={currentSettings.auto_engine_prize_value} onChange={handleSettingsChange} />
+              </div>
+            </div>
+
+            <div>
+              <Label>Intervalo Sorteio Auto (segundos)</Label>
+              <Input name="intervalo_sorteio_auto_seg" type="number" value={currentSettings.intervalo_sorteio_auto_seg} onChange={handleSettingsChange} />
+            </div>
           </div>
         </div>
 

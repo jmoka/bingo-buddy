@@ -2,7 +2,7 @@ import React, { createContext, useContext, useEffect, useState, useRef } from 'r
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './AuthContext';
-import { Win } from '@/types/match';
+import { Win, GameSettings } from '@/types/match';
 import { useGameSettings } from '@/hooks/useGameSettings';
 import { useMatches } from '@/hooks/useMatches';
 import { usePlayerCards } from '@/hooks/usePlayerCards';

@@ -66,6 +66,27 @@ export interface Win {
   won_at: string;
 }
 
+export interface GameSettings {
+  custo_nova_cartela: number;
+  custo_recarga_cartela: number;
+  usos_por_recarga: number;
+  intervalo_sorteio_auto_seg: number;
+  valor_por_credito: number;
+  pix_key?: string;
+  credit_request_text?: string;
+  n8n_test_url?: string;
+  n8n_prod_url?: string;
+  n8n_env?: 'test' | 'production';
+  admin_profit: number;
+  auto_engine_enabled: boolean;
+  auto_engine_interval_mins: number;
+  auto_engine_matches_per_day: number;
+  auto_engine_game_type: GameType;
+  auto_engine_card_price: number;
+  auto_engine_prize_type: PrizeType;
+  auto_engine_prize_value: number;
+}
+
 export interface CreditRequestMessage {
   id: string;
   credit_request_id: string;
