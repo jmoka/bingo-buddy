@@ -99,7 +99,6 @@ const SettingsManager = () => {
   const handleToggleChange = async (name: string, checked: boolean) => {
     setCurrentSettings(prev => ({ ...prev, [name]: checked }));
     
-    // Salva imediatamente a alteração do switch para evitar confusão
     setIsSaving(true);
     const success = await updateGameSettings({ 
         ...currentSettings, 
@@ -138,8 +137,8 @@ const SettingsManager = () => {
       valor_por_credito: Number(currentSettings.valor_por_credito),
       auto_engine_interval_mins: parseInt(currentSettings.auto_engine_interval_mins as any, 10),
       auto_engine_matches_per_day: parseInt(currentSettings.auto_engine_matches_per_day as any, 10),
-      auto_engine_card_price: Number(currentSettings.auto_engine_card_price),
-      auto_engine_prize_value: Number(currentSettings.auto_engine_prize_value),
+      auto_engine_card_price: Number(currentSettings.auto_engine_card_price), // Usando Number em vez de parseInt
+      auto_engine_prize_value: Number(currentSettings.auto_engine_prize_value), // Usando Number em vez de parseInt
       auto_engine_start_hour: parseInt(currentSettings.auto_engine_start_hour as any, 10),
     });
     
