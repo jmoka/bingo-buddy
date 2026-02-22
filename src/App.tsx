@@ -16,6 +16,8 @@ import NotFound from "./pages/NotFound";
 import PlayersAdmin from "./pages/PlayersAdmin";
 import CreditRequestsAdmin from "./pages/CreditRequestsAdmin";
 import RedeemRequestsAdmin from "./pages/RedeemRequestsAdmin";
+import ActivePlayers from "./pages/ActivePlayers";
+import Trophies from "./pages/Trophies";
 import { Loader2 } from "lucide-react";
 
 const queryClient = new QueryClient();
@@ -53,6 +55,8 @@ const App = () => (
               <Route path="/admin/redeem-requests" element={<ProtectedRoute><RedeemRequestsAdmin /></ProtectedRoute>} />
               <Route path="/match/:id" element={<ProtectedRoute><MatchView /></ProtectedRoute>} />
               <Route path="/print" element={<ProtectedRoute><PrintView /></ProtectedRoute>} />
+              <Route path="/active-players" element={<ProtectedRoute><ActivePlayers /></ProtectedRoute>} />
+              <Route path="/trophies" element={<ProtectedRoute><Trophies /></ProtectedRoute>} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>

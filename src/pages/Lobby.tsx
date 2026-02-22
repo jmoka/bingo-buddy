@@ -460,7 +460,10 @@ const Lobby = () => {
           </div>
         </div>
 
-        <div className="card-container bg-gradient-to-br from-accent to-accent/80 text-white border-none p-6 flex flex-col justify-between relative overflow-hidden group">
+        <div 
+          className="card-container bg-gradient-to-br from-accent to-accent/80 text-white border-none p-6 flex flex-col justify-between relative overflow-hidden group cursor-pointer"
+          onClick={() => navigate('/active-players')}
+        >
           <Users className="absolute -right-4 -bottom-4 w-32 h-32 text-white/10 -rotate-12 group-hover:scale-110 transition-transform duration-500" />
           <div>
             <p className="text-xs font-bold uppercase tracking-widest opacity-80 mb-1">Jogadores Ativos</p>
@@ -472,7 +475,10 @@ const Lobby = () => {
           </div>
         </div>
 
-        <div className="card-container bg-gradient-to-br from-amber-500 to-amber-600 text-white border-none p-6 flex flex-col justify-between relative overflow-hidden group">
+        <div 
+          className="card-container bg-gradient-to-br from-amber-500 to-amber-600 text-white border-none p-6 flex flex-col justify-between relative overflow-hidden group cursor-pointer"
+          onClick={() => navigate('/trophies')}
+        >
           <Trophy className="absolute -right-4 -bottom-4 w-32 h-32 text-white/10 rotate-6 group-hover:scale-110 transition-transform duration-500" />
           <div>
             <p className="text-xs font-bold uppercase tracking-widest opacity-80 mb-1">Suas Vitórias</p>
