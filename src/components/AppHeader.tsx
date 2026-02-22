@@ -4,7 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useGame } from '@/contexts/GameContext';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
-import { Menu, User, Wallet, Plus, Banknote, History, Printer, LogOut, Star, RefreshCw } from 'lucide-react';
+import { Menu, User, Wallet, Plus, Banknote, History, Printer, LogOut, Star, Crown } from 'lucide-react';
 import { CreditRequestDialog } from './CreditRequestDialog';
 import { MyCreditRequestsDialog } from './MyCreditRequestsDialog';
 import { RedeemRequestDialog } from './RedeemRequestDialog';
@@ -43,6 +43,11 @@ export const AppHeader = () => {
     },
     {
       dialog: <MyRedeemRequestsDialog><Button variant="ghost" className="w-full justify-start text-base py-6"><Banknote className="w-5 h-5 mr-4" />Meus Resgates</Button></MyRedeemRequestsDialog>,
+    },
+    {
+      action: () => navigate('/ranking'),
+      label: 'Hall da Fama (Ranking)',
+      icon: Crown,
     },
     {
       action: () => navigate('/print'),
