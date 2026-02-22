@@ -60,4 +60,4 @@ O sistema foi atualizado para abandonar o uso de números inteiros em saldos e c
 
 -   **Otimização de Realtime**: Refinar as inscrições de canais do Supabase para reduzir o tráfego em partidas com muitos jogadores.
 -   **Relatórios Avançados**: Criação de gráficos de lucro e volume de apostas por período no painel administrativo.
--   **Notificações Push**: Integração com serviços de notificação para avisar jogadores quando uma partida automática estiver prestes a começar.
+- **Notificações Push**: Integração com serviços de notificação para avisar jogadores quando uma partida automática estiver prestes a começar..
