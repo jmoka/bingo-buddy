@@ -1,6 +1,6 @@
 import { Match, MatchCard } from '@/types/match';
 import { calculateNumbersToWin } from '@/utils/bingoUtils';
-import { Ticket, Trophy, Flame, Target } from 'lucide-react';
+import { Ticket, Trophy, Flame, Target, Star, Coins } from 'lucide-react';
 
 interface MatchStatsProps {
   match: Match;
@@ -16,6 +16,8 @@ const getPrizeDisplay = (match: Match) => {
 
 export const MatchStats = ({ match, allMatchCards }: MatchStatsProps) => {
   const totalCards = allMatchCards.length;
+  const realCardsCount = allMatchCards.filter(c => c.credit_type === 'real').length;
+  const fakeCardsCount = allMatchCards.filter(c => c.credit_type === 'fake').length;
   const prizeDisplay = getPrizeDisplay(match);
 
   const stats = {
@@ -50,6 +52,15 @@ export const MatchStats = ({ match, allMatchCards }: MatchStatsProps) => {
         <div className="flex flex-col items-center justify-center p-2 sm:p-4 rounded-lg bg-muted/50 border border-border/50">
           <Ticket className="w-4 h-4 sm:w-6 sm:h-6 text-primary mb-1" />
           <span className="font-bold text-lg sm:text-2xl font-heading">{totalCards}</span>
+          <div className="flex items-center gap-2 text-[9px] sm:text-[10px] font-bold uppercase tracking-wider">
+            <span className="flex items-center gap-0.5 text-primary">
+              <Coins className="w-2.5 h-2.5" /> {realCardsCount}
+            </span>
+            <span className="text-muted-foreground">/</span>
+            <span className="flex items-center gap-0.5 text-amber-600">
+              <Star className="w-2.5 h-2.5" /> {fakeCardsCount}
+            </span>
+          </div>
           <span className="text-[10px] sm:text-sm text-muted-foreground">Cartelas</span>
         </div>
         <div className="flex flex-col items-center justify-center p-2 sm:p-4 rounded-lg bg-muted/50 border border-border/50">

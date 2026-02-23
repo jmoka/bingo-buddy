@@ -44,6 +44,7 @@ export interface PlayerCard {
   numbers: number[][];
   uses_left: number;
   is_archived: boolean;
+  credit_type: 'real' | 'fake';
 }
 
 export interface MatchCard {
@@ -54,6 +55,7 @@ export interface MatchCard {
   name: string;
   numbers: number[][];
   marked_numbers: Set<number>;
+  credit_type: 'real' | 'fake';
 }
 
 export interface Win {

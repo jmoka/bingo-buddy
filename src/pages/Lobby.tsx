@@ -228,6 +228,8 @@ const Lobby = () => {
       <div className="space-y-4">
         {matchesToRender.map(match => {
           const allCardsInMatch = matchCards.filter(mc => mc.match_id === match.id);
+          const realCardsCount = allCardsInMatch.filter(c => c.credit_type === 'real').length;
+          const fakeCardsCount = allCardsInMatch.filter(c => c.credit_type === 'fake').length;
           const playersInMatchCount = new Set(allCardsInMatch.map(mc => mc.player_id)).size;
           const myMatchCards = getPlayerMatchCards(match.id, profile.id);
           const alreadyJoined = myMatchCards.length > 0;
@@ -247,7 +249,13 @@ const Lobby = () => {
                     <div className="flex flex-wrap gap-3 text-[11px] text-muted-foreground font-medium">
                       <span className="flex items-center gap-1"><Trophy className="w-3 h-3" />{gameTypeLabels[match.game_type]}</span>
                       <span className="flex items-center gap-1"><Users className="w-3 h-3" />{playersInMatchCount} Jogadores</span>
-                      <span className="flex items-center gap-1"><Ticket className="w-3 h-3" />{allCardsInMatch.length} Cartelas</span>
+                      <span className="flex items-center gap-1" title={`${realCardsCount} Reais / ${fakeCardsCount} Brincar`}>
+                        <Ticket className="w-3 h-3" /> 
+                        {allCardsInMatch.length} Cartelas 
+                        <span className="flex items-center gap-1 ml-1 opacity-80">
+                          (<Coins className="w-2.5 h-2.5 text-primary" />{realCardsCount} / <Star className="w-2.5 h-2.5 text-amber-600" />{fakeCardsCount})
+                        </span>
+                      </span>
                     </div>
                   </div>
                   <div className="flex gap-2 sm:flex-col items-end justify-between sm:justify-center">
