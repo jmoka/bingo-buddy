@@ -55,7 +55,7 @@ const Lobby = () => {
   const [cardsToJoin, setCardsToJoin] = useState<Set<string>>(new Set());
   const [isJoining, setIsJoining] = useState(false);
   const [rechargingCardId, setRechargingCardId] = useState<string | null>(null);
-  const [isAgendaOpen, setIsAgendaOpen] = useState(false);
+  const [isAgendaOpen, setIsAgendaOpen] = useState(true);
 
   useEffect(() => {
     if (!session) {
@@ -313,7 +313,7 @@ const Lobby = () => {
               
               <div className={cn(
                 "transition-all duration-300 ease-in-out overflow-hidden",
-                isAgendaOpen ? "max-height-[1000px] opacity-100 p-4" : "max-height-0 opacity-0"
+                isAgendaOpen ? "max-h-[1000px] opacity-100 p-4" : "max-h-0 opacity-0"
               )}>
                 <div className="space-y-2 max-h-[400px] overflow-y-auto pr-1 custom-scrollbar">
                   {schedule.map((time, idx) => (
