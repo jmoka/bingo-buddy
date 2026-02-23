@@ -3,13 +3,14 @@ import { useGame } from '@/contexts/GameContext';
 import { BingoCell } from '@/components/BingoCell';
 import { Button } from '@/components/ui/button';
 import { gameTypeLabels } from '@/utils/bingoUtils';
-import { ArrowLeft, Coins, Users, Bot, Loader2 } from 'lucide-react';
+import { ArrowLeft, Coins, Users, Bot, Loader2, Star, Trophy } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { playNotificationSound } from '@/utils/soundUtils';
 import { WinnerDisplay } from '@/components/WinnerDisplay';
 import { useAuth } from '@/contexts/AuthContext';
 import { MatchStats } from '@/components/MatchStats';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 const MatchView = () => {
   const { id } = useParams<{ id: string }>();
@@ -24,6 +25,7 @@ const MatchView = () => {
   const allCardsForThisMatch = matchCards.filter(c => c.match_id === id);
 
   const prevCalledNumbersRef = useRef<number[]>(match ? match.called_numbers : []);
+  const prevWinnersCountRef = useRef<number>(match ? match.winners.length : 0);
 
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 1000);
@@ -33,33 +35,41 @@ const MatchView = () => {
   useEffect(() => {
     if (!match) return;
 
-    const prevNumbers = prevCalledNumbersRef.current;
+    // Notificação de novo número
     const currentNumbers = match.called_numbers;
-
-    if (currentNumbers.length > prevNumbers.length) {
+    if (currentNumbers.length > prevCalledNumbersRef.current.length) {
       const newNumber = currentNumbers[currentNumbers.length - 1];
       setLastCalledNumber(newNumber);
-      
       if (match.status !== 'finished') {
-        toast.info(`Número sorteado: ${newNumber}!`, {
-          description: 'Confira sua cartela.',
+        toast.info(`Número sorteado: ${newNumber}!`, { duration: 2000 });
+        playNotificationSound();
+      }
+    }
+    prevCalledNumbersRef.current = currentNumbers;
+
+    // Notificação de vencedor (especialmente para modo brincar com jogo em andamento)
+    if (match.winners.length > prevWinnersCountRef.current) {
+      const latestWinner = match.winners[match.winners.length - 1];
+      const isFunWinner = (latestWinner as any).creditType === 'fake';
+
+      if (isFunWinner && match.status !== 'finished') {
+        toast.success(`BINGO DE BRINCAR!`, {
+          description: `${latestWinner.playerName} bateu com a cartela "${latestWinner.cardName}". O jogo continua para o prêmio real!`,
+          duration: 6000,
+        });
+        playNotificationSound();
+      } else if (match.status === 'finished') {
+        toast.success('BINGO! Partida finalizada!', {
+          description: `Parabéns aos vencedores!`,
+          duration: 10000,
         });
         playNotificationSound();
       }
     }
-    
-    if (match.status === 'finished' && prevCalledNumbersRef.current.length < currentNumbers.length) {
-      toast.success('BINGO! Temos um vencedor!', {
-        description: `Parabéns a ${match.winners.map(w => w.playerName).join(', ')}!`,
-        duration: 10000,
-      });
-      playNotificationSound();
-    }
+    prevWinnersCountRef.current = match.winners.length;
 
-    prevCalledNumbersRef.current = currentNumbers;
   }, [match]);
 
-  // Se estiver carregando os dados iniciais, mostra um spinner em vez de "não encontrada"
   if (isLoading && !match) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
@@ -72,7 +82,7 @@ const MatchView = () => {
   if (!match) {
     return (
       <div className="card-container text-center py-20">
-        <p className="text-muted-foreground text-lg">Partida não encontrada ou já finalizada.</p>
+        <p className="text-muted-foreground text-lg">Partida não encontrada.</p>
         <Button className="mt-6 gradient-primary" onClick={() => navigate('/')}>
           <ArrowLeft className="w-4 h-4 mr-2" /> Voltar ao Lobby
         </Button>
@@ -83,6 +93,9 @@ const MatchView = () => {
   const playersInMatchCount = new Set(allCardsForThisMatch.map(mc => mc.player_id)).size;
   const lastCalled = match.called_numbers.length > 0 ? match.called_numbers[match.called_numbers.length - 1] : null;
   const countdown = match.next_auto_call_timestamp ? Math.max(0, Math.round((new Date(match.next_auto_call_timestamp).getTime() - now) / 1000)) : null;
+
+  // Filtra vencedores de brincar que ganharam enquanto o jogo ainda corre
+  const funWinnersInProgress = match.winners.filter(w => (w as any).creditType === 'fake');
 
   return (
     <>
@@ -108,6 +121,18 @@ const MatchView = () => {
           )}
         </div>
       </div>
+
+      {/* Alerta de Vencedores de Brincar (Jogo em andamento) */}
+      {match.status === 'in_progress' && funWinnersInProgress.length > 0 && (
+        <Alert className="mb-6 border-amber-500 bg-amber-500/10 text-amber-700 animate-pulse">
+          <Star className="h-4 w-4 text-amber-600" />
+          <AlertTitle className="font-heading font-bold">Bingo de Brincar!</AlertTitle>
+          <AlertDescription className="text-xs">
+            {funWinnersInProgress.map(w => w.playerName).join(', ')} já bateu Bingo de brincar. 
+            <strong> O jogo continua valendo o prêmio real!</strong>
+          </AlertDescription>
+        </Alert>
+      )}
 
       <WinnerDisplay match={match} allMatchCards={allCardsForThisMatch} />
 
@@ -142,9 +167,6 @@ const MatchView = () => {
               {num}
             </span>
           ))}
-          {(match.called_numbers || []).length === 0 && (
-            <span className="text-sm text-muted-foreground italic">Aguardando sorteio...</span>
-          )}
         </div>
       </div>
 
@@ -154,7 +176,10 @@ const MatchView = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {myCards.map((card) => (
           <div key={card.id} className="card-container max-w-sm mx-auto w-full">
-            <h3 className="font-heading font-semibold text-foreground mb-4">{card.name}</h3>
+            <h3 className="font-heading font-semibold text-foreground mb-4 flex items-center justify-between">
+              {card.name}
+              {(card as any).credit_type === 'fake' && <Badge variant="outline" className="text-[10px] border-amber-400 text-amber-600">Brincar</Badge>}
+            </h3>
             <div className="grid grid-cols-5 gap-1.5 sm:gap-2">
               {['B', 'I', 'N', 'G', 'O'].map(letter => (
                 <div key={letter} className="w-full aspect-square rounded-lg flex items-center justify-center text-sm sm:text-lg font-heading font-bold gradient-primary text-primary-foreground shadow-sm">

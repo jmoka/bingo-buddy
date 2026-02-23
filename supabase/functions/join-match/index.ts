@@ -33,6 +33,7 @@ serve(async (req) => {
     const { data: { user }, error: userError } = await userSupabaseClient.auth.getUser()
     if (userError || !user) throw new Error("Usuário não encontrado ou token inválido.");
 
+    // Verifica se as cartelas já estão na partida
     const { data: existingMatchCards, error: existingError } = await supabaseAdmin
       .from('cartelas_partida')
       .select('player_card_id')
@@ -56,6 +57,7 @@ serve(async (req) => {
     const profile = profileRes.data;
     const playerCards = playerCardsRes.data;
 
+    // Apenas cartelas do tipo 'real' custam créditos reais
     const realCards = playerCards.filter(c => c.credit_type === 'real');
     const totalCost = realCards.length * match.card_price;
 
@@ -63,6 +65,7 @@ serve(async (req) => {
       throw new Error("Créditos insuficientes para as cartelas reais!");
     }
 
+    // Debita créditos se houver custo
     if (totalCost > 0) {
       const { error: creditError } = await supabaseAdmin
         .from('perfis')
@@ -71,6 +74,7 @@ serve(async (req) => {
       if (creditError) throw new Error(`Erro ao debitar créditos.`);
     }
 
+    // Atualiza usos das cartelas originais
     const cardUpdatePromises = playerCards.map(card => 
       supabaseAdmin
         .from('cartelas_jogador')
@@ -79,6 +83,7 @@ serve(async (req) => {
     );
     await Promise.all(cardUpdatePromises);
 
+    // Insere as cartelas na partida (mantendo o credit_type)
     const newMatchCards = playerCards.map(card => ({
       player_id: user.id,
       match_id: matchId,
@@ -96,6 +101,7 @@ serve(async (req) => {
     
     if (insertError) throw new Error(`Erro ao inscrever cartelas.`);
 
+    // Atualiza o pote da partida apenas com o valor das cartelas reais
     if (totalCost > 0) {
       await supabaseAdmin.from('partidas').update({ pot: match.pot + totalCost }).eq('id', matchId);
     }

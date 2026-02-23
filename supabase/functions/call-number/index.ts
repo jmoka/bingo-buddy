@@ -16,102 +16,108 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // 1. Tenta obter um lock exclusivo para esta partida. Se falhar, outra execução já está em andamento.
-    const { data: gotLock, error: lockError } = await supabaseAdmin.rpc('try_lock_match', { p_match_id: matchId });
-    if (lockError) throw lockError;
-    if (!gotLock) {
-      console.log(`[call-number] Partida ${matchId} ocupada. Pulando.`);
-      return new Response(JSON.stringify({ success: true, message: 'Partida ocupada, outra execução em andamento.' }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    // 1. Lock da partida
+    const { data: gotLock } = await supabaseAdmin.rpc('try_lock_match', { p_match_id: matchId });
+    if (!gotLock) return new Response(JSON.stringify({ success: true, message: 'Ocupado' }), { headers: corsHeaders });
+
+    // 2. Adiciona número e marca cartelas
+    const { data: appendResult } = await supabaseAdmin.rpc('append_called_number', { p_match_id: matchId, p_num: num });
+    if (!appendResult || appendResult.status === 'finished' || appendResult.already_called) {
+      return new Response(JSON.stringify({ success: true }), { headers: corsHeaders });
     }
-
-    // 2. Adiciona o número sorteado de forma atômica. A RPC já verifica se a partida está finalizada ou se o número já foi chamado.
-    const { data: appendResult, error: appendError } = await supabaseAdmin.rpc('append_called_number', { p_match_id: matchId, p_num: num });
-    if (appendError) throw appendError;
-
-    if (appendResult.status === 'finished' || appendResult.already_called) {
-      return new Response(JSON.stringify({ success: true, message: 'Número já sorteado ou partida finalizada.' }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-    }
-
-    // 3. Marca o número em todas as cartelas da partida de forma atômica e performática.
     await supabaseAdmin.rpc('mark_number_for_match_cards', { p_match_id: matchId, p_num: num });
 
-    // 4. Busca os dados necessários para a verificação de vencedores.
-    const { data: match, error: matchError } = await supabaseAdmin.from('partidas').select('*').eq('id', matchId).single();
-    if (matchError || !match) throw new Error("Partida não encontrada após o lock.");
+    // 3. Busca dados da partida e cartelas
+    const { data: match } = await supabaseAdmin.from('partidas').select('*').eq('id', matchId).single();
+    const { data: matchCards } = await supabaseAdmin.from('cartelas_partida').select('*').eq('match_id', matchId);
+    const { data: allProfiles } = await supabaseAdmin.from('perfis').select('id, full_name');
 
-    const { data: freshMatchCards, error: cardsError } = await supabaseAdmin.from('cartelas_partida').select('*').eq('match_id', matchId);
-    if (cardsError) throw cardsError;
+    // 4. Verifica novos vencedores (ignorando quem já ganhou antes nesta partida)
+    const existingWinnerCardIds = new Set((match.winners || []).map((w: any) => w.cardId));
+    const newWinnersFound = [];
 
-    // 5. Verifica se há vencedores.
-    const foundWinners = [];
-    for (const card of freshMatchCards || []) {
+    for (const card of matchCards || []) {
+      if (existingWinnerCardIds.has(card.id)) continue;
+
       const tempBingoCard: BingoCard = { id: card.id, name: card.name, numbers: card.numbers, markedNumbers: new Set(card.marked_numbers || []) };
       const winResult = checkWin(tempBingoCard, match.game_type);
-      if (winResult) foundWinners.push({ card, result: winResult });
+      
+      if (winResult) {
+        newWinnersFound.push({ card, result: winResult });
+      }
     }
 
     let matchUpdatePayload: any = {};
+    const currentWinners = [...(match.winners || [])];
 
-    // 6. Processa os vencedores ou continua a partida.
-    if (foundWinners.length > 0) {
-      const { data: allProfiles } = await supabaseAdmin.from('perfis').select('id, full_name');
-      const winnerData: Winner[] = foundWinners.map(fw => ({ playerId: fw.card.player_id, playerName: allProfiles?.find(p => p.id === fw.card.player_id)?.full_name || 'Jogador', cardId: fw.card.id, cardName: fw.card.name }));
+    if (newWinnersFound.length > 0) {
+      const realWinners = newWinnersFound.filter(fw => fw.card.credit_type === 'real');
+      const funWinners = newWinnersFound.filter(fw => fw.card.credit_type === 'fake');
 
-      const realWinners = foundWinners.filter(fw => fw.card.credit_type === 'real');
-      let prizeAmountPerRealWinner = 0;
-      let adminProfit = 0;
+      // Registra TODAS as vitórias no banco (para o Ranking)
+      for (const fw of newWinnersFound) {
+        await supabaseAdmin.rpc('record_winner', {
+          p_match_id: match.id,
+          p_player_id: fw.card.player_id,
+          p_player_card_id: fw.card.player_card_id,
+          p_match_card_id: fw.card.id,
+          p_prize_details: match.prize
+        });
+        
+        currentWinners.push({
+          playerId: fw.card.player_id,
+          playerName: allProfiles?.find(p => p.id === fw.card.player_id)?.full_name || 'Jogador',
+          cardId: fw.card.id,
+          cardName: fw.card.name,
+          creditType: fw.card.credit_type // Adicionado para o UI saber
+        });
+      }
 
+      // Lógica de finalização ou continuidade
       if (realWinners.length > 0) {
-        if (match.prize.type === 'fixed') {
-          prizeAmountPerRealWinner = Number(match.prize.value || 0);
-          adminProfit = match.pot - (prizeAmountPerRealWinner * realWinners.length);
-        } else if (match.prize.type === 'percentage') {
-          const totalPrizeToWinners = (match.pot * (Number(match.prize.value) || 0)) / 100;
-          adminProfit = match.pot - totalPrizeToWinners;
-          prizeAmountPerRealWinner = totalPrizeToWinners / realWinners.length;
-        }
-      } else {
-        adminProfit = match.pot;
-      }
+        // Se houver vencedores REAIS, o jogo termina e paga o prêmio
+        const prizeAmountPerRealWinner = match.prize.type === 'fixed' 
+          ? Number(match.prize.value || 0) 
+          : (match.pot * (Number(match.prize.value) || 0)) / 100 / realWinners.length;
 
-      if (adminProfit > 0) {
-        await supabaseAdmin.rpc('increment_admin_profit', { amount: adminProfit });
-      }
+        const adminProfit = match.pot - (prizeAmountPerRealWinner * realWinners.length);
+        if (adminProfit > 0) await supabaseAdmin.rpc('increment_admin_profit', { amount: adminProfit });
 
-      for (const fw of foundWinners) {
-        if (fw.card.credit_type === 'real') {
-          // Registra a vitória de forma idempotente.
-          await supabaseAdmin.rpc('record_winner', {
-            p_match_id: match.id,
-            p_player_id: fw.card.player_id,
-            p_player_card_id: fw.card.player_card_id,
-            p_match_card_id: fw.card.id,
-            p_prize_details: match.prize
-          });
-          // Paga o prêmio de forma atômica.
+        for (const rw of realWinners) {
           if (prizeAmountPerRealWinner > 0) {
-            await supabaseAdmin.rpc('increment_player_credits', { p_player_id: fw.card.player_id, p_amount: prizeAmountPerRealWinner });
+            await supabaseAdmin.rpc('increment_player_credits', { p_player_id: rw.card.player_id, p_amount: prizeAmountPerRealWinner });
           }
         }
+
+        matchUpdatePayload = { status: 'finished', winners: currentWinners, is_auto_calling: false, next_auto_call_timestamp: null, admin_profit_from_match: adminProfit };
+      } else {
+        // Apenas vencedores de BRINCAR
+        const remainingRealCards = matchCards.filter(c => c.credit_type === 'real' && !existingWinnerCardIds.has(c.id));
+        
+        if (remainingRealCards.length > 0) {
+          // Jogo continua porque ainda tem gente com dinheiro real jogando
+          matchUpdatePayload = { winners: currentWinners };
+          if (match.is_auto_calling) {
+            const { data: settings } = await supabaseAdmin.from('configuracoes').select('intervalo_sorteio_auto_seg').single();
+            matchUpdatePayload.next_auto_call_timestamp = new Date(Date.now() + (settings?.intervalo_sorteio_auto_seg || 120) * 1000).toISOString();
+          }
+        } else {
+          // Não tem mais ninguém real jogando, finaliza o jogo
+          matchUpdatePayload = { status: 'finished', winners: currentWinners, is_auto_calling: false, next_auto_call_timestamp: null, admin_profit_from_match: match.pot };
+          if (match.pot > 0) await supabaseAdmin.rpc('increment_admin_profit', { amount: match.pot });
+        }
       }
-
-      matchUpdatePayload = { status: 'finished', winners: winnerData, is_auto_calling: false, next_auto_call_timestamp: null, admin_profit_from_match: adminProfit };
     } else if (match.is_auto_calling) {
-      // Se não houver vencedores, agenda o próximo sorteio automático.
       const { data: settings } = await supabaseAdmin.from('configuracoes').select('intervalo_sorteio_auto_seg').single();
-      const interval = settings?.intervalo_sorteio_auto_seg || 120;
-      matchUpdatePayload.next_auto_call_timestamp = new Date(Date.now() + interval * 1000).toISOString();
+      matchUpdatePayload.next_auto_call_timestamp = new Date(Date.now() + (settings?.intervalo_sorteio_auto_seg || 120) * 1000).toISOString();
     }
 
-    // 7. Atualiza o status final da partida.
     if (Object.keys(matchUpdatePayload).length > 0) {
-      const { error: finalUpdateError } = await supabaseAdmin.from('partidas').update(matchUpdatePayload).eq('id', matchId).eq('status', 'in_progress'); // Condição de segurança
-      if (finalUpdateError) throw finalUpdateError;
+      await supabaseAdmin.from('partidas').update(matchUpdatePayload).eq('id', matchId);
     }
 
-    return new Response(JSON.stringify({ success: true, winners: foundWinners.length }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+    return new Response(JSON.stringify({ success: true, winners: newWinnersFound.length }), { headers: corsHeaders });
   } catch (error) {
-    console.error(`[call-number] Erro fatal: ${error.message}`);
-    return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+    return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: corsHeaders });
   }
 })
