@@ -404,15 +404,31 @@ const Lobby = () => {
                     <div className="space-y-2">
                       <Label className="text-xs">Tipo de Crédito</Label>
                       <RadioGroup value={creditType} onValueChange={(v: 'real' | 'fake') => setCreditType(v)} className="grid grid-cols-2 gap-2">
-                        <Label htmlFor="real" className="flex flex-col items-center p-3 border-2 rounded-lg cursor-pointer peer-data-[state=checked]:border-primary">
+                        <Label 
+                          htmlFor="real" 
+                          className={cn(
+                            "flex flex-col items-center p-4 border-2 rounded-xl cursor-pointer transition-all",
+                            creditType === 'real' 
+                              ? "border-primary bg-primary/10 text-primary" 
+                              : "border-muted bg-muted/30 text-muted-foreground hover:border-muted-foreground/30"
+                          )}
+                        >
                           <RadioGroupItem value="real" id="real" className="sr-only" />
-                          <Coins className="w-5 h-5 mb-1" />
-                          <span className="text-[10px] font-bold">REAIS</span>
+                          <Coins className={cn("w-6 h-6 mb-2", creditType === 'real' ? "text-primary" : "text-muted-foreground")} />
+                          <span className="text-xs font-bold uppercase tracking-wider">Reais</span>
                         </Label>
-                        <Label htmlFor="fake" className="flex flex-col items-center p-3 border-2 rounded-lg cursor-pointer peer-data-[state=checked]:border-primary">
+                        <Label 
+                          htmlFor="fake" 
+                          className={cn(
+                            "flex flex-col items-center p-4 border-2 rounded-xl cursor-pointer transition-all",
+                            creditType === 'fake' 
+                              ? "border-primary bg-primary/10 text-primary" 
+                              : "border-muted bg-muted/30 text-muted-foreground hover:border-muted-foreground/30"
+                          )}
+                        >
                           <RadioGroupItem value="fake" id="fake" className="sr-only" />
-                          <Star className="w-5 h-5 mb-1" />
-                          <span className="text-[10px] font-bold">BRINCAR</span>
+                          <Star className={cn("w-6 h-6 mb-2", creditType === 'fake' ? "text-primary" : "text-muted-foreground")} />
+                          <span className="text-xs font-bold uppercase tracking-wider">Brincar</span>
                         </Label>
                       </RadioGroup>
                     </div>
