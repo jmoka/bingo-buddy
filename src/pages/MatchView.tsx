@@ -2,6 +2,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useGame } from '@/contexts/GameContext';
 import { BingoCell } from '@/components/BingoCell';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { gameTypeLabels } from '@/utils/bingoUtils';
 import { ArrowLeft, Coins, Users, Bot, Loader2, Star, Trophy } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
