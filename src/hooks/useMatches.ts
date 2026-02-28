@@ -101,7 +101,13 @@ export const useMatches = () => {
   const startMatch = async (matchId: string, force = false) => {
     const match = matches.find(m => m.id === matchId);
     if (!match) return;
-    const playersInMatch = new Set(matchCards.filter(mc => mc.match_id === matchId).map(mc => mc.player_id)).size;
+
+    const { data: freshCards } = await supabase
+      .from('cartelas_partida')
+      .select('player_id')
+      .eq('match_id', matchId);
+
+    const playersInMatch = new Set((freshCards || []).map(mc => mc.player_id)).size;
 
     if (playersInMatch < 1) {
       if (match.is_auto_calling) {

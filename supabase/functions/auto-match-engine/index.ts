@@ -101,7 +101,7 @@ serve(async (req) => {
       start_time: nextStartTime.toISOString(),
       status: 'open',
       is_auto_calling: true,
-      min_players: settings.auto_engine_prize_type === 'fixed' ? Math.ceil(settings.auto_engine_prize_value / settings.auto_engine_card_price) : 1
+      min_players: 1
     };
 
     const { data: created, error: createError } = await supabaseAdmin.from('partidas').insert(newMatch).select().single();
