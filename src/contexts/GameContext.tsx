@@ -53,7 +53,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Timer for countdowns and auto-actions
   useEffect(() => {
-    const timer = setInterval(() => setNow(Date.now()), 1000);
+    const timer = setInterval(() => setNow(Date.now()), 200);
     return () => clearInterval(timer);
   }, []);
 
