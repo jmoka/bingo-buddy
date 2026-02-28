@@ -3,11 +3,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { RedeemRequest } from '@/types/match';
-import { useAdminData } from './useAdminData';
 
 export const useRedeemRequests = () => {
   const { user, profile } = useAuth();
-  const { updatePlayerCredits } = useAdminData();
   const queryClient = useQueryClient();
 
   const { data: redeemRequests = [] } = useQuery({
@@ -22,28 +20,19 @@ export const useRedeemRequests = () => {
   });
 
   const requestRedeem = async (credits: number, amount: number, message?: string): Promise<boolean> => {
-    if (!user || !profile || profile.credits < credits) {
-        toast.error('Créditos insuficientes!');
-        return false;
-    }
-    await updatePlayerCredits(user.id, -credits);
-    const { data: newRequest, error } = await supabase.from('solicitacoes_resgate').insert({
-        player_id: user.id,
-        credits_requested: credits,
-        amount_to_receive: amount,
-        status: 'pending'
-    }).select().single();
-    if (error) {
-        await updatePlayerCredits(user.id, credits);
-        toast.error(error.message);
-        return false;
-    }
-    await supabase.from('mensagens_resgate').insert({
-        redeem_request_id: newRequest.id,
-        sender_id: user.id,
-        message: message || `Nova solicitação de resgate: ${credits} créditos. Valor a receber: R$ ${amount.toFixed(2)}`
+    if (!user || !profile) return false;
+
+    const { data, error } = await supabase.functions.invoke('request-redeem', {
+      body: { credits, amount, message },
     });
-    await supabase.functions.invoke('notify-n8n', { body: { event: 'REDEEM_REQUEST', data: { requestId: newRequest.id, credits, amount, userEmail: user.email } } });
+
+    if (error || !data?.success) {
+      const msg = data?.error;
+      if (msg === 'insufficient_credits') toast.error('Créditos insuficientes!');
+      else toast.error('Erro ao criar solicitação de resgate.');
+      return false;
+    }
+
     queryClient.invalidateQueries({ queryKey: ['redeemRequests', user.id] });
     return true;
   };

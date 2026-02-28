@@ -85,28 +85,26 @@ export const useAdminData = () => {
   }, [rawRedeemRequests, players]);
 
   const updatePlayerCredits = async (playerId: string, amount: number): Promise<boolean> => {
-    const { data: p, error: fetchError } = await supabase.from('perfis').select('credits').eq('id', playerId).single();
-    if (fetchError || !p) {
-        toast.error("Erro ao buscar perfil.");
-        return false;
+    const { data, error } = await supabase.rpc('admin_adjust_credits', {
+      p_player_id: playerId,
+      p_delta: amount,
+    });
+    if (error || !data?.success) {
+      toast.error('Erro ao atualizar créditos.');
+      return false;
     }
-    const { error: updateError } = await supabase.from('perfis').update({ credits: p.credits + amount }).eq('id', playerId);
-    if (updateError) {
-        toast.error("Erro ao atualizar créditos.");
-        return false;
-    } else {
-        toast.success("Créditos reais atualizados!");
-        await queryClient.refetchQueries({ queryKey: ['players'] });
-        await queryClient.refetchQueries({ queryKey: ['profile'] });
-        return true;
-    }
+    toast.success('Créditos reais atualizados!');
+    await queryClient.refetchQueries({ queryKey: ['players'] });
+    await queryClient.refetchQueries({ queryKey: ['profile'] });
+    return true;
   };
 
   const updatePlayerFakeCredits = async (playerId: string, amount: number): Promise<boolean> => {
-    const { data: p, error: fetchError } = await supabase.from('perfis').select('fake_credits').eq('id', playerId).single();
-    if (fetchError || !p) return false;
-    const { error: updateError } = await supabase.from('perfis').update({ fake_credits: (p.fake_credits || 0) + amount }).eq('id', playerId);
-    if (updateError) return false;
+    const { data, error } = await supabase.rpc('admin_adjust_fake_credits', {
+      p_player_id: playerId,
+      p_delta: amount,
+    });
+    if (error || !data?.success) return false;
     await queryClient.refetchQueries({ queryKey: ['players'] });
     await queryClient.refetchQueries({ queryKey: ['profile'] });
     return true;

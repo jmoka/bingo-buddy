@@ -73,63 +73,19 @@ export const usePlayerCards = () => {
   };
 
   const buyCardUses = async (playerCardId: string) => {
-    if (!profile || !gameSettings) return false;
+    const { data, error } = await supabase.rpc('buy_card_uses', {
+      p_player_card_id: playerCardId,
+    });
 
-    const card = playerCards.find(c => c.id === playerCardId);
-    if (!card) return false;
-
-    const isFake = (card as any).credit_type === 'fake';
-    const cost = gameSettings.custo_recarga_cartela;
-
-    if (isFake) {
-      if ((profile.fake_credits || 0) < cost) {
-        toast.error(`Saldo de brincar insuficiente para recarregar.`);
-        return false;
-      }
-      
-      const { error: profileError } = await supabase
-        .from('perfis')
-        .update({ fake_credits: (profile.fake_credits || 0) - cost })
-        .eq('id', profile.id);
-
-      if (profileError) {
-        toast.error("Erro ao debitar créditos de brincar.");
-        return false;
-      }
-    } else {
-      if (profile.credits < cost) {
-        toast.error(`Saldo de créditos reais insuficiente para recarregar.`);
-        return false;
-      }
-
-      if (cost > 0) {
-        const { error: profileError } = await supabase
-          .from('perfis')
-          .update({ credits: profile.credits - cost })
-          .eq('id', profile.id);
-
-        if (profileError) {
-          toast.error("Erro ao debitar créditos reais.");
-          return false;
-        }
-      }
-    }
-
-    const { error: cardError } = await supabase
-      .from('cartelas_jogador')
-      .update({ uses_left: card.uses_left + gameSettings.usos_por_recarga })
-      .eq('id', playerCardId);
-
-    if (cardError) {
-      if (isFake) {
-        await supabase.from('perfis').update({ fake_credits: profile.fake_credits }).eq('id', profile.id);
-      } else {
-        await supabase.from('perfis').update({ credits: profile.credits }).eq('id', profile.id);
-      }
-      toast.error("Erro ao recarregar cartela.");
+    if (error || !data?.success) {
+      const msg = data?.error;
+      if (msg === 'insufficient_credits') toast.error('Saldo de créditos reais insuficiente.');
+      else if (msg === 'insufficient_fake_credits') toast.error('Saldo de brincar insuficiente.');
+      else if (msg === 'unauthorized') toast.error('Ação não autorizada.');
+      else toast.error('Erro ao recarregar cartela.');
       return false;
     }
-    
+
     queryClient.invalidateQueries({ queryKey: ['profile', user?.id] });
     queryClient.invalidateQueries({ queryKey: ['playerCards', user?.id] });
     return true;

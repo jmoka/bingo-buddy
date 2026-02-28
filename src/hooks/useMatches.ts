@@ -157,9 +157,9 @@ export const useMatches = () => {
     updateMatchMutation.mutate({ matchId, updates });
   };
 
-  const callNumber = async (matchId: string, num: number) => {
+  const callNumber = async (matchId: string) => {
     try {
-      const { error } = await supabase.functions.invoke('call-number', { body: { matchId, num } });
+      const { error } = await supabase.functions.invoke('call-number', { body: { matchId } });
       if (error) throw error;
       await queryClient.invalidateQueries({ queryKey: ['matches'] });
       await queryClient.invalidateQueries({ queryKey: ['matchCards'] });

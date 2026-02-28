@@ -10,7 +10,7 @@ serve(async (req) => {
   }
 
   try {
-    const { matchId, num } = await req.json()
+    const { matchId } = await req.json()
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -20,19 +20,36 @@ serve(async (req) => {
     const { data: gotLock } = await supabaseAdmin.rpc('try_lock_match', { p_match_id: matchId });
     if (!gotLock) return new Response(JSON.stringify({ success: true, message: 'Ocupado' }), { headers: corsHeaders });
 
-    // 2. Adiciona número e marca cartelas
+    // 2. Reler partida após obter o lock para validar o ciclo
+    const { data: match } = await supabaseAdmin.from('partidas').select('*').eq('id', matchId).single();
+
+    // Se next_auto_call_timestamp já está no futuro, outro client já atendeu este ciclo
+    if (match.next_auto_call_timestamp && new Date(match.next_auto_call_timestamp).getTime() > Date.now()) {
+      return new Response(JSON.stringify({ success: true, message: 'already_called_this_cycle' }), { headers: corsHeaders });
+    }
+
+    // 3. Gerar número no servidor
+    const availableNumbers = Array.from({ length: 75 }, (_, i) => i + 1)
+      .filter(n => !(match.called_numbers || []).includes(n));
+
+    if (availableNumbers.length === 0) {
+      return new Response(JSON.stringify({ success: true }), { headers: corsHeaders });
+    }
+
+    const num = availableNumbers[Math.floor(Math.random() * availableNumbers.length)];
+
+    // 4. Adiciona número e marca cartelas
     const { data: appendResult } = await supabaseAdmin.rpc('append_called_number', { p_match_id: matchId, p_num: num });
     if (!appendResult || appendResult.status === 'finished' || appendResult.already_called) {
       return new Response(JSON.stringify({ success: true }), { headers: corsHeaders });
     }
     await supabaseAdmin.rpc('mark_number_for_match_cards', { p_match_id: matchId, p_num: num });
 
-    // 3. Busca dados da partida e cartelas
-    const { data: match } = await supabaseAdmin.from('partidas').select('*').eq('id', matchId).single();
+    // 5. Busca cartelas e perfis
     const { data: matchCards } = await supabaseAdmin.from('cartelas_partida').select('*').eq('match_id', matchId);
     const { data: allProfiles } = await supabaseAdmin.from('perfis').select('id, full_name');
 
-    // 4. Verifica novos vencedores (ignorando quem já ganhou antes nesta partida)
+    // 6. Verifica novos vencedores (ignorando quem já ganhou antes nesta partida)
     const existingWinnerCardIds = new Set((match.winners || []).map((w: any) => w.cardId));
     const newWinnersFound = [];
 
@@ -54,7 +71,6 @@ serve(async (req) => {
       const realWinners = newWinnersFound.filter(fw => fw.card.credit_type === 'real');
       const funWinners = newWinnersFound.filter(fw => fw.card.credit_type === 'fake');
 
-      // Registra TODAS as vitórias no banco (para o Ranking)
       for (const fw of newWinnersFound) {
         await supabaseAdmin.rpc('record_winner', {
           p_match_id: match.id,
@@ -69,13 +85,11 @@ serve(async (req) => {
           playerName: allProfiles?.find(p => p.id === fw.card.player_id)?.full_name || 'Jogador',
           cardId: fw.card.id,
           cardName: fw.card.name,
-          creditType: fw.card.credit_type // Adicionado para o UI saber
+          creditType: fw.card.credit_type
         });
       }
 
-      // Lógica de finalização ou continuidade
       if (realWinners.length > 0) {
-        // Se houver vencedores REAIS, o jogo termina e paga o prêmio
         const prizeAmountPerRealWinner = match.prize.type === 'fixed' 
           ? Number(match.prize.value || 0) 
           : (match.pot * (Number(match.prize.value) || 0)) / 100 / realWinners.length;
@@ -91,18 +105,19 @@ serve(async (req) => {
 
         matchUpdatePayload = { status: 'finished', winners: currentWinners, is_auto_calling: false, next_auto_call_timestamp: null, admin_profit_from_match: adminProfit };
       } else {
-        // Apenas vencedores de BRINCAR
         const remainingRealCards = matchCards.filter(c => c.credit_type === 'real' && !existingWinnerCardIds.has(c.id));
         
         if (remainingRealCards.length > 0) {
-          // Jogo continua porque ainda tem gente com dinheiro real jogando
           matchUpdatePayload = { winners: currentWinners };
           if (match.is_auto_calling) {
             const { data: settings } = await supabaseAdmin.from('configuracoes').select('intervalo_sorteio_auto_seg').single();
             matchUpdatePayload.next_auto_call_timestamp = new Date(Date.now() + (settings?.intervalo_sorteio_auto_seg || 120) * 1000).toISOString();
           }
         } else {
-          // Não tem mais ninguém real jogando, finaliza o jogo
+          if (match.is_auto_calling) {
+            await supabaseAdmin.from('partidas').delete().eq('id', matchId);
+            return new Response(JSON.stringify({ success: true, message: 'match_deleted_no_real_players' }), { headers: corsHeaders });
+          }
           matchUpdatePayload = { status: 'finished', winners: currentWinners, is_auto_calling: false, next_auto_call_timestamp: null, admin_profit_from_match: match.pot };
           if (match.pot > 0) await supabaseAdmin.rpc('increment_admin_profit', { amount: match.pot });
         }

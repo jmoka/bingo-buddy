@@ -16,11 +16,19 @@ export const useGameSettings = () => {
   });
 
   const updateGameSettings = async (newSettings: Partial<GameSettings>): Promise<boolean> => {
-    const { error } = await supabase.from('configuracoes').update(newSettings).eq('singleton', true);
-    
-    if (error) {
-      console.error("Erro ao salvar configurações:", error);
-      toast.error("Erro ao salvar no banco de dados: " + error.message);
+    const { data, error } = await supabase.rpc('update_game_settings', {
+      p_settings: newSettings,
+    });
+
+    if (error || !data?.success) {
+      const msg = data?.error;
+      if (msg === 'call_interval_too_low') toast.error('Intervalo de sorteio deve ser no mínimo 5 segundos.');
+      else if (msg === 'invalid_pot_percentage') toast.error('Percentual do pote deve estar entre 0 e 100.');
+      else if (msg === 'unauthorized') toast.error('Ação não autorizada.');
+      else {
+        console.error("Erro ao salvar configurações:", error);
+        toast.error("Erro ao salvar no banco de dados.");
+      }
       return false;
     }
 

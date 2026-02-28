@@ -26,7 +26,7 @@ type GameContextType =
 const GameContext = createContext<GameContextType | null>(null);
 
 export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const queryClient = useQueryClient();
   const [now, setNow] = useState(Date.now());
   const processingRef = useRef(new Set<string>());
@@ -57,8 +57,10 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => clearInterval(timer);
   }, []);
 
-  // Effect for auto-starting and auto-calling
+  // Effect for auto-starting and auto-calling (apenas admin executa o motor)
   useEffect(() => {
+    if (profile?.role !== 'admin') return;
+
     // Heartbeat: Verifica se precisa criar uma nova partida a cada 30 segundos
     if (
       gameSettingsHook.gameSettings?.auto_engine_enabled && 
@@ -67,7 +69,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       lastHeartbeatRef.current = now;
       const hasOpenMatch = matchesHook.matches.some(m => m.status === 'open');
       if (!hasOpenMatch) {
-        console.log("[Bingo] Heartbeat: Nenhuma partida aberta encontrada. Chamando motor...");
+        if (import.meta.env.DEV) console.log("[Bingo] Heartbeat: Nenhuma partida aberta encontrada. Chamando motor...");
         supabase.functions.invoke('auto-match-engine');
       }
     }
@@ -84,7 +86,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
         !processingRef.current.has(processingKeyStart)
       ) {
         processingRef.current.add(processingKeyStart);
-        console.log(`[Bingo] Iniciando partida automática: ${match.name}`);
+        if (import.meta.env.DEV) console.log(`[Bingo] Iniciando partida automática: ${match.name}`);
         
         matchesHook.startMatch(match.id, true).finally(() => {
            // Limpa a trava após 3 segundos para permitir novas ações se necessário
@@ -107,22 +109,14 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
         lastProcessedTimestampRef.current.set(match.id, nextTimestamp);
         processingRef.current.add(processingKeyCall);
         
-        console.log(`[Bingo] Chamando número automático para: ${match.name}`);
+        if (import.meta.env.DEV) console.log(`[Bingo] Chamando número automático para: ${match.name}`);
         
-        const availableNumbers = Array.from({ length: 75 }, (_, i) => i + 1)
-          .filter(num => !(match.called_numbers || []).includes(num));
-          
-        if (availableNumbers.length > 0) {
-          const randomIndex = Math.floor(Math.random() * availableNumbers.length);
-          matchesHook.callNumber(match.id, availableNumbers[randomIndex]).finally(() => {
-            setTimeout(() => processingRef.current.delete(processingKeyCall), 2000);
-          });
-        } else {
-          processingRef.current.delete(processingKeyCall);
-        }
+        matchesHook.callNumber(match.id).finally(() => {
+          setTimeout(() => processingRef.current.delete(processingKeyCall), 2000);
+        });
       }
     });
-  }, [now, matchesHook.matches, gameSettingsHook.gameSettings]);
+  }, [now, matchesHook.matches, gameSettingsHook.gameSettings, profile]);
 
   useEffect(() => {
     const channel = supabase
