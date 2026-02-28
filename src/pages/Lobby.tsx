@@ -10,6 +10,7 @@ import {
   Coins, Plus, Trophy, Users, Settings, 
   Timer, DoorOpen, Ticket, Zap, ZapOff, Tv, Archive, Trash2, RotateCcw, Star, Loader2, History, LogOut, TrendingUp, Target, Flame, Bot, CalendarDays, Clock, Crown, ChevronDown, ChevronUp
 } from 'lucide-react';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { 
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose, DialogDescription
 } from '@/components/ui/dialog';
@@ -151,7 +152,10 @@ const Lobby = () => {
   const inProgressMatches = sortedMatches.filter(m => m.status === 'in_progress');
   const openMatches = sortedMatches.filter(m => m.status === 'open');
   const waitingMatches = sortedMatches.filter(m => m.status === 'waiting');
-  const finishedMatches = sortedMatches.filter(m => m.status === 'finished');
+  const finishedMatches = sortedMatches.filter(m => 
+    m.status === 'finished' && 
+    (m.winners || []).some((w: any) => w.creditType === 'real')
+  );
 
   const totalPot = matches.filter(m => m.status !== 'finished').reduce((acc, m) => acc + Number(m.pot || 0), 0);
   const totalPlayers = new Set(matchCards.filter(mc => {
@@ -269,6 +273,21 @@ const Lobby = () => {
                     </div>
                   </div>
                 </div>
+                {match.status === 'finished' && (match.winners || []).filter((w: any) => w.creditType === 'real').length > 0 && (
+                  <div className="mt-3 pt-3 border-t">
+                    <p className="text-[10px] font-bold uppercase text-muted-foreground mb-2 flex items-center gap-1"><Trophy className="w-3 h-3 text-amber-500" /> Ganhadores</p>
+                    <div className="flex flex-wrap gap-2">
+                      {(match.winners || []).filter((w: any) => w.creditType === 'real').map((w: any) => (
+                        <div key={w.cardId} className="flex items-center gap-1.5 bg-success/10 rounded-full px-2 py-1">
+                          <Avatar className="w-5 h-5">
+                            <AvatarFallback className="text-[8px]">{w.playerName?.charAt(0) || '?'}</AvatarFallback>
+                          </Avatar>
+                          <span className="text-[11px] font-semibold text-success">{w.playerName}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 <div className="mt-4 pt-4 border-t flex flex-wrap gap-2 justify-end">
                   {match.status === 'in_progress' && (
                     <Button size="sm" className="bg-accent hover:bg-accent/90 text-white font-bold" onClick={() => navigate(`/match/${match.id}`)}>
