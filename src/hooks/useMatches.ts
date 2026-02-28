@@ -46,7 +46,7 @@ export const useMatches = () => {
       if (error) throw error;
       return data as Match[];
     },
-    refetchInterval: 3000, // Atualiza a cada 3 segundos para garantir instantaneidade
+    refetchInterval: 1500,
   });
 
   const { data: matchCards = [], isLoading: isLoadingCards } = useQuery({
@@ -56,7 +56,7 @@ export const useMatches = () => {
       if (error) throw error;
       return data.map(c => ({ ...c, marked_numbers: new Set(c.marked_numbers || []) })) as MatchCard[];
     },
-    refetchInterval: 2000, // Cartelas atualizam ainda mais rápido para marcações
+    refetchInterval: 1500,
   });
 
   const triggerAutoEngine = async () => {
@@ -166,6 +166,7 @@ export const useMatches = () => {
     try {
       const { error } = await supabase.functions.invoke('call-number', { body: { matchId } });
       if (error) throw error;
+      await new Promise(resolve => setTimeout(resolve, 300));
       await queryClient.invalidateQueries({ queryKey: ['matches'] });
       await queryClient.invalidateQueries({ queryKey: ['matchCards'] });
     } catch (error) {
