@@ -106,7 +106,6 @@ export const useMatches = () => {
     if (playersInMatch < 1) {
       if (match.is_auto_calling) {
         await supabase.from('partidas').delete().eq('id', matchId);
-        toast.warning(`Partida automática "${match.name}" excluída.`, { description: 'Nenhum jogador se inscreveu a tempo.' });
       } else {
         toast.error('A partida não pode ser iniciada sem jogadores.', { description: 'Retornando a partida para o status "Aguardando".' });
         const newPrize = { ...match.prize, returnedReason: 'NO_PLAYERS' as const };
