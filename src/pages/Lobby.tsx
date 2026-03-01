@@ -59,6 +59,15 @@ const Lobby = () => {
   const [isJoining, setIsJoining] = useState(false);
   const [rechargingCardId, setRechargingCardId] = useState<string | null>(null);
   const [isAgendaOpen, setIsAgendaOpen] = useState(true);
+  const [expandedParticipants, setExpandedParticipants] = useState<Set<string>>(new Set());
+  const toggleParticipants = (matchId: string) => {
+    setExpandedParticipants(prev => {
+      const next = new Set(prev);
+      if (next.has(matchId)) next.delete(matchId);
+      else next.add(matchId);
+      return next;
+    });
+  };
 
   useEffect(() => {
     if (!session) {
@@ -294,21 +303,30 @@ const Lobby = () => {
                 </div>
                 {match.status !== 'finished' && allCardsInMatch.length > 0 && (
                   <div className="mt-3 pt-3 border-t">
-                    <p className="text-[10px] font-bold uppercase text-muted-foreground mb-2 flex items-center gap-1"><Users className="w-3 h-3" /> Participantes</p>
-                    <div className="flex flex-wrap gap-2">
-                      {Array.from(new Set(allCardsInMatch.map(mc => mc.player_id))).map(pid => {
-                        const p = participantProfiles.find((pr: any) => pr.id === pid);
-                        return (
-                          <div key={pid} className="flex items-center gap-1.5 bg-muted rounded-full px-2 py-1">
-                            <Avatar className="w-5 h-5">
-                              <AvatarImage src={p?.avatar_url || ''} />
-                              <AvatarFallback className="text-[8px]">{p?.full_name?.charAt(0) || '?'}</AvatarFallback>
-                            </Avatar>
-                            <span className="text-[11px] font-medium">{p?.full_name || 'Jogador'}</span>
-                          </div>
-                        );
-                      })}
-                    </div>
+                    <button
+                      onClick={() => toggleParticipants(match.id)}
+                      className="flex items-center gap-2 w-full py-1.5 text-[11px] font-bold uppercase text-muted-foreground active:opacity-70 transition-opacity"
+                    >
+                      <Users className="w-3.5 h-3.5 shrink-0" />
+                      <span>Ver participantes ({playersInMatchCount})</span>
+                      {expandedParticipants.has(match.id) ? <ChevronUp className="w-3.5 h-3.5 ml-auto shrink-0" /> : <ChevronDown className="w-3.5 h-3.5 ml-auto shrink-0" />}
+                    </button>
+                    {expandedParticipants.has(match.id) && (
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 mt-2">
+                        {Array.from(new Set(allCardsInMatch.map(mc => mc.player_id))).map(pid => {
+                          const p = participantProfiles.find((pr: any) => pr.id === pid);
+                          return (
+                            <div key={pid} className="flex items-center gap-2 bg-muted rounded-lg px-2 py-1.5 min-w-0">
+                              <Avatar className="w-6 h-6 shrink-0">
+                                <AvatarImage src={p?.avatar_url || ''} />
+                                <AvatarFallback className="text-[9px]">{p?.full_name?.charAt(0) || '?'}</AvatarFallback>
+                              </Avatar>
+                              <span className="text-[11px] font-medium truncate">{p?.full_name || 'Jogador'}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                 )}
                 {match.status === 'finished' && (match.winners || []).filter((w: any) => w.creditType === 'real').length > 0 && (
