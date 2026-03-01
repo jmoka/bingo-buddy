@@ -1,4 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
 import { useGame } from '@/contexts/GameContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -63,6 +65,23 @@ const Lobby = () => {
       navigate('/login');
     }
   }, [session, navigate]);
+
+  const participantIds = useMemo(() => {
+    return Array.from(new Set(matchCards.map(mc => mc.player_id)));
+  }, [matchCards]);
+
+  const { data: participantProfiles = [] } = useQuery({
+    queryKey: ['participantProfiles', participantIds],
+    queryFn: async () => {
+      if (participantIds.length === 0) return [];
+      const { data } = await supabase
+        .from('perfis')
+        .select('id, full_name, avatar_url')
+        .in('id', participantIds);
+      return data || [];
+    },
+    enabled: participantIds.length > 0,
+  });
 
   const myOwnedCards = profile ? playerCards.filter(c => c.player_id === profile.id) : [];
   const activeCards = myOwnedCards.filter(c => !c.is_archived);
@@ -273,6 +292,25 @@ const Lobby = () => {
                     </div>
                   </div>
                 </div>
+                {match.status !== 'finished' && allCardsInMatch.length > 0 && (
+                  <div className="mt-3 pt-3 border-t">
+                    <p className="text-[10px] font-bold uppercase text-muted-foreground mb-2 flex items-center gap-1"><Users className="w-3 h-3" /> Participantes</p>
+                    <div className="flex flex-wrap gap-2">
+                      {Array.from(new Set(allCardsInMatch.map(mc => mc.player_id))).map(pid => {
+                        const p = participantProfiles.find((pr: any) => pr.id === pid);
+                        return (
+                          <div key={pid} className="flex items-center gap-1.5 bg-muted rounded-full px-2 py-1">
+                            <Avatar className="w-5 h-5">
+                              <AvatarImage src={p?.avatar_url || ''} />
+                              <AvatarFallback className="text-[8px]">{p?.full_name?.charAt(0) || '?'}</AvatarFallback>
+                            </Avatar>
+                            <span className="text-[11px] font-medium">{p?.full_name || 'Jogador'}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
                 {match.status === 'finished' && (match.winners || []).filter((w: any) => w.creditType === 'real').length > 0 && (
                   <div className="mt-3 pt-3 border-t">
                     <p className="text-[10px] font-bold uppercase text-muted-foreground mb-2 flex items-center gap-1"><Trophy className="w-3 h-3 text-amber-500" /> Ganhadores</p>
