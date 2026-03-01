@@ -19,6 +19,13 @@ import RedeemRequestsAdmin from "./pages/RedeemRequestsAdmin";
 import ActivePlayers from "./pages/ActivePlayers";
 import Trophies from "./pages/Trophies";
 import Ranking from "./pages/Ranking";
+import Rifas from "./pages/Rifas";
+import RifaView from "./pages/RifaView";
+import RifasAdmin from "./pages/admin/RifasAdmin";
+import RifaDetalheAdmin from "./pages/admin/RifaDetalheAdmin";
+import VendedorRifa from "./pages/VendedorRifa";
+import VendedorCartelas from "./pages/VendedorCartelas";
+import ValidarCartela from "./pages/ValidarCartela";
 import { Loader2 } from "lucide-react";
 
 const queryClient = new QueryClient();
@@ -59,6 +66,13 @@ const App = () => (
               <Route path="/active-players" element={<ProtectedRoute><ActivePlayers /></ProtectedRoute>} />
               <Route path="/trophies" element={<ProtectedRoute><Trophies /></ProtectedRoute>} />
               <Route path="/ranking" element={<ProtectedRoute><Ranking /></ProtectedRoute>} />
+              <Route path="/rifas" element={<ProtectedRoute><Rifas /></ProtectedRoute>} />
+              <Route path="/rifas/:id" element={<ProtectedRoute><RifaView /></ProtectedRoute>} />
+              <Route path="/admin/rifas" element={<ProtectedRoute><RifasAdmin /></ProtectedRoute>} />
+              <Route path="/admin/rifas/:id" element={<ProtectedRoute><RifaDetalheAdmin /></ProtectedRoute>} />
+              <Route path="/vendedor" element={<ProtectedRoute><VendedorRifa /></ProtectedRoute>} />
+              <Route path="/vendedor/cartelas/:compraId" element={<ProtectedRoute><VendedorCartelas /></ProtectedRoute>} />
+              <Route path="/validar-cartela" element={<ProtectedRoute><ValidarCartela /></ProtectedRoute>} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>

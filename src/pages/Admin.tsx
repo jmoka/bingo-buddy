@@ -2,7 +2,7 @@ import { useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
-import { ArrowRight, Users, ShieldCheck, Coins } from 'lucide-react';
+import { ArrowRight, Users, ShieldCheck, Coins, Ticket } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useGame } from '@/contexts/GameContext';
 import MatchManager from '@/components/admin/MatchManager';
@@ -64,7 +64,7 @@ const Admin = () => {
       </div>
 
       <Tabs defaultValue="matches" className="w-full">
-        <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 md:grid-cols-5 h-auto mb-8">
+        <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 md:grid-cols-6 h-auto mb-8">
           <TabsTrigger value="matches" className="py-3">Partidas</TabsTrigger>
           <TabsTrigger value="credits" className="py-3 relative">
             Entradas
@@ -75,6 +75,7 @@ const Admin = () => {
             {pendingRedeemsCount > 0 && <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-amber-500 text-[9px] font-bold text-white border border-background">{pendingRedeemsCount}</span>}
           </TabsTrigger>
           <TabsTrigger value="players" className="py-3">Jogadores</TabsTrigger>
+          <TabsTrigger value="rifas" className="py-3">Rifas</TabsTrigger>
           <TabsTrigger value="settings" className="py-3">Ajustes</TabsTrigger>
         </TabsList>
 
@@ -103,6 +104,14 @@ const Admin = () => {
             <h2 className="font-heading text-xl font-bold text-foreground mb-4">Base de Jogadores</h2>
             <p className="text-muted-foreground mb-6">Visualize detalhes de perfis e ajuste saldos manualmente.</p>
             <Button className="w-full py-6 text-lg" variant="outline" onClick={() => navigate('/admin/players')}>Gerenciar Jogadores <ArrowRight className="w-5 h-5 ml-2" /></Button>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="rifas">
+          <div className="card-container">
+            <h2 className="font-heading text-xl font-bold text-foreground mb-4 flex items-center gap-2"><Ticket className="w-5 h-5" />Módulo de Rifas</h2>
+            <p className="text-muted-foreground mb-6">Crie e gerencie rifas, vendedores e registre vendas físicas.</p>
+            <Button className="w-full py-6 text-lg gradient-primary" onClick={() => navigate('/admin/rifas')}>Gerenciar Rifas <ArrowRight className="w-5 h-5 ml-2" /></Button>
           </div>
         </TabsContent>
 

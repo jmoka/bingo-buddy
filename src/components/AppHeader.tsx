@@ -4,7 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useGame } from '@/contexts/GameContext';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
-import { Menu, User, Wallet, Plus, Banknote, History, Printer, LogOut, Star, Crown } from 'lucide-react';
+import { Menu, User, Wallet, Plus, Banknote, History, Printer, LogOut, Star, Crown, Ticket, Search } from 'lucide-react';
 import { CreditRequestDialog } from './CreditRequestDialog';
 import { MyCreditRequestsDialog } from './MyCreditRequestsDialog';
 import { RedeemRequestDialog } from './RedeemRequestDialog';
@@ -48,6 +48,16 @@ export const AppHeader = () => {
       action: () => navigate('/ranking'),
       label: 'Hall da Fama (Ranking)',
       icon: Crown,
+    },
+    {
+      action: () => navigate('/rifas'),
+      label: 'Rifas',
+      icon: Ticket,
+    },
+    {
+      action: () => navigate('/validar-cartela'),
+      label: 'Validar Cartela de Rifa',
+      icon: Search,
     },
     {
       action: () => navigate('/print'),
