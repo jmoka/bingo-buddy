@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useRifas } from '@/hooks/useRifas';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -15,6 +15,7 @@ import {
   ChevronDown,
   ChevronUp,
   Coins,
+  Tag,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -33,6 +34,8 @@ const statusBadge = (status: Rifa['status']) => {
 const RifaView = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const refCodigo = searchParams.get('ref') || undefined;
   const { profile } = useAuth();
   const { rifas, isLoadingRifas, getRifa, getNumerosRifa, comprarNumeros } = useRifas();
 
@@ -83,7 +86,7 @@ const RifaView = () => {
   const handleComprar = async () => {
     if (!id || selectedNumbers.length === 0) return;
     setIsBuying(true);
-    const success = await comprarNumeros(id, selectedNumbers);
+    const success = await comprarNumeros(id, selectedNumbers, refCodigo);
     if (success) setSelectedNumbers([]);
     setIsBuying(false);
   };
@@ -122,7 +125,14 @@ const RifaView = () => {
         {statusBadge(rifa.status)}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      {refCodigo && (
+        <div className="flex items-center gap-2 p-2.5 bg-primary/10 border border-primary/30 rounded-lg text-sm text-primary font-medium">
+          <Tag className="w-4 h-4 shrink-0" />
+          Indicação ativa: código <span className="font-mono font-bold">{refCodigo}</span>
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div className="lg:col-span-1 space-y-4">
           {rifa.foto_capa ? (
             <img
@@ -141,17 +151,17 @@ const RifaView = () => {
               <p className="text-sm text-muted-foreground">{rifa.descricao}</p>
             )}
 
-            {(rifa.premio_descricao || rifa.premio_foto) && (
+            {(rifa.premio_descricao || (rifa.premio_fotos && rifa.premio_fotos.length > 0)) && (
               <div className="border rounded-lg p-3 bg-amber-50 dark:bg-amber-900/10 border-amber-200 dark:border-amber-700/30 space-y-2">
                 <p className="text-xs font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-400 flex items-center gap-1.5">
                   <Trophy className="w-3.5 h-3.5" /> Prêmio
                 </p>
-                {rifa.premio_foto && (
-                  <img
-                    src={rifa.premio_foto}
-                    alt="Foto do prêmio"
-                    className="w-full max-h-40 object-cover rounded"
-                  />
+                {rifa.premio_fotos && rifa.premio_fotos.length > 0 && (
+                  <div className={`grid gap-1.5 ${rifa.premio_fotos.length === 1 ? 'grid-cols-1' : 'grid-cols-2'}`}>
+                    {rifa.premio_fotos.map((url, i) => (
+                      <img key={i} src={url} alt={`Foto do prêmio ${i + 1}`} className="w-full max-h-40 object-cover rounded" />
+                    ))}
+                  </div>
                 )}
                 {rifa.premio_descricao && (
                   <p className="text-sm text-amber-800 dark:text-amber-300">{rifa.premio_descricao}</p>
@@ -235,7 +245,7 @@ const RifaView = () => {
           <div className="card-container space-y-4">
             <h2 className="font-heading font-bold text-base">Selecione seus números</h2>
 
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               {(['todos', 'disponivel', 'vendido'] as NumberFilter[]).map(f => (
                 <button
                   key={f}
@@ -252,7 +262,7 @@ const RifaView = () => {
               ))}
             </div>
 
-            <div className="grid grid-cols-8 sm:grid-cols-10 gap-1">
+            <div className="grid grid-cols-8 sm:grid-cols-10 gap-1.5">
               {filteredNumbers.map(num => {
                 const found = numeros.find(n => n.numero === num);
                 const status = found?.status ?? 'disponivel';

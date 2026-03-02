@@ -23,7 +23,7 @@ import {
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Coins, Edit, Zap, ZapOff, Loader2, DollarSign } from 'lucide-react';
+import { ArrowLeft, Coins, Edit, Zap, ZapOff, Loader2, DollarSign, ShieldBan, ShieldCheck, Trash2 } from 'lucide-react';
 import PlayerAvatar from '@/components/PlayerAvatar';
 import { Profile } from '@/contexts/AuthContext';
 import { format } from 'date-fns';
@@ -40,11 +40,13 @@ const formatPrize = (prize: Prize) => {
 const PlayersAdmin = () => {
   const navigate = useNavigate();
   const { profile } = useAuth();
-  const { players, allPlayerCards, updatePlayerCredits, allWins, matches, gameSettings } = useGame();
+  const { players, allPlayerCards, updatePlayerCredits, allWins, matches, gameSettings, toggleBlockPlayer, deletePlayer } = useGame();
   const [selectedPlayer, setSelectedPlayer] = useState<Profile | null>(null);
   const [creditAmount, setCreditAmount] = useState<number>(0);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isUpdatingCredits, setIsUpdatingCredits] = useState(false);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const totalCreditsInPlay = useMemo(() => {
     return (players || []).reduce((acc, player) => acc + Number(player.credits || 0), 0);
@@ -71,9 +73,18 @@ const PlayersAdmin = () => {
       setIsUpdatingCredits(true);
       const success = await updatePlayerCredits(selectedPlayer.id, amount);
       setIsUpdatingCredits(false);
-      if (success) {
-        setIsDialogOpen(false);
-      }
+      if (success) setIsDialogOpen(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!deleteConfirmId) return;
+    setIsDeleting(true);
+    const success = await deletePlayer(deleteConfirmId);
+    setIsDeleting(false);
+    if (success) {
+      setDeleteConfirmId(null);
+      setIsDialogOpen(false);
     }
   };
 
@@ -130,11 +141,14 @@ const PlayersAdmin = () => {
             {players.map(player => {
               const playerCardsCount = allPlayerCards.filter(c => c.player_id === player.id).length;
               return (
-                <TableRow key={player.id}>
+                <TableRow key={player.id} className={player.bloqueado ? 'bg-destructive/10 hover:bg-destructive/15' : ''}>
                   <TableCell className="min-w-[200px]">
                     <div className="flex items-center gap-3">
                       <PlayerAvatar url={player.avatar_url} />
-                      <span className="font-medium">{player.full_name || 'Não definido'}</span>
+                      <div>
+                        <span className={`font-medium ${player.bloqueado ? 'text-destructive' : ''}`}>{player.full_name || 'Não definido'}</span>
+                        {player.bloqueado && <Badge variant="destructive" className="ml-2 text-[10px]">Bloqueado</Badge>}
+                      </div>
                     </div>
                   </TableCell>
                   <TableCell>{player.cpf || '-'}</TableCell>
@@ -142,10 +156,30 @@ const PlayersAdmin = () => {
                   <TableCell className="text-center font-mono">{Number(player.credits || 0).toFixed(2)}</TableCell>
                   <TableCell className="text-center font-mono">{playerCardsCount}</TableCell>
                   <TableCell className="text-right">
-                    <Button variant="outline" size="sm" onClick={() => handleOpenDialog(player)}>
-                      <Edit className="w-3 h-3 mr-2" />
-                      Gerenciar
-                    </Button>
+                    <div className="flex items-center justify-end gap-1.5">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className={player.bloqueado ? 'text-green-600 hover:text-green-700 hover:bg-green-50' : 'text-destructive hover:text-destructive hover:bg-destructive/10'}
+                        title={player.bloqueado ? 'Desbloquear' : 'Bloquear'}
+                        onClick={() => toggleBlockPlayer(player.id, !player.bloqueado)}
+                      >
+                        {player.bloqueado ? <ShieldCheck className="w-4 h-4" /> : <ShieldBan className="w-4 h-4" />}
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                        title="Deletar jogador"
+                        onClick={() => setDeleteConfirmId(player.id)}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={() => handleOpenDialog(player)}>
+                        <Edit className="w-3 h-3 mr-2" />
+                        Gerenciar
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               );
@@ -269,6 +303,25 @@ const PlayersAdmin = () => {
               </div>
             </TabsContent>
           </Tabs>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={!!deleteConfirmId} onOpenChange={open => !open && setDeleteConfirmId(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <Trash2 className="w-5 h-5" /> Confirmar Exclusão
+            </DialogTitle>
+            <DialogDescription>
+              Esta ação é irreversível. O jogador e todos os seus dados serão permanentemente removidos.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <DialogClose asChild><Button variant="ghost">Cancelar</Button></DialogClose>
+            <Button variant="destructive" onClick={handleDelete} disabled={isDeleting}>
+              {isDeleting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Trash2 className="w-4 h-4 mr-2" />}
+              Confirmar Exclusão
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </>

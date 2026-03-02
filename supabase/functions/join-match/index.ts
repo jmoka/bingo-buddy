@@ -45,7 +45,7 @@ serve(async (req) => {
 
     const [matchRes, profileRes, playerCardsRes] = await Promise.all([
       supabaseAdmin.from('partidas').select('card_price, pot').eq('id', matchId).single(),
-      supabaseAdmin.from('perfis').select('credits').eq('id', user.id).single(),
+      supabaseAdmin.from('perfis').select('credits, bloqueado').eq('id', user.id).single(),
       supabaseAdmin.from('cartelas_jogador').select('*').in('id', playerCardIds)
     ]);
 
@@ -56,6 +56,10 @@ serve(async (req) => {
     const match = matchRes.data;
     const profile = profileRes.data;
     const playerCards = playerCardsRes.data;
+
+    if (profile.bloqueado) {
+      throw new Error("Sua conta está bloqueada. Entre em contato com o administrador.");
+    }
 
     // Apenas cartelas do tipo 'real' custam créditos reais
     const realCards = playerCards.filter(c => c.credit_type === 'real');

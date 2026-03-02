@@ -2,7 +2,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
-import { Rifa, NumeroRifa, CompraRifa, VendedorRifa, ClienteRifa, CartelaRifa } from '@/types/rifa';
+import { Rifa, NumeroRifa, CompraRifa, VendedorRifa, ClienteRifa, CartelaRifa, SolicitacaoVendedor } from '@/types/rifa';
 
 export const useRifaAdmin = () => {
   const { profile } = useAuth();
@@ -63,6 +63,37 @@ export const useRifaAdmin = () => {
     refetchInterval: 5000,
   });
 
+  const { data: solicitacoesVendedor = [], isLoading: isLoadingSolicitacoes } = useQuery({
+    queryKey: ['solicitacoesVendedor'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('solicitacoes_vendedor')
+        .select('*, perfis!solicitacoes_vendedor_user_id_fkey(full_name, avatar_url)')
+        .order('created_at', { ascending: false });
+      if (error) {
+        console.error('[useRifaAdmin] solicitacoesVendedor error:', error);
+        throw error;
+      }
+      return data as SolicitacaoVendedor[];
+    },
+    enabled: isAdmin,
+    refetchInterval: 5000,
+  });
+
+  const { data: vendedoresComStats = [] } = useQuery({
+    queryKey: ['vendedoresComStats'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('vendedores_rifa')
+        .select('*, perfis(full_name, avatar_url)')
+        .order('nome');
+      if (error) throw error;
+      return data;
+    },
+    enabled: isAdmin,
+    refetchInterval: 5000,
+  });
+
   const criarRifa = async (payload: Partial<Rifa>): Promise<string | null> => {
     const { data, error } = await supabase
       .from('rifas')
@@ -90,10 +121,22 @@ export const useRifaAdmin = () => {
     return rifaId;
   };
 
+  const uploadImagemRifa = async (file: File): Promise<string | null> => {
+    const ext = file.name.split('.').pop();
+    const filePath = `rifas/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
+    const { error } = await supabase.storage.from('prizes').upload(filePath, file);
+    if (error) { toast.error('Erro ao enviar imagem.'); return null; }
+    const { data } = supabase.storage.from('prizes').getPublicUrl(filePath);
+    return data.publicUrl;
+  };
+
   const atualizarRifa = async (rifaId: string, payload: Partial<Rifa>): Promise<boolean> => {
-    const { error } = await supabase.from('rifas').update(payload).eq('id', rifaId);
+    const clean = Object.fromEntries(
+      Object.entries(payload).filter(([, v]) => v !== undefined)
+    );
+    const { error } = await supabase.from('rifas').update(clean).eq('id', rifaId);
     if (error) {
-      toast.error('Erro ao atualizar rifa.');
+      toast.error('Erro ao atualizar rifa: ' + error.message);
       return false;
     }
     toast.success('Rifa atualizada!');
@@ -260,19 +303,57 @@ export const useRifaAdmin = () => {
     return true;
   };
 
+  const aprovarVendedor = async (solicitacaoId: string, mensagemAdmin?: string): Promise<boolean> => {
+    const { data, error } = await supabase.rpc('aprovar_vendedor', {
+      p_solicitacao_id: solicitacaoId,
+      p_comissao: 0,
+      p_desconto: 0,
+      p_mensagem_admin: mensagemAdmin ?? null,
+    });
+    if (error || !data?.success) {
+      toast.error('Erro ao aprovar vendedor: ' + (data?.error ?? error?.message));
+      return false;
+    }
+    toast.success('Vendedor aprovado!');
+    queryClient.invalidateQueries({ queryKey: ['solicitacoesVendedor'] });
+    queryClient.invalidateQueries({ queryKey: ['vendedoresRifa'] });
+    queryClient.invalidateQueries({ queryKey: ['vendedoresComStats'] });
+    return true;
+  };
+
+  const rejeitarVendedor = async (solicitacaoId: string, mensagemAdmin?: string): Promise<boolean> => {
+    const { data, error } = await supabase.rpc('rejeitar_vendedor', {
+      p_solicitacao_id: solicitacaoId,
+      p_mensagem_admin: mensagemAdmin ?? null,
+    });
+    if (error || !data?.success) {
+      toast.error('Erro ao rejeitar vendedor: ' + (data?.error ?? error?.message));
+      return false;
+    }
+    toast.success('Solicitação rejeitada.');
+    queryClient.invalidateQueries({ queryKey: ['solicitacoesVendedor'] });
+    return true;
+  };
+
   return {
     todasRifas,
     vendedores,
+    vendedoresComStats,
     clientes,
     todasCompras,
+    solicitacoesVendedor,
     isLoading: isLoadingRifas || isLoadingVendedores || isLoadingCompras,
+    isLoadingSolicitacoes,
     criarRifa,
     atualizarRifa,
     deletarRifa,
     finalizarRifa,
     cancelarRifa,
+    uploadImagemRifa,
     criarVendedor,
     atualizarVendedor,
+    aprovarVendedor,
+    rejeitarVendedor,
     getNumerosRifaAdmin,
     getCartelasCompra,
     registrarVendaVendedor,

@@ -33,7 +33,7 @@ CREATE TABLE rifas (
   fotos JSONB DEFAULT '[]',
   foto_capa TEXT,
   premio_descricao TEXT,
-  premio_foto TEXT,
+  premio_fotos JSONB DEFAULT '[]',
   quantidade_numeros INTEGER NOT NULL,
   numero_inicial INTEGER NOT NULL DEFAULT 1,
   custo_por_numero NUMERIC NOT NULL DEFAULT 1,

@@ -1,0 +1,2 @@
+ALTER TABLE perfis
+  ADD COLUMN IF NOT EXISTS bloqueado BOOLEAN DEFAULT false;

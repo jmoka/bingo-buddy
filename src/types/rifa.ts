@@ -1,6 +1,7 @@
 export type RifaStatus = 'ativa' | 'finalizada' | 'cancelada';
 export type NumeroStatus = 'disponivel' | 'reservado' | 'vendido';
 export type TipoPagamento = 'creditos' | 'vendedor';
+export type StatusSolicitacao = 'pendente' | 'aprovado' | 'rejeitado';
 
 export interface Rifa {
   id: string;
@@ -10,10 +11,11 @@ export interface Rifa {
   fotos: string[];
   foto_capa: string | null;
   premio_descricao: string | null;
-  premio_foto: string | null;
+  premio_fotos: string[];
   quantidade_numeros: number;
   numero_inicial: number;
   custo_por_numero: number;
+  preco_vendedor: number | null;
   data_inicio: string | null;
   data_encerramento: string | null;
   status: RifaStatus;
@@ -32,6 +34,9 @@ export interface NumeroRifa {
   vendedor_id: string | null;
   cliente_rifa_id: string | null;
   reservado_ate: string | null;
+  nome_comprador: string | null;
+  telefone_comprador: string | null;
+  endereco_comprador: string | null;
 }
 
 export interface CompraRifa {
@@ -40,6 +45,7 @@ export interface CompraRifa {
   comprador_id: string | null;
   vendedor_id: string | null;
   cliente_rifa_id: string | null;
+  ref_vendedor_id: string | null;
   numeros: number[];
   valor_total: number;
   desconto_aplicado: number;
@@ -54,6 +60,8 @@ export interface VendedorRifa {
   documento: string | null;
   telefone: string | null;
   percentual_desconto: number;
+  comissao_percentual: number;
+  codigo_ref: string;
   ativo: boolean;
   created_at: string;
 }
@@ -75,4 +83,23 @@ export interface CartelaRifa {
   qr_code_data: string | null;
   impresso: boolean;
   created_at: string;
+}
+
+export interface SolicitacaoVendedor {
+  id: string;
+  user_id: string;
+  status: StatusSolicitacao;
+  nome: string;
+  documento: string | null;
+  telefone: string | null;
+  endereco: string | null;
+  mensagem: string | null;
+  mensagem_admin: string | null;
+  created_at: string;
+  resolved_at: string | null;
+  resolved_by: string | null;
+  perfis?: {
+    full_name: string | null;
+    avatar_url: string | null;
+  };
 }

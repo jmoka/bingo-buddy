@@ -88,6 +88,8 @@ export interface GameSettings {
   auto_engine_prize_type: PrizeType;
   auto_engine_prize_value: number;
   auto_engine_start_hour: number;
+  desconto_vendedor_global: number;
+  comissao_vendedor_global: number;
 }
 
 export interface CreditRequestMessage {

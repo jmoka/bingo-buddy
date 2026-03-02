@@ -26,6 +26,9 @@ import RifaDetalheAdmin from "./pages/admin/RifaDetalheAdmin";
 import VendedorRifa from "./pages/VendedorRifa";
 import VendedorCartelas from "./pages/VendedorCartelas";
 import ValidarCartela from "./pages/ValidarCartela";
+import SolicitarVendedor from "./pages/SolicitarVendedor";
+import VendedorPainel from "./pages/VendedorPainel";
+import VendedoresAdmin from "./pages/admin/VendedoresAdmin";
 import { Loader2 } from "lucide-react";
 
 const queryClient = new QueryClient();
@@ -72,7 +75,11 @@ const App = () => (
               <Route path="/admin/rifas/:id" element={<ProtectedRoute><RifaDetalheAdmin /></ProtectedRoute>} />
               <Route path="/vendedor" element={<ProtectedRoute><VendedorRifa /></ProtectedRoute>} />
               <Route path="/vendedor/cartelas/:compraId" element={<ProtectedRoute><VendedorCartelas /></ProtectedRoute>} />
+              <Route path="/vendedor/imprimir/:rifaId" element={<ProtectedRoute><VendedorCartelas /></ProtectedRoute>} />
+              <Route path="/vendedor/painel" element={<ProtectedRoute><VendedorPainel /></ProtectedRoute>} />
+              <Route path="/solicitar-vendedor" element={<ProtectedRoute><SolicitarVendedor /></ProtectedRoute>} />
               <Route path="/validar-cartela" element={<ProtectedRoute><ValidarCartela /></ProtectedRoute>} />
+              <Route path="/admin/vendedores" element={<ProtectedRoute><VendedoresAdmin /></ProtectedRoute>} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>

@@ -7,12 +7,13 @@ export interface Profile {
   id: string;
   full_name: string | null;
   avatar_url: string | null;
-  role: 'admin' | 'user';
+  role: 'admin' | 'user' | 'vendedor';
   credits: number;
-  fake_credits: number; // Adicionado créditos de brincar
+  fake_credits: number;
   cpf: string | null;
   whatsapp: string | null;
   address: string | null;
+  bloqueado: boolean;
 }
 
 interface AuthContextType {

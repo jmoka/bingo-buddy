@@ -146,7 +146,7 @@ export default function VendedorRifaPage() {
 
   return (
     <div className="min-h-screen bg-background p-4">
-      <div className="max-w-4xl mx-auto space-y-6">
+      <div className="max-w-2xl mx-auto space-y-6">
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="icon" onClick={() => navigate('/')}>
             <ArrowLeft className="h-5 w-5" />
@@ -242,7 +242,7 @@ export default function VendedorRifaPage() {
       </div>
 
       <Dialog open={vendaDialogOpen} onOpenChange={setVendaDialogOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Registrar Venda</DialogTitle>
           </DialogHeader>

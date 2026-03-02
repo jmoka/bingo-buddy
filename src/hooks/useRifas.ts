@@ -77,11 +77,12 @@ export const useRifas = () => {
     refetchInterval: 5000,
   });
 
-  const comprarNumeros = async (rifaId: string, numeros: number[]): Promise<boolean> => {
-    const { data, error } = await supabase.rpc('comprar_numeros_rifa', {
-      p_rifa_id: rifaId,
-      p_numeros: numeros,
-    });
+  const comprarNumeros = async (rifaId: string, numeros: number[], refCodigo?: string): Promise<boolean> => {
+    const rpcName = refCodigo ? 'comprar_numeros_via_ref' : 'comprar_numeros_rifa';
+    const params = refCodigo
+      ? { p_rifa_id: rifaId, p_numeros: numeros, p_ref_codigo: refCodigo }
+      : { p_rifa_id: rifaId, p_numeros: numeros };
+    const { data, error } = await supabase.rpc(rpcName as any, params);
     if (error || !data?.success) {
       const msg = data?.error;
       if (msg === 'rifa_not_found') toast.error('Rifa não encontrada ou encerrada.');

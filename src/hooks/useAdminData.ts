@@ -194,6 +194,34 @@ export const useAdminData = () => {
     return data;
   };
 
+  const toggleBlockPlayer = async (playerId: string, bloqueado: boolean): Promise<boolean> => {
+    const { error } = await supabase
+      .from('perfis')
+      .update({ bloqueado })
+      .eq('id', playerId);
+    if (error) {
+      toast.error('Erro ao ' + (bloqueado ? 'bloquear' : 'desbloquear') + ' jogador.');
+      return false;
+    }
+    toast.success('Jogador ' + (bloqueado ? 'bloqueado' : 'desbloqueado') + ' com sucesso!');
+    await queryClient.refetchQueries({ queryKey: ['players'] });
+    return true;
+  };
+
+  const deletePlayer = async (playerId: string): Promise<boolean> => {
+    const { error } = await supabase
+      .from('perfis')
+      .delete()
+      .eq('id', playerId);
+    if (error) {
+      toast.error('Erro ao deletar jogador: ' + error.message);
+      return false;
+    }
+    toast.success('Jogador deletado com sucesso!');
+    await queryClient.refetchQueries({ queryKey: ['players'] });
+    return true;
+  };
+
   const fetchRedeemMessages = async (requestId: string) => {
     const { data, error } = await supabase.from('mensagens_resgate').select('*').eq('redeem_request_id', requestId).order('created_at', { ascending: true });
     if (error) return [];
@@ -217,5 +245,7 @@ export const useAdminData = () => {
     deleteRedeemRequest,
     fetchRequestMessages,
     fetchRedeemMessages,
+    toggleBlockPlayer,
+    deletePlayer,
   };
 };

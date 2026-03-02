@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useRifaAdmin } from '@/hooks/useRifaAdmin';
 import { useRifas } from '@/hooks/useRifas';
@@ -15,7 +15,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ArrowLeft, Trophy, Users, DollarSign, Hash, Loader2, CheckCircle, XCircle, AlertCircle, Pencil, Trash2 } from 'lucide-react';
+import { ArrowLeft, Trophy, Users, DollarSign, Hash, Loader2, CheckCircle, XCircle, AlertCircle, Pencil, Trash2, Upload, Link, Plus, X as XIcon, ImageIcon } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { NumeroRifa, CompraRifa, Rifa } from '@/types/rifa';
@@ -34,10 +34,79 @@ const numeroBadgeClass: Record<string, string> = {
   reservado: 'bg-amber-500/15 text-amber-700 border border-amber-500/30',
 };
 
+interface EditForm {
+  nome: string;
+  descricao: string;
+  regulamento: string;
+  premio_descricao: string;
+  premio_fotos: string[];
+  foto_capa: string;
+  custo_por_numero: number | string;
+  data_encerramento: string;
+}
+
+const ImageUploadField = ({
+  label,
+  value,
+  onChange,
+  onUpload,
+  uploading,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  onUpload: (file: File) => Promise<string | null>;
+  uploading: boolean;
+}) => {
+  const ref = useRef<HTMLInputElement>(null);
+  const [mode, setMode] = useState<'url' | 'file'>('url');
+
+  return (
+    <div className="space-y-1.5">
+      <Label>{label}</Label>
+      <div className="flex gap-2 mb-1.5">
+        <button
+          type="button"
+          onClick={() => setMode('url')}
+          className={`flex items-center gap-1 text-xs px-2 py-1 rounded border transition-colors ${mode === 'url' ? 'bg-primary text-primary-foreground border-primary' : 'border-border text-muted-foreground hover:border-primary/40'}`}
+        >
+          <Link className="w-3 h-3" /> URL
+        </button>
+        <button
+          type="button"
+          onClick={() => setMode('file')}
+          className={`flex items-center gap-1 text-xs px-2 py-1 rounded border transition-colors ${mode === 'file' ? 'bg-primary text-primary-foreground border-primary' : 'border-border text-muted-foreground hover:border-primary/40'}`}
+        >
+          <Upload className="w-3 h-3" /> Arquivo
+        </button>
+      </div>
+      {mode === 'url' ? (
+        <Input value={value} onChange={e => onChange(e.target.value)} placeholder="https://..." />
+      ) : (
+        <div>
+          <input ref={ref} type="file" accept="image/*" className="hidden" onChange={async e => {
+            const file = e.target.files?.[0];
+            if (!file) return;
+            const url = await onUpload(file);
+            if (url) onChange(url);
+          }} />
+          <Button type="button" variant="outline" size="sm" className="w-full" onClick={() => ref.current?.click()} disabled={uploading}>
+            {uploading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Upload className="w-4 h-4 mr-2" />}
+            {uploading ? 'Enviando...' : 'Selecionar arquivo'}
+          </Button>
+        </div>
+      )}
+      {value && (
+        <img src={value} alt="" className="mt-1 h-20 w-full object-cover rounded border" onError={e => (e.currentTarget.style.display = 'none')} />
+      )}
+    </div>
+  );
+};
+
 const RifaDetalheAdmin = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { todasRifas, todasCompras, getNumerosRifaAdmin, finalizarRifa, cancelarRifa, atualizarRifa, deletarRifa } = useRifaAdmin();
+  const { todasRifas, todasCompras, getNumerosRifaAdmin, finalizarRifa, cancelarRifa, atualizarRifa, deletarRifa, uploadImagemRifa } = useRifaAdmin();
   useRifas();
 
   const rifa = todasRifas.find(r => r.id === id);
@@ -55,8 +124,22 @@ const RifaDetalheAdmin = () => {
   const [cancelando, setCancelando] = useState(false);
   const [deletando, setDeletando] = useState(false);
   const [salvando, setSalvando] = useState(false);
+  const [uploadingCapa, setUploadingCapa] = useState(false);
+  const [uploadingPremio, setUploadingPremio] = useState(false);
+  const premioFileRef = useRef<HTMLInputElement>(null);
+  const [premioUrlInput, setPremioUrlInput] = useState('');
+  const [premioMode, setPremioMode] = useState<'url' | 'file'>('url');
 
-  const [editForm, setEditForm] = useState<Partial<Rifa>>({});
+  const [editForm, setEditForm] = useState<EditForm>({
+    nome: '',
+    descricao: '',
+    regulamento: '',
+    premio_descricao: '',
+    premio_fotos: [],
+    foto_capa: '',
+    custo_por_numero: 1,
+    data_encerramento: '',
+  });
 
   useEffect(() => {
     if (rifa) {
@@ -65,12 +148,10 @@ const RifaDetalheAdmin = () => {
         descricao: rifa.descricao ?? '',
         regulamento: rifa.regulamento ?? '',
         premio_descricao: rifa.premio_descricao ?? '',
-        premio_foto: rifa.premio_foto ?? '',
+        premio_fotos: Array.isArray(rifa.premio_fotos) ? rifa.premio_fotos : [],
         foto_capa: rifa.foto_capa ?? '',
         custo_por_numero: rifa.custo_por_numero,
-        data_encerramento: rifa.data_encerramento
-          ? rifa.data_encerramento.slice(0, 16)
-          : '',
+        data_encerramento: rifa.data_encerramento ? rifa.data_encerramento.slice(0, 16) : '',
       });
     }
   }, [rifa?.id]);
@@ -131,16 +212,33 @@ const RifaDetalheAdmin = () => {
     if (ok) navigate('/admin/rifas');
   };
 
+  const handleAddPremioFoto = async (source: 'url' | File) => {
+    if (typeof source === 'string') {
+      if (!source.trim()) return;
+      setEditForm(p => ({ ...p, premio_fotos: [...p.premio_fotos, source.trim()] }));
+      setPremioUrlInput('');
+    } else {
+      setUploadingPremio(true);
+      const url = await uploadImagemRifa(source);
+      setUploadingPremio(false);
+      if (url) setEditForm(p => ({ ...p, premio_fotos: [...p.premio_fotos, url] }));
+    }
+  };
+
+  const handleRemovePremioFoto = (idx: number) => {
+    setEditForm(p => ({ ...p, premio_fotos: p.premio_fotos.filter((_, i) => i !== idx) }));
+  };
+
   const handleSalvarEdicao = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!id) return;
     setSalvando(true);
     const payload: Partial<Rifa> = {
-      nome: editForm.nome,
+      nome: editForm.nome || undefined,
       descricao: editForm.descricao || null,
       regulamento: editForm.regulamento || null,
       premio_descricao: editForm.premio_descricao || null,
-      premio_foto: editForm.premio_foto || null,
+      premio_fotos: editForm.premio_fotos,
       foto_capa: editForm.foto_capa || null,
       custo_por_numero: Number(editForm.custo_por_numero),
       data_encerramento: editForm.data_encerramento || null,
@@ -152,17 +250,17 @@ const RifaDetalheAdmin = () => {
 
   return (
     <>
-      <div className="flex items-center justify-between mb-6 gap-4 flex-wrap">
-        <div className="flex items-center gap-3 min-w-0">
+      <div className="flex items-center justify-between mb-6 gap-3 flex-wrap">
+        <div className="flex items-center gap-3 min-w-0 flex-1">
           <Button variant="ghost" size="icon" onClick={() => navigate('/admin/rifas')}>
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <div className="flex flex-col min-w-0">
-            <h1 className="font-heading text-xl md:text-2xl font-bold text-foreground truncate">
+            <h1 className="font-heading text-lg md:text-2xl font-bold text-foreground truncate">
               {rifa.nome}
             </h1>
           </div>
-          <Badge variant="outline" className={cfg.badgeClass}>
+          <Badge variant="outline" className={`shrink-0 ${cfg.badgeClass}`}>
             {cfg.label}
           </Badge>
         </div>
@@ -264,7 +362,7 @@ const RifaDetalheAdmin = () => {
               </div>
             ) : (
               <>
-                <div className="grid grid-cols-6 sm:grid-cols-8 md:grid-cols-10 lg:grid-cols-12 gap-1.5 mb-4">
+                <div className="grid grid-cols-5 sm:grid-cols-8 md:grid-cols-10 lg:grid-cols-12 gap-1.5 mb-4">
                   {numerosFiltrados.map(n => (
                     <span
                       key={n.id}
@@ -496,74 +594,100 @@ const RifaDetalheAdmin = () => {
               <Input
                 id="edit-nome"
                 required
-                value={editForm.nome ?? ''}
+                value={editForm.nome}
                 onChange={e => setEditForm(p => ({ ...p, nome: e.target.value }))}
               />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="edit-descricao">Descrição</Label>
-              <Textarea
-                id="edit-descricao"
-                rows={2}
-                value={editForm.descricao ?? ''}
-                onChange={e => setEditForm(p => ({ ...p, descricao: e.target.value }))}
-              />
+              <Textarea id="edit-descricao" rows={2} value={editForm.descricao}
+                onChange={e => setEditForm(p => ({ ...p, descricao: e.target.value }))} />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="edit-regulamento">Regulamento</Label>
-              <Textarea
-                id="edit-regulamento"
-                rows={3}
-                value={editForm.regulamento ?? ''}
-                onChange={e => setEditForm(p => ({ ...p, regulamento: e.target.value }))}
-              />
+              <Textarea id="edit-regulamento" rows={3} value={editForm.regulamento}
+                onChange={e => setEditForm(p => ({ ...p, regulamento: e.target.value }))} />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="edit-premio-desc">Descrição do Prêmio</Label>
-              <Textarea
-                id="edit-premio-desc"
-                rows={2}
-                value={editForm.premio_descricao ?? ''}
-                onChange={e => setEditForm(p => ({ ...p, premio_descricao: e.target.value }))}
-              />
+              <Textarea id="edit-premio-desc" rows={2} value={editForm.premio_descricao}
+                onChange={e => setEditForm(p => ({ ...p, premio_descricao: e.target.value }))} />
             </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="edit-premio-foto">URL da Foto do Prêmio</Label>
-              <Input
-                id="edit-premio-foto"
-                value={editForm.premio_foto ?? ''}
-                onChange={e => setEditForm(p => ({ ...p, premio_foto: e.target.value }))}
-                placeholder="https://..."
-              />
+
+            <div className="space-y-2">
+              <Label>Fotos do Prêmio</Label>
+              {editForm.premio_fotos.length > 0 && (
+                <div className="grid grid-cols-3 gap-2">
+                  {editForm.premio_fotos.map((url, idx) => (
+                    <div key={idx} className="relative group">
+                      <img src={url} alt="" className="h-20 w-full object-cover rounded border" onError={e => (e.currentTarget.style.display = 'none')} />
+                      <button
+                        type="button"
+                        onClick={() => handleRemovePremioFoto(idx)}
+                        className="absolute top-1 right-1 bg-destructive text-white rounded-full w-5 h-5 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                      >
+                        <XIcon className="w-3 h-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div className="flex gap-2 mb-1">
+                <button type="button" onClick={() => setPremioMode('url')}
+                  className={`flex items-center gap-1 text-xs px-2 py-1 rounded border transition-colors ${premioMode === 'url' ? 'bg-primary text-primary-foreground border-primary' : 'border-border text-muted-foreground hover:border-primary/40'}`}>
+                  <Link className="w-3 h-3" /> URL
+                </button>
+                <button type="button" onClick={() => setPremioMode('file')}
+                  className={`flex items-center gap-1 text-xs px-2 py-1 rounded border transition-colors ${premioMode === 'file' ? 'bg-primary text-primary-foreground border-primary' : 'border-border text-muted-foreground hover:border-primary/40'}`}>
+                  <Upload className="w-3 h-3" /> Arquivo
+                </button>
+              </div>
+              {premioMode === 'url' ? (
+                <div className="flex gap-2">
+                  <Input value={premioUrlInput} onChange={e => setPremioUrlInput(e.target.value)} placeholder="https://..." />
+                  <Button type="button" size="sm" variant="outline" onClick={() => handleAddPremioFoto(premioUrlInput)} disabled={!premioUrlInput.trim()}>
+                    <Plus className="w-4 h-4" />
+                  </Button>
+                </div>
+              ) : (
+                <div>
+                  <input ref={premioFileRef} type="file" accept="image/*" multiple className="hidden" onChange={async e => {
+                    const files = Array.from(e.target.files || []);
+                    for (const f of files) await handleAddPremioFoto(f);
+                    e.target.value = '';
+                  }} />
+                  <Button type="button" variant="outline" size="sm" className="w-full" onClick={() => premioFileRef.current?.click()} disabled={uploadingPremio}>
+                    {uploadingPremio ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <ImageIcon className="w-4 h-4 mr-2" />}
+                    {uploadingPremio ? 'Enviando...' : 'Selecionar imagens'}
+                  </Button>
+                </div>
+              )}
             </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="edit-foto-capa">URL da Foto de Capa</Label>
-              <Input
-                id="edit-foto-capa"
-                value={editForm.foto_capa ?? ''}
-                onChange={e => setEditForm(p => ({ ...p, foto_capa: e.target.value }))}
-                placeholder="https://..."
-              />
-            </div>
+
+            <ImageUploadField
+              label="Foto de Capa"
+              value={editForm.foto_capa}
+              onChange={v => setEditForm(p => ({ ...p, foto_capa: v }))}
+              onUpload={async (file) => {
+                setUploadingCapa(true);
+                const url = await uploadImagemRifa(file);
+                setUploadingCapa(false);
+                return url;
+              }}
+              uploading={uploadingCapa}
+            />
+
             <div className="space-y-1.5">
               <Label htmlFor="edit-custo">Custo por Número (R$)</Label>
-              <Input
-                id="edit-custo"
-                type="number"
-                step="0.01"
-                min={0}
-                value={editForm.custo_por_numero ?? ''}
-                onChange={e => setEditForm(p => ({ ...p, custo_por_numero: Number(e.target.value) }))}
-              />
+              <Input id="edit-custo" type="number" step="0.01" min={0}
+                value={editForm.custo_por_numero}
+                onChange={e => setEditForm(p => ({ ...p, custo_por_numero: e.target.value }))} />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="edit-encerramento">Data de Encerramento</Label>
-              <Input
-                id="edit-encerramento"
-                type="datetime-local"
-                value={editForm.data_encerramento ?? ''}
-                onChange={e => setEditForm(p => ({ ...p, data_encerramento: e.target.value }))}
-              />
+              <Input id="edit-encerramento" type="datetime-local"
+                value={editForm.data_encerramento}
+                onChange={e => setEditForm(p => ({ ...p, data_encerramento: e.target.value }))} />
             </div>
             <div className="flex gap-3 pt-2">
               <Button type="button" variant="outline" className="flex-1" onClick={() => setEditarOpen(false)}>

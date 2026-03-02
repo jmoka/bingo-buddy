@@ -5,13 +5,16 @@ import { Button } from '@/components/ui/button';
 import { ArrowRight, Users, ShieldCheck, Coins, Ticket } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useGame } from '@/contexts/GameContext';
+import { useRifaAdmin } from '@/hooks/useRifaAdmin';
 import MatchManager from '@/components/admin/MatchManager';
 import SettingsManager from '@/components/admin/SettingsManager';
+import VendedoresAdmin from './admin/VendedoresAdmin';
 
 const Admin = () => {
   const navigate = useNavigate();
   const { profile } = useAuth();
   const { allCreditRequests, allRedeemRequests, players, gameSettings } = useGame();
+  const { solicitacoesVendedor } = useRifaAdmin();
 
   useEffect(() => {
     if (profile && profile.role !== 'admin') {
@@ -32,6 +35,7 @@ const Admin = () => {
 
   const pendingRequestsCount = (allCreditRequests || []).filter(r => r.status === 'pending').length;
   const pendingRedeemsCount = (allRedeemRequests || []).filter(r => r.status === 'pending').length;
+  const pendingVendedoresCount = solicitacoesVendedor.filter(s => s.status === 'pendente').length;
 
   return (
     <>
@@ -64,7 +68,7 @@ const Admin = () => {
       </div>
 
       <Tabs defaultValue="matches" className="w-full">
-        <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 md:grid-cols-6 h-auto mb-8">
+        <TabsList className="flex flex-wrap h-auto gap-1 mb-8 bg-muted p-1 rounded-lg">
           <TabsTrigger value="matches" className="py-3">Partidas</TabsTrigger>
           <TabsTrigger value="credits" className="py-3 relative">
             Entradas
@@ -76,6 +80,10 @@ const Admin = () => {
           </TabsTrigger>
           <TabsTrigger value="players" className="py-3">Jogadores</TabsTrigger>
           <TabsTrigger value="rifas" className="py-3">Rifas</TabsTrigger>
+          <TabsTrigger value="vendedores" className="py-3 relative">
+            Vendedores
+            {pendingVendedoresCount > 0 && <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-amber-500 text-[9px] font-bold text-white border border-background">{pendingVendedoresCount}</span>}
+          </TabsTrigger>
           <TabsTrigger value="settings" className="py-3">Ajustes</TabsTrigger>
         </TabsList>
 
@@ -113,6 +121,10 @@ const Admin = () => {
             <p className="text-muted-foreground mb-6">Crie e gerencie rifas, vendedores e registre vendas físicas.</p>
             <Button className="w-full py-6 text-lg gradient-primary" onClick={() => navigate('/admin/rifas')}>Gerenciar Rifas <ArrowRight className="w-5 h-5 ml-2" /></Button>
           </div>
+        </TabsContent>
+
+        <TabsContent value="vendedores">
+          <VendedoresAdmin />
         </TabsContent>
 
         <TabsContent value="settings">

@@ -45,6 +45,8 @@ const SettingsManager = () => {
     auto_engine_prize_type: 'percentage' as any,
     auto_engine_prize_value: 80,
     auto_engine_start_hour: 0,
+    desconto_vendedor_global: 0,
+    comissao_vendedor_global: 0,
   });
   const [isSaving, setIsSaving] = useState(false);
   const [justSaved, setJustSaved] = useState(false);
@@ -74,6 +76,8 @@ const SettingsManager = () => {
         auto_engine_prize_type: gameSettings.auto_engine_prize_type || 'percentage',
         auto_engine_prize_value: gameSettings.auto_engine_prize_value || 80,
         auto_engine_start_hour: gameSettings.auto_engine_start_hour || 0,
+        desconto_vendedor_global: gameSettings.desconto_vendedor_global || 0,
+        comissao_vendedor_global: gameSettings.comissao_vendedor_global || 0,
       });
     }
   }, [gameSettings]);
@@ -140,6 +144,8 @@ const SettingsManager = () => {
       auto_engine_card_price: Number(currentSettings.auto_engine_card_price), // Usando Number em vez de parseInt
       auto_engine_prize_value: Number(currentSettings.auto_engine_prize_value), // Usando Number em vez de parseInt
       auto_engine_start_hour: parseInt(currentSettings.auto_engine_start_hour as any, 10),
+      desconto_vendedor_global: Number(currentSettings.desconto_vendedor_global),
+      comissao_vendedor_global: Number(currentSettings.comissao_vendedor_global),
     });
     
     setIsSaving(false);
@@ -332,6 +338,23 @@ const SettingsManager = () => {
                 <SelectItem value="production">Produção</SelectItem>
               </SelectContent>
             </Select>
+          </div>
+        </div>
+
+        <div className="space-y-6">
+          <h3 className="font-heading font-bold text-primary border-b pb-2">Rifas — Vendedores (Padrão)</h3>
+          <p className="text-xs text-muted-foreground -mt-4">Valores usados quando o vendedor não tem configuração específica na rifa.</p>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label>Desconto Global (%)</Label>
+              <Input name="desconto_vendedor_global" type="number" step="0.1" min="0" max="100" value={currentSettings.desconto_vendedor_global} onChange={handleSettingsChange} />
+              <p className="text-[10px] text-muted-foreground mt-1">Desconto aplicado ao preço para vendedores sem configuração própria.</p>
+            </div>
+            <div>
+              <Label>Comissão Global (%)</Label>
+              <Input name="comissao_vendedor_global" type="number" step="0.1" min="0" max="100" value={currentSettings.comissao_vendedor_global} onChange={handleSettingsChange} />
+              <p className="text-[10px] text-muted-foreground mt-1">Percentual de comissão creditado ao vendedor por venda validada.</p>
+            </div>
           </div>
         </div>
 

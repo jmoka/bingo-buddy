@@ -1,10 +1,12 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useGame } from '@/contexts/GameContext';
+import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
-import { Menu, User, Wallet, Plus, Banknote, History, Printer, LogOut, Star, Crown, Ticket, Search } from 'lucide-react';
+import { Menu, Wallet, Plus, Banknote, History, Printer, LogOut, Star, Crown, Ticket, Search, UserCheck, ShieldCheck, User } from 'lucide-react';
 import { CreditRequestDialog } from './CreditRequestDialog';
 import { MyCreditRequestsDialog } from './MyCreditRequestsDialog';
 import { RedeemRequestDialog } from './RedeemRequestDialog';
@@ -17,10 +19,25 @@ export const AppHeader = () => {
   const { gameSettings, playerCards, updatePlayerFakeCredits } = useGame();
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [isRecharging, setIsRecharging] = useState(false);
+  const [avatarSrc, setAvatarSrc] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!profile?.avatar_url) { setAvatarSrc(null); return; }
+    supabase.storage.from('avatars').download(profile.avatar_url).then(({ data, error }) => {
+      if (error || !data) return;
+      setAvatarSrc(URL.createObjectURL(data));
+    });
+  }, [profile?.avatar_url]);
 
   if (!profile) return null;
 
   const myOwnedCards = playerCards.filter(c => c.player_id === profile.id);
+
+  const roleBadge = {
+    admin: { label: 'Admin', className: 'bg-purple-500/15 text-purple-700 dark:text-purple-400 border-purple-500/30' },
+    vendedor: { label: 'Vendedor', className: 'bg-green-500/15 text-green-700 dark:text-green-400 border-green-500/30' },
+    user: { label: 'Usuário', className: 'bg-muted text-muted-foreground border-border' },
+  }[profile.role] ?? { label: profile.role, className: '' };
 
   const handleRechargeFake = async () => {
     setIsRecharging(true);
@@ -59,6 +76,21 @@ export const AppHeader = () => {
       label: 'Validar Cartela de Rifa',
       icon: Search,
     },
+    ...(profile.role === 'vendedor' ? [{
+      action: () => navigate('/vendedor/painel'),
+      label: 'Painel do Vendedor',
+      icon: UserCheck,
+    }] : []),
+    ...(profile.role !== 'vendedor' ? [{
+      action: () => navigate('/solicitar-vendedor'),
+      label: 'Ser Vendedor de Rifas',
+      icon: UserCheck,
+    }] : []),
+    ...(profile.role === 'admin' ? [{
+      action: () => navigate('/admin'),
+      label: 'Painel Admin',
+      icon: ShieldCheck,
+    }] : []),
     {
       action: () => navigate('/print'),
       label: 'Imprimir Cartelas',
@@ -95,21 +127,49 @@ export const AppHeader = () => {
             </Button>
           </div>
 
-          <Button size="icon" variant="ghost" onClick={() => navigate('/account')}>
-            <User className="w-5 h-5" />
-          </Button>
+          <button
+            onClick={() => navigate('/account')}
+            className="flex items-center gap-1.5 hover:opacity-80 transition-opacity"
+            title="Meu perfil"
+          >
+            <div className="flex items-center gap-1.5 bg-muted rounded-full pl-0.5 pr-2 py-0.5 border border-border">
+              {avatarSrc ? (
+                <img src={avatarSrc} alt="avatar" className="w-7 h-7 rounded-full object-cover shrink-0" />
+              ) : (
+                <div className="w-7 h-7 rounded-full bg-background flex items-center justify-center shrink-0">
+                  <User className="w-4 h-4 text-muted-foreground" />
+                </div>
+              )}
+              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full border ${roleBadge.className}`}>
+                {roleBadge.label}
+              </span>
+            </div>
+          </button>
           <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
             <SheetTrigger asChild>
               <Button size="icon" variant="ghost">
                 <Menu className="w-5 h-5" />
               </Button>
             </SheetTrigger>
-            <SheetContent className="w-[300px] sm:w-[400px]">
+            <SheetContent className="w-[300px] sm:w-[400px] flex flex-col">
               <SheetHeader>
                 <SheetTitle className="font-heading">Menu</SheetTitle>
               </SheetHeader>
-              <div className="mt-6 flex flex-col h-full pb-10">
-                <div className="flex-grow space-y-1">
+              <div className="flex items-center gap-3 px-1 py-3 border-b">
+                {avatarSrc ? (
+                  <img src={avatarSrc} alt="avatar" className="w-12 h-12 rounded-full object-cover border-2 border-border shrink-0" />
+                ) : (
+                  <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center border-2 border-border shrink-0">
+                    <User className="w-6 h-6 text-muted-foreground" />
+                  </div>
+                )}
+                <div className="min-w-0">
+                  <p className="font-semibold text-sm truncate">{profile.full_name || 'Usuário'}</p>
+                  <Badge className={`text-[10px] mt-0.5 ${roleBadge.className}`}>{roleBadge.label}</Badge>
+                </div>
+              </div>
+              <div className="flex-1 overflow-y-auto">
+                <div className="space-y-1 py-2">
                   {menuItems.map((item, index) => (
                     item.dialog ? (
                       <div key={index}>{item.dialog}</div>
@@ -127,7 +187,9 @@ export const AppHeader = () => {
                     )
                   ))}
                 </div>
-                <Button variant="ghost" className="w-full justify-start text-base py-6 text-destructive mt-auto" onClick={signOut}>
+              </div>
+              <div className="border-t pt-2 pb-6">
+                <Button variant="ghost" className="w-full justify-start text-base py-6 text-destructive" onClick={signOut}>
                   <LogOut className="w-5 h-5 mr-4" />
                   Sair
                 </Button>

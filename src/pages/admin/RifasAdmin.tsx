@@ -45,6 +45,11 @@ const RifasAdmin = () => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [novaRifaForm, setNovaRifaForm] = useState(defaultForm);
   const [criandoRifa, setCriandoRifa] = useState(false);
+  const [filtroStatus, setFiltroStatus] = useState<'todas' | 'ativa' | 'finalizada'>('todas');
+
+  const rifasFiltradas = filtroStatus === 'todas'
+    ? todasRifas
+    : todasRifas.filter(r => r.status === filtroStatus);
 
   if (profile?.role !== 'admin') {
     return (
@@ -225,30 +230,26 @@ const RifasAdmin = () => {
       ) : (
         <>
           <div className="grid grid-cols-3 gap-4 mb-6">
-            <div className="card-container p-4 text-center">
-              <div className="flex items-center justify-center gap-2 text-muted-foreground mb-1">
-                <Ticket className="w-4 h-4" />
-                <span className="text-xs font-semibold uppercase tracking-wide">Total</span>
-              </div>
-              <p className="text-2xl font-bold font-heading">{todasRifas.length}</p>
-            </div>
-            <div className="card-container p-4 text-center">
-              <div className="flex items-center justify-center gap-2 text-muted-foreground mb-1">
-                <Users className="w-4 h-4" />
-                <span className="text-xs font-semibold uppercase tracking-wide">Ativas</span>
-              </div>
-              <p className="text-2xl font-bold font-heading text-green-600">{ativas}</p>
-            </div>
-            <div className="card-container p-4 text-center">
-              <div className="flex items-center justify-center gap-2 text-muted-foreground mb-1">
-                <DollarSign className="w-4 h-4" />
-                <span className="text-xs font-semibold uppercase tracking-wide">Finalizadas</span>
-              </div>
-              <p className="text-2xl font-bold font-heading text-blue-600">{finalizadas}</p>
-            </div>
+            {([
+              { key: 'todas', label: 'Total', icon: Ticket, value: todasRifas.length, color: 'text-foreground', bg: 'bg-primary/10 border-primary/30' },
+              { key: 'ativa', label: 'Ativas', icon: Users, value: ativas, color: 'text-green-600', bg: 'bg-green-50 border-green-200 dark:bg-green-900/10 dark:border-green-700/30' },
+              { key: 'finalizada', label: 'Finalizadas', icon: DollarSign, value: finalizadas, color: 'text-blue-600', bg: 'bg-blue-50 border-blue-200 dark:bg-blue-900/10 dark:border-blue-700/30' },
+            ] as const).map(({ key, label, icon: Icon, value, color, bg }) => (
+              <button
+                key={key}
+                onClick={() => setFiltroStatus(key)}
+                className={`card-container p-4 text-center transition-all border-2 ${filtroStatus === key ? `${bg} ring-2 ring-offset-1 ring-primary/40` : 'border-transparent'}`}
+              >
+                <div className="flex items-center justify-center gap-2 text-muted-foreground mb-1">
+                  <Icon className="w-4 h-4" />
+                  <span className="text-xs font-semibold uppercase tracking-wide">{label}</span>
+                </div>
+                <p className={`text-2xl font-bold font-heading ${color}`}>{value}</p>
+              </button>
+            ))}
           </div>
 
-          {todasRifas.length === 0 ? (
+          {rifasFiltradas.length === 0 ? (
             <div className="card-container p-10 text-center">
               <Ticket className="w-12 h-12 text-muted-foreground/30 mx-auto mb-3" />
               <p className="text-muted-foreground">Nenhuma rifa criada ainda.</p>
@@ -258,7 +259,7 @@ const RifasAdmin = () => {
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {todasRifas.map(rifa => (
+              {rifasFiltradas.map(rifa => (
                 <RifaCard
                   key={rifa.id}
                   rifa={rifa}
