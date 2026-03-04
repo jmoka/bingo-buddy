@@ -47,8 +47,13 @@ serve(async (req) => {
         }
 
         if ((count || 0) === 0) {
-          console.log(`[auto-call-engine] Deletando partida vazia e atrasada: ${match.name} (ID: ${match.id})`);
-          await supabaseAdmin.from('partidas').delete().eq('id', match.id);
+          // CORREÇÃO: SÓ DELETA PARTIDAS AUTOMÁTICAS VAZIAS
+          if (match.name.startsWith('Bingo Automático')) {
+            console.log(`[auto-call-engine] Deletando partida automática vazia e atrasada: ${match.name} (ID: ${match.id})`);
+            await supabaseAdmin.from('partidas').delete().eq('id', match.id);
+          } else {
+            console.log(`[auto-call-engine] Ignorando partida manual vazia e atrasada: ${match.name} (ID: ${match.id})`);
+          }
         } else {
           console.log(`[auto-call-engine] Iniciando partida com ${count} jogadores: ${match.name}`);
           const { data: cfg } = await supabaseAdmin.from('configuracoes').select('intervalo_sorteio_auto_seg').single();
