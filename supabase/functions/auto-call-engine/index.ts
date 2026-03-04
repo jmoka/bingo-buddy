@@ -17,58 +17,59 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    const loopEnd = Date.now() + 50000; // Roda por 50s
-    console.log("[auto-call-engine] Iniciando ciclo de monitoramento...");
-
+    const loopEnd = Date.now() + 55000;
     while (Date.now() < loopEnd) {
-      const nowIso = new Date().toISOString();
+      const now = new Date();
+      const nowIso = now.toISOString();
 
-      // 1. AUTO-START: Partidas abertas que atingiram o horário
-      const { data: toStart } = await supabaseAdmin
+      // 1. BUSCAR PARTIDAS QUE JÁ DEVERIAM TER COMEÇADO
+      const { data: overdue } = await supabaseAdmin
         .from('partidas')
-        .select('id, name, start_time')
+        .select('*')
         .eq('status', 'open')
-        .eq('is_auto_calling', true)
         .lte('start_time', nowIso);
 
-      for (const m of toStart || []) {
+      for (const m of overdue || []) {
         const { count } = await supabaseAdmin
           .from('cartelas_partida')
           .select('*', { count: 'exact', head: true })
           .eq('match_id', m.id);
 
-        if ((count || 0) === 0) {
-          // Se não tem ninguém, espera mais 2 minutos antes de deletar (margem de segurança)
-          const gracePeriod = new Date(new Date(m.start_time).getTime() + 120000).toISOString();
-          if (nowIso > gracePeriod) {
+        const playersCount = count || 0;
+
+        if (playersCount === 0) {
+          // CARÊNCIA: Só deleta se já passou mais de 1 minuto do horário de início e continua vazia
+          const startTime = new Date(m.start_time).getTime();
+          const oneMinutePast = startTime + 60000;
+          
+          if (Date.now() > oneMinutePast) {
+            console.log(`[auto-call-engine] Removendo partida vazia após carência: ${m.name}`);
             await supabaseAdmin.from('partidas').delete().eq('id', m.id);
-            console.log(`[auto-call-engine] Partida vazia deletada: ${m.name}`);
           }
           continue;
         }
 
+        // SE TEM JOGADORES: INICIA IMEDIATAMENTE
         const { data: cfg } = await supabaseAdmin.from('configuracoes').select('intervalo_sorteio_auto_seg').single();
-        const next = new Date(Date.now() + (Number(cfg?.intervalo_sorteio_auto_seg || 120) * 1000)).toISOString();
+        const interval = Number(cfg?.intervalo_sorteio_auto_seg || 10);
+        const nextCall = new Date(Date.now() + (interval * 1000)).toISOString();
 
+        console.log(`[auto-call-engine] Iniciando partida com ${playersCount} jogadores: ${m.name}`);
         await supabaseAdmin.from('partidas').update({ 
           status: 'in_progress', 
-          next_auto_call_timestamp: next 
+          next_auto_call_timestamp: nextCall 
         }).eq('id', m.id);
-        
-        console.log(`[auto-call-engine] Partida iniciada: ${m.name}`);
       }
 
-      // 2. AUTO-CALL: Partidas em andamento que precisam de novo número
+      // 2. SORTEIO AUTOMÁTICO
       const { data: toCall } = await supabaseAdmin
         .from('partidas')
-        .select('id, name')
+        .select('id')
         .eq('status', 'in_progress')
         .eq('is_auto_calling', true)
         .lte('next_auto_call_timestamp', nowIso);
 
       for (const m of toCall || []) {
-        console.log(`[auto-call-engine] Solicitando número para: ${m.name}`);
-        // Chamada interna para a função de sorteio
         fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/call-number`, {
           method: 'POST',
           headers: { 
@@ -76,16 +77,37 @@ serve(async (req) => {
             'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`
           },
           body: JSON.stringify({ matchId: m.id })
-        }).catch(e => console.error(`[auto-call-engine] Erro ao chamar call-number para ${m.name}:`, e.message));
+        }).catch(() => {});
       }
 
-      await sleep(1000); // Verifica a cada segundo
+      // 3. GARANTIA DE PARTIDA NO LOBBY
+      const { count: openCount } = await supabaseAdmin
+        .from('partidas')
+        .select('*', { count: 'exact', head: true })
+        .in('status', ['open', 'waiting']);
+
+      if ((openCount || 0) === 0) {
+        const { data: settings } = await supabaseAdmin.from('configuracoes').select('*').single();
+        if (settings?.auto_engine_enabled) {
+            const nextStart = new Date(Date.now() + 30000).toISOString(); // Cria uma para daqui a 30 segundos
+            await supabaseAdmin.from('partidas').insert([{
+              name: "Bingo Automático #1",
+              game_type: settings.auto_engine_game_type || "full",
+              card_price: settings.auto_engine_card_price || 10,
+              min_players: 1,
+              prize: { type: settings.auto_engine_prize_type || "percentage", value: settings.auto_engine_prize_value || 95 },
+              start_time: nextStart,
+              status: 'open',
+              is_auto_calling: true
+            }]);
+        }
+      }
+
+      await sleep(1000);
     }
 
     return new Response(JSON.stringify({ success: true }), { headers: corsHeaders });
-
   } catch (error: any) {
-    console.error("[auto-call-engine] Erro:", error.message);
     return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: corsHeaders });
   }
 })

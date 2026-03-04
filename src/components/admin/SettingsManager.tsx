@@ -84,9 +84,10 @@ const SettingsManager = () => {
 
   const schedulePreview = useMemo(() => {
     const times = [];
+    const intervalMins = Math.max(1, Number(currentSettings.auto_engine_interval_mins));
     let checkTime = startOfDay(new Date()).getTime() + (Number(currentSettings.auto_engine_start_hour) * 3600000);
     const limit = checkTime + (24 * 3600000);
-    const interval = Number(currentSettings.auto_engine_interval_mins) * 60000;
+    const interval = intervalMins * 60000;
 
     while (checkTime < limit && times.length < Number(currentSettings.auto_engine_matches_per_day)) {
       times.push(new Date(checkTime));
@@ -107,7 +108,7 @@ const SettingsManager = () => {
     const success = await updateGameSettings({ 
         ...currentSettings, 
         [name]: checked,
-        auto_engine_interval_mins: Number(currentSettings.auto_engine_interval_mins),
+        auto_engine_interval_mins: Math.max(1, Number(currentSettings.auto_engine_interval_mins)),
         auto_engine_matches_per_day: Number(currentSettings.auto_engine_matches_per_day),
         auto_engine_card_price: Number(currentSettings.auto_engine_card_price),
         auto_engine_prize_value: Number(currentSettings.auto_engine_prize_value),
@@ -118,10 +119,7 @@ const SettingsManager = () => {
     if (success && name === 'auto_engine_enabled' && checked) {
         toast.info("Motor ativado! Tentando criar a primeira partida...");
         try {
-            const { data } = await supabase.functions.invoke('auto-match-engine', { body: { force: true } });
-            if (data?.success) {
-                toast.success(`Partida criada: ${data.match.name}`);
-            }
+            await supabase.functions.invoke('auto-match-engine', { body: { force: true } });
         } catch (e) {}
     }
   };
@@ -131,6 +129,11 @@ const SettingsManager = () => {
   };
 
   const handleSaveSettings = async () => {
+    if (Number(currentSettings.auto_engine_interval_mins) < 1) {
+        toast.error("O intervalo do motor deve ser de pelo menos 1 minuto.");
+        return;
+    }
+
     setIsSaving(true);
     const success = await updateGameSettings({
       ...currentSettings,
@@ -141,8 +144,8 @@ const SettingsManager = () => {
       valor_por_credito: Number(currentSettings.valor_por_credito),
       auto_engine_interval_mins: parseInt(currentSettings.auto_engine_interval_mins as any, 10),
       auto_engine_matches_per_day: parseInt(currentSettings.auto_engine_matches_per_day as any, 10),
-      auto_engine_card_price: Number(currentSettings.auto_engine_card_price), // Usando Number em vez de parseInt
-      auto_engine_prize_value: Number(currentSettings.auto_engine_prize_value), // Usando Number em vez de parseInt
+      auto_engine_card_price: Number(currentSettings.auto_engine_card_price),
+      auto_engine_prize_value: Number(currentSettings.auto_engine_prize_value),
       auto_engine_start_hour: parseInt(currentSettings.auto_engine_start_hour as any, 10),
       desconto_vendedor_global: Number(currentSettings.desconto_vendedor_global),
       comissao_vendedor_global: Number(currentSettings.comissao_vendedor_global),
@@ -152,9 +155,7 @@ const SettingsManager = () => {
     if (success) {
         setJustSaved(true);
         toast.success("Configurações salvas com sucesso!");
-        setTimeout(() => {
-          setJustSaved(false);
-        }, 2000);
+        setTimeout(() => setJustSaved(false), 2000);
     }
   };
 
@@ -244,7 +245,7 @@ const SettingsManager = () => {
               </div>
               <div>
                 <Label>Intervalo (min)</Label>
-                <Input name="auto_engine_interval_mins" type="number" value={currentSettings.auto_engine_interval_mins} onChange={handleSettingsChange} />
+                <Input name="auto_engine_interval_mins" type="number" min="1" value={currentSettings.auto_engine_interval_mins} onChange={handleSettingsChange} />
               </div>
             </div>
 
@@ -308,7 +309,6 @@ const SettingsManager = () => {
                         </div>
                     ))}
                 </div>
-                <p className="text-[9px] text-muted-foreground mt-2 italic">* As partidas serão criadas nestes horários cravados.</p>
             </div>
 
             {currentSettings.auto_engine_enabled && (
@@ -343,17 +343,14 @@ const SettingsManager = () => {
 
         <div className="space-y-6">
           <h3 className="font-heading font-bold text-primary border-b pb-2">Rifas — Vendedores (Padrão)</h3>
-          <p className="text-xs text-muted-foreground -mt-4">Valores usados quando o vendedor não tem configuração específica na rifa.</p>
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label>Desconto Global (%)</Label>
               <Input name="desconto_vendedor_global" type="number" step="0.1" min="0" max="100" value={currentSettings.desconto_vendedor_global} onChange={handleSettingsChange} />
-              <p className="text-[10px] text-muted-foreground mt-1">Desconto aplicado ao preço para vendedores sem configuração própria.</p>
             </div>
             <div>
               <Label>Comissão Global (%)</Label>
               <Input name="comissao_vendedor_global" type="number" step="0.1" min="0" max="100" value={currentSettings.comissao_vendedor_global} onChange={handleSettingsChange} />
-              <p className="text-[10px] text-muted-foreground mt-1">Percentual de comissão creditado ao vendedor por venda validada.</p>
             </div>
           </div>
         </div>
@@ -366,9 +363,6 @@ const SettingsManager = () => {
               <p className="text-2xl font-bold font-heading text-success">
                 {Number(gameSettings?.admin_profit || 0).toFixed(2)} créditos
               </p>
-              <p className="text-sm font-medium text-muted-foreground">
-                (R$ {adminProfitInReais.toFixed(2).replace('.', ',')})
-              </p>
             </div>
             <Dialog open={isWithdrawDialogOpen} onOpenChange={setIsWithdrawDialogOpen}>
               <DialogTrigger asChild>
@@ -380,15 +374,8 @@ const SettingsManager = () => {
               <DialogContent>
                 <DialogHeader>
                   <DialogTitle>Retirar Lucro do Caixa</DialogTitle>
-                  <DialogDescription>
-                    Insira a quantidade de créditos que deseja retirar. Este valor será subtraído do lucro total acumulado.
-                  </DialogDescription>
                 </DialogHeader>
                 <div className="py-4 space-y-4">
-                  <div className="p-3 bg-muted rounded-lg">
-                    <p className="text-xs text-muted-foreground">Lucro disponível</p>
-                    <p className="text-lg font-bold">{Number(gameSettings?.admin_profit || 0).toFixed(2)} créditos</p>
-                  </div>
                   <div>
                     <Label htmlFor="withdraw-amount">Créditos a Retirar</Label>
                     <Input
@@ -398,7 +385,6 @@ const SettingsManager = () => {
                       value={withdrawAmount || ''}
                       onChange={(e) => setWithdrawAmount(Number(e.target.value) || 0)}
                       max={gameSettings?.admin_profit || 0}
-                      placeholder="Ex: 100.50"
                     />
                   </div>
                 </div>
@@ -417,22 +403,8 @@ const SettingsManager = () => {
 
       <div className="mt-10 flex justify-end">
         <Button onClick={handleSaveSettings} className="gradient-primary" disabled={isSaving || justSaved}>
-          {isSaving ? (
-            <>
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              Salvando...
-            </>
-          ) : justSaved ? (
-            <span className="flex items-center animate-saved">
-              <Check className="w-4 h-4 mr-2" />
-              Salvo!
-            </span>
-          ) : (
-            <>
-              <Save className="w-4 h-4 mr-2" />
-              Salvar Alterações
-            </>
-          )}
+          {isSaving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : justSaved ? <Check className="w-4 h-4 mr-2" /> : <Save className="w-4 h-4 mr-2" />}
+          {isSaving ? 'Salvando...' : justSaved ? 'Salvo!' : 'Salvar Alterações'}
         </Button>
       </div>
     </div>
