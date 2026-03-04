@@ -98,11 +98,10 @@ serve(async (req) => {
     }
     await supabaseAdmin.rpc('mark_number_for_match_cards', { p_match_id: matchId, p_num: num });
 
-    // 5. Verificar vencedores
+    // 5. Verificar vencedores (recarregando os dados para garantir consistência)
     const { data: matchCards } = await supabaseAdmin.from('cartelas_partida').select('*').eq('match_id', matchId);
     const { data: allProfiles } = await supabaseAdmin.from('perfis').select('id, full_name');
     
-    const allCalledNumbers = new Set([...calledArray, num]);
     const existingWinnerCardIds = new Set((match.winners || []).map((w: any) => w.cardId));
     const newWinnersFound: any[] = [];
 
@@ -114,7 +113,7 @@ serve(async (req) => {
         id: card.id,
         name: card.name,
         numbers: grid,
-        markedNumbers: new Set(grid.flat().filter(n => allCalledNumbers.has(n)))
+        markedNumbers: new Set(card.marked_numbers as number[] || [])
       };
 
       const winResult = checkWin(tempCard, match.game_type);
@@ -137,7 +136,6 @@ serve(async (req) => {
     if (newWinnersFound.length > 0) {
       const realWinners = newWinnersFound.filter(w => w.creditType === 'real');
       
-      // Registrar vitórias no histórico
       for (const w of newWinnersFound) {
         await supabaseAdmin.rpc('record_winner', {
           p_match_id: matchId,
@@ -149,7 +147,6 @@ serve(async (req) => {
       }
 
       if (realWinners.length > 0) {
-        // Vencedor REAL: Encerrar partida e pagar
         const prizeValue = match.prize.type === 'fixed' 
           ? Number(match.prize.value || 0) 
           : (Number(match.pot) * Number(match.prize.value || 0)) / 100;
@@ -173,7 +170,6 @@ serve(async (req) => {
           admin_profit_from_match: adminProfit
         };
       } else {
-        // Apenas vencedores de BRINCAR: Continuar se houver cartelas reais restantes
         const hasRemainingReal = (matchCards || []).some(c => c.credit_type === 'real' && !updatedWinners.some(w => w.cardId === c.id));
         
         if (hasRemainingReal) {
@@ -184,12 +180,10 @@ serve(async (req) => {
             matchUpdate.next_auto_call_timestamp = next;
           }
         } else {
-          // Sem cartelas reais na partida: Encerrar
           matchUpdate = { status: 'finished', winners: updatedWinners, is_auto_calling: false, next_auto_call_timestamp: null };
         }
       }
     } else if (match.is_auto_calling) {
-      // Nenhum vencedor: Agendar próximo número
       const { data: cfg } = await supabaseAdmin.from('configuracoes').select('intervalo_sorteio_auto_seg').single();
       const next = new Date(Date.now() + (Number(cfg?.intervalo_sorteio_auto_seg || 120) * 1000)).toISOString();
       matchUpdate.next_auto_call_timestamp = next;
