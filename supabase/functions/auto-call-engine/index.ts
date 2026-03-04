@@ -47,11 +47,9 @@ serve(async (req) => {
         }
 
         if ((count || 0) === 0) {
-          // Ação: Deletar partida vazia e atrasada IMEDIATAMENTE
           console.log(`[auto-call-engine] Deletando partida vazia e atrasada: ${match.name} (ID: ${match.id})`);
           await supabaseAdmin.from('partidas').delete().eq('id', match.id);
         } else {
-          // Ação: Iniciar partida com jogadores
           console.log(`[auto-call-engine] Iniciando partida com ${count} jogadores: ${match.name}`);
           const { data: cfg } = await supabaseAdmin.from('configuracoes').select('intervalo_sorteio_auto_seg').single();
           const nextCall = new Date(Date.now() + (Number(cfg?.intervalo_sorteio_auto_seg || 10) * 1000)).toISOString();
@@ -77,10 +75,53 @@ serve(async (req) => {
       }
 
       for (const match of toCall || []) {
-        // Invoca a função de sorteio de forma assíncrona
         supabaseAdmin.functions.invoke('call-number', { 
           body: { matchId: match.id }
         }).catch(err => console.error(`[auto-call-engine] Erro ao invocar call-number para ${match.id}:`, err.message));
+      }
+
+      // --- 3. GARANTIR QUE O LOBBY NUNCA FIQUE VAZIO ---
+      const { count: openOrWaitingCount } = await supabaseAdmin
+        .from('partidas')
+        .select('*', { count: 'exact', head: true })
+        .in('status', ['open', 'waiting']);
+
+      if ((openOrWaitingCount || 0) === 0) {
+        const { data: settings } = await supabaseAdmin.from('configuracoes').select('*').single();
+        
+        if (settings?.auto_engine_enabled) {
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            
+            const { data: todayMatches } = await supabaseAdmin.from('partidas').select('name').gte('created_at', today.toISOString());
+            
+            let nextNumber = 1;
+            if (todayMatches && todayMatches.length > 0) {
+              const numbers = todayMatches.map(m => {
+                  const match = m.name.match(/#(\d+)/);
+                  return match ? parseInt(match[1], 10) : 0;
+                }).filter(n => n > 0);
+              if (numbers.length > 0) nextNumber = Math.max(...numbers) + 1;
+              else nextNumber = todayMatches.length + 1;
+            }
+
+            if (nextNumber <= settings.auto_engine_matches_per_day) {
+                const nextStart = new Date(Date.now() + 30000).toISOString(); // Próxima em 30 segundos
+                const newMatch = {
+                  name: `Bingo Automático #${nextNumber}`,
+                  game_type: settings.auto_engine_game_type,
+                  max_cards_per_player: 3,
+                  card_price: settings.auto_engine_card_price,
+                  prize: { type: settings.auto_engine_prize_type, value: settings.auto_engine_prize_value },
+                  start_time: nextStart,
+                  status: 'open',
+                  is_auto_calling: true,
+                  min_players: 1
+                };
+                await supabaseAdmin.from('partidas').insert([newMatch]);
+                console.log(`[auto-call-engine] Garantia: Criada nova partida ${newMatch.name}`);
+            }
+        }
       }
 
       await sleep(1000); // Verifica a cada segundo
