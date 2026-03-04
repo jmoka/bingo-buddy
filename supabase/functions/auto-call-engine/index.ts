@@ -29,7 +29,7 @@ serve(async (req) => {
         .select('*')
         .eq('status', 'open')
         .lte('start_time', nowIso)
-        .like('name', 'Bingo Automático%'); // <-- CORREÇÃO CRÍTICA: SÓ OLHA PARTIDAS AUTOMÁTICAS
+        .like('name', 'Bingo Automático%'); // <-- SÓ OLHA PARTIDAS AUTOMÁTICAS
 
       if (overdueError) {
         console.error("[auto-call-engine] Erro ao buscar partidas atrasadas:", overdueError.message);
@@ -48,7 +48,6 @@ serve(async (req) => {
         }
 
         if ((count || 0) === 0) {
-          // Agora é seguro deletar, pois só estamos olhando partidas automáticas
           console.log(`[auto-call-engine] Deletando partida automática vazia e atrasada: ${match.name} (ID: ${match.id})`);
           await supabaseAdmin.from('partidas').delete().eq('id', match.id);
         } else {
@@ -82,13 +81,14 @@ serve(async (req) => {
         }).catch(err => console.error(`[auto-call-engine] Erro ao invocar call-number para ${match.id}:`, err.message));
       }
 
-      // --- 3. GARANTIR QUE O LOBBY NUNCA FIQUE VAZIO ---
-      const { count: openOrWaitingCount } = await supabaseAdmin
+      // --- 3. GARANTIR QUE O LOBBY NUNCA FIQUE VAZIO (DE PARTIDAS AUTOMÁTICAS) ---
+      const { count: openOrWaitingAutoCount } = await supabaseAdmin
         .from('partidas')
         .select('*', { count: 'exact', head: true })
-        .in('status', ['open', 'waiting']);
+        .in('status', ['open', 'waiting'])
+        .like('name', 'Bingo Automático%'); // <-- CORREÇÃO CRÍTICA AQUI
 
-      if ((openOrWaitingCount || 0) === 0) {
+      if ((openOrWaitingAutoCount || 0) === 0) {
         const { data: settings } = await supabaseAdmin.from('configuracoes').select('*').single();
         
         if (settings?.auto_engine_enabled) {
