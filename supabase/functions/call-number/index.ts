@@ -98,10 +98,11 @@ serve(async (req) => {
     }
     await supabaseAdmin.rpc('mark_number_for_match_cards', { p_match_id: matchId, p_num: num });
 
-    // 5. Verificar vencedores (recarregando os dados para garantir consistência)
+    // 5. Verificar vencedores usando a fonte da verdade (called_numbers da partida)
     const { data: matchCards } = await supabaseAdmin.from('cartelas_partida').select('*').eq('match_id', matchId);
     const { data: allProfiles } = await supabaseAdmin.from('perfis').select('id, full_name');
     
+    const allCalledNumbers = new Set(appendResult.called_numbers as number[]);
     const existingWinnerCardIds = new Set((match.winners || []).map((w: any) => w.cardId));
     const newWinnersFound: any[] = [];
 
@@ -113,7 +114,7 @@ serve(async (req) => {
         id: card.id,
         name: card.name,
         numbers: grid,
-        markedNumbers: new Set(card.marked_numbers as number[] || [])
+        markedNumbers: new Set(grid.flat().filter(n => allCalledNumbers.has(n)))
       };
 
       const winResult = checkWin(tempCard, match.game_type);
