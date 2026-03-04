@@ -1,8 +1,8 @@
-import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
+import React, { createContext, useContext, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './AuthContext';
-import { Win, GameSettings } from '@/types/match';
+import { Win } from '@/types/match';
 import { useGameSettings } from '@/hooks/useGameSettings';
 import { useMatches } from '@/hooks/useMatches';
 import { usePlayerCards } from '@/hooks/usePlayerCards';
@@ -10,7 +10,6 @@ import { useCreditRequests } from '@/hooks/useCreditRequests';
 import { useRedeemRequests } from '@/hooks/useRedeemRequests';
 import { useAdminData } from '@/hooks/useAdminData';
 
-// Combine all return types from hooks into one giant context type
 type GameContextType = 
   ReturnType<typeof useGameSettings> &
   ReturnType<typeof useMatches> &
@@ -26,12 +25,8 @@ type GameContextType =
 const GameContext = createContext<GameContextType | null>(null);
 
 export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user, profile } = useAuth();
+  const { user } = useAuth();
   const queryClient = useQueryClient();
-  const [now, setNow] = useState(Date.now());
-  const processingRef = useRef(new Set<string>());
-  const lastProcessedTimestampRef = useRef(new Map<string, string>());
-  const lastHeartbeatRef = useRef(0);
 
   const gameSettingsHook = useGameSettings();
   const matchesHook = useMatches();
@@ -51,81 +46,16 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     enabled: !!user,
   });
 
-  // Timer for countdowns and auto-actions
-  useEffect(() => {
-    const timer = setInterval(() => setNow(Date.now()), 500);
-    return () => clearInterval(timer);
-  }, []);
-
-  // Effect for auto-starting and auto-calling (apenas admin executa o motor)
-  useEffect(() => {
-    if (profile?.role !== 'admin') return;
-
-    // Heartbeat: Verifica se precisa criar uma nova partida a cada 30 segundos
-    if (
-      gameSettingsHook.gameSettings?.auto_engine_enabled && 
-      now - lastHeartbeatRef.current > 30000
-    ) {
-      lastHeartbeatRef.current = now;
-      const hasOpenMatch = matchesHook.matches.some(m => m.status === 'open');
-      if (!hasOpenMatch) {
-        if (import.meta.env.DEV) console.log("[Bingo] Heartbeat: Nenhuma partida aberta encontrada. Chamando motor...");
-        supabase.functions.invoke('auto-match-engine');
-      }
-    }
-
-    matchesHook.matches.forEach(match => {
-      // Auto-start logic
-      const processingKeyStart = `start_${match.id}`;
-      const startTime = new Date(match.start_time).getTime();
-      
-      if (
-        match.is_auto_calling &&
-        match.status === 'open' &&
-        now >= startTime &&
-        !processingRef.current.has(processingKeyStart)
-      ) {
-        processingRef.current.add(processingKeyStart);
-        if (import.meta.env.DEV) console.log(`[Bingo] Iniciando partida automática: ${match.name}`);
-        
-        matchesHook.startMatch(match.id, true).finally(() => {
-           // Limpa a trava após 3 segundos para permitir novas ações se necessário
-           setTimeout(() => processingRef.current.delete(processingKeyStart), 3000);
-        });
-      }
-
-      // Auto-call logic (Proteção contra chamadas extras)
-      const processingKeyCall = `call_${match.id}`;
-      const nextTimestamp = match.next_auto_call_timestamp;
-      
-      if (
-        match.is_auto_calling &&
-        match.status === 'in_progress' && 
-        nextTimestamp &&
-        now >= new Date(nextTimestamp).getTime() &&
-        !processingRef.current.has(processingKeyCall) &&
-        lastProcessedTimestampRef.current.get(match.id) !== nextTimestamp
-      ) {
-        lastProcessedTimestampRef.current.set(match.id, nextTimestamp);
-        processingRef.current.add(processingKeyCall);
-        
-        if (import.meta.env.DEV) console.log(`[Bingo] Chamando número automático para: ${match.name}`);
-        
-        matchesHook.callNumber(match.id).finally(() => {
-          setTimeout(() => processingRef.current.delete(processingKeyCall), 2000);
-        });
-      }
-    });
-  }, [now, matchesHook.matches, gameSettingsHook.gameSettings, profile]);
-
   useEffect(() => {
     const channel = supabase
       .channel('db-changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'partidas' }, () => {
         queryClient.invalidateQueries({ queryKey: ['matches'] });
+        queryClient.refetchQueries({ queryKey: ['matches'] });
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'cartelas_partida' }, () => {
         queryClient.invalidateQueries({ queryKey: ['matchCards'] });
+        queryClient.refetchQueries({ queryKey: ['matchCards'] });
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'perfis' }, () => {
         queryClient.invalidateQueries({ queryKey: ['profile'] });

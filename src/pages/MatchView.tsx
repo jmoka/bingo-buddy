@@ -12,14 +12,33 @@ import { WinnerDisplay } from '@/components/WinnerDisplay';
 import { useAuth } from '@/contexts/AuthContext';
 import { MatchStats } from '@/components/MatchStats';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { supabase } from '@/integrations/supabase/client';
+import { useQueryClient } from '@tanstack/react-query';
 
 const MatchView = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { profile } = useAuth();
   const { matches, getPlayerMatchCards, matchCards, isLoading } = useGame();
+  const queryClient = useQueryClient();
   const [lastCalledNumber, setLastCalledNumber] = useState<number | null>(null);
   const [now, setNow] = useState(Date.now());
+
+  useEffect(() => {
+    if (!id) return;
+    const channel = supabase
+      .channel(`match-view-${id}`)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'partidas', filter: `id=eq.${id}` }, () => {
+        queryClient.invalidateQueries({ queryKey: ['matches'] });
+        queryClient.refetchQueries({ queryKey: ['matches'] });
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'cartelas_partida', filter: `match_id=eq.${id}` }, () => {
+        queryClient.invalidateQueries({ queryKey: ['matchCards'] });
+        queryClient.refetchQueries({ queryKey: ['matchCards'] });
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [id, queryClient]);
 
   const match = matches.find(m => m.id === id);
   const myCards = profile && id ? getPlayerMatchCards(id, profile.id) : [];

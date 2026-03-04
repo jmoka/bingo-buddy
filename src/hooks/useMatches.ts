@@ -42,11 +42,20 @@ export const useMatches = () => {
   const { data: matches = [], isLoading: isLoadingMatches } = useQuery({
     queryKey: ['matches'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('partidas').select('*').order('start_time', { ascending: false });
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const { data, error } = await supabase
+        .from('partidas')
+        .select('*')
+        .order('start_time', { ascending: false });
       if (error) throw error;
-      return data as Match[];
+      return (data as Match[]).filter(m =>
+        m.status !== 'finished' || new Date(m.created_at) >= today
+      );
     },
-    refetchInterval: 1500,
+    refetchInterval: 800,
+    staleTime: 0,
+    gcTime: 0,
   });
 
   const { data: matchCards = [], isLoading: isLoadingCards } = useQuery({
@@ -162,11 +171,13 @@ export const useMatches = () => {
     updateMatchMutation.mutate({ matchId, updates });
   };
 
-  const callNumber = async (matchId: string) => {
+  const callNumber = async (matchId: string, specificNumber?: number) => {
     try {
-      const { error } = await supabase.functions.invoke('call-number', { body: { matchId } });
+      const body: { matchId: string; specificNumber?: number } = { matchId };
+      if (specificNumber) body.specificNumber = specificNumber;
+      const { error } = await supabase.functions.invoke('call-number', { body });
       if (error) throw error;
-      await new Promise(resolve => setTimeout(resolve, 300));
+      await new Promise(resolve => setTimeout(resolve, 200));
       await queryClient.invalidateQueries({ queryKey: ['matches'] });
       await queryClient.invalidateQueries({ queryKey: ['matchCards'] });
     } catch (error) {
