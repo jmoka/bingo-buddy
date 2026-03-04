@@ -10,7 +10,7 @@ import { Match, MatchStatus, PlayerCard } from '@/types/match';
 import { gameTypeLabels } from '@/utils/bingoUtils';
 import { 
   Coins, Plus, Trophy, Users, Settings, 
-  Timer, DoorOpen, Ticket, Zap, ZapOff, Tv, Archive, Trash2, RotateCcw, Star, Loader2, History, LogOut, TrendingUp, Target, Flame, Bot, CalendarDays, Clock, Crown, ChevronDown, ChevronUp
+  Timer, DoorOpen, Ticket, Zap, ZapOff, Tv, Archive, Trash2, RotateCcw, Star, Loader2, CalendarDays, Clock, Crown, ChevronDown, ChevronUp
 } from 'lucide-react';
 import PlayerAvatar from '@/components/PlayerAvatar';
 import { 
@@ -59,7 +59,10 @@ const Lobby = () => {
   const [isJoining, setIsJoining] = useState(false);
   const [rechargingCardId, setRechargingCardId] = useState<string | null>(null);
   const [isAgendaOpen, setIsAgendaOpen] = useState(true);
+  
+  // Estado para controlar a expansão da lista de participantes por partida
   const [expandedParticipants, setExpandedParticipants] = useState<Set<string>>(new Set());
+  
   const toggleParticipants = (matchId: string) => {
     setExpandedParticipants(prev => {
       const next = new Set(prev);
@@ -302,19 +305,19 @@ const Lobby = () => {
                   </div>
                 </div>
                 
-                {/* Lista Visual de Participantes Elegante */}
+                {/* Lista de Participantes Recolhível */}
                 {match.status !== 'finished' && allCardsInMatch.length > 0 && (
-                  <div className="mt-3 pt-3 border-t">
+                  <div className="mt-3 pt-3 border-t border-border/50">
                     <button
                       onClick={() => toggleParticipants(match.id)}
-                      className="flex items-center gap-2 w-full py-1.5 text-[11px] font-bold uppercase text-muted-foreground hover:text-primary active:opacity-70 transition-colors"
+                      className="flex items-center gap-2 w-full py-1.5 text-[11px] font-bold uppercase text-muted-foreground hover:text-primary transition-colors"
                     >
                       <Users className="w-3.5 h-3.5 shrink-0" />
                       <span>Ver participantes ({playersInMatchCount})</span>
                       {expandedParticipants.has(match.id) ? <ChevronUp className="w-3.5 h-3.5 ml-auto shrink-0" /> : <ChevronDown className="w-3.5 h-3.5 ml-auto shrink-0" />}
                     </button>
                     {expandedParticipants.has(match.id) && (
-                      <div className="flex flex-wrap gap-2 mt-3 p-3 bg-muted/40 rounded-xl border border-border/50">
+                      <div className="flex flex-wrap gap-2 mt-3 p-3 bg-muted/40 rounded-xl border border-border/50 animate-in fade-in slide-in-from-top-2">
                         {Array.from(new Set(allCardsInMatch.map(mc => mc.player_id))).map(pid => {
                           const p = participantProfiles.find((pr: any) => pr.id === pid);
                           const pCards = allCardsInMatch.filter(mc => mc.player_id === pid);
