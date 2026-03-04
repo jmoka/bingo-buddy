@@ -17,97 +17,79 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    const loopEnd = Date.now() + 55000;
-    while (Date.now() < loopEnd) {
-      const now = new Date();
-      const nowIso = now.toISOString();
+    const loopEnd = Date.now() + 55000; // Run for 55 seconds
+    console.log("[auto-call-engine] Iniciando ciclo de processamento de partidas...");
 
-      // 1. BUSCAR PARTIDAS QUE JÁ DEVERIAM TER COMEÇADO
-      const { data: overdue } = await supabaseAdmin
+    while (Date.now() < loopEnd) {
+      const nowIso = new Date().toISOString();
+
+      // --- 1. PROCESSAR PARTIDAS ABERTAS E ATRASADAS ---
+      const { data: overdueMatches, error: overdueError } = await supabaseAdmin
         .from('partidas')
         .select('*')
         .eq('status', 'open')
         .lte('start_time', nowIso);
 
-      for (const m of overdue || []) {
-        const { count } = await supabaseAdmin
+      if (overdueError) {
+        console.error("[auto-call-engine] Erro ao buscar partidas atrasadas:", overdueError.message);
+        continue;
+      }
+
+      for (const match of overdueMatches || []) {
+        const { count, error: countError } = await supabaseAdmin
           .from('cartelas_partida')
           .select('*', { count: 'exact', head: true })
-          .eq('match_id', m.id);
+          .eq('match_id', match.id);
 
-        const playersCount = count || 0;
-
-        if (playersCount === 0) {
-          // CARÊNCIA: Só deleta se já passou mais de 1 minuto do horário de início e continua vazia
-          const startTime = new Date(m.start_time).getTime();
-          const oneMinutePast = startTime + 60000;
-          
-          if (Date.now() > oneMinutePast) {
-            console.log(`[auto-call-engine] Removendo partida vazia após carência: ${m.name}`);
-            await supabaseAdmin.from('partidas').delete().eq('id', m.id);
-          }
+        if (countError) {
+          console.error(`[auto-call-engine] Erro ao contar jogadores para partida ${match.id}:`, countError.message);
           continue;
         }
 
-        // SE TEM JOGADORES: INICIA IMEDIATAMENTE
-        const { data: cfg } = await supabaseAdmin.from('configuracoes').select('intervalo_sorteio_auto_seg').single();
-        const interval = Number(cfg?.intervalo_sorteio_auto_seg || 10);
-        const nextCall = new Date(Date.now() + (interval * 1000)).toISOString();
-
-        console.log(`[auto-call-engine] Iniciando partida com ${playersCount} jogadores: ${m.name}`);
-        await supabaseAdmin.from('partidas').update({ 
-          status: 'in_progress', 
-          next_auto_call_timestamp: nextCall 
-        }).eq('id', m.id);
+        if ((count || 0) === 0) {
+          // Ação: Deletar partida vazia e atrasada IMEDIATAMENTE
+          console.log(`[auto-call-engine] Deletando partida vazia e atrasada: ${match.name} (ID: ${match.id})`);
+          await supabaseAdmin.from('partidas').delete().eq('id', match.id);
+        } else {
+          // Ação: Iniciar partida com jogadores
+          console.log(`[auto-call-engine] Iniciando partida com ${count} jogadores: ${match.name}`);
+          const { data: cfg } = await supabaseAdmin.from('configuracoes').select('intervalo_sorteio_auto_seg').single();
+          const nextCall = new Date(Date.now() + (Number(cfg?.intervalo_sorteio_auto_seg || 10) * 1000)).toISOString();
+          
+          await supabaseAdmin.from('partidas').update({ 
+            status: 'in_progress', 
+            next_auto_call_timestamp: nextCall 
+          }).eq('id', match.id);
+        }
       }
 
-      // 2. SORTEIO AUTOMÁTICO
-      const { data: toCall } = await supabaseAdmin
+      // --- 2. PROCESSAR SORTEIOS DE NÚMEROS ---
+      const { data: toCall, error: toCallError } = await supabaseAdmin
         .from('partidas')
         .select('id')
         .eq('status', 'in_progress')
         .eq('is_auto_calling', true)
         .lte('next_auto_call_timestamp', nowIso);
-
-      for (const m of toCall || []) {
-        fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/call-number`, {
-          method: 'POST',
-          headers: { 
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`
-          },
-          body: JSON.stringify({ matchId: m.id })
-        }).catch(() => {});
+      
+      if (toCallError) {
+        console.error("[auto-call-engine] Erro ao buscar partidas para sorteio:", toCallError.message);
+        continue;
       }
 
-      // 3. GARANTIA DE PARTIDA NO LOBBY
-      const { count: openCount } = await supabaseAdmin
-        .from('partidas')
-        .select('*', { count: 'exact', head: true })
-        .in('status', ['open', 'waiting']);
-
-      if ((openCount || 0) === 0) {
-        const { data: settings } = await supabaseAdmin.from('configuracoes').select('*').single();
-        if (settings?.auto_engine_enabled) {
-            const nextStart = new Date(Date.now() + 30000).toISOString(); // Cria uma para daqui a 30 segundos
-            await supabaseAdmin.from('partidas').insert([{
-              name: "Bingo Automático #1",
-              game_type: settings.auto_engine_game_type || "full",
-              card_price: settings.auto_engine_card_price || 10,
-              min_players: 1,
-              prize: { type: settings.auto_engine_prize_type || "percentage", value: settings.auto_engine_prize_value || 95 },
-              start_time: nextStart,
-              status: 'open',
-              is_auto_calling: true
-            }]);
-        }
+      for (const match of toCall || []) {
+        // Invoca a função de sorteio de forma assíncrona
+        supabaseAdmin.functions.invoke('call-number', { 
+          body: { matchId: match.id }
+        }).catch(err => console.error(`[auto-call-engine] Erro ao invocar call-number para ${match.id}:`, err.message));
       }
 
-      await sleep(1000);
+      await sleep(1000); // Verifica a cada segundo
     }
 
-    return new Response(JSON.stringify({ success: true }), { headers: corsHeaders });
+    return new Response(JSON.stringify({ success: true, message: "Ciclo concluído." }), { headers: corsHeaders });
+
   } catch (error: any) {
+    console.error("[auto-call-engine] Erro fatal no ciclo:", error.message);
     return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: corsHeaders });
   }
 })

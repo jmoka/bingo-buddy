@@ -43,7 +43,7 @@ export const useMatches = () => {
       if (error) throw error;
       return (data as Match[]).filter(m => m.status !== 'finished' || new Date(m.created_at) >= today);
     },
-    refetchInterval: 2000, // Aumentado para 2s para evitar sobrecarga, o Realtime cuida do resto
+    refetchInterval: 500,
   });
 
   const { data: matchCards = [], isLoading: isLoadingCards } = useQuery({
@@ -53,7 +53,7 @@ export const useMatches = () => {
       if (error) throw error;
       return data.map(c => ({ ...c, marked_numbers: new Set(c.marked_numbers || []) })) as MatchCard[];
     },
-    refetchInterval: 3000,
+    refetchInterval: 1000,
   });
 
   const createMatch = async (data: any) => {
@@ -80,7 +80,7 @@ export const useMatches = () => {
     const playersInMatch = count || 0;
 
     if (playersInMatch < 1) {
-      toast.error('A partida precisa de jogadores.');
+      toast.error("A partida precisa de jogadores para ser iniciada manualmente.");
       return;
     }
 
