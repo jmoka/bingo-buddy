@@ -98,7 +98,7 @@ export const checkWin = (card: BingoCard, gameType: GameType): WinResult | null 
 
 export const calculateNumbersToWin = (card: MatchCard, gameType: GameType): number => {
   const { numbers, marked_numbers } = card;
-  const tempCard: BingoCard = { id: card.id, name: card.name, numbers, markedNumbers: marked_numbers };
+  const tempCard: BingoCard = { id: card.id, name: card.name, numbers, markedNumbers: new Set(Array.from(marked_numbers).map(Number)) };
   const type = String(gameType).toLowerCase().trim() as GameType;
 
   switch (type) {

@@ -6,14 +6,14 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// ---- bingoUtils inline com correções de tipo ----
+// ---- Lógica de Verificação de Bingo (Garantindo o espaço livre 0) ----
 type GameType = 'horizontal' | 'vertical' | 'diagonal' | 'full';
 interface BingoCard { id: string; name: string; numbers: number[][]; markedNumbers: Set<number>; }
 interface WinResult { cardId: string; cardName: string; type: GameType; winningNumbers: number[]; }
 
 const isCellMarked = (card: BingoCard, row: number, col: number): boolean => {
   const num = Number(card.numbers[row][col]);
-  if (num === 0) return true; // Espaço Livre (Free Space)
+  if (num === 0) return true; // O espaço do meio é 0 e está sempre marcado
   return card.markedNumbers.has(num);
 };
 
@@ -41,7 +41,7 @@ const checkFullCardWin = (card: BingoCard): number[] | null => {
   const all: number[] = [];
   for (let r = 0; r < 5; r++) for (let c = 0; c < 5; c++) {
     if (!isCellMarked(card, r, c)) return null;
-    if (!(r === 2 && c === 2)) all.push(Number(card.numbers[r][c]));
+    if (Number(card.numbers[r][c]) !== 0) all.push(Number(card.numbers[r][c]));
   }
   return all;
 };
@@ -69,14 +69,14 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // 1. Lock para evitar sorteios duplicados simultâneos
+    // 1. Lock
     const { data: gotLock } = await supabaseAdmin.rpc('try_lock_match', { p_match_id: matchId });
     if (!gotLock) return new Response(JSON.stringify({ success: true, message: 'Match busy' }), { headers: corsHeaders });
 
-    // 2. Buscar estado atual da partida
+    // 2. Buscar Partida
     const { data: match, error: matchErr } = await supabaseAdmin.from('partidas').select('*').eq('id', matchId).single();
     if (matchErr || !match) throw new Error("Partida não encontrada");
-    if (match.status === 'finished') return new Response(JSON.stringify({ success: true, message: 'Match already finished' }), { headers: corsHeaders });
+    if (match.status === 'finished') return new Response(JSON.stringify({ success: true, message: 'Match finished' }), { headers: corsHeaders });
 
     // 3. Sortear número
     const calledArray = match.called_numbers || [];
@@ -91,14 +91,14 @@ serve(async (req) => {
       ? specificNumber
       : availableNumbers[Math.floor(Math.random() * availableNumbers.length)];
 
-    // 4. Registrar número e marcar cartelas via RPC (atômico)
+    // 4. Registrar número no banco
     const { data: appendResult } = await supabaseAdmin.rpc('append_called_number', { p_match_id: matchId, p_num: num });
     if (!appendResult || appendResult.already_called) {
        return new Response(JSON.stringify({ success: true, message: 'Number already processed' }), { headers: corsHeaders });
     }
     await supabaseAdmin.rpc('mark_number_for_match_cards', { p_match_id: matchId, p_num: num });
 
-    // 5. Verificar vencedores usando os dados atualizados das cartelas
+    // 5. Analisar Vencedores
     const { data: matchCards } = await supabaseAdmin.from('cartelas_partida').select('*').eq('match_id', matchId);
     const { data: allProfiles } = await supabaseAdmin.from('perfis').select('id, full_name');
     
@@ -113,7 +113,6 @@ serve(async (req) => {
         id: card.id,
         name: card.name,
         numbers: grid,
-        // CORREÇÃO: Usa os números marcados da própria cartela como fonte da verdade
         markedNumbers: new Set(card.marked_numbers as number[])
       };
 
@@ -130,47 +129,47 @@ serve(async (req) => {
       }
     }
 
-    // 6. Processar Resultados
+    // 6. Processar Conclusão
     let matchUpdate: any = {};
     const updatedWinners = [...(match.winners || []), ...newWinnersFound];
 
     if (newWinnersFound.length > 0) {
       const realWinners = newWinnersFound.filter(w => w.creditType === 'real');
       
-      for (const w of newWinnersFound) {
-        await supabaseAdmin.rpc('record_winner', {
-          p_match_id: matchId,
-          p_player_id: w.playerId,
-          p_player_card_id: w.playerCardId,
-          p_match_card_id: w.cardId,
-          p_prize_details: match.prize
-        });
-      }
-
       if (realWinners.length > 0) {
-        const prizeValue = match.prize.type === 'fixed' 
-          ? Number(match.prize.value || 0) 
-          : (Number(match.pot) * Number(match.prize.value || 0)) / 100;
-        
-        const prizePerWinner = prizeValue / realWinners.length;
-        const adminProfit = Number(match.pot) - prizeValue;
-
-        if (adminProfit > 0) await supabaseAdmin.rpc('increment_admin_profit', { amount: adminProfit });
-
-        for (const rw of realWinners) {
-          if (prizePerWinner > 0) {
-            await supabaseAdmin.rpc('increment_player_credits', { p_player_id: rw.playerId, p_amount: prizePerWinner });
-          }
-        }
-
+        // MATCH ACABOU! Atualiza IMEDIATAMENTE para evitar que a partida continue aberta
         matchUpdate = { 
           status: 'finished', 
           winners: updatedWinners, 
           is_auto_calling: false, 
-          next_auto_call_timestamp: null,
-          admin_profit_from_match: adminProfit
+          next_auto_call_timestamp: null
         };
+        const { error: updateError } = await supabaseAdmin.from('partidas').update(matchUpdate).eq('id', matchId);
+        
+        if (!updateError) {
+            // Se a partida foi finalizada com sucesso, distribui os prêmios
+            const safePot = Number(match.pot) || 0;
+            const prizeValConf = Number(match.prize?.value) || 0;
+            const prizeValue = match.prize?.type === 'fixed' ? prizeValConf : (safePot * prizeValConf) / 100;
+            
+            const adminProfit = Math.max(0, safePot - prizeValue);
+            const prizePerWinner = prizeValue / realWinners.length;
+
+            if (adminProfit > 0) {
+              await supabaseAdmin.rpc('increment_admin_profit', { amount: adminProfit }).catch(() => {});
+            }
+
+            for (const rw of realWinners) {
+              if (prizePerWinner > 0) {
+                await supabaseAdmin.rpc('increment_player_credits', { p_player_id: rw.playerId, p_amount: prizePerWinner }).catch(() => {});
+              }
+            }
+        } else {
+            console.error("[call-number] Erro CRÍTICO ao finalizar partida:", updateError.message);
+        }
+
       } else {
+        // Vitória apenas de cartelas "brincar". Verifica se o jogo deve continuar.
         const hasRemainingReal = (matchCards || []).some(c => c.credit_type === 'real' && !updatedWinners.some(w => w.cardId === c.id));
         
         if (hasRemainingReal) {
@@ -183,15 +182,25 @@ serve(async (req) => {
         } else {
           matchUpdate = { status: 'finished', winners: updatedWinners, is_auto_calling: false, next_auto_call_timestamp: null };
         }
+        await supabaseAdmin.from('partidas').update(matchUpdate).eq('id', matchId);
       }
+
+      // Registra os troféus
+      for (const w of newWinnersFound) {
+        await supabaseAdmin.rpc('record_winner', {
+          p_match_id: matchId,
+          p_player_id: w.playerId,
+          p_player_card_id: w.playerCardId,
+          p_match_card_id: w.cardId,
+          p_prize_details: match.prize
+        }).catch(() => {});
+      }
+
     } else if (match.is_auto_calling) {
+      // Ninguém ganhou, programa o próximo sorteio
       const { data: cfg } = await supabaseAdmin.from('configuracoes').select('intervalo_sorteio_auto_seg').single();
       const next = new Date(Date.now() + (Number(cfg?.intervalo_sorteio_auto_seg || 120) * 1000)).toISOString();
-      matchUpdate.next_auto_call_timestamp = next;
-    }
-
-    if (Object.keys(matchUpdate).length > 0) {
-      await supabaseAdmin.from('partidas').update(matchUpdate).eq('id', matchId);
+      await supabaseAdmin.from('partidas').update({ next_auto_call_timestamp: next }).eq('id', matchId);
     }
 
     return new Response(JSON.stringify({ success: true, newWinners: newWinnersFound.length }), { headers: corsHeaders });
