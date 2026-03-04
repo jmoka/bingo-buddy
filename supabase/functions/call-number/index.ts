@@ -48,7 +48,7 @@ const checkFullCardWin = (card: BingoCard): number[] | null => {
 
 const checkWin = (card: BingoCard, gameType: GameType): WinResult | null => {
   let winning: number[] | null = null;
-  const type = String(gameType).toLowerCase() as GameType;
+  const type = String(gameType).toLowerCase().trim() as GameType;
   
   if (type === 'horizontal') winning = checkHorizontalWin(card);
   else if (type === 'vertical') winning = checkVerticalWin(card);
