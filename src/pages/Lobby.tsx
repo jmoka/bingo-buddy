@@ -12,7 +12,7 @@ import {
   Coins, Plus, Trophy, Users, Settings, 
   Timer, DoorOpen, Ticket, Zap, ZapOff, Tv, Archive, Trash2, RotateCcw, Star, Loader2, History, LogOut, TrendingUp, Target, Flame, Bot, CalendarDays, Clock, Crown, ChevronDown, ChevronUp
 } from 'lucide-react';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import PlayerAvatar from '@/components/PlayerAvatar';
 import { 
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose, DialogDescription
 } from '@/components/ui/dialog';
@@ -301,27 +301,35 @@ const Lobby = () => {
                     </div>
                   </div>
                 </div>
+                
+                {/* Lista Visual de Participantes Elegante */}
                 {match.status !== 'finished' && allCardsInMatch.length > 0 && (
                   <div className="mt-3 pt-3 border-t">
                     <button
                       onClick={() => toggleParticipants(match.id)}
-                      className="flex items-center gap-2 w-full py-1.5 text-[11px] font-bold uppercase text-muted-foreground active:opacity-70 transition-opacity"
+                      className="flex items-center gap-2 w-full py-1.5 text-[11px] font-bold uppercase text-muted-foreground hover:text-primary active:opacity-70 transition-colors"
                     >
                       <Users className="w-3.5 h-3.5 shrink-0" />
                       <span>Ver participantes ({playersInMatchCount})</span>
                       {expandedParticipants.has(match.id) ? <ChevronUp className="w-3.5 h-3.5 ml-auto shrink-0" /> : <ChevronDown className="w-3.5 h-3.5 ml-auto shrink-0" />}
                     </button>
                     {expandedParticipants.has(match.id) && (
-                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 mt-2">
+                      <div className="flex flex-wrap gap-2 mt-3 p-3 bg-muted/40 rounded-xl border border-border/50">
                         {Array.from(new Set(allCardsInMatch.map(mc => mc.player_id))).map(pid => {
                           const p = participantProfiles.find((pr: any) => pr.id === pid);
+                          const pCards = allCardsInMatch.filter(mc => mc.player_id === pid);
+                          const realCount = pCards.filter(c => c.credit_type === 'real').length;
+                          const fakeCount = pCards.filter(c => c.credit_type === 'fake').length;
                           return (
-                            <div key={pid} className="flex items-center gap-2 bg-muted rounded-lg px-2 py-1.5 min-w-0">
-                              <Avatar className="w-6 h-6 shrink-0">
-                                <AvatarImage src={p?.avatar_url || ''} />
-                                <AvatarFallback className="text-[9px]">{p?.full_name?.charAt(0) || '?'}</AvatarFallback>
-                              </Avatar>
-                              <span className="text-[11px] font-medium truncate">{p?.full_name || 'Jogador'}</span>
+                            <div key={pid} className="flex items-center gap-2.5 bg-card border border-border shadow-sm rounded-full pl-1.5 pr-4 py-1.5 min-w-0 hover:border-primary/40 transition-all">
+                              <PlayerAvatar url={p?.avatar_url || null} fallback={p?.full_name} className="w-8 h-8 shadow-sm" />
+                              <div className="flex flex-col justify-center">
+                                <span className="text-xs font-bold leading-tight truncate max-w-[100px] text-foreground">{p?.full_name || 'Jogador'}</span>
+                                <span className="text-[9px] font-medium text-muted-foreground leading-tight flex items-center gap-1.5 mt-0.5">
+                                  {realCount > 0 && <span className="flex items-center gap-0.5 text-primary"><Coins className="w-2.5 h-2.5" />{realCount}</span>}
+                                  {fakeCount > 0 && <span className="flex items-center gap-0.5 text-amber-600"><Star className="w-2.5 h-2.5" />{fakeCount}</span>}
+                                </span>
+                              </div>
                             </div>
                           );
                         })}
@@ -329,21 +337,24 @@ const Lobby = () => {
                     )}
                   </div>
                 )}
+
                 {match.status === 'finished' && (match.winners || []).filter((w: any) => w.creditType === 'real').length > 0 && (
                   <div className="mt-3 pt-3 border-t">
                     <p className="text-[10px] font-bold uppercase text-muted-foreground mb-2 flex items-center gap-1"><Trophy className="w-3 h-3 text-amber-500" /> Ganhadores</p>
                     <div className="flex flex-wrap gap-2">
-                      {(match.winners || []).filter((w: any) => w.creditType === 'real').map((w: any) => (
-                        <div key={w.cardId} className="flex items-center gap-1.5 bg-success/10 rounded-full px-2 py-1">
-                          <Avatar className="w-5 h-5">
-                            <AvatarFallback className="text-[8px]">{w.playerName?.charAt(0) || '?'}</AvatarFallback>
-                          </Avatar>
-                          <span className="text-[11px] font-semibold text-success">{w.playerName}</span>
-                        </div>
-                      ))}
+                      {(match.winners || []).filter((w: any) => w.creditType === 'real').map((w: any) => {
+                        const p = participantProfiles.find((pr: any) => pr.id === w.playerId);
+                        return (
+                          <div key={w.cardId} className="flex items-center gap-2 bg-success/10 border border-success/20 rounded-full pl-1.5 pr-3 py-1">
+                            <PlayerAvatar url={p?.avatar_url || null} fallback={w.playerName} className="w-7 h-7 border border-success/30" />
+                            <span className="text-[11px] font-bold text-success truncate max-w-[100px]">{w.playerName}</span>
+                          </div>
+                        )
+                      })}
                     </div>
                   </div>
                 )}
+                
                 <div className="mt-4 pt-4 border-t flex flex-wrap gap-2 justify-end">
                   {match.status === 'in_progress' && (
                     <Button size="sm" className="bg-accent hover:bg-accent/90 text-white font-bold" onClick={() => navigate(`/match/${match.id}`)}>
