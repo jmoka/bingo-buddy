@@ -36,8 +36,8 @@ export const generateBingoCard = (): number[][] => {
 export const generateCardId = (): string => `card-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
 const isCellMarked = (card: BingoCard, row: number, col: number): boolean => {
-  if (row === 2 && col === 2) return true;
   const num = card.numbers[row][col];
+  if (num === 0) return true; // O espaço do meio (free space) é 0 e está sempre marcado
   return card.markedNumbers.has(num);
 };
 

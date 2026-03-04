@@ -12,8 +12,8 @@ interface BingoCard { id: string; name: string; numbers: number[][]; markedNumbe
 interface WinResult { cardId: string; cardName: string; type: GameType; winningNumbers: number[]; }
 
 const isCellMarked = (card: BingoCard, row: number, col: number): boolean => {
-  if (row === 2 && col === 2) return true;
   const num = Number(card.numbers[row][col]);
+  if (num === 0) return true; // Espaço Livre (Free Space)
   return card.markedNumbers.has(num);
 };
 
