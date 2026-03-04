@@ -94,7 +94,7 @@ serve(async (req) => {
       player_card_id: card.id,
       name: card.name,
       numbers: card.numbers,
-      marked_numbers: [],
+      marked_numbers: [0], // <--- IMPORTANTE: O zero já nasce marcado!
       credit_type: card.credit_type,
     }));
 

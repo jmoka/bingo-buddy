@@ -36,7 +36,7 @@ export const generateBingoCard = (): number[][] => {
 export const generateCardId = (): string => `card-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
 const isCellMarked = (card: BingoCard, row: number, col: number): boolean => {
-  const num = card.numbers[row][col];
+  const num = Number(card.numbers[row][col]);
   if (num === 0) return true; // O espaço do meio (free space) é 0 e está sempre marcado
   return card.markedNumbers.has(num);
 };
@@ -47,7 +47,7 @@ export const checkHorizontalWin = (card: BingoCard): number[] | null => {
     for (let col = 0; col < 5; col++) {
       if (!isCellMarked(card, row, col)) { allMarked = false; break; }
     }
-    if (allMarked) return card.numbers[row];
+    if (allMarked) return card.numbers[row].map(Number);
   }
   return null;
 };
@@ -58,7 +58,7 @@ export const checkVerticalWin = (card: BingoCard): number[] | null => {
     for (let row = 0; row < 5; row++) {
       if (!isCellMarked(card, row, col)) { allMarked = false; break; }
     }
-    if (allMarked) return card.numbers.map(r => r[col]);
+    if (allMarked) return card.numbers.map(r => Number(r[col]));
   }
   return null;
 };
@@ -66,10 +66,10 @@ export const checkVerticalWin = (card: BingoCard): number[] | null => {
 export const checkDiagonalWin = (card: BingoCard): number[] | null => {
   let mainDiag = true;
   for (let i = 0; i < 5; i++) { if (!isCellMarked(card, i, i)) { mainDiag = false; break; } }
-  if (mainDiag) return [0, 1, 2, 3, 4].map(i => card.numbers[i][i]);
+  if (mainDiag) return [0, 1, 2, 3, 4].map(i => Number(card.numbers[i][i]));
   let antiDiag = true;
   for (let i = 0; i < 5; i++) { if (!isCellMarked(card, i, 4 - i)) { antiDiag = false; break; } }
-  if (antiDiag) return [0, 1, 2, 3, 4].map(i => card.numbers[i][4 - i]);
+  if (antiDiag) return [0, 1, 2, 3, 4].map(i => Number(card.numbers[i][4 - i]));
   return null;
 };
 
@@ -78,7 +78,7 @@ export const checkFullCardWin = (card: BingoCard): number[] | null => {
   for (let row = 0; row < 5; row++) {
     for (let col = 0; col < 5; col++) {
       if (!isCellMarked(card, row, col)) return null;
-      if (!(row === 2 && col === 2)) allNumbers.push(card.numbers[row][col]);
+      if (Number(card.numbers[row][col]) !== 0) allNumbers.push(Number(card.numbers[row][col]));
     }
   }
   return allNumbers;
@@ -86,20 +86,22 @@ export const checkFullCardWin = (card: BingoCard): number[] | null => {
 
 export const checkWin = (card: BingoCard, gameType: GameType): WinResult | null => {
   let winningNumbers: number[] | null = null;
-  switch (gameType) {
+  const type = String(gameType).toLowerCase().trim() as GameType;
+  switch (type) {
     case 'horizontal': winningNumbers = checkHorizontalWin(card); break;
     case 'vertical': winningNumbers = checkVerticalWin(card); break;
     case 'diagonal': winningNumbers = checkDiagonalWin(card); break;
     case 'full': winningNumbers = checkFullCardWin(card); break;
   }
-  return winningNumbers ? { cardId: card.id, cardName: card.name, type: gameType, winningNumbers } : null;
+  return winningNumbers ? { cardId: card.id, cardName: card.name, type, winningNumbers } : null;
 };
 
 export const calculateNumbersToWin = (card: MatchCard, gameType: GameType): number => {
   const { numbers, marked_numbers } = card;
   const tempCard: BingoCard = { id: card.id, name: card.name, numbers, markedNumbers: marked_numbers };
+  const type = String(gameType).toLowerCase().trim() as GameType;
 
-  switch (gameType) {
+  switch (type) {
     case 'full':
         let needed = 0;
         for (let r = 0; r < 5; r++) 
