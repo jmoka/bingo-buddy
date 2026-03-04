@@ -39,7 +39,12 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     queryKey: ['wins', user?.id],
     queryFn: async () => {
       if (!user) return [];
-      const { data, error } = await supabase.from('vitorias').select('*').eq('player_id', user.id);
+      // Adicionada ordenação decrescente por data para as vitórias mais recentes ficarem no topo
+      const { data, error } = await supabase
+        .from('vitorias')
+        .select('*')
+        .eq('player_id', user.id)
+        .order('won_at', { ascending: false });
       if (error) throw error;
       return data as Win[];
     },

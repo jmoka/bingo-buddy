@@ -187,15 +187,21 @@ serve(async (req) => {
         await supabaseAdmin.from('partidas').update(matchUpdate).eq('id', matchId);
       }
 
-      // Registra os troféus
+      // Registra os troféus no banco de dados de vitórias de forma robusta e com verificação de nulos
       for (const w of newWinnersFound) {
-        await supabaseAdmin.rpc('record_winner', {
-          p_match_id: matchId,
-          p_player_id: w.playerId,
-          p_player_card_id: w.playerCardId,
-          p_match_card_id: w.cardId,
-          p_prize_details: match.prize
-        }).catch(() => {});
+        const { error: winErr } = await supabaseAdmin.from('vitorias').insert({
+          match_id: matchId,
+          player_id: w.playerId,
+          player_card_id: w.playerCardId || null,
+          match_card_id: w.cardId,
+          prize_details: match.prize
+        });
+        
+        if (winErr) {
+          console.error(`[call-number] Erro ao registrar troféu para ${w.playerName}:`, winErr.message);
+        } else {
+          console.log(`[call-number] Troféu registrado com sucesso para ${w.playerName}`);
+        }
       }
 
     } else if (match.is_auto_calling) {
