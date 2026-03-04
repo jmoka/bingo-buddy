@@ -1,14 +1,14 @@
--- 1. Liberar Cartelas da Partida (para contar jogadores e cartelas corretamente)
-DROP POLICY IF EXISTS "Todos podem ler cartelas_partida" ON public.cartelas_partida;
-CREATE POLICY "Todos podem ler cartelas_partida" 
-ON public.cartelas_partida FOR SELECT USING (true);
+-- PASSO 1: APAGA AS REGRAS ANTIGAS E RESTRITIVAS QUE ESTÃO BLOQUEANDO
+DROP POLICY IF EXISTS "Users can view their own match cards" ON public.cartelas_partida;
+DROP POLICY IF EXISTS "Users can view their own profile" ON public.perfis;
+DROP POLICY IF EXISTS "Users can view their own wins" ON public.vitorias;
 
--- 2. Liberar Perfis (para mostrar nomes e fotos de todos na lista)
-DROP POLICY IF EXISTS "Todos podem ler perfis" ON public.perfis;
-CREATE POLICY "Todos podem ler perfis" 
-ON public.perfis FOR SELECT USING (true);
+-- PASSO 2: CRIA NOVAS REGRAS QUE PERMITEM QUE JOGADORES LOGADOS VEJAM OS DADOS UNS DOS OUTROS
+CREATE POLICY "Permitir que todos os jogadores vejam as cartelas da partida" 
+ON public.cartelas_partida FOR SELECT TO authenticated USING (true);
 
--- 3. Liberar Vitórias (para o Hall da Fama funcionar para todos)
-DROP POLICY IF EXISTS "Todos podem ler vitorias" ON public.vitorias;
-CREATE POLICY "Todos podem ler vitorias" 
-ON public.vitorias FOR SELECT USING (true);
+CREATE POLICY "Permitir que todos os jogadores vejam os perfis uns dos outros" 
+ON public.perfis FOR SELECT TO authenticated USING (true);
+
+CREATE POLICY "Permitir que todos os jogadores vejam as vitorias uns dos outros" 
+ON public.vitorias FOR SELECT TO authenticated USING (true);
