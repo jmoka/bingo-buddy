@@ -23,12 +23,13 @@ serve(async (req) => {
     while (Date.now() < loopEnd) {
       const nowIso = new Date().toISOString();
 
-      // --- 1. PROCESSAR PARTIDAS ABERTAS E ATRASADAS ---
+      // --- 1. PROCESSAR PARTIDAS AUTOMÁTICAS ABERTAS E ATRASADAS ---
       const { data: overdueMatches, error: overdueError } = await supabaseAdmin
         .from('partidas')
         .select('*')
         .eq('status', 'open')
-        .lte('start_time', nowIso);
+        .lte('start_time', nowIso)
+        .like('name', 'Bingo Automático%'); // <-- CORREÇÃO CRÍTICA: SÓ OLHA PARTIDAS AUTOMÁTICAS
 
       if (overdueError) {
         console.error("[auto-call-engine] Erro ao buscar partidas atrasadas:", overdueError.message);
@@ -47,13 +48,9 @@ serve(async (req) => {
         }
 
         if ((count || 0) === 0) {
-          // CORREÇÃO: SÓ DELETA PARTIDAS AUTOMÁTICAS VAZIAS
-          if (match.name.startsWith('Bingo Automático')) {
-            console.log(`[auto-call-engine] Deletando partida automática vazia e atrasada: ${match.name} (ID: ${match.id})`);
-            await supabaseAdmin.from('partidas').delete().eq('id', match.id);
-          } else {
-            console.log(`[auto-call-engine] Ignorando partida manual vazia e atrasada: ${match.name} (ID: ${match.id})`);
-          }
+          // Agora é seguro deletar, pois só estamos olhando partidas automáticas
+          console.log(`[auto-call-engine] Deletando partida automática vazia e atrasada: ${match.name} (ID: ${match.id})`);
+          await supabaseAdmin.from('partidas').delete().eq('id', match.id);
         } else {
           console.log(`[auto-call-engine] Iniciando partida com ${count} jogadores: ${match.name}`);
           const { data: cfg } = await supabaseAdmin.from('configuracoes').select('intervalo_sorteio_auto_seg').single();
