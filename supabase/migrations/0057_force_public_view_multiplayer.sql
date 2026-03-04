@@ -1,14 +1,24 @@
--- PASSO 1: APAGA AS REGRAS ANTIGAS E RESTRITIVAS QUE ESTÃO BLOQUEANDO
-DROP POLICY IF EXISTS "Users can view their own match cards" ON public.cartelas_partida;
-DROP POLICY IF EXISTS "Users can view their own profile" ON public.perfis;
-DROP POLICY IF EXISTS "Users can view their own wins" ON public.vitorias;
+-- 1. DESATIVA O RLS PARA LIMPEZA
+ALTER TABLE public.cartelas_partida DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.perfis DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.vitorias DISABLE ROW LEVEL SECURITY;
 
--- PASSO 2: CRIA NOVAS REGRAS QUE PERMITEM QUE JOGADORES LOGADOS VEJAM OS DADOS UNS DOS OUTROS
-CREATE POLICY "Permitir que todos os jogadores vejam as cartelas da partida" 
-ON public.cartelas_partida FOR SELECT TO authenticated USING (true);
+-- 2. APAGA TODAS AS POLÍTICAS EXISTENTES (Loop de limpeza)
+DO $$ 
+DECLARE 
+    pol record;
+BEGIN
+    FOR pol IN (SELECT policyname, tablename FROM pg_policies WHERE schemaname = 'public' AND tablename IN ('cartelas_partida', 'perfis', 'vitorias')) LOOP
+        EXECUTE format('DROP POLICY IF EXISTS %I ON public.%I', pol.policyname, pol.tablename);
+    END LOOP;
+END $$;
 
-CREATE POLICY "Permitir que todos os jogadores vejam os perfis uns dos outros" 
-ON public.perfis FOR SELECT TO authenticated USING (true);
+-- 3. CRIA REGRAS DE ACESSO TOTAL PARA LEITURA
+CREATE POLICY "Acesso publico total" ON public.cartelas_partida FOR SELECT USING (true);
+CREATE POLICY "Acesso publico total" ON public.perfis FOR SELECT USING (true);
+CREATE POLICY "Acesso publico total" ON public.vitorias FOR SELECT USING (true);
 
-CREATE POLICY "Permitir que todos os jogadores vejam as vitorias uns dos outros" 
-ON public.vitorias FOR SELECT TO authenticated USING (true);
+-- 4. REATIVA O RLS
+ALTER TABLE public.cartelas_partida ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.perfis ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.vitorias ENABLE ROW LEVEL SECURITY;
