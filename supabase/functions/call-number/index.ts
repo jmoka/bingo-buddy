@@ -124,7 +124,9 @@ serve(async (req) => {
           cardId: card.id,
           cardName: card.name,
           creditType: card.credit_type,
-          playerCardId: card.player_card_id
+          playerCardId: card.player_card_id,
+          numbers: grid,
+          markedNumbers: card.marked_numbers
         });
       }
     }

@@ -15,6 +15,10 @@ export interface Winner {
   playerName:string;
   cardId: string;
   cardName: string;
+  creditType?: 'real' | 'fake';
+  playerCardId?: string;
+  numbers?: number[][];
+  markedNumbers?: number[];
 }
 
 export interface Match {
