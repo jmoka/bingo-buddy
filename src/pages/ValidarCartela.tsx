@@ -148,12 +148,13 @@ export default function ValidarCartela() {
             </div>
 
             {buscadoRifa && !resultadoRifa && (
-              <div className="card-container p-6 border-red-300">
+  <div className="card-container p-6 border-red-300" >
+ 
                 <div className="flex items-center gap-3">
                   <XCircle className="h-8 w-8 text-red-500" />
                   <div>
-                    <p className="font-bold text-lg text-red-700">Número não encontrado</p>
-                    <p className="text-sm text-muted-foreground">Verifique se o número foi reservado ou vendido.</p>
+                    <p className="font-bold text-lg text-blue-700">Número Liberado para Comprar</p>
+                    < p className = "text-sm text-muted-foreground" > Volte até a Rifa e selecione esse número para realizar a compra! </p>
                   </div>
                 </div>
               </div>
