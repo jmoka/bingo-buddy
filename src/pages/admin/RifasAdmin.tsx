@@ -66,18 +66,22 @@ const RifasAdmin = () => {
   const handleCriarRifa = async (e: React.FormEvent) => {
     e.preventDefault();
     setCriandoRifa(true);
+    
+    // Mapeia os campos para o formato que o banco de dados espera
     const payload: Partial<Rifa> = {
       nome: novaRifaForm.nome,
       descricao: novaRifaForm.descricao || null,
       regulamento: novaRifaForm.regulamento || null,
       premio_descricao: novaRifaForm.premio_descricao || null,
-      premio_foto: novaRifaForm.premio_foto || null,
+      // Transforma a URL única em uma lista (array) para a coluna premio_fotos
+      premio_fotos: novaRifaForm.premio_foto ? [novaRifaForm.premio_foto] : [],
       quantidade_numeros: Number(novaRifaForm.quantidade_numeros),
       numero_inicial: Number(novaRifaForm.numero_inicial),
       custo_por_numero: Number(novaRifaForm.custo_por_numero),
       data_encerramento: novaRifaForm.data_encerramento || null,
       status: 'ativa',
     };
+    
     const id = await criarRifa(payload);
     setCriandoRifa(false);
     if (id) {
