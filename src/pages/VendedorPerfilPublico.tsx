@@ -9,7 +9,7 @@ import PlayerAvatar from '@/components/PlayerAvatar';
 export default function VendedorPerfilPublico() {
   const { codigo } = useParams<{ codigo: string }>();
   const navigate = useNavigate();
-  const [vendedor, setVendedor] = useState<any>(null);
+  const [vendedor, setVendedor] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -17,13 +17,24 @@ export default function VendedorPerfilPublico() {
       if (!codigo) return;
       setLoading(true);
       
-      // Chamamos a função RPC que criamos para buscar dados públicos com segurança
-      const { data, error } = await supabase.rpc('get_public_vendedor_by_codigo', {
-        p_codigo_ref: codigo.toUpperCase()
-      });
+      // Revertido para a busca direta na tabela.
+      // NOTA: Isso pode não funcionar para usuários não logados devido às regras de segurança (RLS).
+      const { data, error } = await supabase
+        .from('vendedores_rifa')
+        .select('*, perfis(avatar_url, address)')
+        .eq('codigo_ref', codigo.toUpperCase())
+        .eq('ativo', true)
+        .single();
 
-      if (!error && data && data.length > 0) {
-        setVendedor(data[0]); // A função retorna uma lista (tabela), pegamos o primeiro
+      if (!error && data) {
+        const profileData: any = data.perfis;
+        delete (data as any).perfis;
+        const combinedData = {
+            ...data,
+            avatar_url: profileData?.avatar_url,
+            address: profileData?.address
+        };
+        setVendedor(combinedData);
       }
       setLoading(false);
     }
