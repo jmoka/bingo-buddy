@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Printer, Loader2, Ticket, ShieldCheck, User, Phone, MapPin, ExternalLink } from 'lucide-react';
+import { ArrowLeft, Printer, Loader2, Ticket, ShieldCheck } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 
 const BASE_URL = window.location.origin;
@@ -129,7 +129,7 @@ export default function VendedorCartelas() {
           <div className="flex flex-col gap-4 max-w-4xl mx-auto print:max-w-none print:mx-0 print:gap-2">
             {bilhetes.map((b, idx) => (
               <div key={`${b.numero}-${idx}`} className="print:break-inside-avoid">
-                <div className="bg-white rounded-xl overflow-hidden shadow border border-gray-200 print:shadow-none print:border print:border-gray-400 print:rounded-none flex min-w-0 h-[180px]">
+                <div className="bg-white rounded-xl overflow-hidden shadow border border-gray-200 print:shadow-none print:border print:border-gray-400 print:rounded-none flex min-w-0 h-[200px]">
                   
                   {/* CANHOTO DO CLIENTE (MAIOR) */}
                   <div className="flex-1 flex min-w-0">
@@ -140,7 +140,7 @@ export default function VendedorCartelas() {
                     </div>
 
                     {/* Conteúdo Cliente */}
-                    <div className="flex-1 p-3 flex flex-col justify-between min-w-0">
+                    <div className="flex-1 p-4 flex flex-col justify-between min-w-0">
                       <div className="flex justify-between items-start gap-2">
                         <div className="min-w-0">
                           <h2 className="text-lg font-black text-gray-800 uppercase truncate leading-tight">{b.rifa?.nome}</h2>
@@ -189,17 +189,17 @@ export default function VendedorCartelas() {
                   </div>
 
                   {/* CANHOTO DO VENDEDOR (MENOR) */}
-                  <div className="w-[220px] bg-gray-50/50 p-3 flex flex-col shrink-0">
-                    <div className="flex justify-between items-center mb-2">
+                  <div className="w-[220px] bg-gray-50/50 p-4 flex flex-col shrink-0">
+                    <div className="flex justify-between items-center mb-3">
                       <p className="text-[8px] font-black text-gray-400 uppercase">Canhoto Vendedor</p>
                       <p className="text-sm font-black font-mono text-gray-800">Nº {String(b.numero).padStart(3, '0')}</p>
                     </div>
 
                     {/* Campos para preencher */}
-                    <div className="space-y-2 flex-1">
+                    <div className="space-y-3 flex-1">
                       <div className="border-b border-gray-300 pb-0.5">
                         <p className="text-[7px] text-gray-400 uppercase font-bold">Nome Comprador</p>
-                        <div className="h-4" /> {/* Espaço para escrever */}
+                        <div className="h-4" />
                       </div>
                       <div className="border-b border-gray-300 pb-0.5">
                         <p className="text-[7px] text-gray-400 uppercase font-bold">Telefone / WhatsApp</p>
@@ -211,13 +211,13 @@ export default function VendedorCartelas() {
                       </div>
                     </div>
 
-                    <div className="mt-2 pt-2 border-t border-gray-200 flex items-center justify-between gap-2">
+                    <div className="mt-3 pt-2 border-t border-gray-200 flex items-center justify-between gap-2">
                       <div className="min-w-0">
                         <p className="text-[7px] text-gray-400 uppercase font-bold truncate">{b.rifa?.nome}</p>
                         <p className="text-[8px] font-black text-emerald-600 mt-0.5">VALIDAR VENDA →</p>
                       </div>
                       <div className="shrink-0 bg-white p-1 border border-gray-200 rounded shadow-sm">
-                        <QRCodeSVG value={`${BASE_URL}/validar-cartela?codigo=${b.codigoValidacao}`} size={40} />
+                        <QRCodeSVG value={`${BASE_URL}/validar-cartela?codigo=${b.codigoValidacao}`} size={42} />
                       </div>
                     </div>
                   </div>
