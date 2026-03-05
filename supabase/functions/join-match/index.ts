@@ -20,11 +20,9 @@ serve(async (req) => {
 
     const authHeader = req.headers.get('Authorization')
     if (!authHeader) {
-      return new Response('Unauthorized', { 
-        status: 401, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-      })
+      throw new Error("Token de autorização não encontrado.");
     }
+    
     const userSupabaseClient = createClient(
         Deno.env.get('SUPABASE_URL') ?? '',
         Deno.env.get('SUPABASE_ANON_KEY') ?? '',
@@ -75,7 +73,7 @@ serve(async (req) => {
         .from('perfis')
         .update({ credits: profile.credits - totalCost })
         .eq('id', user.id);
-      if (creditError) throw new Error(`Erro ao debitar créditos.`);
+      if (creditError) throw new Error(`Erro ao debitar créditos: ${creditError.message}`);
     }
 
     // Atualiza usos das cartelas originais
@@ -87,14 +85,14 @@ serve(async (req) => {
     );
     await Promise.all(cardUpdatePromises);
 
-    // Insere as cartelas na partida (mantendo o credit_type)
+    // Insere as cartelas na partida (mantendo o credit_type e marcando o zero)
     const newMatchCards = playerCards.map(card => ({
       player_id: user.id,
       match_id: matchId,
       player_card_id: card.id,
       name: card.name,
       numbers: card.numbers,
-      marked_numbers: [0], // <--- IMPORTANTE: O zero já nasce marcado!
+      marked_numbers: [0], 
       credit_type: card.credit_type,
     }));
 
@@ -103,22 +101,24 @@ serve(async (req) => {
       .insert(newMatchCards)
       .select();
     
-    if (insertError) throw new Error(`Erro ao inscrever cartelas.`);
+    if (insertError) throw new Error(`Erro ao inscrever cartelas: ${insertError.message}`);
 
     // Atualiza o pote da partida apenas com o valor das cartelas reais
     if (totalCost > 0) {
       await supabaseAdmin.from('partidas').update({ pot: match.pot + totalCost }).eq('id', matchId);
     }
 
-    return new Response(JSON.stringify(insertedMatchCards), {
+    return new Response(JSON.stringify({ success: true, data: insertedMatchCards }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
     })
 
-  } catch (error) {
+  } catch (error: any) {
+    console.error("[join-match] Erro:", error.message);
+    // Retornando 400 para que o cliente consiga ler a mensagem de erro formatada
     return new Response(JSON.stringify({ error: error.message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 500,
+      status: 400,
     })
   }
 })

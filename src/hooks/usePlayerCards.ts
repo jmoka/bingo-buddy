@@ -94,17 +94,34 @@ export const usePlayerCards = () => {
   const joinMatch = async (matchId: string, playerCardIds: string[]): Promise<MatchCard[] | null> => {
     try {
       const { data, error } = await supabase.functions.invoke('join-match', { body: { matchId, playerCardIds } });
+      
       if (error) {
-        toast.error("Erro ao entrar na partida.");
+        // O invoke joga o status 400 pra dentro do objeto error com a mensagem customizada
+        const errorMessage = error.message || "Erro desconhecido ao entrar.";
+        
+        // Vamos tentar extrair se o erro veio envelopado em JSON stringificado
+        try {
+            const parsed = JSON.parse(errorMessage);
+            toast.error(parsed.error || "Erro ao entrar na partida.");
+        } catch {
+            toast.error(errorMessage);
+        }
         return null;
       }
+
+      if (data && data.error) {
+        toast.error(`Aviso: ${data.error}`);
+        return null;
+      }
+
       queryClient.invalidateQueries({ queryKey: ['profile', user?.id] });
       queryClient.invalidateQueries({ queryKey: ['playerCards', user?.id] });
       queryClient.invalidateQueries({ queryKey: ['matchCards'] });
       queryClient.invalidateQueries({ queryKey: ['matches'] });
-      return data as MatchCard[];
-    } catch (e) {
-      toast.error("Erro inesperado.");
+      
+      return data?.data as MatchCard[];
+    } catch (e: any) {
+      toast.error(`Erro inesperado: ${e.message}`);
       return null;
     }
   };
