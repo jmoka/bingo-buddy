@@ -19,7 +19,7 @@ export const usePlayerCards = () => {
       return data as PlayerCard[];
     },
     enabled: !!user,
-    refetchInterval: 5000, // Atualiza a cada 5 segundos
+    refetchInterval: 5000, 
   });
 
   const createPlayerCard = async (options: { name: string; numbers: number[][]; creditType: 'real' | 'fake' }) => {
@@ -96,21 +96,12 @@ export const usePlayerCards = () => {
       const { data, error } = await supabase.functions.invoke('join-match', { body: { matchId, playerCardIds } });
       
       if (error) {
-        // O invoke joga o status 400 pra dentro do objeto error com a mensagem customizada
-        const errorMessage = error.message || "Erro desconhecido ao entrar.";
-        
-        // Vamos tentar extrair se o erro veio envelopado em JSON stringificado
-        try {
-            const parsed = JSON.parse(errorMessage);
-            toast.error(parsed.error || "Erro ao entrar na partida.");
-        } catch {
-            toast.error(errorMessage);
-        }
+        toast.error("Falha de conexão com o servidor.");
         return null;
       }
 
-      if (data && data.error) {
-        toast.error(`Aviso: ${data.error}`);
+      if (data && data.success === false) {
+        toast.error(data.error || "Erro ao entrar na partida.");
         return null;
       }
 
@@ -128,11 +119,18 @@ export const usePlayerCards = () => {
 
   const leaveMatch = async (matchId: string): Promise<boolean> => {
     try {
-      const { error } = await supabase.functions.invoke('leave-match', { body: { matchId } });
+      const { data, error } = await supabase.functions.invoke('leave-match', { body: { matchId } });
+      
       if (error) {
-        toast.error("Erro ao sair da partida.", { description: error.message });
+        toast.error("Falha de conexão com o servidor ao sair.");
         return false;
       }
+
+      if (data && data.success === false) {
+        toast.error(data.error || "Erro ao sair da partida.");
+        return false;
+      }
+
       toast.success("Você saiu da partida.", { description: "Seus créditos foram estornados." });
       
       await Promise.all([
@@ -144,7 +142,7 @@ export const usePlayerCards = () => {
 
       return true;
     } catch (e: any) {
-      toast.error("Erro inesperado ao sair da partida.", { description: e.message });
+      toast.error(`Erro inesperado ao sair: ${e.message}`);
       return false;
     }
   };
