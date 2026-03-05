@@ -111,7 +111,7 @@ const RifasAdmin = () => {
               Nova Rifa
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-lg">
+          <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle className="font-heading flex items-center gap-2">
                 <Ticket className="w-5 h-5 text-primary" />
