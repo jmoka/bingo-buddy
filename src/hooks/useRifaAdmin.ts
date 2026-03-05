@@ -66,27 +66,24 @@ export const useRifaAdmin = () => {
   const { data: solicitacoesVendedor = [], isLoading: isLoadingSolicitacoes } = useQuery({
     queryKey: ['solicitacoesVendedor'],
     queryFn: async () => {
-      // 1. Busca apenas as solicitações sem o JOIN
       const { data, error } = await supabase
         .from('solicitacoes_vendedor')
         .select('*')
         .order('created_at', { ascending: false });
         
       if (error) {
-        console.error('[useRifaAdmin] solicitacoesVendedor error:', error);
+        console.error('[useRifaAdmin] Erro ao buscar solicitações:', error);
         throw error;
       }
 
       if (!data || data.length === 0) return [];
 
-      // 2. Extrai os IDs dos usuários e busca os perfis
       const userIds = [...new Set(data.map(s => s.user_id))];
       const { data: profilesData } = await supabase
         .from('perfis')
         .select('id, full_name, avatar_url')
         .in('id', userIds);
 
-      // 3. Junta os dados em memória
       return data.map(s => ({
         ...s,
         perfis: profilesData?.find(p => p.id === s.user_id) || null
@@ -99,17 +96,14 @@ export const useRifaAdmin = () => {
   const { data: vendedoresComStats = [] } = useQuery({
     queryKey: ['vendedoresComStats'],
     queryFn: async () => {
-      // 1. Busca os vendedores
       const { data, error } = await supabase
         .from('vendedores_rifa')
         .select('*')
         .order('nome');
         
       if (error) throw error;
-
       if (!data || data.length === 0) return [];
 
-      // 2. Extrai os IDs e busca os perfis manualmente
       const userIds = [...new Set(data.map(v => v.user_id).filter(Boolean))];
       
       let profilesData: any[] | null = [];
@@ -121,7 +115,6 @@ export const useRifaAdmin = () => {
         profilesData = res.data;
       }
 
-      // 3. Junta os dados
       return data.map(v => ({
         ...v,
         perfis: profilesData?.find(p => p.id === v.user_id) || null
@@ -341,32 +334,55 @@ export const useRifaAdmin = () => {
   };
 
   const aprovarVendedor = async (solicitacaoId: string, mensagemAdmin?: string): Promise<boolean> => {
+    console.log('[useRifaAdmin] Iniciando aprovação do vendedor:', solicitacaoId);
+    
     const { data, error } = await supabase.rpc('aprovar_vendedor', {
       p_solicitacao_id: solicitacaoId,
       p_comissao: 0,
       p_desconto: 0,
       p_mensagem_admin: mensagemAdmin ?? null,
     });
-    if (error || !data?.success) {
-      toast.error('Erro ao aprovar vendedor: ' + (data?.error ?? error?.message));
+
+    if (error) {
+      console.error('[useRifaAdmin] Erro CRÍTICO na chamada RPC aprovar_vendedor:', error);
+      toast.error(`Erro no servidor: ${error.message}`);
       return false;
     }
+
+    if (!data?.success) {
+      console.warn('[useRifaAdmin] O servidor retornou falha na aprovação:', data);
+      toast.error('Não foi possível aprovar: ' + (data?.error ?? 'Erro desconhecido'));
+      return false;
+    }
+
+    console.log('[useRifaAdmin] Vendedor aprovado com sucesso!', data);
     toast.success('Vendedor aprovado!');
     queryClient.invalidateQueries({ queryKey: ['solicitacoesVendedor'] });
     queryClient.invalidateQueries({ queryKey: ['vendedoresRifa'] });
     queryClient.invalidateQueries({ queryKey: ['vendedoresComStats'] });
+    queryClient.invalidateQueries({ queryKey: ['profile'] });
     return true;
   };
 
   const rejeitarVendedor = async (solicitacaoId: string, mensagemAdmin?: string): Promise<boolean> => {
+    console.log('[useRifaAdmin] Rejeitando solicitação:', solicitacaoId);
+    
     const { data, error } = await supabase.rpc('rejeitar_vendedor', {
       p_solicitacao_id: solicitacaoId,
       p_mensagem_admin: mensagemAdmin ?? null,
     });
-    if (error || !data?.success) {
-      toast.error('Erro ao rejeitar vendedor: ' + (data?.error ?? error?.message));
+
+    if (error) {
+      console.error('[useRifaAdmin] Erro na chamada RPC rejeitar_vendedor:', error);
+      toast.error(`Erro no servidor: ${error.message}`);
       return false;
     }
+
+    if (!data?.success) {
+      toast.error('Erro ao rejeitar: ' + (data?.error ?? 'Erro desconhecido'));
+      return false;
+    }
+
     toast.success('Solicitação rejeitada.');
     queryClient.invalidateQueries({ queryKey: ['solicitacoesVendedor'] });
     return true;
