@@ -9,8 +9,8 @@ export const useGameSettings = () => {
   const { data: gameSettings } = useQuery({
     queryKey: ['gameSettings'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('configuracoes').select('*').limit(1).single();
-      if (error) return { custo_nova_cartela: 10, custo_recarga_cartela: 5, usos_por_recarga: 1, intervalo_sorteio_auto_seg: 120, valor_por_credito: 1, admin_profit: 0 } as GameSettings;
+      const { data, error } = await supabase.from('configuracoes').select('*').limit(1).maybeSingle();
+      if (error || !data) return { custo_nova_cartela: 10, custo_recarga_cartela: 5, usos_por_recarga: 1, intervalo_sorteio_auto_seg: 120, valor_por_credito: 1, admin_profit: 0 } as GameSettings;
       return data as GameSettings;
     }
   });
