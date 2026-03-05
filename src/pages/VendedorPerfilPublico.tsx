@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, UserCheck, Phone, MapPin, ArrowLeft, ShieldCheck, ExternalLink } from 'lucide-react';
+import { Loader2, UserCheck, Phone, MapPin, ArrowLeft, ShieldCheck } from 'lucide-react';
 import PlayerAvatar from '@/components/PlayerAvatar';
 
 export default function VendedorPerfilPublico() {
@@ -17,15 +17,13 @@ export default function VendedorPerfilPublico() {
       if (!codigo) return;
       setLoading(true);
       
-      // Buscamos o vendedor pelo código de referência
-      const { data, error } = await supabase
-        .from('vendedores_rifa')
-        .select('nome, telefone, codigo_ref, ativo, user_id, perfis(avatar_url, address)')
-        .eq('codigo_ref', codigo.toUpperCase())
-        .single();
+      // Chamamos a função RPC que criamos para buscar dados públicos com segurança
+      const { data, error } = await supabase.rpc('get_public_vendedor_by_codigo', {
+        p_codigo_ref: codigo.toUpperCase()
+      });
 
-      if (!error && data) {
-        setVendedor(data);
+      if (!error && data && data.length > 0) {
+        setVendedor(data[0]); // A função retorna uma lista (tabela), pegamos o primeiro
       }
       setLoading(false);
     }
@@ -59,9 +57,8 @@ export default function VendedorPerfilPublico() {
     <div className="min-h-screen bg-muted/30 flex items-center justify-center p-4">
       <div className="max-w-md w-full space-y-6">
         <div className="card-container p-8 text-center relative overflow-hidden border-2 border-green-500/20">
-          {/* Selo de Autorizado */}
           <div className="absolute top-4 right-4">
-            <Badge className="bg-green-500 hover:bg-green-600 text-white px-3 py-1 gap-1.5 animate-bounce-in">
+            <Badge className="bg-green-500 hover:bg-green-600 text-white px-3 py-1 gap-1.5 animate-bounce-in border-none">
               <UserCheck className="h-3.5 w-3.5" />
               AUTORIZADO
             </Badge>
@@ -70,7 +67,7 @@ export default function VendedorPerfilPublico() {
           <div className="flex flex-col items-center space-y-4">
             <div className="relative">
               <PlayerAvatar 
-                url={vendedor.perfis?.avatar_url} 
+                url={vendedor.avatar_url} 
                 className="h-24 w-24 border-4 border-background shadow-xl"
               />
               <div className="absolute -bottom-1 -right-1 bg-green-500 text-white rounded-full p-1 border-2 border-background">
@@ -103,7 +100,7 @@ export default function VendedorPerfilPublico() {
                 <div className="min-w-0">
                   <p className="text-[10px] font-bold text-muted-foreground uppercase">Localização</p>
                   <p className="font-medium text-sm line-clamp-2">
-                    {vendedor.perfis?.address || 'Vendedor Externo Autorizado'}
+                    {vendedor.address || 'Vendedor Externo Autorizado'}
                   </p>
                 </div>
               </div>
