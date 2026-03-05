@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Printer, Loader2, Ticket } from 'lucide-react';
+import { ArrowLeft, Printer, Loader2, Ticket, ShieldCheck } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 
 const BASE_URL = window.location.origin;
@@ -23,6 +23,7 @@ interface BilheteData {
   vendedor: {
     nome: string;
     telefone: string | null;
+    codigo_ref: string | null;
   } | null;
   compra: {
     created_at: string;
@@ -46,7 +47,7 @@ export default function VendedorCartelas() {
 
       const { data: v } = await supabase
         .from('vendedores_rifa')
-        .select('id, nome, telefone')
+        .select('id, nome, telefone, codigo_ref')
         .eq('user_id', user.id)
         .eq('ativo', true)
         .single();
@@ -83,7 +84,7 @@ export default function VendedorCartelas() {
         telefone_comprador: nData.telefone_comprador ?? null,
         endereco_comprador: nData.endereco_comprador ?? null,
         rifa: nData.rifas as any,
-        vendedor: { nome: v.nome, telefone: v.telefone },
+        vendedor: { nome: v.nome, telefone: v.telefone, codigo_ref: v.codigo_ref },
         compra: null,
       }));
 
@@ -173,26 +174,28 @@ export default function VendedorCartelas() {
                   </div>
 
                   {/* Canhoto do vendedor — separado por linha tracejada vertical */}
-                  <div className="border-l-2 border-dashed border-gray-300 flex flex-col items-center justify-center px-3 py-3 shrink-0 w-[100px] gap-1.5 relative">
+                  <div className="border-l-2 border-dashed border-gray-300 flex flex-col items-center justify-center px-3 py-3 shrink-0 w-[110px] gap-1.5 relative bg-gray-50/50">
                     <div className="absolute -left-2 -top-2 w-4 h-4 bg-gray-100 rounded-full border border-gray-300 print:bg-white" />
                     <div className="absolute -left-2 -bottom-2 w-4 h-4 bg-gray-100 rounded-full border border-gray-300 print:bg-white" />
-                    <p className="text-[7px] text-gray-400 uppercase tracking-widest text-center">Canhoto</p>
-                    <div className="text-center space-y-0.5">
-                      <p className="text-[7px] text-gray-400 uppercase tracking-widest">Nº</p>
-                      <p className="font-black text-xl font-mono text-emerald-700">{String(b.numero).padStart(3, '0')}</p>
+                    
+                    <div className="flex flex-col items-center gap-1">
+                      {b.vendedor?.codigo_ref && (
+                        <div className="p-1 bg-white border border-gray-200 rounded shadow-sm">
+                          <QRCodeSVG value={`${BASE_URL}/vendedor/perfil/${b.vendedor.codigo_ref}`} size={40} />
+                        </div>
+                      )}
+                      <p className="text-[6px] text-gray-400 uppercase font-bold text-center leading-tight">Verificar Vendedor</p>
                     </div>
-                    <div className="text-center space-y-0.5">
+
+                    <div className="text-center space-y-0.5 border-t border-gray-200 pt-1 w-full">
                       <p className="text-[7px] text-gray-400 uppercase tracking-widest">Vendedor</p>
-                      <p className="text-[8px] font-semibold text-gray-700 text-center leading-tight">{b.vendedor?.nome ?? '—'}</p>
-                      {b.vendedor?.telefone && <p className="text-[7px] text-gray-500 text-center">{b.vendedor.telefone}</p>}
+                      <p className="text-[8px] font-bold text-gray-700 text-center leading-tight truncate w-full">{b.vendedor?.nome ?? '—'}</p>
+                      <p className="text-[7px] font-mono text-emerald-600 font-bold">{b.vendedor?.codigo_ref ?? '—'}</p>
                     </div>
-                    <div className="text-center space-y-0.5">
-                      <p className="text-[7px] text-gray-400 uppercase tracking-widest">Código</p>
-                      <p className="font-mono text-[7px] font-bold text-gray-600 break-all">{b.codigoValidacao ?? '—'}</p>
-                    </div>
+
                     <div className="mt-auto pt-1 flex items-center gap-1">
-                      <div className="w-2 h-2 rounded-full border border-amber-500" />
-                      <p className="text-[6px] font-bold text-amber-600 uppercase">Pendente</p>
+                      <ShieldCheck className="h-2.5 w-2.5 text-emerald-600" />
+                      <p className="text-[6px] font-bold text-emerald-600 uppercase">Autorizado</p>
                     </div>
                   </div>
                 </div>
