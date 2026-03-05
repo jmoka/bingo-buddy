@@ -66,15 +66,31 @@ export const useRifaAdmin = () => {
   const { data: solicitacoesVendedor = [], isLoading: isLoadingSolicitacoes } = useQuery({
     queryKey: ['solicitacoesVendedor'],
     queryFn: async () => {
+      // 1. Busca apenas as solicitações sem o JOIN
       const { data, error } = await supabase
         .from('solicitacoes_vendedor')
-        .select('*, perfis(full_name, avatar_url)')
+        .select('*')
         .order('created_at', { ascending: false });
+        
       if (error) {
         console.error('[useRifaAdmin] solicitacoesVendedor error:', error);
         throw error;
       }
-      return data as SolicitacaoVendedor[];
+
+      if (!data || data.length === 0) return [];
+
+      // 2. Extrai os IDs dos usuários e busca os perfis
+      const userIds = [...new Set(data.map(s => s.user_id))];
+      const { data: profilesData } = await supabase
+        .from('perfis')
+        .select('id, full_name, avatar_url')
+        .in('id', userIds);
+
+      // 3. Junta os dados em memória
+      return data.map(s => ({
+        ...s,
+        perfis: profilesData?.find(p => p.id === s.user_id) || null
+      })) as SolicitacaoVendedor[];
     },
     enabled: isAdmin,
     refetchInterval: 5000,
@@ -83,12 +99,33 @@ export const useRifaAdmin = () => {
   const { data: vendedoresComStats = [] } = useQuery({
     queryKey: ['vendedoresComStats'],
     queryFn: async () => {
+      // 1. Busca os vendedores
       const { data, error } = await supabase
         .from('vendedores_rifa')
-        .select('*, perfis(full_name, avatar_url)')
+        .select('*')
         .order('nome');
+        
       if (error) throw error;
-      return data;
+
+      if (!data || data.length === 0) return [];
+
+      // 2. Extrai os IDs e busca os perfis manualmente
+      const userIds = [...new Set(data.map(v => v.user_id).filter(Boolean))];
+      
+      let profilesData: any[] | null = [];
+      if (userIds.length > 0) {
+        const res = await supabase
+          .from('perfis')
+          .select('id, full_name, avatar_url')
+          .in('id', userIds);
+        profilesData = res.data;
+      }
+
+      // 3. Junta os dados
+      return data.map(v => ({
+        ...v,
+        perfis: profilesData?.find(p => p.id === v.user_id) || null
+      }));
     },
     enabled: isAdmin,
     refetchInterval: 5000,
