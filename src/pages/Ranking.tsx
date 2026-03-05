@@ -1,34 +1,26 @@
-import React, { useMemo } from 'react';
+import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useGame } from '@/contexts/GameContext';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Trophy, Crown, Loader2 } from 'lucide-react';
 import RankingCard from '@/components/RankingCard';
 
 const Ranking = () => {
   const navigate = useNavigate();
-  const { allWins, players, isLoading } = useGame();
 
-  const leaderboard = useMemo(() => {
-    if (!players || !allWins) return [];
-
-    // Conta vitórias por jogador
-    const winCounts = allWins.reduce((acc: Record<string, number>, win) => {
-      acc[win.player_id] = (acc[win.player_id] || 0) + 1;
-      return acc;
-    }, {});
-
-    // Mapeia para o formato do ranking e ordena
-    return players
-      .map(player => ({
-        id: player.id,
-        full_name: player.full_name,
-        avatar_url: player.avatar_url,
-        winCount: winCounts[player.id] || 0
-      }))
-      .filter(p => p.winCount > 0)
-      .sort((a, b) => b.winCount - a.winCount);
-  }, [players, allWins]);
+  // Modificado: usa uma chamada RPC em vez de baixar todas as vitórias e perfis no frontend
+  const { data: leaderboard = [], isLoading } = useQuery({
+    queryKey: ['leaderboard'],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('get_leaderboard');
+      if (error) {
+        console.error("Erro ao buscar ranking:", error);
+        return [];
+      }
+      return data.map((p: any) => ({ ...p, winCount: Number(p.win_count) }));
+    }
+  });
 
   if (isLoading) {
     return (
@@ -63,7 +55,7 @@ const Ranking = () => {
         </div>
       ) : (
         <div className="grid gap-4">
-          {leaderboard.map((player, index) => (
+          {leaderboard.map((player: any, index: number) => (
             <RankingCard 
               key={player.id} 
               player={player} 

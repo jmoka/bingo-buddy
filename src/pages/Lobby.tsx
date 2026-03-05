@@ -60,7 +60,6 @@ const Lobby = () => {
   const [rechargingCardId, setRechargingCardId] = useState<string | null>(null);
   const [isAgendaOpen, setIsAgendaOpen] = useState(true);
   
-  // Estado para controlar a expansão da lista de participantes por partida
   const [expandedParticipants, setExpandedParticipants] = useState<Set<string>>(new Set());
   
   const toggleParticipants = (matchId: string) => {
@@ -82,14 +81,16 @@ const Lobby = () => {
     return Array.from(new Set(matchCards.map(mc => mc.player_id)));
   }, [matchCards]);
 
+  // Modificado: usa uma função (RPC) segura para buscar os dados públicos dos adversários
   const { data: participantProfiles = [] } = useQuery({
     queryKey: ['participantProfiles', participantIds],
     queryFn: async () => {
       if (participantIds.length === 0) return [];
-      const { data } = await supabase
-        .from('perfis')
-        .select('id, full_name, avatar_url')
-        .in('id', participantIds);
+      const { data, error } = await supabase.rpc('get_public_profiles', { p_user_ids: participantIds });
+      if (error) {
+        console.error("Erro ao carregar perfis públicos:", error);
+        return [];
+      }
       return data || [];
     },
     enabled: participantIds.length > 0,
@@ -391,7 +392,6 @@ const Lobby = () => {
         </Button>
       )}
 
-      {/* Estatísticas Compactas - 4 Colunas no Mobile */}
       <div className="grid grid-cols-4 gap-1.5 sm:gap-4">
         <div className="card-container p-2 sm:p-4 bg-primary text-white border-none flex flex-col items-center text-center justify-center">
           <Coins className="w-4 h-4 sm:w-6 sm:h-6 mb-1 opacity-80" />
@@ -416,7 +416,6 @@ const Lobby = () => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Agenda Recolhível */}
         {gameSettings?.auto_engine_enabled && (
           <div className="lg:col-span-3 order-2 lg:order-1">
             <div className="card-container p-0 border-2 border-primary/20 overflow-hidden">
@@ -449,10 +448,7 @@ const Lobby = () => {
           </div>
         )}
 
-        {/* Conteúdo Principal: Partidas e Cartelas */}
         <div className={cn("space-y-8 order-1 lg:order-2", gameSettings?.auto_engine_enabled ? "lg:col-span-9" : "lg:col-span-12")}>
-          
-          {/* Seção de Partidas */}
           <section>
             <div className="flex items-center gap-2 mb-4">
               <DoorOpen className="w-5 h-5 text-accent" />
@@ -480,7 +476,6 @@ const Lobby = () => {
             </Tabs>
           </section>
 
-          {/* Seção de Cartelas */}
           <section>
             <div className="flex items-center justify-between mb-4 gap-2">
               <div className="flex items-center gap-2">
@@ -556,7 +551,6 @@ const Lobby = () => {
         </div>
       </div>
 
-      {/* Diálogo de Inscrição */}
       <Dialog open={isJoinDialogOpen} onOpenChange={setJoinDialogOpen}>
         <DialogContent className="max-w-md max-h-[80vh] overflow-y-auto">
           <DialogHeader><DialogTitle>Entrar na Partida</DialogTitle></DialogHeader>
