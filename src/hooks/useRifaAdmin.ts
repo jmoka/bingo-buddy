@@ -68,7 +68,7 @@ export const useRifaAdmin = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('solicitacoes_vendedor')
-        .select('*, perfis!solicitacoes_vendedor_user_id_fkey(full_name, avatar_url)')
+        .select('*, perfis(full_name, avatar_url)')
         .order('created_at', { ascending: false });
       if (error) {
         console.error('[useRifaAdmin] solicitacoesVendedor error:', error);
