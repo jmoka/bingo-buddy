@@ -190,35 +190,36 @@ export default function VendedorCartelas() {
 
                   {/* CANHOTO DO VENDEDOR (MENOR) */}
                   <div className="w-[220px] bg-gray-50/50 p-4 flex flex-col shrink-0">
-                    <div className="flex justify-between items-center mb-3">
-                      <p className="text-[8px] font-black text-gray-400 uppercase">Canhoto Vendedor</p>
-                      <p className="text-sm font-black font-mono text-gray-800">Nº {String(b.numero).padStart(3, '0')}</p>
+                    <div className="flex justify-between items-start mb-2">
+                      <p className="text-[8px] font-black text-gray-400 uppercase pt-1">Canhoto Vendedor</p>
+                      <div className="text-right">
+                        <p className="text-sm font-black font-mono text-gray-800">Nº {String(b.numero).padStart(3, '0')}</p>
+                        {b.codigoValidacao && (
+                          <div className="mt-1 bg-white p-1 border border-gray-200 rounded shadow-sm inline-block">
+                            <QRCodeSVG value={`${BASE_URL}/validar-cartela?codigo=${b.codigoValidacao}`} size={42} />
+                          </div>
+                        )}
+                      </div>
                     </div>
 
                     {/* Campos para preencher */}
-                    <div className="space-y-3 flex-1">
+                    <div className="space-y-2 flex-1">
                       <div className="border-b border-gray-300 pb-0.5">
                         <p className="text-[7px] text-gray-400 uppercase font-bold">Nome Comprador</p>
-                        <div className="h-4" />
+                        <div className="h-3" />
                       </div>
                       <div className="border-b border-gray-300 pb-0.5">
                         <p className="text-[7px] text-gray-400 uppercase font-bold">Telefone / WhatsApp</p>
-                        <div className="h-4" />
+                        <div className="h-3" />
                       </div>
                       <div className="border-b border-gray-300 pb-0.5">
                         <p className="text-[7px] text-gray-400 uppercase font-bold">Endereço</p>
-                        <div className="h-4" />
+                        <div className="h-3" />
                       </div>
                     </div>
 
-                    <div className="mt-3 pt-2 border-t border-gray-200 flex items-center justify-between gap-2">
-                      <div className="min-w-0">
-                        <p className="text-[7px] text-gray-400 uppercase font-bold truncate">{b.rifa?.nome}</p>
-                        <p className="text-[8px] font-black text-emerald-600 mt-0.5">VALIDAR VENDA →</p>
-                      </div>
-                      <div className="shrink-0 bg-white p-1 border border-gray-200 rounded shadow-sm">
-                        <QRCodeSVG value={`${BASE_URL}/validar-cartela?codigo=${b.codigoValidacao}`} size={42} />
-                      </div>
+                    <div className="mt-auto pt-2 border-t border-gray-200">
+                      <p className="text-[7px] text-gray-400 uppercase font-bold truncate">{b.rifa?.nome}</p>
                     </div>
                   </div>
 
