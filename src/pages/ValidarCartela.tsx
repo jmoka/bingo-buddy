@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -18,10 +18,12 @@ import { toast } from 'sonner';
 
 export default function ValidarCartela() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const urlCodigo = searchParams.get('codigo');
 
   const [rifasAbertas, setRifasAbertas] = useState<{ id: string; nome: string }[]>([]);
 
-  const [codigoCartela, setCodigoCartela] = useState('');
+  const [codigoCartela, setCodigoCartela] = useState(urlCodigo || '');
   const [loadingCartela, setLoadingCartela] = useState(false);
   const [resultadoCartela, setResultadoCartela] = useState<any | null>(null);
   const [buscadoCartela, setBuscadoCartela] = useState(false);
@@ -43,16 +45,27 @@ export default function ValidarCartela() {
       });
   }, []);
 
-  const buscarCartela = async () => {
-    if (!codigoCartela.trim()) { toast.error('Digite o código de validação.'); return; }
+  // Busca automática se vier código na URL
+  useEffect(() => {
+    if (urlCodigo) {
+      buscarCartela(urlCodigo);
+    }
+  }, [urlCodigo]);
+
+  const buscarCartela = async (codigoOverride?: string) => {
+    const code = codigoOverride || codigoCartela;
+    if (!code.trim()) { toast.error('Digite o código de validação.'); return; }
+    
     setLoadingCartela(true);
     setBuscadoCartela(false);
     setResultadoCartela(null);
+    
     const { data, error } = await supabase
       .from('cartelas_rifa')
       .select('*, compras_rifa(*, rifas(nome, status, numero_ganhador)), numeros_rifa(numero, status, nome_comprador, telefone_comprador)')
-      .eq('codigo_validacao', codigoCartela.toUpperCase().trim())
+      .eq('codigo_validacao', code.toUpperCase().trim())
       .single();
+      
     setLoadingCartela(false);
     setBuscadoCartela(true);
     setResultadoCartela(error || !data ? null : data);
@@ -75,7 +88,6 @@ export default function ValidarCartela() {
     }
 
     const { data, error } = await query.limit(10);
-    console.log('buscarNumeroRifa:', { data, error, numeroRifa, rifaIdSelecionada });
     setLoadingRifa(false);
     setBuscadoRifa(true);
     setResultadoRifa(error || !data || data.length === 0 ? null : data);
@@ -87,7 +99,6 @@ export default function ValidarCartela() {
   const nomeComprador = resultadoCartela?.numeros_rifa?.nome_comprador;
   const telefoneComprador = resultadoCartela?.numeros_rifa?.telefone_comprador;
   const isVendido = statusNumero === 'vendido';
-  const isReservado = statusNumero === 'reservado';
   const isGanhador =
     rifa?.status === 'finalizada' &&
     rifa?.numero_ganhador != null &&
@@ -104,7 +115,7 @@ export default function ValidarCartela() {
           <h1 className="text-2xl font-bold">Validar</h1>
         </div>
 
-        <Tabs defaultValue="rifa">
+        <Tabs defaultValue={urlCodigo ? "cartela" : "rifa"}>
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="rifa" className="flex items-center gap-1.5">
               <Hash className="w-4 h-4" /> Número da Rifa
@@ -240,19 +251,20 @@ export default function ValidarCartela() {
             <div className="card-container p-6 space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="codigo">Código de validação</Label>
-                <Input
-                  id="codigo"
-                  value={codigoCartela}
-                  onChange={e => setCodigoCartela(e.target.value.toUpperCase())}
-                  onKeyDown={e => e.key === 'Enter' && buscarCartela()}
-                  placeholder="Ex: AB12CD34EF"
-                  className="font-mono uppercase"
-                />
+                <div className="flex gap-2">
+                  <Input
+                    id="codigo"
+                    value={codigoCartela}
+                    onChange={e => setCodigoCartela(e.target.value.toUpperCase())}
+                    onKeyDown={e => e.key === 'Enter' && buscarCartela()}
+                    placeholder="Ex: AB12CD34EF"
+                    className="font-mono uppercase"
+                  />
+                  <Button onClick={() => buscarCartela()} disabled={loadingCartela}>
+                    {loadingCartela ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+                  </Button>
+                </div>
               </div>
-              <Button className="w-full gradient-primary" onClick={buscarCartela} disabled={loadingCartela}>
-                {loadingCartela ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Search className="h-4 w-4 mr-2" />}
-                Buscar
-              </Button>
             </div>
 
             {buscadoCartela && resultadoCartela && (
