@@ -13,7 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { ArrowLeft, Search, CheckCircle, XCircle, Ticket, Loader2, Hash } from 'lucide-react';
+import { ArrowLeft, Search, CheckCircle, XCircle, Ticket, Loader2, Hash, Check } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function ValidarCartela() {
@@ -98,7 +98,7 @@ export default function ValidarCartela() {
       <div className="max-w-xl mx-auto space-y-6">
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="icon" onClick={() => navigate('/')}>
-            <ArrowLeft className="h-5 w-5" />
+            <ArrowLeft className="w-5 h-5" />
           </Button>
           <Search className="h-6 w-6 text-primary" />
           <h1 className="text-2xl font-bold">Validar</h1>
@@ -148,13 +148,19 @@ export default function ValidarCartela() {
             </div>
 
             {buscadoRifa && !resultadoRifa && (
-  <div className="card-container p-6 border-red-300" >
- 
+              <div className="card-container p-6 border-blue-300 bg-blue-50/50">
                 <div className="flex items-center gap-3">
-                  <XCircle className="h-8 w-8 text-red-500" />
-                  <div>
-                    <p className="font-bold text-lg text-blue-700">Número Liberado para Comprar</p>
-                    < p className = "text-sm text-muted-foreground" > Volte até a Rifa e selecione esse número para realizar a compra! </p>
+                  <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
+                    <Check className="h-6 w-6 text-blue-600" />
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <p className="font-bold text-lg text-blue-700 leading-none">Número Disponível</p>
+                      <Badge className="bg-blue-600 text-white hover:bg-blue-700 animate-pulse">LIBERADA</Badge>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      Este número está livre! Volte até a Rifa e selecione-o para realizar a compra agora mesmo.
+                    </p>
                   </div>
                 </div>
               </div>
