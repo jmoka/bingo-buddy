@@ -101,7 +101,7 @@ export const AppHeader = () => {
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="container max-w-6xl mx-auto flex h-16 items-center justify-between px-4">
+      <div className="container max-w-6xl mx-auto flex h-16 items-center justify-between">
         <a href="/" className="font-heading text-2xl font-bold text-foreground">
           🎱 Bingo
         </a>
@@ -129,21 +129,19 @@ export const AppHeader = () => {
 
           <button
             onClick={() => navigate('/account')}
-            className="flex items-center gap-1.5 hover:opacity-80 transition-opacity"
+            className="flex flex-col items-center gap-0.5 hover:opacity-80 transition-opacity"
             title="Meu perfil"
           >
-            <div className="flex items-center gap-1.5 bg-muted rounded-full pl-0.5 pr-2 py-0.5 border border-border">
-              {avatarSrc ? (
-                <img src={avatarSrc} alt="avatar" className="w-7 h-7 rounded-full object-cover shrink-0" />
-              ) : (
-                <div className="w-7 h-7 rounded-full bg-background flex items-center justify-center shrink-0">
-                  <User className="w-4 h-4 text-muted-foreground" />
-                </div>
-              )}
-              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full border ${roleBadge.className}`}>
-                {roleBadge.label}
-              </span>
-            </div>
+            {avatarSrc ? (
+              <img src={avatarSrc} alt="avatar" className="w-8 h-8 rounded-full object-cover shrink-0" />
+            ) : (
+              <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center shrink-0">
+                <User className="w-4 h-4 text-muted-foreground" />
+              </div>
+            )}
+            <span className={`text-[9px] font-bold px-1.5 py-0 rounded-full border ${roleBadge.className}`}>
+              {roleBadge.label}
+            </span>
           </button>
           <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
             <SheetTrigger asChild>
