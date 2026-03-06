@@ -33,12 +33,15 @@ const MatchView = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { profile } = useAuth();
-  const { matches, getPlayerMatchCards, matchCards, isLoading, setManualMode, toggleManualMark } = useGame();
+  const { matches, getPlayerMatchCards, matchCards, isLoading, setManualMode, toggleManualMark, checkWinState } = useGame();
   const queryClient = useQueryClient();
   const [lastCalledNumber, setLastCalledNumber] = useState<number | null>(null);
   const [now, setNow] = useState(Date.now());
   
   const [confirmManualCard, setConfirmManualCard] = useState<{cardId: string} | null>(null);
+  
+  const checkedCardsRef = useRef<Set<string>>(new Set());
+  const warnedCardsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     if (!id) return;
@@ -104,6 +107,7 @@ const MatchView = () => {
   // Validação de vitória manual no lado do cliente
   useEffect(() => {
     if (!match || !profile) return;
+    if (match.status !== 'in_progress') return;
 
     const myCurrentCards = getPlayerMatchCards(match.id, profile.id);
 
@@ -123,15 +127,24 @@ const MatchView = () => {
                 const uncalledNumbers = winningNumbers.filter(n => !calledNumbers.has(n));
 
                 if (uncalledNumbers.length > 0) {
-                    toast.error("Bingo Inválido!", {
-                        description: `Reveja sua cartela. Os números ${uncalledNumbers.join(', ')} não foram sorteados.`,
-                        duration: 6000,
-                    });
+                    if (!warnedCardsRef.current.has(card.id)) {
+                        toast.error("Bingo Inválido!", {
+                            description: `Reveja sua cartela. Você marcou números que ainda não saíram: ${uncalledNumbers.join(', ')}.`,
+                            duration: 6000,
+                        });
+                        warnedCardsRef.current.add(card.id);
+                    }
+                } else {
+                    warnedCardsRef.current.delete(card.id); // Limpa o aviso se ele arrumou a cartela
+                    if (!checkedCardsRef.current.has(card.id)) {
+                        checkedCardsRef.current.add(card.id);
+                        checkWinState(match.id);
+                    }
                 }
             }
         }
     });
-  }, [matchCards, match, profile]);
+  }, [matchCards, match, profile, checkWinState]);
 
   const handleCellClick = async (cardId: string, num: number, currentMode: 'auto' | 'manual') => {
     if (!match || match.status !== 'in_progress' || num === 0) return;
@@ -313,7 +326,7 @@ const MatchView = () => {
                             number={num}
                             isMarked={isMarked}
                             isFreeSpace={i === 12}
-                            isNewlyMarked={isMarked && num === lastCalledNumber} // <-- AQUI ESTÁ A CORREÇÃO (SÓ PISCA SE ESTIVER REALMENTE MARCADO)
+                            isNewlyMarked={isMarked && num === lastCalledNumber}
                             onClick={() => handleCellClick(card.id, num, mode)}
                         />
                     )

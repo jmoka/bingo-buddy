@@ -171,6 +171,20 @@ export const useMatches = () => {
     }
   };
 
+  const checkWinState = async (matchId: string) => {
+    const { data, error } = await supabase.functions.invoke('call-number', {
+      body: { matchId, checkOnly: true }
+    });
+    if (error) {
+      console.error("Erro ao verificar vitória manual:", error);
+      return;
+    }
+    if (data?.newWinners && data.newWinners.length > 0) {
+      queryClient.invalidateQueries({ queryKey: ['matches'] });
+      queryClient.invalidateQueries({ queryKey: ['matchCards'] });
+    }
+  };
+
   const getPlayerMatchCards = (matchId: string, playerId: string) => matchCards.filter(c => c.match_id === matchId && c.player_id === playerId);
 
   return {
@@ -188,5 +202,6 @@ export const useMatches = () => {
     getPlayerMatchCards,
     setManualMode,
     toggleManualMark,
+    checkWinState,
   };
 };

@@ -55,13 +55,13 @@ serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
   try {
-    const { matchId, specificNumber } = await req.json();
+    const { matchId, specificNumber, checkOnly } = await req.json();
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    console.log(`[call-number] Processando partida ${matchId}`);
+    console.log(`[call-number] Processando partida ${matchId} (checkOnly: ${checkOnly})`);
 
     // 1. Lock para evitar processamento duplo
     const { data: gotLock } = await supabaseAdmin.rpc('try_lock_match', { p_match_id: matchId });
@@ -72,25 +72,29 @@ serve(async (req) => {
     if (matchErr || !match) throw new Error("Partida não encontrada");
     if (match.status === 'finished') return new Response(JSON.stringify({ success: true, message: 'Match finished' }), { headers: corsHeaders });
 
-    // 3. Sorteio
-    const calledArray = match.called_numbers || [];
-    const availableNumbers = Array.from({ length: 75 }, (_, i) => i + 1).filter(n => !calledArray.includes(n));
+    let num = null;
 
-    if (availableNumbers.length === 0) {
-      await supabaseAdmin.from('partidas').update({ status: 'finished', is_auto_calling: false }).eq('id', matchId);
-      return new Response(JSON.stringify({ success: true, message: 'No numbers left' }), { headers: corsHeaders });
+    if (!checkOnly) {
+        // 3. Sorteio
+        const calledArray = match.called_numbers || [];
+        const availableNumbers = Array.from({ length: 75 }, (_, i) => i + 1).filter(n => !calledArray.includes(n));
+
+        if (availableNumbers.length === 0) {
+          await supabaseAdmin.from('partidas').update({ status: 'finished', is_auto_calling: false }).eq('id', matchId);
+          return new Response(JSON.stringify({ success: true, message: 'No numbers left' }), { headers: corsHeaders });
+        }
+
+        num = (specificNumber && availableNumbers.includes(specificNumber))
+          ? specificNumber
+          : availableNumbers[Math.floor(Math.random() * availableNumbers.length)];
+
+        // 4. Registrar número e marcar cartelas no banco
+        const { data: appendResult } = await supabaseAdmin.rpc('append_called_number', { p_match_id: matchId, p_num: num });
+        if (!appendResult || appendResult.already_called) {
+           return new Response(JSON.stringify({ success: true, message: 'Number already processed' }), { headers: corsHeaders });
+        }
+        await supabaseAdmin.rpc('mark_number_for_match_cards', { p_match_id: matchId, p_num: num });
     }
-
-    const num = (specificNumber && availableNumbers.includes(specificNumber))
-      ? specificNumber
-      : availableNumbers[Math.floor(Math.random() * availableNumbers.length)];
-
-    // 4. Registrar número e marcar cartelas no banco
-    const { data: appendResult } = await supabaseAdmin.rpc('append_called_number', { p_match_id: matchId, p_num: num });
-    if (!appendResult || appendResult.already_called) {
-       return new Response(JSON.stringify({ success: true, message: 'Number already processed' }), { headers: corsHeaders });
-    }
-    await supabaseAdmin.rpc('mark_number_for_match_cards', { p_match_id: matchId, p_num: num });
 
     // 5. Analisar Vencedores
     const { data: matchCards } = await supabaseAdmin.from('cartelas_partida').select('*').eq('match_id', matchId);
@@ -98,6 +102,9 @@ serve(async (req) => {
     
     const existingWinnerCardIds = new Set((match.winners || []).map((w: any) => w.cardId));
     const newWinnersFound: any[] = [];
+
+    const calledNumbersSet = new Set(match.called_numbers || []);
+    if (!checkOnly && num !== null) calledNumbersSet.add(num);
 
     for (const card of (matchCards || [])) {
       if (existingWinnerCardIds.has(card.id)) continue;
@@ -112,16 +119,21 @@ serve(async (req) => {
 
       const winResult = checkWin(tempCard, match.game_type);
       if (winResult) {
-        newWinnersFound.push({
-          playerId: card.player_id,
-          playerName: allProfiles?.find(p => p.id === card.player_id)?.full_name || 'Jogador',
-          cardId: card.id,
-          cardName: card.name,
-          creditType: card.credit_type,
-          playerCardId: card.player_card_id,
-          numbers: grid,
-          markedNumbers: Array.from(tempCard.markedNumbers)
-        });
+        // SEGURANÇA: Verificar se todos os números vencedores realmente foram sorteados
+        const uncalled = winResult.winningNumbers.filter(n => n !== 0 && !calledNumbersSet.has(n));
+
+        if (uncalled.length === 0) {
+            newWinnersFound.push({
+              playerId: card.player_id,
+              playerName: allProfiles?.find(p => p.id === card.player_id)?.full_name || 'Jogador',
+              cardId: card.id,
+              cardName: card.name,
+              creditType: card.credit_type,
+              playerCardId: card.player_card_id,
+              numbers: grid,
+              markedNumbers: Array.from(tempCard.markedNumbers)
+            });
+        }
       }
     }
 
@@ -176,15 +188,19 @@ serve(async (req) => {
         
         if (hasRemainingReal) {
           // O jogo continua para os outros que jogam com créditos reais
-          const { data: cfg } = await supabaseAdmin.from('configuracoes').select('intervalo_sorteio_auto_seg').single();
-          const next = new Date(Date.now() + (Number(cfg?.intervalo_sorteio_auto_seg || 120) * 1000)).toISOString();
-          await supabaseAdmin.from('partidas').update({ winners: updatedWinners, next_auto_call_timestamp: next }).eq('id', matchId);
+          if (!checkOnly) {
+              const { data: cfg } = await supabaseAdmin.from('configuracoes').select('intervalo_sorteio_auto_seg').single();
+              const next = new Date(Date.now() + (Number(cfg?.intervalo_sorteio_auto_seg || 120) * 1000)).toISOString();
+              await supabaseAdmin.from('partidas').update({ winners: updatedWinners, next_auto_call_timestamp: next }).eq('id', matchId);
+          } else {
+              await supabaseAdmin.from('partidas').update({ winners: updatedWinners }).eq('id', matchId);
+          }
         } else {
           // Não há mais ninguém jogando com crédito real, encerra.
           await supabaseAdmin.from('partidas').update({ status: 'finished', winners: updatedWinners, is_auto_calling: false, next_auto_call_timestamp: null }).eq('id', matchId);
         }
       }
-    } else if (match.is_auto_calling) {
+    } else if (match.is_auto_calling && !checkOnly) {
       // Ninguém ganhou nesta bola, programa o próximo sorteio
       const { data: cfg } = await supabaseAdmin.from('configuracoes').select('intervalo_sorteio_auto_seg').single();
       const next = new Date(Date.now() + (Number(cfg?.intervalo_sorteio_auto_seg || 120) * 1000)).toISOString();
