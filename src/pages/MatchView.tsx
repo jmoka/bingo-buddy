@@ -4,7 +4,7 @@ import { BingoCell } from '@/components/BingoCell';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { gameTypeLabels } from '@/utils/bingoUtils';
-import { ArrowLeft, Coins, Users, Bot, Loader2, Star, Trophy, AlertTriangle, CheckCircle2, HandPointer } from 'lucide-react';
+import { ArrowLeft, Coins, Users, Bot, Loader2, Star, Trophy, AlertTriangle, CheckCircle2, Hand } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { playNotificationSound } from '@/utils/soundUtils';
@@ -119,7 +119,7 @@ const MatchView = () => {
     if (confirmManualCard) {
         // Se a troca foi via clique em número, marcamos o número. 
         // Se foi via switch, apenas trocamos o modo (usando um número já sorteado qualquer ou apenas forçando o modo via RPC)
-        const numToMark = confirmManualCard.num || match?.called_numbers[0];
+        const numToMark = confirmManualCard.num || (match?.called_numbers && match.called_numbers.length > 0 ? match.called_numbers[0] : null);
         if (numToMark) {
             await markNumberManually(confirmManualCard.cardId, numToMark);
         }
@@ -231,7 +231,7 @@ const MatchView = () => {
             Minhas Cartelas ({myCards.length})
         </h2>
         <div className="flex items-center gap-2 px-3 py-1.5 bg-muted rounded-full border border-border/50">
-            <HandPointer className="w-3.5 h-3.5 text-muted-foreground" />
+            <Hand className="w-3.5 h-3.5 text-muted-foreground" />
             <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-tight">Clique no número para marcar manual</span>
         </div>
       </div>
