@@ -117,13 +117,10 @@ const MatchView = () => {
 
   const handleConfirmManual = async () => {
     if (confirmManualCard) {
-        // Se a troca foi via clique em número, marcamos o número. 
-        // Se foi via switch, apenas trocamos o modo (usando um número já sorteado qualquer ou apenas forçando o modo via RPC)
-        const numToMark = confirmManualCard.num || (match?.called_numbers && match.called_numbers.length > 0 ? match.called_numbers[0] : null);
-        if (numToMark) {
-            await markNumberManually(confirmManualCard.cardId, numToMark);
-        }
-        setConfirmManualCard(null);
+      // Se a troca foi via clique em número, marcamos o número. 
+      // Se foi via switch, passamos null para apenas trocar o modo.
+      await markNumberManually(confirmManualCard.cardId, confirmManualCard.num || null);
+      setConfirmManualCard(null);
     }
   };
 

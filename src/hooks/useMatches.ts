@@ -120,7 +120,7 @@ export const useMatches = () => {
     });
   };
 
-  const markNumberManually = async (cardId: string, num: number) => {
+  const markNumberManually = async (cardId: string, num: number | null) => {
     const { data, error } = await supabase.rpc('manual_mark_number', {
       p_card_id: cardId,
       p_num: num
