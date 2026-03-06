@@ -120,6 +120,28 @@ export const useMatches = () => {
     });
   };
 
+  const markNumberManually = async (cardId: string, num: number) => {
+    const { data, error } = await supabase.rpc('manual_mark_number', {
+      p_card_id: cardId,
+      p_num: num
+    });
+
+    if (error) {
+      console.error("Erro ao marcar manualmente:", error);
+      return false;
+    }
+
+    if (!data?.success) {
+      if (data?.error === 'number_not_called') {
+        toast.error("Este número ainda não foi sorteado!");
+      }
+      return false;
+    }
+
+    queryClient.invalidateQueries({ queryKey: ['matchCards'] });
+    return true;
+  };
+
   const callNumber = async (matchId: string, specificNumber?: number) => {
     const { data, error } = await supabase.functions.invoke('call-number', { 
       body: { matchId, specificNumber } 
@@ -130,15 +152,11 @@ export const useMatches = () => {
       return;
     }
   
-    // Invalidate queries to refresh the UI immediately
     queryClient.invalidateQueries({ queryKey: ['matches'] });
     queryClient.invalidateQueries({ queryKey: ['matchCards'] });
   
-    // Show a success toast if there are winners
     if (data?.newWinners && data.newWinners.length > 0) {
       const realWinners = data.newWinners.filter((w: any) => w.creditType === 'real');
-      
-      // Check if the match is actually finished by looking at the real winners
       if (realWinners.length > 0) {
         const winnerNames = realWinners.map((w: any) => w.playerName).join(', ');
         toast.success('BINGO! Partida finalizada!', {
@@ -146,7 +164,6 @@ export const useMatches = () => {
           duration: 10000,
         });
       } else {
-        // This is for "fake credit" winners where the game continues
         const fakeWinnerNames = data.newWinners.map((w: any) => w.playerName).join(', ');
         toast.info('Bingo de Brincar!', {
           description: `${fakeWinnerNames} venceu. O jogo continua para o prêmio real!`,
@@ -171,5 +188,6 @@ export const useMatches = () => {
     toggleAutoCall,
     callNumber,
     getPlayerMatchCards,
+    markNumberManually,
   };
 };

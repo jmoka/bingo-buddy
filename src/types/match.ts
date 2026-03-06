@@ -60,6 +60,7 @@ export interface MatchCard {
   numbers: number[][];
   marked_numbers: Set<number>;
   credit_type: 'real' | 'fake';
+  marking_mode: 'auto' | 'manual';
 }
 
 export interface Win {

@@ -4,7 +4,7 @@ import { BingoCell } from '@/components/BingoCell';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { gameTypeLabels } from '@/utils/bingoUtils';
-import { ArrowLeft, Coins, Users, Bot, Loader2, Star, Trophy } from 'lucide-react';
+import { ArrowLeft, Coins, Users, Bot, Loader2, Star, Trophy, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { playNotificationSound } from '@/utils/soundUtils';
@@ -14,15 +14,27 @@ import { MatchStats } from '@/components/MatchStats';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 const MatchView = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { profile } = useAuth();
-  const { matches, getPlayerMatchCards, matchCards, isLoading } = useGame();
+  const { matches, getPlayerMatchCards, matchCards, isLoading, markNumberManually } = useGame();
   const queryClient = useQueryClient();
   const [lastCalledNumber, setLastCalledNumber] = useState<number | null>(null);
   const [now, setNow] = useState(Date.now());
+  
+  const [confirmManualCard, setConfirmManualCard] = useState<{cardId: string, num: number} | null>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -55,7 +67,6 @@ const MatchView = () => {
   useEffect(() => {
     if (!match) return;
 
-    // Notificação de novo número
     const currentNumbers = match.called_numbers;
     if (currentNumbers.length > prevCalledNumbersRef.current.length) {
       const newNumber = currentNumbers[currentNumbers.length - 1];
@@ -67,7 +78,6 @@ const MatchView = () => {
     }
     prevCalledNumbersRef.current = currentNumbers;
 
-    // Notificação de vencedor (especialmente para modo brincar com jogo em andamento)
     if (match.winners.length > prevWinnersCountRef.current) {
       const latestWinner = match.winners[match.winners.length - 1];
       const isFunWinner = (latestWinner as any).creditType === 'fake';
@@ -89,6 +99,29 @@ const MatchView = () => {
     prevWinnersCountRef.current = match.winners.length;
 
   }, [match]);
+
+  const handleCellClick = async (cardId: string, num: number, currentMode: 'auto' | 'manual', isMarked: boolean) => {
+    if (match?.status !== 'in_progress' || isMarked || num === 0) return;
+    
+    // Verifica se o número foi sorteado
+    if (!match.called_numbers.includes(num)) {
+        toast.error("Este número ainda não foi sorteado!");
+        return;
+    }
+
+    if (currentMode === 'auto') {
+        setConfirmManualCard({ cardId, num });
+    } else {
+        await markNumberManually(cardId, num);
+    }
+  };
+
+  const handleConfirmManual = async () => {
+    if (confirmManualCard) {
+        await markNumberManually(confirmManualCard.cardId, confirmManualCard.num);
+        setConfirmManualCard(null);
+    }
+  };
 
   if (isLoading && !match) {
     return (
@@ -114,7 +147,6 @@ const MatchView = () => {
   const lastCalled = match.called_numbers.length > 0 ? match.called_numbers[match.called_numbers.length - 1] : null;
   const countdown = match.next_auto_call_timestamp ? Math.max(0, Math.round((new Date(match.next_auto_call_timestamp).getTime() - now) / 1000)) : null;
 
-  // Filtra vencedores de brincar que ganharam enquanto o jogo ainda corre
   const funWinnersInProgress = match.winners.filter(w => (w as any).creditType === 'fake');
 
   return (
@@ -142,7 +174,6 @@ const MatchView = () => {
         </div>
       </div>
 
-      {/* Alerta de Vencedores de Brincar (Jogo em andamento) */}
       {match.status === 'in_progress' && funWinnersInProgress.length > 0 && (
         <Alert className="mb-6 border-amber-500 bg-amber-500/10 text-amber-700 animate-pulse">
           <Star className="h-4 w-4 text-amber-600" />
@@ -194,32 +225,84 @@ const MatchView = () => {
         Minhas Cartelas ({myCards.length})
       </h2>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {myCards.map((card) => (
-          <div key={card.id} className="card-container max-w-sm mx-auto w-full">
-            <h3 className="font-heading font-semibold text-foreground mb-4 flex items-center justify-between">
-              {card.name}
-              {(card as any).credit_type === 'fake' && <Badge variant="outline" className="text-[10px] border-amber-400 text-amber-600">Brincar</Badge>}
-            </h3>
-            <div className="grid grid-cols-5 gap-1.5 sm:gap-2">
-              {['B', 'I', 'N', 'G', 'O'].map(letter => (
-                <div key={letter} className="w-full aspect-square rounded-lg flex items-center justify-center text-sm sm:text-lg font-heading font-bold gradient-primary text-primary-foreground shadow-sm">
-                  {letter}
+        {myCards.map((card) => {
+          const mode = card.marking_mode || 'auto';
+          return (
+            <div key={card.id} className="card-container max-w-sm mx-auto w-full border-2 transition-colors relative">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                    <h3 className="font-heading font-semibold text-foreground flex items-center gap-2">
+                    {card.name}
+                    {card.credit_type === 'fake' && <Badge variant="outline" className="text-[10px] border-amber-400 text-amber-600">Brincar</Badge>}
+                    </h3>
+                    <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-tighter">
+                        Marcação: <span className={cn("font-bold", mode === 'auto' ? "text-primary" : "text-amber-600")}>
+                            {mode === 'auto' ? 'Automática' : 'MANUAL'}
+                        </span>
+                    </p>
                 </div>
-              ))}
-              {card.numbers.flat().map((num, i) => (
-                  <BingoCell
-                    key={`${card.id}-${i}`}
-                    number={num}
-                    isMarked={card.marked_numbers.has(num)}
-                    isFreeSpace={i === 12}
-                    isNewlyMarked={num === lastCalledNumber}
-                  />
-                ))
-              }
+                {mode === 'manual' && <Badge className="bg-amber-500 h-5 text-[9px] animate-pulse">ATENÇÃO: MODO MANUAL</Badge>}
+              </div>
+              
+              <div className="grid grid-cols-5 gap-1.5 sm:gap-2">
+                {['B', 'I', 'N', 'G', 'O'].map(letter => (
+                  <div key={letter} className="w-full aspect-square rounded-lg flex items-center justify-center text-sm sm:text-lg font-heading font-bold gradient-primary text-primary-foreground shadow-sm">
+                    {letter}
+                  </div>
+                ))}
+                {card.numbers.flat().map((num, i) => {
+                    const isMarked = card.marked_numbers.has(num);
+                    return (
+                        <BingoCell
+                            key={`${card.id}-${i}`}
+                            number={num}
+                            isMarked={isMarked}
+                            isFreeSpace={i === 12}
+                            isNewlyMarked={num === lastCalledNumber}
+                            onClick={() => handleCellClick(card.id, num, mode, isMarked)}
+                        />
+                    )
+                })}
+              </div>
+              
+              {mode === 'manual' && match.status === 'in_progress' && (
+                <div className="mt-4 p-2.5 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-2 animate-in fade-in slide-in-from-bottom-1">
+                    <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                    <p className="text-[10px] text-amber-800 leading-tight">
+                        Você assumiu a marcação. Fique atento aos números sorteados para não passar batido!
+                    </p>
+                </div>
+              )}
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
+
+      <AlertDialog open={!!confirmManualCard} onOpenChange={(open) => !open && setConfirmManualCard(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+                <AlertTriangle className="w-6 h-6 text-amber-500" />
+                Mudar para Marcação Manual?
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-3">
+              <p className="font-bold text-foreground">
+                Uma vez que você marcar manualmente, esta cartela deixará de ser marcada automaticamente pelo sistema!
+              </p>
+              <div className="p-3 bg-destructive/5 border border-destructive/20 rounded-lg text-destructive font-semibold text-sm">
+                "Você terá que marcar os números manualmente caso deixe de marcar você passará batido."
+              </div>
+              <p>Deseja continuar e marcar este número agora?</p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmManual} className="bg-amber-600 hover:bg-amber-700">
+                Sim, quero marcar manual
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 };
