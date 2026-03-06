@@ -15,7 +15,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ArrowLeft, Trophy, Users, DollarSign, Hash, Loader2, CheckCircle, XCircle, AlertCircle, Pencil, Trash2, Upload, Link, Plus, X as XIcon, ImageIcon } from 'lucide-react';
+import { ArrowLeft, Trophy, Users, DollarSign, Hash, Loader2, CheckCircle, XCircle, AlertCircle, Pencil, Trash2, Upload, Link, Plus, X as XIcon, Image as ImageIcon } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { NumeroRifa, CompraRifa, Rifa } from '@/types/rifa';
@@ -233,6 +233,12 @@ const RifaDetalheAdmin = () => {
     e.preventDefault();
     if (!id) return;
     setSalvando(true);
+    
+    // Tratamento rigoroso das datas para evitar falha no update
+    const dataEncParsed = editForm.data_encerramento 
+      ? new Date(editForm.data_encerramento).toISOString() 
+      : null;
+
     const payload: Partial<Rifa> = {
       nome: editForm.nome || undefined,
       descricao: editForm.descricao || null,
@@ -241,8 +247,9 @@ const RifaDetalheAdmin = () => {
       premio_fotos: editForm.premio_fotos,
       foto_capa: editForm.foto_capa || null,
       custo_por_numero: Number(editForm.custo_por_numero),
-      data_encerramento: editForm.data_encerramento || null,
+      data_encerramento: dataEncParsed,
     };
+    
     const ok = await atualizarRifa(id, payload);
     setSalvando(false);
     if (ok) setEditarOpen(false);

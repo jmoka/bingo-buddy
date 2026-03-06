@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useRifaAdmin } from '@/hooks/useRifaAdmin';
 import { useAuth } from '@/contexts/AuthContext';
@@ -14,7 +14,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Plus, Ticket, Eye, Loader2, ArrowLeft, Calendar, DollarSign, Users } from 'lucide-react';
+import { Plus, Ticket, Eye, Loader2, ArrowLeft, Calendar, DollarSign, Users, Link as LinkIcon, Upload, Image as ImageIcon, X as XIcon } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Rifa } from '@/types/rifa';
@@ -30,22 +30,87 @@ const defaultForm = {
   descricao: '',
   regulamento: '',
   premio_descricao: '',
-  premio_foto: '',
+  premio_fotos: [] as string[],
+  foto_capa: '',
   quantidade_numeros: 100,
   numero_inicial: 1,
   custo_por_numero: 1,
   data_encerramento: '',
 };
 
+const ImageUploadField = ({
+  label,
+  value,
+  onChange,
+  onUpload,
+  uploading,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  onUpload: (file: File) => Promise<string | null>;
+  uploading: boolean;
+}) => {
+  const ref = useRef<HTMLInputElement>(null);
+  const [mode, setMode] = useState<'url' | 'file'>('url');
+
+  return (
+    <div className="space-y-1.5">
+      <Label>{label}</Label>
+      <div className="flex gap-2 mb-1.5">
+        <button
+          type="button"
+          onClick={() => setMode('url')}
+          className={`flex items-center gap-1 text-xs px-2 py-1 rounded border transition-colors ${mode === 'url' ? 'bg-primary text-primary-foreground border-primary' : 'border-border text-muted-foreground hover:border-primary/40'}`}
+        >
+          <LinkIcon className="w-3 h-3" /> URL
+        </button>
+        <button
+          type="button"
+          onClick={() => setMode('file')}
+          className={`flex items-center gap-1 text-xs px-2 py-1 rounded border transition-colors ${mode === 'file' ? 'bg-primary text-primary-foreground border-primary' : 'border-border text-muted-foreground hover:border-primary/40'}`}
+        >
+          <Upload className="w-3 h-3" /> Arquivo
+        </button>
+      </div>
+      {mode === 'url' ? (
+        <Input value={value} onChange={e => onChange(e.target.value)} placeholder="https://..." />
+      ) : (
+        <div>
+          <input ref={ref} type="file" accept="image/*" className="hidden" onChange={async e => {
+            const file = e.target.files?.[0];
+            if (!file) return;
+            const url = await onUpload(file);
+            if (url) onChange(url);
+          }} />
+          <Button type="button" variant="outline" size="sm" className="w-full" onClick={() => ref.current?.click()} disabled={uploading}>
+            {uploading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Upload className="w-4 h-4 mr-2" />}
+            {uploading ? 'Enviando...' : 'Selecionar arquivo'}
+          </Button>
+        </div>
+      )}
+      {value && (
+        <img src={value} alt="" className="mt-1 h-20 w-full object-cover rounded border" onError={e => (e.currentTarget.style.display = 'none')} />
+      )}
+    </div>
+  );
+};
+
 const RifasAdmin = () => {
   const navigate = useNavigate();
   const { profile } = useAuth();
-  const { todasRifas, isLoading, criarRifa } = useRifaAdmin();
+  const { todasRifas, isLoading, criarRifa, uploadImagemRifa } = useRifaAdmin();
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [novaRifaForm, setNovaRifaForm] = useState(defaultForm);
   const [criandoRifa, setCriandoRifa] = useState(false);
   const [filtroStatus, setFiltroStatus] = useState<'todas' | 'ativa' | 'finalizada'>('todas');
+
+  const [uploadingCapa, setUploadingCapa] = useState(false);
+  const [uploadingPremio, setUploadingPremio] = useState(false);
+  const premioFileRef = useRef<HTMLInputElement>(null);
+  const [premioUrlInput, setPremioUrlInput] = useState('');
+  const [premioMode, setPremioMode] = useState<'url' | 'file'>('url');
 
   const rifasFiltradas = filtroStatus === 'todas'
     ? todasRifas
@@ -63,22 +128,38 @@ const RifasAdmin = () => {
     setNovaRifaForm(prev => ({ ...prev, [field]: value }));
   };
 
+  const handleAddPremioFoto = async (source: string | File) => {
+    if (typeof source === 'string') {
+      if (!source.trim()) return;
+      setNovaRifaForm(p => ({ ...p, premio_fotos: [...p.premio_fotos, source.trim()] }));
+      setPremioUrlInput('');
+    } else {
+      setUploadingPremio(true);
+      const url = await uploadImagemRifa(source);
+      setUploadingPremio(false);
+      if (url) setNovaRifaForm(p => ({ ...p, premio_fotos: [...p.premio_fotos, url] }));
+    }
+  };
+
+  const handleRemovePremioFoto = (idx: number) => {
+    setNovaRifaForm(p => ({ ...p, premio_fotos: p.premio_fotos.filter((_, i) => i !== idx) }));
+  };
+
   const handleCriarRifa = async (e: React.FormEvent) => {
     e.preventDefault();
     setCriandoRifa(true);
     
-    // Mapeia os campos para o formato que o banco de dados espera
     const payload: Partial<Rifa> = {
       nome: novaRifaForm.nome,
       descricao: novaRifaForm.descricao || null,
       regulamento: novaRifaForm.regulamento || null,
       premio_descricao: novaRifaForm.premio_descricao || null,
-      // Transforma a URL única em uma lista (array) para a coluna premio_fotos
-      premio_fotos: novaRifaForm.premio_foto ? [novaRifaForm.premio_foto] : [],
+      premio_fotos: novaRifaForm.premio_fotos,
+      foto_capa: novaRifaForm.foto_capa || null,
       quantidade_numeros: Number(novaRifaForm.quantidade_numeros),
       numero_inicial: Number(novaRifaForm.numero_inicial),
       custo_por_numero: Number(novaRifaForm.custo_por_numero),
-      data_encerramento: novaRifaForm.data_encerramento || null,
+      data_encerramento: novaRifaForm.data_encerramento ? new Date(novaRifaForm.data_encerramento).toISOString() : null,
       status: 'ativa',
     };
     
@@ -115,7 +196,7 @@ const RifasAdmin = () => {
               Nova Rifa
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle className="font-heading flex items-center gap-2">
                 <Ticket className="w-5 h-5 text-primary" />
@@ -140,7 +221,7 @@ const RifasAdmin = () => {
                   value={novaRifaForm.descricao}
                   onChange={e => handleFormChange('descricao', e.target.value)}
                   placeholder="Descrição da rifa (opcional)"
-                  rows={3}
+                  rows={2}
                 />
               </div>
               <div className="space-y-1.5">
@@ -150,7 +231,7 @@ const RifasAdmin = () => {
                   value={novaRifaForm.regulamento}
                   onChange={e => handleFormChange('regulamento', e.target.value)}
                   placeholder="Regras e regulamento da rifa (opcional)"
-                  rows={3}
+                  rows={2}
                 />
               </div>
               <div className="space-y-1.5">
@@ -163,15 +244,70 @@ const RifasAdmin = () => {
                   rows={2}
                 />
               </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="premio_foto">URL da Foto do Prêmio</Label>
-                <Input
-                  id="premio_foto"
-                  value={novaRifaForm.premio_foto}
-                  onChange={e => handleFormChange('premio_foto', e.target.value)}
-                  placeholder="https://..."
-                />
+
+              <div className="space-y-2">
+                <Label>Fotos do Prêmio</Label>
+                {novaRifaForm.premio_fotos.length > 0 && (
+                  <div className="grid grid-cols-3 gap-2">
+                    {novaRifaForm.premio_fotos.map((url, idx) => (
+                      <div key={idx} className="relative group">
+                        <img src={url} alt="" className="h-20 w-full object-cover rounded border" onError={e => (e.currentTarget.style.display = 'none')} />
+                        <button
+                          type="button"
+                          onClick={() => handleRemovePremioFoto(idx)}
+                          className="absolute top-1 right-1 bg-destructive text-white rounded-full w-5 h-5 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                          <XIcon className="w-3 h-3" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <div className="flex gap-2 mb-1">
+                  <button type="button" onClick={() => setPremioMode('url')}
+                    className={`flex items-center gap-1 text-xs px-2 py-1 rounded border transition-colors ${premioMode === 'url' ? 'bg-primary text-primary-foreground border-primary' : 'border-border text-muted-foreground hover:border-primary/40'}`}>
+                    <LinkIcon className="w-3 h-3" /> URL
+                  </button>
+                  <button type="button" onClick={() => setPremioMode('file')}
+                    className={`flex items-center gap-1 text-xs px-2 py-1 rounded border transition-colors ${premioMode === 'file' ? 'bg-primary text-primary-foreground border-primary' : 'border-border text-muted-foreground hover:border-primary/40'}`}>
+                    <Upload className="w-3 h-3" /> Arquivo
+                  </button>
+                </div>
+                {premioMode === 'url' ? (
+                  <div className="flex gap-2">
+                    <Input value={premioUrlInput} onChange={e => setPremioUrlInput(e.target.value)} placeholder="https://..." />
+                    <Button type="button" size="sm" variant="outline" onClick={() => handleAddPremioFoto(premioUrlInput)} disabled={!premioUrlInput.trim()}>
+                      <Plus className="w-4 h-4" />
+                    </Button>
+                  </div>
+                ) : (
+                  <div>
+                    <input ref={premioFileRef} type="file" accept="image/*" multiple className="hidden" onChange={async e => {
+                      const files = Array.from(e.target.files || []);
+                      for (const f of files) await handleAddPremioFoto(f);
+                      e.target.value = '';
+                    }} />
+                    <Button type="button" variant="outline" size="sm" className="w-full" onClick={() => premioFileRef.current?.click()} disabled={uploadingPremio}>
+                      {uploadingPremio ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <ImageIcon className="w-4 h-4 mr-2" />}
+                      {uploadingPremio ? 'Enviando...' : 'Selecionar imagens'}
+                    </Button>
+                  </div>
+                )}
               </div>
+
+              <ImageUploadField
+                label="Foto de Capa Principal"
+                value={novaRifaForm.foto_capa}
+                onChange={v => handleFormChange('foto_capa', v)}
+                onUpload={async (file) => {
+                  setUploadingCapa(true);
+                  const url = await uploadImagemRifa(file);
+                  setUploadingCapa(false);
+                  return url;
+                }}
+                uploading={uploadingCapa}
+              />
+
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <Label htmlFor="quantidade_numeros">Qtd. Números</Label>
@@ -194,27 +330,29 @@ const RifasAdmin = () => {
                   />
                 </div>
               </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="custo_por_numero">Custo por Número (R$)</Label>
-                <Input
-                  id="custo_por_numero"
-                  type="number"
-                  step="0.01"
-                  min={0}
-                  value={novaRifaForm.custo_por_numero}
-                  onChange={e => handleFormChange('custo_por_numero', e.target.value)}
-                />
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label htmlFor="custo_por_numero">Custo por Número (R$)</Label>
+                  <Input
+                    id="custo_por_numero"
+                    type="number"
+                    step="0.01"
+                    min={0}
+                    value={novaRifaForm.custo_por_numero}
+                    onChange={e => handleFormChange('custo_por_numero', e.target.value)}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="data_encerramento">Data de Encerramento</Label>
+                  <Input
+                    id="data_encerramento"
+                    type="datetime-local"
+                    value={novaRifaForm.data_encerramento}
+                    onChange={e => handleFormChange('data_encerramento', e.target.value)}
+                  />
+                </div>
               </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="data_encerramento">Data de Encerramento</Label>
-                <Input
-                  id="data_encerramento"
-                  type="datetime-local"
-                  value={novaRifaForm.data_encerramento}
-                  onChange={e => handleFormChange('data_encerramento', e.target.value)}
-                />
-              </div>
-              <Button type="submit" className="w-full gradient-primary" disabled={criandoRifa}>
+              <Button type="submit" className="w-full gradient-primary mt-2" disabled={criandoRifa}>
                 {criandoRifa ? (
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                 ) : (
