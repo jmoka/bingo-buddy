@@ -211,7 +211,7 @@ serve(async (req) => {
       await supabaseAdmin.from('partidas').update({ next_auto_call_timestamp: next }).eq('id', matchId);
     }
 
-    return new Response(JSON.stringify({ success: true, newWinners: newWinnersFound.length }), { headers: corsHeaders });
+    return new Response(JSON.stringify({ success: true, newWinners: newWinnersFound }), { headers: corsHeaders });
 
   } catch (error: any) {
     console.error("[call-number] Erro fatal:", error.message);

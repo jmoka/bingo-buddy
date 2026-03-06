@@ -121,11 +121,38 @@ export const useMatches = () => {
   };
 
   const callNumber = async (matchId: string, specificNumber?: number) => {
-    const { error } = await supabase.functions.invoke('call-number', { body: { matchId, specificNumber } });
-    if (error) toast.error("Erro no sorteio.");
-    else {
-      queryClient.invalidateQueries({ queryKey: ['matches'] });
-      queryClient.invalidateQueries({ queryKey: ['matchCards'] });
+    const { data, error } = await supabase.functions.invoke('call-number', { 
+      body: { matchId, specificNumber } 
+    });
+  
+    if (error) {
+      toast.error("Erro no sorteio.", { description: error.message });
+      return;
+    }
+  
+    // Invalidate queries to refresh the UI immediately
+    queryClient.invalidateQueries({ queryKey: ['matches'] });
+    queryClient.invalidateQueries({ queryKey: ['matchCards'] });
+  
+    // Show a success toast if there are winners
+    if (data?.newWinners && data.newWinners.length > 0) {
+      const realWinners = data.newWinners.filter((w: any) => w.creditType === 'real');
+      
+      // Check if the match is actually finished by looking at the real winners
+      if (realWinners.length > 0) {
+        const winnerNames = realWinners.map((w: any) => w.playerName).join(', ');
+        toast.success('BINGO! Partida finalizada!', {
+          description: `Vencedor(es): ${winnerNames}.`,
+          duration: 10000,
+        });
+      } else {
+        // This is for "fake credit" winners where the game continues
+        const fakeWinnerNames = data.newWinners.map((w: any) => w.playerName).join(', ');
+        toast.info('Bingo de Brincar!', {
+          description: `${fakeWinnerNames} venceu. O jogo continua para o prêmio real!`,
+          duration: 6000,
+        });
+      }
     }
   };
 
