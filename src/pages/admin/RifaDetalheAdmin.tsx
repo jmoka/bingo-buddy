@@ -17,7 +17,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ArrowLeft, Trophy, Users, DollarSign, Hash, Loader2, CheckCircle, XCircle, AlertCircle, Pencil, Trash2, Upload, Link, Plus, X as XIcon, Image as ImageIcon, MapPin, Phone, Store, Globe } from 'lucide-react';
+import { ArrowLeft, Trophy, Users, DollarSign, Hash, Loader2, CheckCircle, XCircle, AlertCircle, Pencil, Trash2, Upload, Link, Plus, X as XIcon, Image as ImageIcon, MapPin, Phone, Store, Globe, Banknote, BadgePercent } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { NumeroRifa, CompraRifa, Rifa } from '@/types/rifa';
@@ -109,7 +109,7 @@ const ImageUploadField = ({
 const RifaDetalheAdmin = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { todasRifas, todasCompras, getNumerosRifaAdmin, finalizarRifa, cancelarRifa, atualizarRifa, deletarRifa, uploadImagemRifa } = useRifaAdmin();
+  const { todasRifas, todasCompras, vendedores, getNumerosRifaAdmin, finalizarRifa, cancelarRifa, atualizarRifa, deletarRifa, uploadImagemRifa } = useRifaAdmin();
   useRifas();
 
   const rifa = todasRifas.find(r => r.id === id);
@@ -179,13 +179,37 @@ const RifaDetalheAdmin = () => {
   const total = rifa.quantidade_numeros;
   const percentualVendido = total > 0 ? Math.round((vendidos / total) * 100) : 0;
 
-  // Variáveis do Dashboard Financeiro
+  // ==== CÁLCULOS DO DASHBOARD FINANCEIRO AVANÇADO ====
   const custoPremio = Number(rifa.custo_premio) || 0;
   const receitaTotalPrevista = total * Number(rifa.custo_por_numero);
-  const saldoPrevisto = receitaTotalPrevista - custoPremio;
-  const receitaVendida = vendidos * Number(rifa.custo_por_numero);
-  const receitaNaoVendida = (disponiveis + reservados) * Number(rifa.custo_por_numero);
-  const saldoAtual = receitaVendida - custoPremio;
+  
+  // O valor bruto de vendas se não houvesse desconto nenhum
+  const receitaBrutaVendida = vendidos * Number(rifa.custo_por_numero);
+
+  // Calcula quanto foi dado de desconto/comissão para os Vendedores
+  let custoVendedores = 0;
+  comprasRifa.forEach(compra => {
+    const brutoCompra = compra.numeros.length * Number(rifa.custo_por_numero);
+    
+    if (compra.tipo_pagamento === 'vendedor') {
+      // Vendedor reservando/comprando números: desconto aplicado no valor_total
+      const descontoDado = brutoCompra - Number(compra.valor_total);
+      if (descontoDado > 0) custoVendedores += descontoDado;
+    } else if (compra.ref_vendedor_id) {
+      // Usuário final comprou usando o link de um vendedor (comissão)
+      const vendedorInfo = vendedores.find(v => v.id === compra.ref_vendedor_id);
+      if (vendedorInfo && vendedorInfo.comissao_percentual) {
+        const comissaoPaga = Number(compra.valor_total) * (Number(vendedorInfo.comissao_percentual) / 100);
+        custoVendedores += comissaoPaga;
+      }
+    }
+  });
+
+  // A receita líquida (que realmente entra no caixa do Admin após descontos/comissões)
+  const receitaLiquidaCaixa = receitaBrutaVendida - custoVendedores;
+  
+  // Lucro ou Prejuízo real
+  const saldoAtualLucro = receitaLiquidaCaixa - custoPremio;
 
   const numerosFiltrados =
     filtroNumeros === 'todos' ? numeros : numeros.filter(n => n.status === filtroNumeros);
@@ -332,30 +356,30 @@ const RifaDetalheAdmin = () => {
         <h2 className="font-heading text-lg font-bold mb-4 flex items-center gap-2">
           <DollarSign className="w-5 h-5 text-primary"/> Resumo Financeiro
         </h2>
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 lg:gap-4">
           <div className="p-3 bg-muted rounded-lg border border-border/50">
              <p className="text-[10px] uppercase font-bold text-muted-foreground flex items-center gap-1"><AlertCircle className="w-3 h-3 text-destructive" /> Custo do Prêmio</p>
-             <p className="text-lg font-bold text-destructive">R$ {custoPremio.toFixed(2)}</p>
+             <p className="text-sm font-bold text-destructive">R$ {custoPremio.toFixed(2)}</p>
           </div>
           <div className="p-3 bg-muted rounded-lg border border-border/50">
-             <p className="text-[10px] uppercase font-bold text-muted-foreground">Potencial de Arrecadação</p>
-             <p className="text-lg font-bold text-foreground">R$ {receitaTotalPrevista.toFixed(2)}</p>
+             <p className="text-[10px] uppercase font-bold text-muted-foreground">Potencial (100%)</p>
+             <p className="text-sm font-bold text-foreground">R$ {receitaTotalPrevista.toFixed(2)}</p>
           </div>
           <div className="p-3 bg-muted rounded-lg border border-border/50">
-             <p className="text-[10px] uppercase font-bold text-muted-foreground">Lucro Previsto Máximo</p>
-             <p className="text-lg font-bold text-success">R$ {saldoPrevisto.toFixed(2)}</p>
+             <p className="text-[10px] uppercase font-bold text-muted-foreground" title="Se todos pagassem valor cheio sem desconto">Vendido (Bruto)</p>
+             <p className="text-sm font-bold text-primary">R$ {receitaBrutaVendida.toFixed(2)}</p>
           </div>
-          <div className="p-3 bg-muted rounded-lg border border-border/50">
-             <p className="text-[10px] uppercase font-bold text-muted-foreground">Total Vendido</p>
-             <p className="text-lg font-bold text-primary">R$ {receitaVendida.toFixed(2)}</p>
+          <div className="p-3 bg-amber-500/10 rounded-lg border border-amber-500/20">
+             <p className="text-[10px] uppercase font-bold text-amber-700 flex items-center gap-1" title="Soma de descontos físicos e comissões online"><BadgePercent className="w-3 h-3"/> Custo Vendedores</p>
+             <p className="text-sm font-bold text-amber-600">R$ {custoVendedores.toFixed(2)}</p>
           </div>
-          <div className="p-3 bg-muted rounded-lg border border-border/50">
-             <p className="text-[10px] uppercase font-bold text-muted-foreground">Total Não Vendido</p>
-             <p className="text-lg font-bold text-amber-600">R$ {receitaNaoVendida.toFixed(2)}</p>
+          <div className="p-3 bg-primary/10 rounded-lg border border-primary/20">
+             <p className="text-[10px] uppercase font-bold text-primary" title="Dinheiro que realmente entrou">Receita Líquida</p>
+             <p className="text-sm font-bold text-primary">R$ {receitaLiquidaCaixa.toFixed(2)}</p>
           </div>
-          <div className={`p-3 rounded-lg border ${saldoAtual >= 0 ? 'bg-success/10 border-success/30' : 'bg-destructive/10 border-destructive/30'}`}>
-             <p className="text-[10px] uppercase font-bold text-muted-foreground">Saldo Atual (Caixa Líquido)</p>
-             <p className={`text-lg font-bold ${saldoAtual >= 0 ? 'text-success' : 'text-destructive'}`}>R$ {saldoAtual.toFixed(2)}</p>
+          <div className={`p-3 rounded-lg border ${saldoAtualLucro >= 0 ? 'bg-success/10 border-success/30' : 'bg-destructive/10 border-destructive/30'}`}>
+             <p className="text-[10px] uppercase font-bold text-muted-foreground" title="Receita Líquida - Custo do Prêmio">Saldo / Lucro</p>
+             <p className={`text-sm font-bold ${saldoAtualLucro >= 0 ? 'text-success' : 'text-destructive'}`}>R$ {saldoAtualLucro.toFixed(2)}</p>
           </div>
         </div>
       </div>
