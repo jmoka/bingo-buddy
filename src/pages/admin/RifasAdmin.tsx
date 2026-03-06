@@ -149,6 +149,14 @@ const RifasAdmin = () => {
     e.preventDefault();
     setCriandoRifa(true);
     
+    let dataEncParsed = null;
+    if (novaRifaForm.data_encerramento) {
+      const d = new Date(novaRifaForm.data_encerramento);
+      if (!isNaN(d.getTime())) {
+        dataEncParsed = d.toISOString();
+      }
+    }
+    
     const payload: Partial<Rifa> = {
       nome: novaRifaForm.nome,
       descricao: novaRifaForm.descricao || null,
@@ -159,7 +167,7 @@ const RifasAdmin = () => {
       quantidade_numeros: Number(novaRifaForm.quantidade_numeros),
       numero_inicial: Number(novaRifaForm.numero_inicial),
       custo_por_numero: Number(novaRifaForm.custo_por_numero),
-      data_encerramento: novaRifaForm.data_encerramento ? new Date(novaRifaForm.data_encerramento).toISOString() : null,
+      data_encerramento: dataEncParsed,
       status: 'ativa',
     };
     
@@ -461,7 +469,7 @@ const RifaCard = ({ rifa, onVerDetalhes }: { rifa: Rifa; onVerDetalhes: () => vo
             </span>
             <span className="font-bold text-xs">
               {rifa.data_encerramento
-                ? format(new Date(rifa.data_encerramento), 'dd/MM/yy', { locale: ptBR })
+                ? format(new Date(rifa.data_encerramento), 'dd/MM/yy HH:mm', { locale: ptBR })
                 : '—'}
             </span>
           </div>

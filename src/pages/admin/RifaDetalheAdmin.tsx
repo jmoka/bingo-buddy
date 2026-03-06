@@ -142,21 +142,6 @@ const RifaDetalheAdmin = () => {
   });
 
   useEffect(() => {
-    if (rifa) {
-      setEditForm({
-        nome: rifa.nome,
-        descricao: rifa.descricao ?? '',
-        regulamento: rifa.regulamento ?? '',
-        premio_descricao: rifa.premio_descricao ?? '',
-        premio_fotos: Array.isArray(rifa.premio_fotos) ? rifa.premio_fotos : [],
-        foto_capa: rifa.foto_capa ?? '',
-        custo_por_numero: rifa.custo_por_numero,
-        data_encerramento: rifa.data_encerramento ? rifa.data_encerramento.slice(0, 16) : '',
-      });
-    }
-  }, [rifa?.id]);
-
-  useEffect(() => {
     if (!id) return;
     setLoadingNumeros(true);
     getNumerosRifaAdmin(id).then(data => {
@@ -185,6 +170,24 @@ const RifaDetalheAdmin = () => {
     filtroNumeros === 'todos' ? numeros : numeros.filter(n => n.status === filtroNumeros);
 
   const cfg = statusConfig[rifa.status] ?? statusConfig.cancelada;
+
+  const handleOpenEditar = () => {
+    if (rifa) {
+      setEditForm({
+        nome: rifa.nome,
+        descricao: rifa.descricao ?? '',
+        regulamento: rifa.regulamento ?? '',
+        premio_descricao: rifa.premio_descricao ?? '',
+        premio_fotos: Array.isArray(rifa.premio_fotos) ? [...rifa.premio_fotos] : [],
+        foto_capa: rifa.foto_capa ?? '',
+        custo_por_numero: rifa.custo_por_numero,
+        data_encerramento: rifa.data_encerramento 
+          ? new Date(rifa.data_encerramento).toISOString().slice(0, 16) 
+          : '',
+      });
+    }
+    setEditarOpen(true);
+  };
 
   const handleFinalizar = async () => {
     if (!id) return;
@@ -234,10 +237,13 @@ const RifaDetalheAdmin = () => {
     if (!id) return;
     setSalvando(true);
     
-    // Tratamento rigoroso das datas para evitar falha no update
-    const dataEncParsed = editForm.data_encerramento 
-      ? new Date(editForm.data_encerramento).toISOString() 
-      : null;
+    let dataEncParsed = null;
+    if (editForm.data_encerramento) {
+      const d = new Date(editForm.data_encerramento);
+      if (!isNaN(d.getTime())) {
+        dataEncParsed = d.toISOString();
+      }
+    }
 
     const payload: Partial<Rifa> = {
       nome: editForm.nome || undefined,
@@ -272,7 +278,7 @@ const RifaDetalheAdmin = () => {
           </Badge>
         </div>
         <div className="flex gap-2 shrink-0">
-          <Button variant="outline" size="sm" onClick={() => setEditarOpen(true)}>
+          <Button variant="outline" size="sm" onClick={handleOpenEditar}>
             <Pencil className="w-4 h-4 mr-1.5" /> Editar
           </Button>
           <Button variant="destructive" size="sm" onClick={() => setConfirmDeletarOpen(true)}>

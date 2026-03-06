@@ -158,9 +158,9 @@ export const useRifaAdmin = () => {
 
   const uploadImagemRifa = async (file: File): Promise<string | null> => {
     const ext = file.name.split('.').pop();
-    const filePath = `rifas/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
+    // Removemos a subpasta 'rifas/' para que a imagem seja salva na raiz do bucket 'avatars' (Evita erro de RLS)
+    const filePath = `rifa_img_${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
     
-    // Mudamos de 'prizes' para 'avatars' que é um bucket público que já existe e funciona
     const { error } = await supabase.storage.from('avatars').upload(filePath, file);
     if (error) { 
       toast.error(`Erro ao enviar imagem: ${error.message}`); 
