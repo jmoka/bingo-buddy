@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Loader2, UserCheck, Clock, XCircle, CheckCircle2, Send } from 'lucide-react';
+import { ArrowLeft, Loader2, UserCheck, Clock, XCircle, CheckCircle2, Send, UploadCloud } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -23,24 +23,27 @@ const SolicitarVendedor = () => {
   } = useSolicitacaoVendedor();
 
   const [nome, setNome] = useState('');
-  const [documento, setDocumento] = useState('');
+  const [cpf, setCpf] = useState('');
+  const [rg, setRg] = useState('');
   const [telefone, setTelefone] = useState('');
   const [endereco, setEndereco] = useState('');
   const [mensagem, setMensagem] = useState('');
+  
+  const [foto, setFoto] = useState<File | null>(null);
+  const [documentoFile, setDocumentoFile] = useState<File | null>(null);
+  const [comprovanteFile, setComprovanteFile] = useState<File | null>(null);
+
   const [isSending, setIsSending] = useState(false);
   const [isCanceling, setIsCanceling] = useState(false);
 
   const handleSolicitar = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!nome.trim()) return;
+    if (!nome.trim() || !telefone.trim() || !endereco.trim() || !foto) {
+        return; // Validação simples
+    }
     setIsSending(true);
-    await solicitarVendedor(nome, documento, telefone, endereco, mensagem);
+    await solicitarVendedor(nome, cpf, rg, telefone, endereco, mensagem, foto, documentoFile, comprovanteFile);
     setIsSending(false);
-    setNome('');
-    setDocumento('');
-    setTelefone('');
-    setEndereco('');
-    setMensagem('');
   };
 
   const handleCancelar = async () => {
@@ -59,12 +62,12 @@ const SolicitarVendedor = () => {
   }
 
   return (
-    <div className="max-w-lg mx-auto space-y-6">
+    <div className="max-w-lg mx-auto space-y-6 pb-10">
       <div className="flex items-center gap-3">
         <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
           <ArrowLeft className="w-5 h-5" />
         </Button>
-        <h1 className="font-heading text-xl font-bold">Ser Vendedor de Rifas</h1>
+        <h1 className="font-heading text-xl font-bold">Ser Vendedor Autorizado</h1>
       </div>
 
       {solicitacaoAprovada && (
@@ -76,11 +79,6 @@ const SolicitarVendedor = () => {
           <p className="text-sm text-green-700 dark:text-green-300">
             Sua solicitação foi aprovada. Acesse o painel do vendedor para começar a vender.
           </p>
-          {solicitacaoAprovada.mensagem_admin && (
-            <p className="text-xs text-green-600 dark:text-green-400 border-t border-green-200 dark:border-green-700 pt-2">
-              Mensagem do admin: {solicitacaoAprovada.mensagem_admin}
-            </p>
-          )}
           <Button className="w-full mt-2 gradient-primary" onClick={() => navigate('/vendedor/painel')}>
             <UserCheck className="w-4 h-4 mr-2" />
             Ir para o Painel do Vendedor
@@ -95,19 +93,12 @@ const SolicitarVendedor = () => {
             Solicitação Pendente
           </div>
           <p className="text-sm text-amber-700 dark:text-amber-300">
-            Sua solicitação está aguardando análise do administrador.
+            Sua solicitação e documentos estão aguardando análise do administrador.
           </p>
-          <div className="text-xs text-muted-foreground space-y-1 border-t border-amber-200 dark:border-amber-700 pt-2">
-            <p><span className="font-medium">Nome:</span> {solicitacaoPendente.nome}</p>
-            {solicitacaoPendente.documento && <p><span className="font-medium">Documento:</span> {solicitacaoPendente.documento}</p>}
-            {solicitacaoPendente.telefone && <p><span className="font-medium">Telefone:</span> {solicitacaoPendente.telefone}</p>}
-            {solicitacaoPendente.endereco && <p><span className="font-medium">Endereço:</span> {solicitacaoPendente.endereco}</p>}
-            <p><span className="font-medium">Enviada em:</span> {format(new Date(solicitacaoPendente.created_at), 'dd/MM/yyyy HH:mm', { locale: ptBR })}</p>
-          </div>
           <Button
             variant="outline"
             size="sm"
-            className="text-destructive border-destructive/30 hover:bg-destructive/5"
+            className="text-destructive border-destructive/30 hover:bg-destructive/5 mt-2"
             onClick={handleCancelar}
             disabled={isCanceling}
           >
@@ -128,69 +119,72 @@ const SolicitarVendedor = () => {
               Motivo: {solicitacaoRejeitada.mensagem_admin}
             </p>
           )}
-          <p className="text-xs text-muted-foreground">Você pode enviar uma nova solicitação abaixo.</p>
+          <p className="text-xs text-muted-foreground">Você pode enviar um novo cadastro corrigido abaixo.</p>
         </div>
       )}
 
       {!solicitacaoPendente && !solicitacaoAprovada && (
-        <div className="card-container space-y-5">
+        <div className="card-container space-y-5 border-primary/20">
           <div>
-            <h2 className="font-heading font-bold text-base mb-1">Solicitar status de Vendedor</h2>
+            <h2 className="font-heading font-bold text-base mb-1">Preencha seu Cadastro Oficial</h2>
             <p className="text-sm text-muted-foreground">
-              Preencha o formulário abaixo. O administrador irá analisar sua solicitação e entrar em contato.
+              Este é o seu perfil de vendedor. Alguns dados (como foto e nome) ficarão visíveis para seus clientes na sua página pública.
             </p>
           </div>
           <form onSubmit={handleSolicitar} className="space-y-4">
-            <div>
+            <div className="space-y-1.5">
               <Label htmlFor="nome">Nome Completo *</Label>
-              <Input
-                id="nome"
-                value={nome}
-                onChange={e => setNome(e.target.value)}
-                placeholder="Seu nome completo"
-                required
-              />
+              <Input id="nome" value={nome} onChange={e => setNome(e.target.value)} placeholder="Seu nome completo" required />
             </div>
-            <div>
-              <Label htmlFor="documento">CPF / CNPJ</Label>
-              <Input
-                id="documento"
-                value={documento}
-                onChange={e => setDocumento(e.target.value)}
-                placeholder="Opcional"
-              />
+
+            <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                <Label htmlFor="cpf">CPF *</Label>
+                <Input id="cpf" value={cpf} onChange={e => setCpf(e.target.value)} placeholder="000.000.000-00" required />
+                </div>
+                <div className="space-y-1.5">
+                <Label htmlFor="rg">RG</Label>
+                <Input id="rg" value={rg} onChange={e => setRg(e.target.value)} placeholder="00.000.000-0" />
+                </div>
             </div>
-            <div>
-              <Label htmlFor="telefone">Telefone / WhatsApp</Label>
-              <Input
-                id="telefone"
-                value={telefone}
-                onChange={e => setTelefone(e.target.value)}
-                placeholder="(00) 00000-0000"
-              />
+
+            <div className="space-y-1.5">
+              <Label htmlFor="telefone">Telefone / WhatsApp *</Label>
+              <Input id="telefone" value={telefone} onChange={e => setTelefone(e.target.value)} placeholder="(00) 00000-0000" required />
             </div>
-            <div>
-              <Label htmlFor="endereco">Endereço</Label>
-              <Input
-                id="endereco"
-                value={endereco}
-                onChange={e => setEndereco(e.target.value)}
-                placeholder="Rua, número, bairro, cidade..."
-              />
+            
+            <div className="space-y-1.5">
+              <Label htmlFor="endereco">Endereço Completo *</Label>
+              <Input id="endereco" value={endereco} onChange={e => setEndereco(e.target.value)} placeholder="Rua, número, bairro, cidade..." required />
             </div>
-            <div>
-              <Label htmlFor="mensagem">Mensagem (opcional)</Label>
-              <Textarea
-                id="mensagem"
-                value={mensagem}
-                onChange={e => setMensagem(e.target.value)}
-                placeholder="Conte um pouco sobre você ou por que quer ser vendedor..."
-                rows={3}
-              />
+
+            <div className="pt-4 border-t space-y-4">
+                <h3 className="font-semibold text-sm">Envio de Documentos</h3>
+                
+                <div className="space-y-2">
+                    <Label htmlFor="foto" className="text-xs">1. Foto do Perfil (Visível ao Público) *</Label>
+                    <Input id="foto" type="file" accept="image/*" onChange={e => setFoto(e.target.files ? e.target.files[0] : null)} required className="file:text-xs file:bg-primary/10 file:text-primary file:border-0 file:rounded-full file:px-3 file:py-1 cursor-pointer" />
+                </div>
+
+                <div className="space-y-2">
+                    <Label htmlFor="doc" className="text-xs">2. Foto do Documento (RG ou CNH) *</Label>
+                    <Input id="doc" type="file" accept="image/*,application/pdf" onChange={e => setDocumentoFile(e.target.files ? e.target.files[0] : null)} required className="file:text-xs file:bg-primary/10 file:text-primary file:border-0 file:rounded-full file:px-3 file:py-1 cursor-pointer" />
+                </div>
+
+                <div className="space-y-2">
+                    <Label htmlFor="comp" className="text-xs">3. Comprovante de Residência *</Label>
+                    <Input id="comp" type="file" accept="image/*,application/pdf" onChange={e => setComprovanteFile(e.target.files ? e.target.files[0] : null)} required className="file:text-xs file:bg-primary/10 file:text-primary file:border-0 file:rounded-full file:px-3 file:py-1 cursor-pointer" />
+                </div>
             </div>
-            <Button type="submit" className="w-full gradient-primary" disabled={isSending || !nome.trim()}>
-              {isSending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Send className="w-4 h-4 mr-2" />}
-              Enviar Solicitação
+
+            <div className="pt-2">
+              <Label htmlFor="mensagem">Observação (Opcional)</Label>
+              <Textarea id="mensagem" value={mensagem} onChange={e => setMensagem(e.target.value)} placeholder="Algo mais que o administrador precise saber?" rows={2} />
+            </div>
+
+            <Button type="submit" className="w-full gradient-primary h-12 mt-2" disabled={isSending || !nome || !foto || !documentoFile || !comprovanteFile}>
+              {isSending ? <Loader2 className="w-5 h-5 mr-2 animate-spin" /> : <UploadCloud className="w-5 h-5 mr-2" />}
+              {isSending ? 'Enviando Cadastro...' : 'Enviar Cadastro Completo'}
             </Button>
           </form>
         </div>
@@ -198,16 +192,13 @@ const SolicitarVendedor = () => {
 
       {minhasSolicitacoes.length > 1 && (
         <div className="card-container space-y-2">
-          <h3 className="font-heading font-semibold text-sm">Histórico de Solicitações</h3>
+          <h3 className="font-heading font-semibold text-sm">Histórico</h3>
           <div className="space-y-2">
             {minhasSolicitacoes.map(s => (
               <div key={s.id} className="flex items-center justify-between text-xs text-muted-foreground border-b pb-2 last:border-0">
                 <span>{format(new Date(s.created_at), 'dd/MM/yyyy', { locale: ptBR })}</span>
-                <Badge
-                  variant={s.status === 'aprovado' ? 'default' : s.status === 'rejeitado' ? 'destructive' : 'secondary'}
-                  className="text-[10px]"
-                >
-                  {s.status === 'pendente' ? 'Pendente' : s.status === 'aprovado' ? 'Aprovado' : 'Rejeitado'}
+                <Badge variant={s.status === 'aprovado' ? 'default' : s.status === 'rejeitado' ? 'destructive' : 'secondary'} className="text-[10px]">
+                  {s.status}
                 </Badge>
               </div>
             ))}

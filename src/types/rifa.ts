@@ -103,3 +103,17 @@ export interface SolicitacaoVendedor {
     avatar_url: string | null;
   };
 }
+
+export interface CadastroVendedor {
+  id: string;
+  user_id: string;
+  nome_completo: string;
+  telefone: string | null;
+  endereco: string | null;
+  cpf: string | null;
+  rg: string | null;
+  foto_url: string | null;
+  documento_url: string | null;
+  comprovante_endereco_url: string | null;
+  created_at: string;
+}
