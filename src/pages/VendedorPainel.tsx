@@ -35,6 +35,8 @@ import {
   Printer,
   Plus,
   Undo2,
+  Trophy,
+  Calendar
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -207,22 +209,25 @@ const VendedorPainel = () => {
       </div>
 
       <Tabs defaultValue="reservas">
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="reservas" className="flex items-center gap-1.5">
-            <Ticket className="w-4 h-4" /> Reservas
+        <TabsList className="grid w-full grid-cols-3 h-11 bg-muted/50 p-1">
+          <TabsTrigger value="reservas" className="flex items-center gap-1.5 text-xs">
+            <Ticket className="w-3.5 h-3.5" /> Reservas
             {minhasReservas.filter(r => r.status === 'reservado').length > 0 && (
               <span className="ml-1 bg-amber-500 text-white text-[9px] font-bold rounded-full h-4 w-4 flex items-center justify-center">
                 {minhasReservas.filter(r => r.status === 'reservado').length}
               </span>
             )}
           </TabsTrigger>
-          <TabsTrigger value="vendas" className="flex items-center gap-1.5">
-            <TrendingUp className="w-4 h-4" /> Vendas
+          <TabsTrigger value="vendas" className="flex items-center gap-1.5 text-xs">
+            <TrendingUp className="w-3.5 h-3.5" /> Vendas
             {minhasReservas.filter(r => r.status === 'vendido').length > 0 && (
               <span className="ml-1 bg-green-500 text-white text-[9px] font-bold rounded-full h-4 w-4 flex items-center justify-center">
                 {minhasReservas.filter(r => r.status === 'vendido').length}
               </span>
             )}
+          </TabsTrigger>
+          <TabsTrigger value="encerradas" className="flex items-center gap-1.5 text-xs">
+            <Trophy className="w-3.5 h-3.5" /> Encerradas
           </TabsTrigger>
         </TabsList>
 
@@ -233,47 +238,37 @@ const VendedorPainel = () => {
           {Object.keys(reservasPorRifa).length === 0 ? (
             <div className="card-container text-center py-10 text-muted-foreground text-sm">
               <ShoppingBag className="w-8 h-8 mx-auto mb-2 opacity-30" />
-              Nenhuma reserva ainda.
+              Nenhuma reserva ativa ainda.
             </div>
           ) : (() => {
+            // Filtra para exibir APENAS as rifas que ainda estão ativas (remove as encerradas daqui)
             const ativas = Object.entries(reservasPorRifa).filter(([, nums]) => nums[0]?.rifas?.status === 'ativa');
-            const finalizadas = Object.entries(reservasPorRifa).filter(([, nums]) => nums[0]?.rifas?.status !== 'ativa');
+            
             const renderGrupo = (entries: typeof ativas) => entries.map(([rifaId, numeros]) => {
               const rifa = numeros[0]?.rifas;
-              const finalizada = rifa?.status === 'finalizada';
               return (
-                <div key={rifaId} className={`card-container space-y-3 ${finalizada ? 'border-gray-300 opacity-90' : ''}`}>
+                <div key={rifaId} className="card-container space-y-3">
                   <div className="flex items-center justify-between">
                     <h4 className="font-heading font-bold text-sm">{rifa?.nome ?? 'Rifa'}</h4>
                     <div className="flex items-center gap-2">
-                      {!finalizada && (
-                        <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => navigate(`/vendedor/imprimir/${rifaId}`)}>
-                          <Printer className="w-3 h-3 mr-1" /> Imprimir
-                        </Button>
-                      )}
-                      <Badge variant={finalizada ? 'secondary' : 'default'} className="text-[10px]">
-                        {finalizada ? 'finalizada' : 'ativa'}
-                      </Badge>
+                      <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => navigate(`/vendedor/imprimir/${rifaId}`)}>
+                        <Printer className="w-3 h-3 mr-1" /> Imprimir
+                      </Button>
+                      <Badge className="text-[10px]">Ativa</Badge>
                     </div>
                   </div>
-                  {finalizada && numeros.some(n => n.status === 'reservado') && (
-                    <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
-                      <span className="text-xs font-bold text-red-600">Rifa encerrada — números reservados não foram pagos a tempo.</span>
-                    </div>
-                  )}
+                  
                   <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
                     {numeros.map(n => (
                       <div key={n.id} className="relative group">
                         <button
-                          onClick={() => n.status === 'reservado' && !finalizada && openValidar(n)}
+                          onClick={() => n.status === 'reservado' && openValidar(n)}
                           className={`w-full rounded-lg p-2 flex flex-col items-center justify-center gap-0.5 transition-colors min-h-[64px] ${
                             n.status === 'vendido'
                               ? 'bg-green-100 text-green-700 dark:bg-green-900/20 cursor-default'
-                              : finalizada
-                                ? 'bg-gray-100 text-gray-400 cursor-default'
-                                : 'bg-amber-100 text-amber-700 dark:bg-amber-900/20 hover:bg-amber-200 dark:hover:bg-amber-900/40 cursor-pointer'
+                              : 'bg-amber-100 text-amber-700 dark:bg-amber-900/20 hover:bg-amber-200 dark:hover:bg-amber-900/40 cursor-pointer'
                           }`}
-                          title={n.status === 'vendido' ? (n.nome_comprador || 'Vendido') : finalizada ? 'Rifa encerrada' : 'Clique para validar venda'}
+                          title={n.status === 'vendido' ? (n.nome_comprador || 'Vendido') : 'Clique para validar venda'}
                         >
                           <span className="text-base font-bold font-heading leading-none">{n.numero}</span>
                           {(n as any).cartelas_rifa?.[0]?.codigo_validacao && (
@@ -289,10 +284,10 @@ const VendedorPainel = () => {
                               )}
                             </>
                           ) : (
-                            <span className="text-[9px] leading-none opacity-60">{finalizada ? 'expirado' : 'pendente'}</span>
+                            <span className="text-[9px] leading-none opacity-60">pendente</span>
                           )}
                         </button>
-                        {n.status === 'reservado' && !finalizada && (
+                        {n.status === 'reservado' && (
                           <button
                             onClick={e => { e.stopPropagation(); setCancelarNumero(n); }}
                             className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity bg-red-100 hover:bg-red-200 text-red-600 rounded p-0.5"
@@ -311,21 +306,15 @@ const VendedorPainel = () => {
                 </div>
               );
             });
-            return (
-              <>
-                {ativas.length > 0 && (
-                  <div className="space-y-3">
-                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">Rifas Ativas</p>
-                    {renderGrupo(ativas)}
-                  </div>
-                )}
-                {finalizadas.length > 0 && (
-                  <div className="space-y-3">
-                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">Rifas Finalizadas</p>
-                    {renderGrupo(finalizadas)}
-                  </div>
-                )}
-              </>
+            return ativas.length > 0 ? (
+              <div className="space-y-3">
+                {renderGrupo(ativas)}
+              </div>
+            ) : (
+              <div className="card-container text-center py-10 text-muted-foreground text-sm">
+                <Ticket className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                Nenhuma reserva pendente.
+              </div>
             );
           })()}
         </TabsContent>
@@ -410,6 +399,85 @@ const VendedorPainel = () => {
               </>
             );
           })()}
+        </TabsContent>
+
+        <TabsContent value="encerradas" className="space-y-4 mt-4">
+          {rifas.filter(r => r.status === 'finalizada').length === 0 ? (
+            <div className="card-container text-center py-10 text-muted-foreground text-sm">
+              <Trophy className="w-10 h-10 mx-auto mb-3 opacity-30" />
+              Nenhum sorteio finalizado ainda na plataforma.
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {rifas.filter(r => r.status === 'finalizada').map(rifa => {
+                const numerosDaRifa = getNumerosRifa(rifa.id);
+                const ganhador = numerosDaRifa.find(n => n.numero === rifa.numero_ganhador);
+                const isMeuCliente = ganhador?.vendedor_id === meuVendedor?.id;
+
+                return (
+                  <div key={rifa.id} className="card-container p-0 overflow-hidden flex flex-col border-2 border-muted shadow-sm transition-all hover:shadow-md">
+                    <div className="h-28 relative bg-muted/50">
+                      {rifa.foto_capa || (rifa.premio_fotos && rifa.premio_fotos[0]) ? (
+                        <img src={rifa.foto_capa || rifa.premio_fotos[0]} alt="Prêmio" className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center bg-gradient-to-r from-blue-500/20 to-purple-500/20">
+                          <Trophy className="h-10 w-10 text-blue-500/50" />
+                        </div>
+                      )}
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+                      <div className="absolute bottom-3 left-4 right-4">
+                        <h3 className="font-heading font-bold text-white text-lg leading-tight truncate drop-shadow-md">{rifa.nome}</h3>
+                        <p className="text-[10px] text-white/90 mt-0.5 flex items-center gap-1 drop-shadow-md">
+                          <Calendar className="w-3 h-3" /> Sorteada em {rifa.data_encerramento ? format(new Date(rifa.data_encerramento), 'dd/MM/yyyy') : '—'}
+                        </p>
+                      </div>
+                      <Badge className="absolute top-2 right-2 bg-blue-500/90 text-white border-none shadow-md">Finalizada</Badge>
+                    </div>
+
+                    <div className="p-4 flex-1 flex flex-col space-y-4">
+                      {rifa.premio_descricao && (
+                        <div className="text-sm text-muted-foreground border-b border-border pb-3">
+                          <strong>Prêmio:</strong> {rifa.premio_descricao}
+                        </div>
+                      )}
+
+                      <div className="mt-auto">
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-1.5">
+                          <Trophy className="w-3.5 h-3.5 text-amber-500" /> Ganhador do Sorteio
+                        </p>
+                        
+                        <div className={`flex items-center gap-3 p-3 rounded-xl border shadow-sm transition-colors ${isMeuCliente ? 'bg-green-50 border-green-200 dark:bg-green-900/10 dark:border-green-800/30' : 'bg-muted/30 border-border/50'}`}>
+                          <div className="h-12 w-12 rounded-full bg-primary flex items-center justify-center shrink-0 border-2 border-primary/20 shadow-inner">
+                            <span className="font-heading font-bold text-xl text-primary-foreground">{rifa.numero_ganhador}</span>
+                          </div>
+                          
+                          <div className="min-w-0 flex-1">
+                            {ganhador ? (
+                              <>
+                                <p className="font-bold text-sm truncate text-foreground">
+                                  {ganhador.nome_comprador || (ganhador.comprador_id ? 'Usuário do App' : 'Não identificado')}
+                                </p>
+                                {ganhador.telefone_comprador && (
+                                  <p className="text-xs text-muted-foreground truncate mt-0.5">{ganhador.telefone_comprador}</p>
+                                )}
+                                {isMeuCliente && (
+                                  <Badge className="mt-1.5 bg-green-500 hover:bg-green-600 text-[9px] px-1.5 py-0 h-4 border-none shadow-sm">
+                                    Venda sua!
+                                  </Badge>
+                                )}
+                              </>
+                            ) : (
+                              <p className="text-sm text-muted-foreground italic">Dados não disponíveis</p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </TabsContent>
       </Tabs>
 
