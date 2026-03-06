@@ -9,7 +9,7 @@ import RankingCard from '@/components/RankingCard';
 const Ranking = () => {
   const navigate = useNavigate();
 
-  // Modificado: usa uma chamada RPC em vez de baixar todas as vitórias e perfis no frontend
+  // Busca o ranking através da função SQL get_leaderboard que você criou
   const { data: leaderboard = [], isLoading } = useQuery({
     queryKey: ['leaderboard'],
     queryFn: async () => {
@@ -34,7 +34,7 @@ const Ranking = () => {
     <div className="space-y-6">
       <div className="flex items-center gap-3">
         <Button variant="ghost" size="icon" onClick={() => navigate('/')}>
-          <ArrowLeft className="h-5 w-5" />
+          <ArrowLeft className="w-5 h-5" />
         </Button>
         <h1 className="flex items-center gap-2 font-heading text-2xl font-bold md:text-3xl">
           <Crown className="h-8 w-8 text-yellow-500" />
