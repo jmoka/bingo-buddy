@@ -17,43 +17,35 @@ const isCellMarked = (card: BingoCard, row: number, col: number): boolean => {
   return card.markedNumbers.has(num);
 };
 
-const checkHorizontalWin = (card: BingoCard): number[] | null => {
-  for (let row = 0; row < 5; row++) {
-    if ([0,1,2,3,4].every(col => isCellMarked(card, row, col))) return card.numbers[row].map(Number);
-  }
-  return null;
-};
-
-const checkVerticalWin = (card: BingoCard): number[] | null => {
-  for (let col = 0; col < 5; col++) {
-    if ([0,1,2,3,4].every(row => isCellMarked(card, row, col))) return card.numbers.map(r => Number(r[col]));
-  }
-  return null;
-};
-
-const checkDiagonalWin = (card: BingoCard): number[] | null => {
-  if ([0,1,2,3,4].every(i => isCellMarked(card, i, i))) return [0,1,2,3,4].map(i => Number(card.numbers[i][i]));
-  if ([0,1,2,3,4].every(i => isCellMarked(card, i, 4-i))) return [0,1,2,3,4].map(i => Number(card.numbers[i][4-i]));
-  return null;
-};
-
-const checkFullCardWin = (card: BingoCard): number[] | null => {
-  const all: number[] = [];
-  for (let r = 0; r < 5; r++) for (let c = 0; c < 5; c++) {
-    if (!isCellMarked(card, r, c)) return null;
-    if (Number(card.numbers[r][c]) !== 0) all.push(Number(card.numbers[r][c]));
-  }
-  return all;
-};
-
 const checkWin = (card: BingoCard, gameType: GameType): WinResult | null => {
   let winning: number[] | null = null;
   const type = String(gameType).toLowerCase().trim() as GameType;
   
-  if (type === 'horizontal') winning = checkHorizontalWin(card);
-  else if (type === 'vertical') winning = checkVerticalWin(card);
-  else if (type === 'diagonal') winning = checkDiagonalWin(card);
-  else if (type === 'full') winning = checkFullCardWin(card);
+  // Horizontal
+  for (let row = 0; row < 5; row++) {
+    if ([0,1,2,3,4].every(col => isCellMarked(card, row, col))) winning = card.numbers[row].map(Number);
+  }
+  // Vertical
+  if (!winning) {
+    for (let col = 0; col < 5; col++) {
+      if ([0,1,2,3,4].every(row => isCellMarked(card, row, col))) winning = card.numbers.map(r => Number(r[col]));
+    }
+  }
+  // Diagonal
+  if (!winning) {
+    if ([0,1,2,3,4].every(i => isCellMarked(card, i, i))) winning = [0,1,2,3,4].map(i => Number(card.numbers[i][i]));
+    else if ([0,1,2,3,4].every(i => isCellMarked(card, i, 4-i))) winning = [0,1,2,3,4].map(i => Number(card.numbers[i][4-i]));
+  }
+  // Full
+  if (!winning && type === 'full') {
+    const all: number[] = [];
+    let isFull = true;
+    for (let r = 0; r < 5; r++) for (let c = 0; c < 5; c++) {
+      if (!isCellMarked(card, r, c)) { isFull = false; break; }
+      if (Number(card.numbers[r][c]) !== 0) all.push(Number(card.numbers[r][c]));
+    }
+    if (isFull) winning = all;
+  }
   
   if (!winning) return null;
   return { cardId: card.id, cardName: card.name, type, winningNumbers: winning };
@@ -128,19 +120,33 @@ serve(async (req) => {
           creditType: card.credit_type,
           playerCardId: card.player_card_id,
           numbers: grid,
-          markedNumbers: card.marked_numbers
+          markedNumbers: Array.from(tempCard.markedNumbers)
         });
       }
     }
 
-    // 6. Processar Distribuição e Fim da Partida
+    // 6. Registrar Vitórias e Processar Prêmios
     const updatedWinners = [...(match.winners || []), ...newWinnersFound];
 
     if (newWinnersFound.length > 0) {
+      console.log(`[call-number] ${newWinnersFound.length} novos vencedores encontrados!`);
+
+      // 6.1. REGISTRO IMEDIATO NA TABELA DE VITÓRIAS (HISTÓRICO/TROFÉUS)
+      for (const w of newWinnersFound) {
+        const { error: winInsertErr } = await supabaseAdmin.from('vitorias').insert({
+          match_id: matchId,
+          player_id: w.playerId,
+          player_card_id: w.playerCardId,
+          match_card_id: w.cardId,
+          prize_details: match.prize
+        });
+        if (winInsertErr) console.error(`[call-number] Erro ao inserir na tabela vitorias:`, winInsertErr);
+      }
+
       const realWinners = newWinnersFound.filter(w => w.creditType === 'real');
       
       if (realWinners.length > 0) {
-        // Encerra a partida
+        // Encerra a partida oficialmente pois alguém ganhou prêmio real
         await supabaseAdmin.from('partidas').update({ 
           status: 'finished', 
           winners: updatedWinners, 
@@ -148,56 +154,36 @@ serve(async (req) => {
           next_auto_call_timestamp: null
         }).eq('id', matchId);
 
-        // DISTRIBUIÇÃO DOS CRÉDITOS
+        // Distribuição Financeira
         const safePot = Number(match.pot) || 0;
         const prizeValConf = Number(match.prize?.value) || 0;
-        
-        // Calcula valor total a ser distribuído como prêmio
-        const totalPrizePool = match.prize?.type === 'fixed' 
-          ? prizeValConf 
-          : (safePot * prizeValConf) / 100;
-        
+        const totalPrizePool = match.prize?.type === 'fixed' ? prizeValConf : (safePot * prizeValConf) / 100;
         const prizePerWinner = totalPrizePool / realWinners.length;
         const adminProfit = Math.max(0, safePot - totalPrizePool);
 
-        console.log(`[call-number] Distribuindo prêmio: ${totalPrizePool} entre ${realWinners.length} vencedores.`);
-
-        // 1. Incrementa lucro do Admin (sobra do pote)
         if (adminProfit > 0) {
-          await supabaseAdmin.rpc('increment_admin_profit', { amount: adminProfit }).catch(e => console.error("Erro Admin Profit:", e));
+          await supabaseAdmin.rpc('increment_admin_profit', { amount: adminProfit });
         }
 
-        // 2. Entrega créditos aos vencedores REAIS
         for (const rw of realWinners) {
           if (prizePerWinner > 0) {
-            await supabaseAdmin.rpc('increment_player_credits', { p_player_id: rw.playerId, p_amount: prizePerWinner }).catch(e => console.error("Erro Credit Winner:", e));
+            await supabaseAdmin.rpc('increment_player_credits', { p_player_id: rw.playerId, p_amount: prizePerWinner });
           }
         }
       } else {
-        // Vitória apenas de cartelas "brincar". Verifica se o jogo deve continuar para os outros.
+        // Apenas vencedores de "Brincar"
         const hasRemainingReal = (matchCards || []).some(c => c.credit_type === 'real' && !updatedWinners.some(w => w.cardId === c.id));
         
         if (hasRemainingReal) {
+          // O jogo continua para os outros que jogam com créditos reais
           const { data: cfg } = await supabaseAdmin.from('configuracoes').select('intervalo_sorteio_auto_seg').single();
           const next = new Date(Date.now() + (Number(cfg?.intervalo_sorteio_auto_seg || 120) * 1000)).toISOString();
           await supabaseAdmin.from('partidas').update({ winners: updatedWinners, next_auto_call_timestamp: next }).eq('id', matchId);
         } else {
-          // Se não tem mais ninguém com crédito real, acaba a partida
+          // Não há mais ninguém jogando com crédito real, encerra.
           await supabaseAdmin.from('partidas').update({ status: 'finished', winners: updatedWinners, is_auto_calling: false, next_auto_call_timestamp: null }).eq('id', matchId);
         }
       }
-
-      // Registra os troféus (histórico)
-      for (const w of newWinnersFound) {
-        await supabaseAdmin.from('vitorias').insert({
-          match_id: matchId,
-          player_id: w.playerId,
-          player_card_id: w.playerCardId || null,
-          match_card_id: w.cardId,
-          prize_details: match.prize
-        }).catch(() => {});
-      }
-
     } else if (match.is_auto_calling) {
       // Ninguém ganhou nesta bola, programa o próximo sorteio
       const { data: cfg } = await supabaseAdmin.from('configuracoes').select('intervalo_sorteio_auto_seg').single();
