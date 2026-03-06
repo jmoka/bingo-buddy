@@ -18,7 +18,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ArrowLeft, Trophy, Users, DollarSign, Hash, Loader2, CheckCircle, XCircle, AlertCircle, Pencil, Trash2, Upload, Link, Plus, X as XIcon, Image as ImageIcon, MapPin, Phone, Store, Globe, Banknote, BadgePercent, StoreIcon } from 'lucide-react';
+import { ArrowLeft, Trophy, Users, DollarSign, Hash, Loader2, CheckCircle, XCircle, AlertCircle, Pencil, Trash2, Upload, Link, Plus, X as XIcon, Image as ImageIcon, MapPin, Phone, Store, Globe, BadgePercent, StoreIcon } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { NumeroRifa, CompraRifa, Rifa } from '@/types/rifa';
@@ -165,8 +165,7 @@ const RifaDetalheAdmin = () => {
     enabled: !!rifa?.ganhador_id,
   });
 
-  // Cálculos de Estatísticas de Vendedores
-  const comprasRifa = todasCompras.filter(c => c.rifa_id === id);
+  const comprasRifa = useMemo(() => todasCompras.filter(c => c.rifa_id === id), [todasCompras, id]);
 
   const sellerStatsArray = useMemo(() => {
     if (!rifa) return [];
@@ -250,11 +249,9 @@ const RifaDetalheAdmin = () => {
     const brutoCompra = compra.numeros.length * Number(rifa.custo_por_numero);
     
     if (compra.tipo_pagamento === 'vendedor') {
-      // Vendedor reservando/comprando números: desconto aplicado no valor_total
       const descontoDado = brutoCompra - Number(compra.valor_total);
       if (descontoDado > 0) custoVendedores += descontoDado;
     } else if (compra.ref_vendedor_id) {
-      // Usuário final comprou usando o link de um vendedor (comissão)
       const vendedorInfo = vendedores.find(v => v.id === compra.ref_vendedor_id);
       if (vendedorInfo && vendedorInfo.comissao_percentual) {
         const comissaoPaga = Number(compra.valor_total) * (Number(vendedorInfo.comissao_percentual) / 100);
@@ -263,10 +260,7 @@ const RifaDetalheAdmin = () => {
     }
   });
 
-  // A receita líquida (que realmente entra no caixa do Admin após descontos/comissões)
   const receitaLiquidaCaixa = receitaBrutaVendida - custoVendedores;
-  
-  // Lucro ou Prejuízo real
   const saldoAtualLucro = receitaLiquidaCaixa - custoPremio;
 
   const numerosFiltrados =
