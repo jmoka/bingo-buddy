@@ -1,10 +1,14 @@
+import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useRifas } from '@/hooks/useRifas';
 import { useAuth } from '@/contexts/AuthContext';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Loader2, Ticket, Calendar, DollarSign, ArrowLeft, Trophy, Crown } from 'lucide-react';
+import PlayerAvatar from '@/components/PlayerAvatar';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Rifa } from '@/types/rifa';
@@ -18,10 +22,25 @@ const statusBadge = (status: Rifa['status']) => {
 const Rifas = () => {
   const navigate = useNavigate();
   const { profile } = useAuth();
-  const { rifas, isLoadingRifas } = useRifas();
+  const { rifas, isLoadingRifas, getNumerosRifa, minhasCompras } = useRifas();
 
   const activeRifas = rifas.filter(r => r.status === 'ativa');
   const finishedRifas = rifas.filter(r => r.status === 'finalizada');
+
+  // Coleta os IDs dos ganhadores para buscar as fotos/nomes públicos
+  const ganhadorIds = useMemo(() => {
+    return Array.from(new Set(finishedRifas.map(r => r.ganhador_id).filter(Boolean) as string[]));
+  }, [finishedRifas]);
+
+  const { data: winnerProfiles = [] } = useQuery({
+    queryKey: ['winnerProfilesRifas', ganhadorIds],
+    queryFn: async () => {
+      if (ganhadorIds.length === 0) return [];
+      const { data } = await supabase.rpc('get_public_profiles', { p_user_ids: ganhadorIds });
+      return data || [];
+    },
+    enabled: ganhadorIds.length > 0,
+  });
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto">
@@ -119,7 +138,16 @@ const Rifas = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 {finishedRifas.map(rifa => {
                   const didIWin = profile && rifa.ganhador_id === profile.id;
+                  const participou = profile && minhasCompras.some(c => c.rifa_id === rifa.id);
                   
+                  // Busca dados do ganhador (físico ou via app)
+                  const numeroGanhadorInfo = getNumerosRifa(rifa.id).find(n => n.numero === rifa.numero_ganhador);
+                  const winnerProfile = winnerProfiles.find((p: any) => p.id === rifa.ganhador_id);
+                  
+                  const winnerName = numeroGanhadorInfo?.nome_comprador || winnerProfile?.full_name || 'Usuário não identificado';
+                  const winnerPhone = numeroGanhadorInfo?.telefone_comprador;
+                  const winnerAvatar = winnerProfile?.avatar_url || null;
+
                   return (
                     <div
                       key={rifa.id}
@@ -149,7 +177,7 @@ const Rifas = () => {
                             </p>
                           </div>
                           
-                          <div className="mt-auto">
+                          <div className="mt-auto pt-2">
                             {didIWin ? (
                               <div className="bg-green-500 text-white rounded-xl p-3 flex items-center justify-between shadow-sm animate-pulse">
                                 <div>
@@ -159,12 +187,32 @@ const Rifas = () => {
                                 <Crown className="w-8 h-8 opacity-80" />
                               </div>
                             ) : (
-                              <div className="bg-muted rounded-xl p-3 flex items-center justify-between border">
-                                <div>
-                                  <p className="text-[10px] font-bold uppercase text-muted-foreground tracking-widest">Sorteado</p>
-                                  <p className="text-xl font-heading font-bold text-foreground mt-0.5">Nº {rifa.numero_ganhador ?? '—'}</p>
+                              <div className={`rounded-xl p-3 border ${participou ? 'bg-red-50 border-red-200 dark:bg-red-900/10 dark:border-red-800/30' : 'bg-muted/50 border-border'}`}>
+                                <div className="flex items-start justify-between mb-2">
+                                  <div>
+                                    <p className={`text-[10px] font-bold uppercase tracking-widest ${participou ? 'text-red-600 dark:text-red-400' : 'text-muted-foreground'}`}>
+                                      {participou ? 'Não foi dessa vez' : 'Sorteado'}
+                                    </p>
+                                    <p className="text-lg font-heading font-bold text-foreground mt-0.5 leading-none">
+                                      Nº {rifa.numero_ganhador ?? '—'}
+                                    </p>
+                                  </div>
+                                  <Trophy className={`w-5 h-5 ${participou ? 'text-red-400/50' : 'text-muted-foreground/30'}`} />
                                 </div>
-                                <Trophy className="w-6 h-6 text-muted-foreground/40" />
+                                
+                                <div className="flex items-center gap-2 pt-2 border-t border-border/50">
+                                  {winnerProfile ? (
+                                    <PlayerAvatar url={winnerAvatar} fallback={winnerName} className="w-7 h-7 border border-muted" />
+                                  ) : (
+                                    <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center border border-primary/20 shrink-0">
+                                      <Crown className="w-3.5 h-3.5 text-primary" />
+                                    </div>
+                                  )}
+                                  <div className="min-w-0">
+                                    <p className="text-xs font-semibold text-foreground truncate">{winnerName}</p>
+                                    {winnerPhone && <p className="text-[10px] text-muted-foreground truncate">{winnerPhone}</p>}
+                                  </div>
+                                </div>
                               </div>
                             )}
                           </div>
