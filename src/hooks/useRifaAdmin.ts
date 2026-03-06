@@ -159,9 +159,14 @@ export const useRifaAdmin = () => {
   const uploadImagemRifa = async (file: File): Promise<string | null> => {
     const ext = file.name.split('.').pop();
     const filePath = `rifas/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
-    const { error } = await supabase.storage.from('prizes').upload(filePath, file);
-    if (error) { toast.error('Erro ao enviar imagem.'); return null; }
-    const { data } = supabase.storage.from('prizes').getPublicUrl(filePath);
+    
+    // Mudamos de 'prizes' para 'avatars' que é um bucket público que já existe e funciona
+    const { error } = await supabase.storage.from('avatars').upload(filePath, file);
+    if (error) { 
+      toast.error(`Erro ao enviar imagem: ${error.message}`); 
+      return null; 
+    }
+    const { data } = supabase.storage.from('avatars').getPublicUrl(filePath);
     return data.publicUrl;
   };
 

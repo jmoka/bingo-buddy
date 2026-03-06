@@ -86,7 +86,7 @@ const MatchManager = () => {
         const filePath = `public/${Date.now()}_${file.name.replace(/\s/g, '_')}`;
         
         const { error: uploadError } = await supabase.storage
-            .from('prizes')
+            .from('avatars')
             .upload(filePath, file);
 
         if (uploadError) {
@@ -95,7 +95,7 @@ const MatchManager = () => {
         }
 
         const { data: { publicUrl } } = supabase.storage
-            .from('prizes')
+            .from('avatars')
             .getPublicUrl(filePath);
         
         prizeImageUrl = publicUrl;
@@ -159,12 +159,12 @@ const MatchManager = () => {
       const file = matchForm.prizeImageFile;
       const filePath = `public/${Date.now()}_${file.name.replace(/\s/g, '_')}`;
       
-      const { error: uploadError } = await supabase.storage.from('prizes').upload(filePath, file);
+      const { error: uploadError } = await supabase.storage.from('avatars').upload(filePath, file);
       if (uploadError) {
           toast({ title: 'Erro no Upload', description: uploadError.message, variant: 'destructive' });
           return;
       }
-      const { data: { publicUrl } } = supabase.storage.from('prizes').getPublicUrl(filePath);
+      const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(filePath);
       prizeImageUrl = publicUrl;
     }
 
@@ -174,8 +174,8 @@ const MatchManager = () => {
     const matchData = {
         name: matchForm.name,
         game_type: matchForm.game_type,
-        max_cards_per_player: matchForm.max_cards_per_player,
-        card_price: matchForm.card_price,
+        max_cards_per_player: matchForm.maxCardsPerPlayer,
+        card_price: matchForm.cardPrice,
         prize: prizePayload,
         start_time: new Date(matchForm.startTime).toISOString(),
         prize_image_url: prizeImageUrl,
