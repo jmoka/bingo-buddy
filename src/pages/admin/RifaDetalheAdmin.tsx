@@ -236,14 +236,10 @@ const RifaDetalheAdmin = () => {
   const total = rifa.quantidade_numeros;
   const percentualVendido = total > 0 ? Math.round((vendidos / total) * 100) : 0;
 
-  // ==== CÁLCULOS DO DASHBOARD FINANCEIRO AVANÇADO ====
   const custoPremio = Number(rifa.custo_premio) || 0;
   const receitaTotalPrevista = total * Number(rifa.custo_por_numero);
-  
-  // O valor bruto de vendas se não houvesse desconto nenhum
   const receitaBrutaVendida = vendidos * Number(rifa.custo_por_numero);
 
-  // Calcula quanto foi dado de desconto/comissão para os Vendedores
   let custoVendedores = 0;
   comprasRifa.forEach(compra => {
     const brutoCompra = compra.numeros.length * Number(rifa.custo_por_numero);
@@ -268,10 +264,13 @@ const RifaDetalheAdmin = () => {
 
   const cfg = statusConfig[rifa.status] ?? statusConfig.cancelada;
 
-  // Info Ganhador
+  // Info Ganhador (Agora buscando o vendedor corretamente da lista global de vendedores)
   const numeroGanhadorInfo = numeros.find(n => n.numero === rifa.numero_ganhador);
   const isVendaFisica = !!numeroGanhadorInfo?.vendedor_id;
-  const vendedorNome = (numeroGanhadorInfo as any)?.vendedores_rifa?.nome;
+  const vendedorNome = numeroGanhadorInfo?.vendedor_id 
+    ? vendedores.find(v => v.id === numeroGanhadorInfo.vendedor_id)?.nome || 'Vendedor Desconhecido'
+    : undefined;
+
   const ganhadorNome = numeroGanhadorInfo?.nome_comprador || winnerProfile?.full_name || 'Não identificado';
   const ganhadorTelefone = numeroGanhadorInfo?.telefone_comprador || winnerProfile?.whatsapp || 'Não informado';
   const ganhadorEndereco = numeroGanhadorInfo?.endereco_comprador || winnerProfile?.address || 'Não informado';
