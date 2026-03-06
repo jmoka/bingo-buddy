@@ -75,6 +75,19 @@ const RifaView = () => {
     });
   }, [allNumbers, numeros, filter]);
 
+  const premioFotosParsed = useMemo(() => {
+    if (!rifa?.premio_fotos) return [];
+    if (Array.isArray(rifa.premio_fotos)) return rifa.premio_fotos;
+    if (typeof rifa.premio_fotos === 'string') {
+      try {
+        return JSON.parse(rifa.premio_fotos);
+      } catch (e) {
+        return [rifa.premio_fotos]; // fallback para string solta
+      }
+    }
+    return [];
+  }, [rifa?.premio_fotos]);
+
   const toggleNumber = (num: number) => {
     const found = numeros.find(n => n.numero === num);
     if (found && found.status !== 'disponivel') return;
@@ -139,6 +152,7 @@ const RifaView = () => {
               src={rifa.foto_capa}
               alt={rifa.nome}
               className="w-full max-h-64 object-cover rounded-lg"
+              onError={e => (e.currentTarget.style.display = 'none')}
             />
           ) : (
             <div className="w-full h-48 rounded-lg bg-gradient-to-br from-primary/30 to-accent/30 flex items-center justify-center">
@@ -151,15 +165,21 @@ const RifaView = () => {
               <p className="text-sm text-muted-foreground">{rifa.descricao}</p>
             )}
 
-            {(rifa.premio_descricao || (rifa.premio_fotos && rifa.premio_fotos.length > 0)) && (
+            {(rifa.premio_descricao || premioFotosParsed.length > 0) && (
               <div className="border rounded-lg p-3 bg-amber-50 dark:bg-amber-900/10 border-amber-200 dark:border-amber-700/30 space-y-2">
                 <p className="text-xs font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-400 flex items-center gap-1.5">
                   <Trophy className="w-3.5 h-3.5" /> Prêmio
                 </p>
-                {rifa.premio_fotos && rifa.premio_fotos.length > 0 && (
-                  <div className={`grid gap-1.5 ${rifa.premio_fotos.length === 1 ? 'grid-cols-1' : 'grid-cols-2'}`}>
-                    {rifa.premio_fotos.map((url, i) => (
-                      <img key={i} src={url} alt={`Foto do prêmio ${i + 1}`} className="w-full max-h-40 object-cover rounded" />
+                {premioFotosParsed.length > 0 && (
+                  <div className={`grid gap-1.5 ${premioFotosParsed.length === 1 ? 'grid-cols-1' : 'grid-cols-2'}`}>
+                    {premioFotosParsed.map((url: string, i: number) => (
+                      <img 
+                        key={i} 
+                        src={url} 
+                        alt={`Foto do prêmio ${i + 1}`} 
+                        className="w-full max-h-40 object-cover rounded" 
+                        onError={e => (e.currentTarget.style.display = 'none')}
+                      />
                     ))}
                   </div>
                 )}
