@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useRifaAdmin } from '@/hooks/useRifaAdmin';
@@ -17,7 +17,8 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ArrowLeft, Trophy, Users, DollarSign, Hash, Loader2, CheckCircle, XCircle, AlertCircle, Pencil, Trash2, Upload, Link, Plus, X as XIcon, Image as ImageIcon, MapPin, Phone, Store, Globe, Banknote, BadgePercent } from 'lucide-react';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { ArrowLeft, Trophy, Users, DollarSign, Hash, Loader2, CheckCircle, XCircle, AlertCircle, Pencil, Trash2, Upload, Link, Plus, X as XIcon, Image as ImageIcon, MapPin, Phone, Store, Globe, Banknote, BadgePercent, StoreIcon } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { NumeroRifa, CompraRifa, Rifa } from '@/types/rifa';
@@ -164,6 +165,64 @@ const RifaDetalheAdmin = () => {
     enabled: !!rifa?.ganhador_id,
   });
 
+  // Cálculos de Estatísticas de Vendedores
+  const comprasRifa = todasCompras.filter(c => c.rifa_id === id);
+
+  const sellerStatsArray = useMemo(() => {
+    if (!rifa) return [];
+    
+    const map: Record<string, {
+      id: string;
+      nome: string;
+      qtdNumeros: number;
+      bruto: number;
+      ganhoDesconto: number;
+      ganhoComissao: number;
+      liquido: number;
+    }> = {};
+
+    comprasRifa.forEach(compra => {
+      const isFisica = compra.tipo_pagamento === 'vendedor' && compra.vendedor_id;
+      const isOnlineRef = compra.ref_vendedor_id;
+      const targetVendedorId = isFisica ? compra.vendedor_id : isOnlineRef;
+
+      if (targetVendedorId) {
+        const vendedor = vendedores.find(v => v.id === targetVendedorId);
+        if (!vendedor) return;
+
+        if (!map[targetVendedorId]) {
+          map[targetVendedorId] = {
+            id: targetVendedorId,
+            nome: vendedor.nome,
+            qtdNumeros: 0,
+            bruto: 0,
+            ganhoDesconto: 0,
+            ganhoComissao: 0,
+            liquido: 0,
+          };
+        }
+
+        const stat = map[targetVendedorId];
+        const brutoCompra = compra.numeros.length * Number(rifa.custo_por_numero);
+        
+        stat.qtdNumeros += compra.numeros.length;
+        stat.bruto += brutoCompra;
+
+        if (isFisica) {
+          const desconto = brutoCompra - Number(compra.valor_total);
+          stat.ganhoDesconto += desconto > 0 ? desconto : 0;
+          stat.liquido += Number(compra.valor_total);
+        } else if (isOnlineRef) {
+          const comissao = Number(compra.valor_total) * (Number(vendedor.comissao_percentual || 0) / 100);
+          stat.ganhoComissao += comissao;
+          stat.liquido += (Number(compra.valor_total) - comissao);
+        }
+      }
+    });
+
+    return Object.values(map).sort((a, b) => b.bruto - a.bruto);
+  }, [comprasRifa, rifa, vendedores]);
+
   if (!rifa) {
     return (
       <div className="flex items-center justify-center min-h-[40vh]">
@@ -172,7 +231,6 @@ const RifaDetalheAdmin = () => {
     );
   }
 
-  const comprasRifa = todasCompras.filter(c => c.rifa_id === id);
   const vendidos = numeros.filter(n => n.status === 'vendido').length;
   const reservados = numeros.filter(n => n.status === 'reservado').length;
   const disponiveis = numeros.filter(n => n.status === 'disponivel').length;
@@ -481,7 +539,7 @@ const RifaDetalheAdmin = () => {
       )}
 
       <Tabs defaultValue="numeros" className="w-full">
-        <TabsList className="grid w-full grid-cols-3 mb-6 h-12">
+        <TabsList className="grid w-full grid-cols-4 mb-6 h-12">
           <TabsTrigger value="numeros">Números</TabsTrigger>
           <TabsTrigger value="compras">
             Compras
@@ -490,6 +548,9 @@ const RifaDetalheAdmin = () => {
                 {comprasRifa.length}
               </span>
             )}
+          </TabsTrigger>
+          <TabsTrigger value="vendedores">
+            Vendedores
           </TabsTrigger>
           <TabsTrigger value="finalizar">Finalizar</TabsTrigger>
         </TabsList>
@@ -552,6 +613,57 @@ const RifaDetalheAdmin = () => {
                 <CompraCard key={compra.id} compra={compra} custo={rifa.custo_por_numero} />
               ))
             )}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="vendedores">
+          <div className="card-container p-0 overflow-hidden">
+            <div className="p-4 border-b border-border/50 flex items-center gap-2">
+              <StoreIcon className="w-5 h-5 text-primary" />
+              <h3 className="font-heading font-bold">Relatório de Vendedores</h3>
+            </div>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Vendedor</TableHead>
+                    <TableHead className="text-center">Nº Vendidos</TableHead>
+                    <TableHead className="text-right">Total Vendido (Bruto)</TableHead>
+                    <TableHead className="text-right">Ganho (Desc/Comissão)</TableHead>
+                    <TableHead className="text-right">Repassado (Líquido)</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {sellerStatsArray.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                        Nenhuma venda vinculada a vendedores registrada nesta rifa.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    sellerStatsArray.map(stat => (
+                      <TableRow key={stat.id}>
+                        <TableCell className="font-medium whitespace-nowrap">
+                          {stat.nome}
+                        </TableCell>
+                        <TableCell className="text-center font-mono">
+                          {stat.qtdNumeros}
+                        </TableCell>
+                        <TableCell className="text-right font-semibold">
+                          R$ {stat.bruto.toFixed(2)}
+                        </TableCell>
+                        <TableCell className="text-right text-amber-600 font-bold">
+                          R$ {(stat.ganhoDesconto + stat.ganhoComissao).toFixed(2)}
+                        </TableCell>
+                        <TableCell className="text-right text-primary font-bold">
+                          R$ {stat.liquido.toFixed(2)}
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
           </div>
         </TabsContent>
 
