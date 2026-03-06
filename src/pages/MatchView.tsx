@@ -313,7 +313,7 @@ const MatchView = () => {
                             number={num}
                             isMarked={isMarked}
                             isFreeSpace={i === 12}
-                            isNewlyMarked={num === lastCalledNumber}
+                            isNewlyMarked={isMarked && num === lastCalledNumber} // <-- AQUI ESTÁ A CORREÇÃO (SÓ PISCA SE ESTIVER REALMENTE MARCADO)
                             onClick={() => handleCellClick(card.id, num, mode)}
                         />
                     )
