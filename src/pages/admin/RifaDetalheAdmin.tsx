@@ -394,10 +394,20 @@ const RifaDetalheAdmin = () => {
           </Badge>
         </div>
         <div className="flex gap-2 shrink-0">
-          <Button variant="outline" size="sm" onClick={handleOpenEditar}>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={handleOpenEditar} 
+            disabled={rifa.status === 'finalizada'}
+          >
             <Pencil className="w-4 h-4 mr-1.5" /> Editar
           </Button>
-          <Button variant="destructive" size="sm" onClick={() => setConfirmDeletarOpen(true)}>
+          <Button 
+            variant="destructive" 
+            size="sm" 
+            onClick={() => setConfirmDeletarOpen(true)} 
+            disabled={rifa.status === 'finalizada'}
+          >
             <Trash2 className="w-4 h-4 mr-1.5" /> Deletar
           </Button>
         </div>
