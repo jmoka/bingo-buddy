@@ -1,0 +1,1 @@
+ALTER TABLE public.rifas ADD COLUMN IF NOT EXISTS custo_premio numeric DEFAULT 0;

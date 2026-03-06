@@ -1,7 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { useRifaAdmin } from '@/hooks/useRifaAdmin';
 import { useRifas } from '@/hooks/useRifas';
+import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -15,7 +17,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ArrowLeft, Trophy, Users, DollarSign, Hash, Loader2, CheckCircle, XCircle, AlertCircle, Pencil, Trash2, Upload, Link, Plus, X as XIcon, Image as ImageIcon } from 'lucide-react';
+import { ArrowLeft, Trophy, Users, DollarSign, Hash, Loader2, CheckCircle, XCircle, AlertCircle, Pencil, Trash2, Upload, Link, Plus, X as XIcon, Image as ImageIcon, MapPin, Phone, Store, Globe } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { NumeroRifa, CompraRifa, Rifa } from '@/types/rifa';
@@ -42,6 +44,7 @@ interface EditForm {
   premio_fotos: string[];
   foto_capa: string;
   custo_por_numero: number | string;
+  custo_premio: number | string;
   data_encerramento: string;
 }
 
@@ -138,6 +141,7 @@ const RifaDetalheAdmin = () => {
     premio_fotos: [],
     foto_capa: '',
     custo_por_numero: 1,
+    custo_premio: 0,
     data_encerramento: '',
   });
 
@@ -149,6 +153,16 @@ const RifaDetalheAdmin = () => {
       setLoadingNumeros(false);
     });
   }, [id]);
+
+  const { data: winnerProfile } = useQuery({
+    queryKey: ['winnerProfileFull', rifa?.ganhador_id],
+    queryFn: async () => {
+      if (!rifa?.ganhador_id) return null;
+      const { data } = await supabase.from('perfis').select('*').eq('id', rifa.ganhador_id).single();
+      return data;
+    },
+    enabled: !!rifa?.ganhador_id,
+  });
 
   if (!rifa) {
     return (
@@ -163,13 +177,28 @@ const RifaDetalheAdmin = () => {
   const reservados = numeros.filter(n => n.status === 'reservado').length;
   const disponiveis = numeros.filter(n => n.status === 'disponivel').length;
   const total = rifa.quantidade_numeros;
-  const receitaTotal = vendidos * rifa.custo_por_numero;
   const percentualVendido = total > 0 ? Math.round((vendidos / total) * 100) : 0;
+
+  // Variáveis do Dashboard Financeiro
+  const custoPremio = Number(rifa.custo_premio) || 0;
+  const receitaTotalPrevista = total * Number(rifa.custo_por_numero);
+  const saldoPrevisto = receitaTotalPrevista - custoPremio;
+  const receitaVendida = vendidos * Number(rifa.custo_por_numero);
+  const receitaNaoVendida = (disponiveis + reservados) * Number(rifa.custo_por_numero);
+  const saldoAtual = receitaVendida - custoPremio;
 
   const numerosFiltrados =
     filtroNumeros === 'todos' ? numeros : numeros.filter(n => n.status === filtroNumeros);
 
   const cfg = statusConfig[rifa.status] ?? statusConfig.cancelada;
+
+  // Info Ganhador
+  const numeroGanhadorInfo = numeros.find(n => n.numero === rifa.numero_ganhador);
+  const isVendaFisica = !!numeroGanhadorInfo?.vendedor_id;
+  const vendedorNome = (numeroGanhadorInfo as any)?.vendedores_rifa?.nome;
+  const ganhadorNome = numeroGanhadorInfo?.nome_comprador || winnerProfile?.full_name || 'Não identificado';
+  const ganhadorTelefone = numeroGanhadorInfo?.telefone_comprador || winnerProfile?.whatsapp || 'Não informado';
+  const ganhadorEndereco = numeroGanhadorInfo?.endereco_comprador || winnerProfile?.address || 'Não informado';
 
   const handleOpenEditar = () => {
     if (rifa) {
@@ -190,6 +219,7 @@ const RifaDetalheAdmin = () => {
         premio_fotos: fotosParsed,
         foto_capa: rifa.foto_capa ?? '',
         custo_por_numero: rifa.custo_por_numero,
+        custo_premio: rifa.custo_premio || 0,
         data_encerramento: rifa.data_encerramento 
           ? new Date(rifa.data_encerramento).toISOString().slice(0, 16) 
           : '',
@@ -262,6 +292,7 @@ const RifaDetalheAdmin = () => {
       premio_fotos: editForm.premio_fotos,
       foto_capa: editForm.foto_capa || null,
       custo_por_numero: Number(editForm.custo_por_numero),
+      custo_premio: Number(editForm.custo_premio),
       data_encerramento: dataEncParsed,
     };
     
@@ -296,11 +327,44 @@ const RifaDetalheAdmin = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+      {/* DASHBOARD FINANCEIRO DA RIFA */}
+      <div className="card-container mb-6 p-5 border-l-4 border-l-primary">
+        <h2 className="font-heading text-lg font-bold mb-4 flex items-center gap-2">
+          <DollarSign className="w-5 h-5 text-primary"/> Resumo Financeiro
+        </h2>
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
+          <div className="p-3 bg-muted rounded-lg border border-border/50">
+             <p className="text-[10px] uppercase font-bold text-muted-foreground flex items-center gap-1"><AlertCircle className="w-3 h-3 text-destructive" /> Custo do Prêmio</p>
+             <p className="text-lg font-bold text-destructive">R$ {custoPremio.toFixed(2)}</p>
+          </div>
+          <div className="p-3 bg-muted rounded-lg border border-border/50">
+             <p className="text-[10px] uppercase font-bold text-muted-foreground">Potencial de Arrecadação</p>
+             <p className="text-lg font-bold text-foreground">R$ {receitaTotalPrevista.toFixed(2)}</p>
+          </div>
+          <div className="p-3 bg-muted rounded-lg border border-border/50">
+             <p className="text-[10px] uppercase font-bold text-muted-foreground">Lucro Previsto Máximo</p>
+             <p className="text-lg font-bold text-success">R$ {saldoPrevisto.toFixed(2)}</p>
+          </div>
+          <div className="p-3 bg-muted rounded-lg border border-border/50">
+             <p className="text-[10px] uppercase font-bold text-muted-foreground">Total Vendido</p>
+             <p className="text-lg font-bold text-primary">R$ {receitaVendida.toFixed(2)}</p>
+          </div>
+          <div className="p-3 bg-muted rounded-lg border border-border/50">
+             <p className="text-[10px] uppercase font-bold text-muted-foreground">Total Não Vendido</p>
+             <p className="text-lg font-bold text-amber-600">R$ {receitaNaoVendida.toFixed(2)}</p>
+          </div>
+          <div className={`p-3 rounded-lg border ${saldoAtual >= 0 ? 'bg-success/10 border-success/30' : 'bg-destructive/10 border-destructive/30'}`}>
+             <p className="text-[10px] uppercase font-bold text-muted-foreground">Saldo Atual (Caixa Líquido)</p>
+             <p className={`text-lg font-bold ${saldoAtual >= 0 ? 'text-success' : 'text-destructive'}`}>R$ {saldoAtual.toFixed(2)}</p>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
         <div className="card-container p-4 text-center">
           <div className="flex items-center justify-center gap-1.5 text-muted-foreground mb-1">
             <Hash className="w-4 h-4" />
-            <span className="text-xs font-semibold uppercase tracking-wide">Total</span>
+            <span className="text-xs font-semibold uppercase tracking-wide">Total Números</span>
           </div>
           <p className="text-2xl font-bold font-heading">{total}</p>
         </div>
@@ -318,15 +382,6 @@ const RifaDetalheAdmin = () => {
           </div>
           <p className="text-2xl font-bold font-heading">{disponiveis}</p>
         </div>
-        <div className="card-container p-4 text-center">
-          <div className="flex items-center justify-center gap-1.5 text-muted-foreground mb-1">
-            <DollarSign className="w-4 h-4 text-primary" />
-            <span className="text-xs font-semibold uppercase tracking-wide">Receita</span>
-          </div>
-          <p className="text-2xl font-bold font-heading text-primary">
-            R${receitaTotal.toFixed(2).replace('.', ',')}
-          </p>
-        </div>
       </div>
 
       <div className="card-container p-4 mb-6">
@@ -341,6 +396,65 @@ const RifaDetalheAdmin = () => {
           <span>{disponiveis} disponíveis</span>
         </div>
       </div>
+
+      {rifa.status === 'finalizada' && (
+        <div className="card-container p-6 bg-blue-50/50 border-blue-200 mb-6 shadow-sm">
+          <h3 className="font-heading font-bold text-blue-800 text-lg flex items-center gap-2 mb-4 pb-2 border-b border-blue-200">
+            <Trophy className="w-5 h-5"/> Informações do Ganhador
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+             <div className="space-y-4">
+               <div>
+                 <p className="text-xs text-muted-foreground uppercase font-bold flex items-center gap-1"><Hash className="w-3.5 h-3.5" /> Número Sorteado</p>
+                 <p className="text-4xl font-black font-mono text-blue-700 mt-1">{String(rifa.numero_ganhador).padStart(3, '0')}</p>
+               </div>
+               <div>
+                 <p className="text-xs text-muted-foreground uppercase font-bold flex items-center gap-1"><Users className="w-3.5 h-3.5" /> Nome do Ganhador</p>
+                 <p className="text-lg font-bold text-foreground mt-0.5">{ganhadorNome}</p>
+               </div>
+               <div>
+                 <p className="text-xs text-muted-foreground uppercase font-bold flex items-center gap-1"><Phone className="w-3.5 h-3.5" /> Telefone / WhatsApp</p>
+                 <p className="text-base font-medium mt-0.5">{ganhadorTelefone}</p>
+               </div>
+               <div>
+                 <p className="text-xs text-muted-foreground uppercase font-bold flex items-center gap-1"><MapPin className="w-3.5 h-3.5" /> Endereço</p>
+                 <p className="text-base font-medium mt-0.5">{ganhadorEndereco}</p>
+               </div>
+             </div>
+             
+             <div className="bg-white rounded-xl p-5 border border-blue-100 shadow-sm flex flex-col justify-center">
+               <p className="text-xs text-muted-foreground uppercase font-bold mb-3 flex items-center gap-1.5"><Ticket className="w-3.5 h-3.5" /> Origem da Compra</p>
+               {isVendaFisica ? (
+                 <div className="space-y-3">
+                   <Badge className="bg-amber-500/10 text-amber-700 border-amber-500/30 text-sm px-3 py-1">
+                     <Store className="w-4 h-4 mr-1.5" /> Venda Física (Talonário)
+                   </Badge>
+                   <div>
+                      <p className="text-xs text-muted-foreground">Vendedor Responsável:</p>
+                      <p className="text-base font-bold text-foreground">{vendedorNome}</p>
+                   </div>
+                   <div className="p-3 bg-blue-50/50 rounded-lg text-xs text-blue-800 border border-blue-100">
+                     Este número foi vendido presencialmente. Entre em contato através do telefone acima ou acione o vendedor para organizar a entrega do prêmio.
+                   </div>
+                 </div>
+               ) : (
+                 <div className="space-y-3">
+                   <Badge className="bg-primary/10 text-primary border-primary/30 text-sm px-3 py-1">
+                     <Globe className="w-4 h-4 mr-1.5" /> App Online
+                   </Badge>
+                   <div>
+                      <p className="text-xs text-muted-foreground">Status da Conta:</p>
+                      <p className="text-base font-bold text-foreground">Usuário do Sistema</p>
+                   </div>
+                   <div className="p-3 bg-blue-50/50 rounded-lg text-xs text-blue-800 border border-blue-100">
+                     Este número foi comprado usando o saldo do aplicativo. O usuário possui conta registrada na plataforma.
+                   </div>
+                 </div>
+               )}
+             </div>
+          </div>
+        </div>
+      )}
 
       <Tabs defaultValue="numeros" className="w-full">
         <TabsList className="grid w-full grid-cols-3 mb-6 h-12">
@@ -494,12 +608,6 @@ const RifaDetalheAdmin = () => {
                     {rifa.numero_ganhador}
                   </span>
                 </div>
-              )}
-              {rifa.ganhador_id && (
-                <p className="text-sm text-muted-foreground mt-4">
-                  ID do ganhador:{' '}
-                  <span className="font-mono text-xs">{rifa.ganhador_id}</span>
-                </p>
               )}
             </div>
           )}
@@ -699,11 +807,19 @@ const RifaDetalheAdmin = () => {
               uploading={uploadingCapa}
             />
 
-            <div className="space-y-1.5">
-              <Label htmlFor="edit-custo">Custo por Número (R$)</Label>
-              <Input id="edit-custo" type="number" step="0.01" min={0}
-                value={editForm.custo_por_numero}
-                onChange={e => setEditForm(p => ({ ...p, custo_por_numero: e.target.value }))} />
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="edit-custo">Custo por Número (R$)</Label>
+                <Input id="edit-custo" type="number" step="0.01" min={0}
+                  value={editForm.custo_por_numero}
+                  onChange={e => setEditForm(p => ({ ...p, custo_por_numero: e.target.value }))} />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="edit-custo-premio">Custo do Prêmio (R$)</Label>
+                <Input id="edit-custo-premio" type="number" step="0.01" min={0}
+                  value={editForm.custo_premio}
+                  onChange={e => setEditForm(p => ({ ...p, custo_premio: e.target.value }))} />
+              </div>
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="edit-encerramento">Data de Encerramento</Label>

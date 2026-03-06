@@ -35,6 +35,7 @@ const defaultForm = {
   quantidade_numeros: 100,
   numero_inicial: 1,
   custo_por_numero: 1,
+  custo_premio: 0,
   data_encerramento: '',
 };
 
@@ -167,6 +168,7 @@ const RifasAdmin = () => {
       quantidade_numeros: Number(novaRifaForm.quantidade_numeros),
       numero_inicial: Number(novaRifaForm.numero_inicial),
       custo_por_numero: Number(novaRifaForm.custo_por_numero),
+      custo_premio: Number(novaRifaForm.custo_premio),
       data_encerramento: dataEncParsed,
       status: 'ativa',
     };
@@ -351,14 +353,25 @@ const RifasAdmin = () => {
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="data_encerramento">Data de Encerramento</Label>
+                  <Label htmlFor="custo_premio">Custo do Prêmio (R$)</Label>
+                  <Input
+                    id="custo_premio"
+                    type="number"
+                    step="0.01"
+                    min={0}
+                    value={novaRifaForm.custo_premio}
+                    onChange={e => handleFormChange('custo_premio', e.target.value)}
+                  />
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                  <Label htmlFor="data_encerramento">Data de Encerramento (Opcional)</Label>
                   <Input
                     id="data_encerramento"
                     type="datetime-local"
                     value={novaRifaForm.data_encerramento}
                     onChange={e => handleFormChange('data_encerramento', e.target.value)}
                   />
-                </div>
               </div>
               <Button type="submit" className="w-full gradient-primary mt-2" disabled={criandoRifa}>
                 {criandoRifa ? (

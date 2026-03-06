@@ -15,6 +15,7 @@ export interface Rifa {
   quantidade_numeros: number;
   numero_inicial: number;
   custo_por_numero: number;
+  custo_premio: number;
   preco_vendedor: number | null;
   data_inicio: string | null;
   data_encerramento: string | null;
