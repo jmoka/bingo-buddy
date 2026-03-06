@@ -4,7 +4,7 @@ import { BingoCell } from '@/components/BingoCell';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { gameTypeLabels } from '@/utils/bingoUtils';
-import { ArrowLeft, Coins, Users, Bot, Loader2, Star, Trophy, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, Coins, Users, Bot, Loader2, Star, Trophy, AlertTriangle, CheckCircle2, HandPointer } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { playNotificationSound } from '@/utils/soundUtils';
@@ -14,6 +14,8 @@ import { MatchStats } from '@/components/MatchStats';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -35,7 +37,7 @@ const MatchView = () => {
   const [lastCalledNumber, setLastCalledNumber] = useState<number | null>(null);
   const [now, setNow] = useState(Date.now());
   
-  const [confirmManualCard, setConfirmManualCard] = useState<{cardId: string, num: number} | null>(null);
+  const [confirmManualCard, setConfirmManualCard] = useState<{cardId: string, num?: number} | null>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -53,7 +55,6 @@ const MatchView = () => {
 
   const match = matches.find(m => m.id === id);
   
-  // Ref para monitorar mudanças
   const prevCalledNumbersRef = useRef<number[]>([]);
   const prevWinnersCountRef = useRef<number>(0);
 
@@ -116,12 +117,16 @@ const MatchView = () => {
 
   const handleConfirmManual = async () => {
     if (confirmManualCard) {
-        await markNumberManually(confirmManualCard.cardId, confirmManualCard.num);
+        // Se a troca foi via clique em número, marcamos o número. 
+        // Se foi via switch, apenas trocamos o modo (usando um número já sorteado qualquer ou apenas forçando o modo via RPC)
+        const numToMark = confirmManualCard.num || match?.called_numbers[0];
+        if (numToMark) {
+            await markNumberManually(confirmManualCard.cardId, numToMark);
+        }
         setConfirmManualCard(null);
     }
   };
 
-  // Se estiver carregando e ainda não temos os dados da partida
   if (isLoading && !match) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
@@ -131,7 +136,6 @@ const MatchView = () => {
     );
   }
 
-  // Se terminou de carregar e a partida não existe
   if (!match) {
     return (
       <div className="card-container text-center py-20">
@@ -143,7 +147,6 @@ const MatchView = () => {
     );
   }
 
-  // Dados calculados após garantir que match existe
   const myCards = profile && id ? getPlayerMatchCards(id, profile.id) : [];
   const allCardsForThisMatch = matchCards.filter(c => c.match_id === id);
   const playersInMatchCount = new Set(allCardsForThisMatch.map(mc => mc.player_id)).size;
@@ -223,27 +226,50 @@ const MatchView = () => {
         </div>
       </div>
 
-      <h2 className="font-heading text-lg font-bold text-foreground mb-4">
-        Minhas Cartelas ({myCards.length})
-      </h2>
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="font-heading text-lg font-bold text-foreground">
+            Minhas Cartelas ({myCards.length})
+        </h2>
+        <div className="flex items-center gap-2 px-3 py-1.5 bg-muted rounded-full border border-border/50">
+            <HandPointer className="w-3.5 h-3.5 text-muted-foreground" />
+            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-tight">Clique no número para marcar manual</span>
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {myCards.map((card) => {
           const mode = card.marking_mode || 'auto';
           return (
-            <div key={card.id} className="card-container max-w-sm mx-auto w-full border-2 transition-colors relative">
+            <div key={card.id} className={cn(
+                "card-container max-w-sm mx-auto w-full border-2 transition-all relative",
+                mode === 'manual' ? "border-amber-500/30 shadow-amber-500/5" : "border-transparent"
+            )}>
               <div className="flex items-center justify-between mb-4">
-                <div>
-                    <h3 className="font-heading font-semibold text-foreground flex items-center gap-2">
-                    {card.name}
-                    {card.credit_type === 'fake' && <Badge variant="outline" className="text-[10px] border-amber-400 text-amber-600">Brincar</Badge>}
+                <div className="min-w-0">
+                    <h3 className="font-heading font-semibold text-foreground flex items-center gap-2 truncate">
+                        {card.name}
+                        {card.credit_type === 'fake' && <Badge variant="outline" className="text-[9px] h-4 border-amber-400 text-amber-600">Brincar</Badge>}
                     </h3>
-                    <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-tighter">
-                        Marcação: <span className={cn("font-bold", mode === 'auto' ? "text-primary" : "text-amber-600")}>
-                            {mode === 'auto' ? 'Automática' : 'MANUAL'}
+                    <div className="flex items-center gap-1.5 mt-0.5">
+                        <span className={cn(
+                            "text-[9px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded",
+                            mode === 'auto' ? "bg-primary/10 text-primary" : "bg-amber-500 text-white animate-pulse"
+                        )}>
+                            {mode === 'auto' ? 'Automático' : 'MODO MANUAL'}
                         </span>
-                    </p>
+                    </div>
                 </div>
-                {mode === 'manual' && <Badge className="bg-amber-500 h-5 text-[9px] animate-pulse">ATENÇÃO: MODO MANUAL</Badge>}
+                
+                {/* Interruptor de Modo */}
+                <div className="flex flex-col items-end gap-1">
+                    <Label htmlFor={`mode-${card.id}`} className="text-[8px] uppercase font-bold text-muted-foreground">Trocar p/ Manual</Label>
+                    <Switch 
+                        id={`mode-${card.id}`}
+                        checked={mode === 'manual'}
+                        disabled={mode === 'manual' || match.status === 'finished'}
+                        onCheckedChange={() => mode === 'auto' && setConfirmManualCard({ cardId: card.id })}
+                    />
+                </div>
               </div>
               
               <div className="grid grid-cols-5 gap-1.5 sm:gap-2">
@@ -253,7 +279,6 @@ const MatchView = () => {
                   </div>
                 ))}
                 {card.numbers.flat().map((num, i) => {
-                    // Garantia que marked_numbers é um Set ou array antes de verificar
                     const isMarked = card.marked_numbers instanceof Set 
                         ? card.marked_numbers.has(num) 
                         : Array.isArray(card.marked_numbers) && card.marked_numbers.includes(num);
@@ -274,7 +299,7 @@ const MatchView = () => {
               {mode === 'manual' && match.status === 'in_progress' && (
                 <div className="mt-4 p-2.5 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-2 animate-in fade-in slide-in-from-bottom-1">
                     <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-                    <p className="text-[10px] text-amber-800 leading-tight">
+                    <p className="text-[10px] text-amber-800 font-medium leading-tight">
                         Você assumiu a marcação. Fique atento aos números sorteados para não passar batido!
                     </p>
                 </div>
@@ -298,7 +323,7 @@ const MatchView = () => {
               <div className="p-3 bg-destructive/5 border border-destructive/20 rounded-lg text-destructive font-semibold text-sm">
                 "Você terá que marcar os números manualmente caso deixe de marcar você passará batido."
               </div>
-              <p>Deseja continuar e marcar este número agora?</p>
+              <p>Deseja continuar e assumir o controle desta cartela agora?</p>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
