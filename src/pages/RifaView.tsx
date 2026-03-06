@@ -18,7 +18,8 @@ import {
   Coins,
   Tag,
   Store,
-  Globe
+  Globe,
+  CheckCircle2
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -104,11 +105,14 @@ const RifaView = () => {
     return [];
   }, [rifa?.premio_fotos]);
 
+  // Melhorada a busca dos números do usuário (busca tanto no histórico de compras quanto na tabela de números)
   const meusNumeros = useMemo(() => {
-    const comprasDestaRifa = minhasCompras.filter(c => c.rifa_id === id);
-    const nums = comprasDestaRifa.flatMap(c => c.numeros);
-    return [...new Set(nums)].sort((a,b) => a-b);
-  }, [minhasCompras, id]);
+    if (!profile) return [];
+    const comprasDestaRifa = minhasCompras.filter(c => c.rifa_id === id).flatMap(c => c.numeros);
+    const numsDaTabela = numeros.filter(n => n.comprador_id === profile.id).map(n => n.numero);
+    
+    return [...new Set([...comprasDestaRifa, ...numsDaTabela])].sort((a,b) => a-b);
+  }, [minhasCompras, numeros, profile, id]);
 
   const toggleNumber = (num: number) => {
     const found = numeros.find(n => n.numero === num);
@@ -179,47 +183,47 @@ const RifaView = () => {
             <img
               src={rifa.foto_capa}
               alt={rifa.nome}
-              className="w-full max-h-64 object-cover rounded-lg"
+              className="w-full max-h-64 object-cover rounded-lg shadow-sm"
               onError={e => (e.currentTarget.style.display = 'none')}
             />
           ) : (
-            <div className="w-full h-48 rounded-lg bg-gradient-to-br from-primary/30 to-accent/30 flex items-center justify-center">
+            <div className="w-full h-48 rounded-lg bg-gradient-to-br from-primary/30 to-accent/30 flex items-center justify-center shadow-sm">
               <Ticket className="w-16 h-16 text-primary/50" />
             </div>
           )}
 
-          <div className="card-container space-y-3">
+          <div className="card-container space-y-4">
             {rifa.descricao && (
               <p className="text-sm text-muted-foreground">{rifa.descricao}</p>
             )}
 
             {(rifa.premio_descricao || premioFotosParsed.length > 0) && (
-              <div className="border rounded-lg p-3 bg-amber-50 dark:bg-amber-900/10 border-amber-200 dark:border-amber-700/30 space-y-2">
-                <p className="text-xs font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-400 flex items-center gap-1.5">
-                  <Trophy className="w-3.5 h-3.5" /> Prêmio
+              <div className="border rounded-xl p-3 bg-amber-50 dark:bg-amber-900/10 border-amber-200 dark:border-amber-700/30 space-y-2">
+                <p className="text-xs font-bold uppercase tracking-wide text-amber-700 dark:text-amber-400 flex items-center gap-1.5">
+                  <Trophy className="w-4 h-4" /> Prêmio
                 </p>
                 {premioFotosParsed.length > 0 && (
-                  <div className={`grid gap-1.5 ${premioFotosParsed.length === 1 ? 'grid-cols-1' : 'grid-cols-2'}`}>
+                  <div className={`grid gap-2 ${premioFotosParsed.length === 1 ? 'grid-cols-1' : 'grid-cols-2'}`}>
                     {premioFotosParsed.map((url: string, i: number) => (
                       <img 
                         key={i} 
                         src={url} 
                         alt={`Foto do prêmio ${i + 1}`} 
-                        className="w-full max-h-40 object-cover rounded" 
+                        className="w-full max-h-40 object-cover rounded-lg shadow-sm" 
                         onError={e => (e.currentTarget.style.display = 'none')}
                       />
                     ))}
                   </div>
                 )}
                 {rifa.premio_descricao && (
-                  <p className="text-sm text-amber-800 dark:text-amber-300">{rifa.premio_descricao}</p>
+                  <p className="text-sm font-medium text-amber-800 dark:text-amber-300">{rifa.premio_descricao}</p>
                 )}
               </div>
             )}
 
-            <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
-              <span className="flex items-center gap-1.5 text-muted-foreground">
-                <DollarSign className="w-4 h-4" />
+            <div className="flex flex-wrap gap-x-4 gap-y-2 text-sm bg-muted/30 p-3 rounded-lg border border-border/50">
+              <span className="flex items-center gap-1.5 font-medium">
+                <DollarSign className="w-4 h-4 text-green-600" />
                 {rifa.custo_por_numero.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} / número
               </span>
               {rifa.data_encerramento && (
@@ -233,42 +237,42 @@ const RifaView = () => {
             {rifa.regulamento && (
               <div>
                 <button
-                  className="flex items-center gap-1.5 text-sm font-medium text-primary"
+                  className="flex items-center gap-1.5 text-sm font-medium text-primary hover:underline"
                   onClick={() => setShowRegulamento(v => !v)}
                 >
                   {showRegulamento ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                   Ver regulamento
                 </button>
                 {showRegulamento && (
-                  <p className="mt-2 text-xs text-muted-foreground whitespace-pre-line border-t pt-2">
+                  <p className="mt-2 text-xs text-muted-foreground whitespace-pre-line p-3 bg-muted/50 rounded-lg">
                     {rifa.regulamento}
                   </p>
                 )}
               </div>
             )}
 
-            <div className="space-y-1">
-              <div className="flex justify-between text-xs text-muted-foreground">
+            <div className="pt-2">
+              <div className="flex justify-between text-xs font-medium text-muted-foreground mb-1.5">
                 <span>{stats.sold} de {stats.total} números vendidos</span>
-                <span>{stats.percentage}%</span>
+                <span className="font-bold text-foreground">{stats.percentage}%</span>
               </div>
-              <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
+              <div className="w-full bg-muted rounded-full h-2.5 overflow-hidden shadow-inner">
                 <div
-                  className="h-2 rounded-full bg-primary transition-all"
+                  className="h-full rounded-full bg-primary transition-all duration-500 ease-out"
                   style={{ width: `${stats.percentage}%` }}
                 />
               </div>
             </div>
 
-            {/* SEUS NÚMEROS */}
+            {/* SEUS NÚMEROS AQUI - EM DESTAQUE */}
             {meusNumeros.length > 0 && (
-              <div className="border-t border-border pt-3 mt-3">
-                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-1">
-                  <Ticket className="w-3.5 h-3.5" /> Seus Números ({meusNumeros.length})
+              <div className="bg-primary/5 border-2 border-primary/20 rounded-xl p-4 mt-2">
+                <p className="text-[11px] font-bold text-primary uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
+                  <CheckCircle2 className="w-4 h-4" /> Seus Números Comprados ({meusNumeros.length})
                 </p>
-                <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto custom-scrollbar p-1">
+                <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto custom-scrollbar">
                   {meusNumeros.map(n => (
-                    <span key={n} className="bg-primary/10 text-primary border border-primary/20 text-xs font-bold px-2 py-1 rounded-md">
+                    <span key={n} className="bg-primary text-primary-foreground text-sm font-bold font-mono px-2.5 py-1 rounded shadow-sm">
                       {String(n).padStart(3, '0')}
                     </span>
                   ))}
@@ -366,6 +370,21 @@ const RifaView = () => {
                 const found = numeros.find(n => n.numero === num);
                 const status = found?.status ?? 'disponivel';
                 const isSelected = selectedNumbers.includes(num);
+                const isMine = meusNumeros.includes(num);
+
+                // Se o número é meu, eu o destaco com a cor principal mas informo que já é meu
+                if (isMine) {
+                  return (
+                    <button
+                      key={num}
+                      disabled
+                      title="Você comprou este número"
+                      className="aspect-square rounded text-[10px] font-bold bg-primary text-primary-foreground border border-primary/50 cursor-default shadow-sm ring-1 ring-primary ring-offset-1"
+                    >
+                      {num}
+                    </button>
+                  );
+                }
 
                 if (status === 'vendido') {
                   return (
@@ -423,14 +442,14 @@ const RifaView = () => {
               </div>
 
               <Button
-                className="w-full gradient-primary font-bold"
+                className="w-full gradient-primary font-bold h-12"
                 disabled={selectedNumbers.length === 0 || isBuying}
                 onClick={handleComprar}
               >
                 {isBuying ? (
-                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                  <Loader2 className="w-5 h-5 animate-spin mr-2" />
                 ) : (
-                  <Ticket className="w-4 h-4 mr-2" />
+                  <Ticket className="w-5 h-5 mr-2" />
                 )}
                 Comprar {selectedNumbers.length > 0 ? `${selectedNumbers.length} ` : ''}número{selectedNumbers.length !== 1 ? 's' : ''}
               </Button>
