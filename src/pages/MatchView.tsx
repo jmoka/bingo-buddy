@@ -24,6 +24,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { cn } from '@/lib/utils';
 
 const MatchView = () => {
   const { id } = useParams<{ id: string }>();
@@ -42,22 +43,19 @@ const MatchView = () => {
       .channel(`match-view-${id}`)
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'partidas', filter: `id=eq.${id}` }, () => {
         queryClient.invalidateQueries({ queryKey: ['matches'] });
-        queryClient.refetchQueries({ queryKey: ['matches'] });
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'cartelas_partida', filter: `match_id=eq.${id}` }, () => {
         queryClient.invalidateQueries({ queryKey: ['matchCards'] });
-        queryClient.refetchQueries({ queryKey: ['matchCards'] });
       })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [id, queryClient]);
 
   const match = matches.find(m => m.id === id);
-  const myCards = profile && id ? getPlayerMatchCards(id, profile.id) : [];
-  const allCardsForThisMatch = matchCards.filter(c => c.match_id === id);
-
-  const prevCalledNumbersRef = useRef<number[]>(match ? match.called_numbers : []);
-  const prevWinnersCountRef = useRef<number>(match ? match.winners.length : 0);
+  
+  // Ref para monitorar mudanças
+  const prevCalledNumbersRef = useRef<number[]>([]);
+  const prevWinnersCountRef = useRef<number>(0);
 
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 1000);
@@ -67,7 +65,7 @@ const MatchView = () => {
   useEffect(() => {
     if (!match) return;
 
-    const currentNumbers = match.called_numbers;
+    const currentNumbers = match.called_numbers || [];
     if (currentNumbers.length > prevCalledNumbersRef.current.length) {
       const newNumber = currentNumbers[currentNumbers.length - 1];
       setLastCalledNumber(newNumber);
@@ -78,8 +76,9 @@ const MatchView = () => {
     }
     prevCalledNumbersRef.current = currentNumbers;
 
-    if (match.winners.length > prevWinnersCountRef.current) {
-      const latestWinner = match.winners[match.winners.length - 1];
+    const winners = match.winners || [];
+    if (winners.length > prevWinnersCountRef.current) {
+      const latestWinner = winners[winners.length - 1];
       const isFunWinner = (latestWinner as any).creditType === 'fake';
 
       if (isFunWinner && match.status !== 'finished') {
@@ -96,15 +95,14 @@ const MatchView = () => {
         playNotificationSound();
       }
     }
-    prevWinnersCountRef.current = match.winners.length;
+    prevWinnersCountRef.current = winners.length;
 
   }, [match]);
 
   const handleCellClick = async (cardId: string, num: number, currentMode: 'auto' | 'manual', isMarked: boolean) => {
-    if (match?.status !== 'in_progress' || isMarked || num === 0) return;
+    if (!match || match.status !== 'in_progress' || isMarked || num === 0) return;
     
-    // Verifica se o número foi sorteado
-    if (!match.called_numbers.includes(num)) {
+    if (!match.called_numbers?.includes(num)) {
         toast.error("Este número ainda não foi sorteado!");
         return;
     }
@@ -123,6 +121,7 @@ const MatchView = () => {
     }
   };
 
+  // Se estiver carregando e ainda não temos os dados da partida
   if (isLoading && !match) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
@@ -132,6 +131,7 @@ const MatchView = () => {
     );
   }
 
+  // Se terminou de carregar e a partida não existe
   if (!match) {
     return (
       <div className="card-container text-center py-20">
@@ -143,11 +143,13 @@ const MatchView = () => {
     );
   }
 
+  // Dados calculados após garantir que match existe
+  const myCards = profile && id ? getPlayerMatchCards(id, profile.id) : [];
+  const allCardsForThisMatch = matchCards.filter(c => c.match_id === id);
   const playersInMatchCount = new Set(allCardsForThisMatch.map(mc => mc.player_id)).size;
-  const lastCalled = match.called_numbers.length > 0 ? match.called_numbers[match.called_numbers.length - 1] : null;
+  const lastCalled = match.called_numbers?.length > 0 ? match.called_numbers[match.called_numbers.length - 1] : null;
   const countdown = match.next_auto_call_timestamp ? Math.max(0, Math.round((new Date(match.next_auto_call_timestamp).getTime() - now) / 1000)) : null;
-
-  const funWinnersInProgress = match.winners.filter(w => (w as any).creditType === 'fake');
+  const funWinnersInProgress = (match.winners || []).filter(w => (w as any).creditType === 'fake');
 
   return (
     <>
@@ -251,7 +253,11 @@ const MatchView = () => {
                   </div>
                 ))}
                 {card.numbers.flat().map((num, i) => {
-                    const isMarked = card.marked_numbers.has(num);
+                    // Garantia que marked_numbers é um Set ou array antes de verificar
+                    const isMarked = card.marked_numbers instanceof Set 
+                        ? card.marked_numbers.has(num) 
+                        : Array.isArray(card.marked_numbers) && card.marked_numbers.includes(num);
+                        
                     return (
                         <BingoCell
                             key={`${card.id}-${i}`}
