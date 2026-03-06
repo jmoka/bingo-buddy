@@ -419,49 +419,59 @@ const RifasAdmin = () => {
 const RifaCard = ({ rifa, onVerDetalhes }: { rifa: Rifa; onVerDetalhes: () => void }) => {
   const cfg = statusConfig[rifa.status] ?? statusConfig.cancelada;
   return (
-    <div className="card-container p-5 flex flex-col gap-3">
-      <div className="flex items-start justify-between gap-2">
-        <h2 className="font-heading font-bold text-lg leading-tight">{rifa.nome}</h2>
-        <Badge variant="outline" className={`shrink-0 ${cfg.className}`}>
+    <div className="card-container p-0 overflow-hidden flex flex-col transition-all hover:shadow-lg">
+      <div className="h-32 sm:h-40 w-full relative bg-muted">
+        {rifa.foto_capa ? (
+          <img src={rifa.foto_capa} alt={rifa.nome} className="w-full h-full object-cover" />
+        ) : (
+          <div className="w-full h-full bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center">
+            <Ticket className="w-12 h-12 text-primary/40" />
+          </div>
+        )}
+        <Badge variant="outline" className={`absolute top-2 right-2 bg-background/90 backdrop-blur-sm ${cfg.className}`}>
           {cfg.label}
         </Badge>
       </div>
 
-      {rifa.descricao && (
-        <p className="text-sm text-muted-foreground line-clamp-2">{rifa.descricao}</p>
-      )}
+      <div className="p-4 flex flex-col gap-3 flex-1">
+        <h2 className="font-heading font-bold text-lg leading-tight line-clamp-1" title={rifa.nome}>{rifa.nome}</h2>
 
-      <div className="grid grid-cols-3 gap-3 text-sm">
-        <div className="flex flex-col gap-0.5">
-          <span className="text-[10px] uppercase tracking-wide font-semibold text-muted-foreground flex items-center gap-1">
-            <Ticket className="w-3 h-3" /> Números
-          </span>
-          <span className="font-bold">{rifa.quantidade_numeros}</span>
+        {rifa.descricao && (
+          <p className="text-sm text-muted-foreground line-clamp-2">{rifa.descricao}</p>
+        )}
+
+        <div className="grid grid-cols-3 gap-3 text-sm mt-auto pt-2 border-t border-border/50">
+          <div className="flex flex-col gap-0.5">
+            <span className="text-[10px] uppercase tracking-wide font-semibold text-muted-foreground flex items-center gap-1">
+              <Ticket className="w-3 h-3" /> Números
+            </span>
+            <span className="font-bold">{rifa.quantidade_numeros}</span>
+          </div>
+          <div className="flex flex-col gap-0.5">
+            <span className="text-[10px] uppercase tracking-wide font-semibold text-muted-foreground flex items-center gap-1">
+              <DollarSign className="w-3 h-3" /> Custo
+            </span>
+            <span className="font-bold">
+              R${Number(rifa.custo_por_numero).toFixed(2).replace('.', ',')}
+            </span>
+          </div>
+          <div className="flex flex-col gap-0.5">
+            <span className="text-[10px] uppercase tracking-wide font-semibold text-muted-foreground flex items-center gap-1">
+              <Calendar className="w-3 h-3" /> Fim
+            </span>
+            <span className="font-bold text-xs">
+              {rifa.data_encerramento
+                ? format(new Date(rifa.data_encerramento), 'dd/MM/yy', { locale: ptBR })
+                : '—'}
+            </span>
+          </div>
         </div>
-        <div className="flex flex-col gap-0.5">
-          <span className="text-[10px] uppercase tracking-wide font-semibold text-muted-foreground flex items-center gap-1">
-            <DollarSign className="w-3 h-3" /> Custo
-          </span>
-          <span className="font-bold">
-            R${Number(rifa.custo_por_numero).toFixed(2).replace('.', ',')}
-          </span>
-        </div>
-        <div className="flex flex-col gap-0.5">
-          <span className="text-[10px] uppercase tracking-wide font-semibold text-muted-foreground flex items-center gap-1">
-            <Calendar className="w-3 h-3" /> Encerramento
-          </span>
-          <span className="font-bold text-xs">
-            {rifa.data_encerramento
-              ? format(new Date(rifa.data_encerramento), 'dd/MM/yy HH:mm', { locale: ptBR })
-              : '—'}
-          </span>
-        </div>
+
+        <Button variant="outline" size="sm" className="w-full mt-2" onClick={onVerDetalhes}>
+          <Eye className="w-4 h-4 mr-2" />
+          Ver Detalhes
+        </Button>
       </div>
-
-      <Button variant="outline" size="sm" className="w-full mt-1" onClick={onVerDetalhes}>
-        <Eye className="w-4 h-4 mr-2" />
-        Ver Detalhes
-      </Button>
     </div>
   );
 };
