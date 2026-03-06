@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useGame } from '@/contexts/GameContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { GameType } from '@/types/bingo';
 import { PrizeType, MatchStatus, Match } from '@/types/match';
 import { gameTypeLabels, calculateNumbersToWin } from '@/utils/bingoUtils';
-import { Plus, Trash2, Trophy, Edit, Shuffle, Clock, Coins, Users, TrendingUp, Ticket, User, Flame, Target } from 'lucide-react';
+import { Plus, Trash2, Trophy, Edit, Shuffle, Clock, Coins, Users, TrendingUp, Ticket, User, Flame, Target, Loader2 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { useToast } from '@/hooks/use-toast';
@@ -59,6 +59,7 @@ const MatchManager = () => {
   
   const [callerInput, setCallerInput] = useState<Record<string, string>>({});
   const [now, setNow] = useState(Date.now());
+  const [isCallingRandom, setIsCallingRandom] = useState<string | null>(null);
 
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 1000);
@@ -195,16 +196,21 @@ const MatchManager = () => {
     }
   };
 
-  const handleRandomCall = (matchId: string) => {
+  const handleRandomCall = async (matchId: string) => {
+    setIsCallingRandom(matchId);
     const match = matches.find(m => m.id === matchId);
-    if (!match) return;
+    if (!match) {
+      setIsCallingRandom(null);
+      return;
+    }
     const availableNumbers = Array.from({ length: 75 }, (_, i) => i + 1).filter(num => !(match.called_numbers || []).includes(num));
     if (availableNumbers.length > 0) {
       const randomIndex = Math.floor(Math.random() * availableNumbers.length);
-      callNumber(match.id, availableNumbers[randomIndex]);
+      await callNumber(match.id, availableNumbers[randomIndex]);
     } else {
       toast({ title: 'Todos os números já foram sorteados!', variant: 'destructive' });
     }
+    setIsCallingRandom(null);
   };
 
   const matchDialogContent = (
@@ -524,7 +530,13 @@ const MatchManager = () => {
                             onKeyDown={e => e.key === 'Enter' && handleCallNumber(match.id)}
                         />
                         <Button variant="outline" onClick={() => handleCallNumber(match.id)}>Sortear</Button>
-                        <Button variant="secondary" onClick={() => handleRandomCall(match.id)}><Shuffle className="w-4 h-4" /></Button>
+                        <Button 
+                          variant="secondary" 
+                          onClick={() => handleRandomCall(match.id)}
+                          disabled={isCallingRandom === match.id}
+                        >
+                          {isCallingRandom === match.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Shuffle className="w-4 h-4" />}
+                        </Button>
                     </div>
                     <div className="mt-4">
                         <p className="text-xs text-muted-foreground mb-2">Números chamados ({(match.called_numbers || []).length})</p>
