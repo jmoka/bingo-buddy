@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, UserCheck, Phone, MapPin, ArrowLeft, ShieldCheck } from 'lucide-react';
+import { Loader2, UserCheck, Phone, MapPin, ArrowLeft, ShieldCheck, ShieldBan } from 'lucide-react';
 import PlayerAvatar from '@/components/PlayerAvatar';
 
 export default function VendedorPerfilPublico() {
@@ -17,12 +17,11 @@ export default function VendedorPerfilPublico() {
       if (!codigo) return;
       setLoading(true);
       
-      // 1. Busca o vendedor pelo código e checa se está ativo (A política pública agora permite isso)
+      // 1. Busca o vendedor pelo código (traz independente de estar ativo ou não)
       const { data: vendData, error: vendErr } = await supabase
         .from('vendedores_rifa')
         .select('*')
         .eq('codigo_ref', codigo.toUpperCase())
-        .eq('ativo', true)
         .single();
 
       if (!vendErr && vendData) {
@@ -56,17 +55,35 @@ export default function VendedorPerfilPublico() {
     );
   }
 
-  if (!vendedor || !vendedor.ativo) {
+  // Se o código não existe de forma alguma no banco de dados
+  if (!vendedor) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center p-4 text-center space-y-4">
         <ShieldCheck className="h-16 w-16 text-muted-foreground opacity-20" />
         <h1 className="text-2xl font-bold text-foreground">Vendedor não encontrado</h1>
-        <p className="text-muted-foreground">Este código de vendedor é inválido ou não está mais ativo.</p>
+        <p className="text-muted-foreground">Este código de vendedor é inválido e não existe no sistema.</p>
         <Button onClick={() => navigate('/')}>Voltar ao Início</Button>
       </div>
     );
   }
 
+  // Se o vendedor existe, mas está com o status ativo = false (Bloqueado)
+  if (!vendedor.ativo) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center p-4 text-center space-y-4 bg-destructive/5">
+        <ShieldBan className="h-16 w-16 text-destructive opacity-80" />
+        <h1 className="text-2xl font-bold text-destructive">Vendedor Bloqueado</h1>
+        <p className="text-muted-foreground max-w-sm">
+          Este vendedor ({vendedor.nome_exibicao}) está temporariamente suspenso ou bloqueado e não pode realizar vendas no momento.
+        </p>
+        <Button variant="outline" className="border-destructive/30 text-destructive hover:bg-destructive/10" onClick={() => navigate('/')}>
+          Voltar ao Início
+        </Button>
+      </div>
+    );
+  }
+
+  // Se o vendedor está ativo, exibe o perfil normal
   const whatsappLink = vendedor.telefone_exibicao 
     ? `https://wa.me/55${vendedor.telefone_exibicao.replace(/\D/g, '')}`
     : null;
