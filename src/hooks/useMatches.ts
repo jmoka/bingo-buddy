@@ -120,24 +120,22 @@ export const useMatches = () => {
     });
   };
 
-  const markNumberManually = async (cardId: string, num: number | null) => {
-    const { data, error } = await supabase.rpc('manual_mark_number', {
-      p_card_id: cardId,
-      p_num: num
-    });
-
-    if (error) {
-      console.error("Erro ao marcar manualmente:", error);
+  const setManualMode = async (cardId: string) => {
+    const { data, error } = await supabase.rpc('set_manual_mode', { p_card_id: cardId });
+    if (error || !data?.success) {
+      toast.error("Não foi possível trocar para o modo manual.");
       return false;
     }
+    queryClient.invalidateQueries({ queryKey: ['matchCards'] });
+    return true;
+  };
 
-    if (!data?.success) {
-      if (data?.error === 'number_not_called') {
-        toast.error("Este número ainda não foi sorteado!");
-      }
+  const toggleManualMark = async (cardId: string, num: number) => {
+    const { data, error } = await supabase.rpc('toggle_manual_mark', { p_card_id: cardId, p_num: num });
+    if (error || !data?.success) {
+      toast.error("Erro ao marcar número.");
       return false;
     }
-
     queryClient.invalidateQueries({ queryKey: ['matchCards'] });
     return true;
   };
@@ -188,6 +186,7 @@ export const useMatches = () => {
     toggleAutoCall,
     callNumber,
     getPlayerMatchCards,
-    markNumberManually,
+    setManualMode,
+    toggleManualMark,
   };
 };

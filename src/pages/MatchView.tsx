@@ -3,7 +3,7 @@ import { useGame } from '@/contexts/GameContext';
 import { BingoCell } from '@/components/BingoCell';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { gameTypeLabels } from '@/utils/bingoUtils';
+import { gameTypeLabels, checkWin } from '@/utils/bingoUtils';
 import { ArrowLeft, Coins, Users, Bot, Loader2, Star, Trophy, AlertTriangle, CheckCircle2, Hand } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
@@ -27,17 +27,18 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { cn } from '@/lib/utils';
+import { BingoCard } from '@/types/bingo';
 
 const MatchView = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { profile } = useAuth();
-  const { matches, getPlayerMatchCards, matchCards, isLoading, markNumberManually } = useGame();
+  const { matches, getPlayerMatchCards, matchCards, isLoading, setManualMode, toggleManualMark } = useGame();
   const queryClient = useQueryClient();
   const [lastCalledNumber, setLastCalledNumber] = useState<number | null>(null);
   const [now, setNow] = useState(Date.now());
   
-  const [confirmManualCard, setConfirmManualCard] = useState<{cardId: string, num?: number} | null>(null);
+  const [confirmManualCard, setConfirmManualCard] = useState<{cardId: string} | null>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -100,26 +101,52 @@ const MatchView = () => {
 
   }, [match]);
 
-  const handleCellClick = async (cardId: string, num: number, currentMode: 'auto' | 'manual', isMarked: boolean) => {
-    if (!match || match.status !== 'in_progress' || isMarked || num === 0) return;
-    
-    if (!match.called_numbers?.includes(num)) {
-        toast.error("Este número ainda não foi sorteado!");
-        return;
-    }
+  // Validação de vitória manual no lado do cliente
+  useEffect(() => {
+    if (!match || !profile) return;
+
+    const myCurrentCards = getPlayerMatchCards(match.id, profile.id);
+
+    myCurrentCards.forEach(card => {
+        if (card.marking_mode === 'manual') {
+            const tempCard: BingoCard = {
+                id: card.id,
+                name: card.name,
+                numbers: card.numbers,
+                markedNumbers: card.marked_numbers,
+            };
+            const winResult = checkWin(tempCard, match.game_type);
+
+            if (winResult) {
+                const calledNumbers = new Set(match.called_numbers);
+                const winningNumbers = winResult.winningNumbers.filter(n => n !== 0);
+                const uncalledNumbers = winningNumbers.filter(n => !calledNumbers.has(n));
+
+                if (uncalledNumbers.length > 0) {
+                    toast.error("Bingo Inválido!", {
+                        description: `Reveja sua cartela. Os números ${uncalledNumbers.join(', ')} não foram sorteados.`,
+                        duration: 6000,
+                    });
+                }
+            }
+        }
+    });
+  }, [matchCards, match, profile]);
+
+  const handleCellClick = async (cardId: string, num: number, currentMode: 'auto' | 'manual') => {
+    if (!match || match.status !== 'in_progress' || num === 0) return;
 
     if (currentMode === 'auto') {
-        setConfirmManualCard({ cardId, num });
-    } else {
-        await markNumberManually(cardId, num);
+        toast.info("Mude para o modo manual para poder marcar.");
+        return;
     }
+    
+    await toggleManualMark(cardId, num);
   };
 
   const handleConfirmManual = async () => {
     if (confirmManualCard) {
-      // Se a troca foi via clique em número, marcamos o número. 
-      // Se foi via switch, passamos null para apenas trocar o modo.
-      await markNumberManually(confirmManualCard.cardId, confirmManualCard.num || null);
+      await setManualMode(confirmManualCard.cardId);
       setConfirmManualCard(null);
     }
   };
@@ -287,7 +314,7 @@ const MatchView = () => {
                             isMarked={isMarked}
                             isFreeSpace={i === 12}
                             isNewlyMarked={num === lastCalledNumber}
-                            onClick={() => handleCellClick(card.id, num, mode, isMarked)}
+                            onClick={() => handleCellClick(card.id, num, mode)}
                         />
                     )
                 })}
