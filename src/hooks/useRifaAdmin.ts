@@ -2,7 +2,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
-import { Rifa, NumeroRifa, CompraRifa, VendedorRifa, ClienteRifa, CartelaRifa, SolicitacaoVendedor } from '@/types/rifa';
+import { Rifa, NumeroRifa, CompraRifa, VendedorRifa, ClienteRifa, CartelaRifa, SolicitacaoVendedor, CadastroVendedor } from '@/types/rifa';
 
 export const useRifaAdmin = () => {
   const { profile } = useAuth();
@@ -106,18 +106,23 @@ export const useRifaAdmin = () => {
 
       const userIds = [...new Set(data.map(v => v.user_id).filter(Boolean))];
       
-      let profilesData: any[] | null = [];
+      let profilesData: any[] = [];
+      let cadastrosData: any[] = [];
+      
       if (userIds.length > 0) {
-        const res = await supabase
-          .from('perfis')
-          .select('id, full_name, avatar_url')
-          .in('id', userIds);
-        profilesData = res.data;
+        const [resPerfis, resCadastros] = await Promise.all([
+          supabase.from('perfis').select('id, full_name, avatar_url').in('id', userIds),
+          supabase.from('cadastro_vendedor').select('*').in('user_id', userIds)
+        ]);
+        
+        profilesData = resPerfis.data || [];
+        cadastrosData = resCadastros.data || [];
       }
 
       return data.map(v => ({
         ...v,
-        perfis: profilesData?.find(p => p.id === v.user_id) || null
+        perfis: profilesData?.find(p => p.id === v.user_id) || null,
+        cadastro: cadastrosData?.find(c => c.user_id === v.user_id) || null
       }));
     },
     enabled: isAdmin,
@@ -239,6 +244,35 @@ export const useRifaAdmin = () => {
     }
     toast.success('Vendedor atualizado!');
     queryClient.invalidateQueries({ queryKey: ['vendedoresRifa'] });
+    queryClient.invalidateQueries({ queryKey: ['vendedoresComStats'] });
+    return true;
+  };
+
+  const salvarEdicaoCompletaVendedor = async (
+    vendedorId: string, 
+    userId: string, 
+    payloadRifa: Partial<VendedorRifa>, 
+    payloadCadastro: Partial<CadastroVendedor>
+  ): Promise<boolean> => {
+    const { error: err1 } = await supabase.from('vendedores_rifa').update(payloadRifa).eq('id', vendedorId);
+    if (err1) {
+      toast.error('Erro ao atualizar taxas do vendedor.');
+      return false;
+    }
+
+    if (userId && payloadCadastro) {
+      const { data: existing } = await supabase.from('cadastro_vendedor').select('id').eq('user_id', userId).maybeSingle();
+      if (existing) {
+        const { error: err2 } = await supabase.from('cadastro_vendedor').update(payloadCadastro).eq('user_id', userId);
+        if (err2) { toast.error('Erro ao atualizar cadastro.'); return false; }
+      } else {
+        const { error: err3 } = await supabase.from('cadastro_vendedor').insert({ user_id: userId, ...payloadCadastro });
+        if (err3) { toast.error('Erro ao inserir cadastro.'); return false; }
+      }
+    }
+
+    toast.success('Dados do vendedor atualizados com sucesso!');
+    queryClient.invalidateQueries({ queryKey: ['vendedoresComStats'] });
     return true;
   };
 
@@ -334,8 +368,6 @@ export const useRifaAdmin = () => {
   };
 
   const aprovarVendedor = async (solicitacaoId: string, mensagemAdmin?: string): Promise<boolean> => {
-    console.log('[useRifaAdmin] Iniciando aprovação do vendedor:', solicitacaoId);
-    
     const { data, error } = await supabase.rpc('aprovar_vendedor', {
       p_solicitacao_id: solicitacaoId,
       p_comissao: 0,
@@ -344,18 +376,15 @@ export const useRifaAdmin = () => {
     });
 
     if (error) {
-      console.error('[useRifaAdmin] Erro CRÍTICO na chamada RPC aprovar_vendedor:', error);
       toast.error(`Erro no servidor: ${error.message}`);
       return false;
     }
 
     if (!data?.success) {
-      console.warn('[useRifaAdmin] O servidor retornou falha na aprovação:', data);
       toast.error('Não foi possível aprovar: ' + (data?.error ?? 'Erro desconhecido'));
       return false;
     }
 
-    console.log('[useRifaAdmin] Vendedor aprovado com sucesso!', data);
     toast.success('Vendedor aprovado!');
     queryClient.invalidateQueries({ queryKey: ['solicitacoesVendedor'] });
     queryClient.invalidateQueries({ queryKey: ['vendedoresRifa'] });
@@ -365,15 +394,12 @@ export const useRifaAdmin = () => {
   };
 
   const rejeitarVendedor = async (solicitacaoId: string, mensagemAdmin?: string): Promise<boolean> => {
-    console.log('[useRifaAdmin] Rejeitando solicitação:', solicitacaoId);
-    
     const { data, error } = await supabase.rpc('rejeitar_vendedor', {
       p_solicitacao_id: solicitacaoId,
       p_mensagem_admin: mensagemAdmin ?? null,
     });
 
     if (error) {
-      console.error('[useRifaAdmin] Erro na chamada RPC rejeitar_vendedor:', error);
       toast.error(`Erro no servidor: ${error.message}`);
       return false;
     }
@@ -405,6 +431,7 @@ export const useRifaAdmin = () => {
     uploadImagemRifa,
     criarVendedor,
     atualizarVendedor,
+    salvarEdicaoCompletaVendedor,
     aprovarVendedor,
     rejeitarVendedor,
     getNumerosRifaAdmin,
