@@ -49,29 +49,30 @@ export const useSolicitacaoVendedor = () => {
       let documento_url = null;
       let comprovante_endereco_url = null;
 
-      // Upload da Foto para o bucket público 'avatars'
+      // Upload da Foto para o bucket público 'avatars' (Permite salvar na raiz)
       if (foto) {
         const ext = foto.name.split('.').pop();
         const path = `vendedor_${user.id}_foto_${Date.now()}.${ext}`;
         const { error: err } = await supabase.storage.from('avatars').upload(path, foto);
-        if (err) throw new Error('Erro ao enviar foto.');
+        if (err) throw new Error(`Erro ao enviar foto: ${err.message}`);
         foto_url = path;
       }
 
       // Upload dos documentos para o bucket privado 'receipts'
+      // ATENÇÃO: As regras de segurança exigem que seja salvo dentro da pasta do usuário (${user.id}/)
       if (documento) {
         const ext = documento.name.split('.').pop();
-        const path = `vendedor_${user.id}_doc_${Date.now()}.${ext}`;
+        const path = `${user.id}/vendedor_doc_${Date.now()}.${ext}`;
         const { error: err } = await supabase.storage.from('receipts').upload(path, documento);
-        if (err) throw new Error('Erro ao enviar documento.');
+        if (err) throw new Error(`Erro ao enviar documento: ${err.message}`);
         documento_url = path;
       }
 
       if (comprovante) {
         const ext = comprovante.name.split('.').pop();
-        const path = `vendedor_${user.id}_comp_${Date.now()}.${ext}`;
+        const path = `${user.id}/vendedor_comp_${Date.now()}.${ext}`;
         const { error: err } = await supabase.storage.from('receipts').upload(path, comprovante);
-        if (err) throw new Error('Erro ao enviar comprovante de endereço.');
+        if (err) throw new Error(`Erro ao enviar comprovante de endereço: ${err.message}`);
         comprovante_endereco_url = path;
       }
 
@@ -88,7 +89,7 @@ export const useSolicitacaoVendedor = () => {
         comprovante_endereco_url
       });
 
-      if (cadError) throw new Error('Erro ao salvar o cadastro.');
+      if (cadError) throw new Error(`Erro ao salvar o cadastro: ${cadError.message}`);
 
       // Cria a solicitação no painel do admin
       const { error: solError } = await supabase.from('solicitacoes_vendedor').insert([{
@@ -100,7 +101,7 @@ export const useSolicitacaoVendedor = () => {
         mensagem: mensagem || null,
       }]);
 
-      if (solError) throw new Error('Erro ao registrar a solicitação.');
+      if (solError) throw new Error(`Erro ao registrar a solicitação: ${solError.message}`);
 
       toast.success('Cadastro enviado! Aguarde a aprovação do administrador.');
       queryClient.invalidateQueries({ queryKey: ['minhasSolicitacoesVendedor', user.id] });
