@@ -158,7 +158,6 @@ export const useRifaAdmin = () => {
 
   const uploadImagemRifa = async (file: File): Promise<string | null> => {
     const ext = file.name.split('.').pop();
-    // Removemos a subpasta 'rifas/' para que a imagem seja salva na raiz do bucket 'avatars' (Evita erro de RLS)
     const filePath = `rifa_img_${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
     
     const { error } = await supabase.storage.from('avatars').upload(filePath, file);
@@ -174,11 +173,19 @@ export const useRifaAdmin = () => {
     const clean = Object.fromEntries(
       Object.entries(payload).filter(([, v]) => v !== undefined)
     );
-    const { error } = await supabase.from('rifas').update(clean).eq('id', rifaId);
+    // Adicionamos o .select() para garantir que linhas foram realmente atualizadas
+    const { data, error } = await supabase.from('rifas').update(clean).eq('id', rifaId).select();
+    
     if (error) {
       toast.error('Erro ao atualizar rifa: ' + error.message);
       return false;
     }
+    
+    if (!data || data.length === 0) {
+      toast.error('Erro de permissão: A rifa não foi salva (Atualize as políticas do Supabase).');
+      return false;
+    }
+    
     toast.success('Rifa atualizada!');
     queryClient.invalidateQueries({ queryKey: ['rifasAdmin'] });
     queryClient.invalidateQueries({ queryKey: ['rifas'] });
@@ -204,9 +211,13 @@ export const useRifaAdmin = () => {
   };
 
   const deletarRifa = async (rifaId: string): Promise<boolean> => {
-    const { error } = await supabase.from('rifas').delete().eq('id', rifaId);
+    const { data, error } = await supabase.from('rifas').delete().eq('id', rifaId).select();
     if (error) {
       toast.error('Erro ao deletar rifa.');
+      return false;
+    }
+    if (!data || data.length === 0) {
+      toast.error('A rifa não pôde ser apagada (Verifique permissões RLS).');
       return false;
     }
     toast.success('Rifa deletada.');
@@ -216,12 +227,17 @@ export const useRifaAdmin = () => {
   };
 
   const cancelarRifa = async (rifaId: string): Promise<boolean> => {
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('rifas')
       .update({ status: 'cancelada' })
-      .eq('id', rifaId);
+      .eq('id', rifaId)
+      .select();
     if (error) {
       toast.error('Erro ao cancelar rifa.');
+      return false;
+    }
+    if (!data || data.length === 0) {
+      toast.error('Erro ao cancelar: Sem permissão RLS.');
       return false;
     }
     toast.success('Rifa cancelada.');

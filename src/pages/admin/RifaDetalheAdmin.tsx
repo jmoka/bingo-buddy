@@ -173,12 +173,21 @@ const RifaDetalheAdmin = () => {
 
   const handleOpenEditar = () => {
     if (rifa) {
+      let fotosParsed: string[] = [];
+      if (Array.isArray(rifa.premio_fotos)) {
+        fotosParsed = [...rifa.premio_fotos];
+      } else if (typeof rifa.premio_fotos === 'string') {
+        try {
+          fotosParsed = JSON.parse(rifa.premio_fotos);
+        } catch (e) {}
+      }
+
       setEditForm({
-        nome: rifa.nome,
+        nome: rifa.nome || '',
         descricao: rifa.descricao ?? '',
         regulamento: rifa.regulamento ?? '',
         premio_descricao: rifa.premio_descricao ?? '',
-        premio_fotos: Array.isArray(rifa.premio_fotos) ? [...rifa.premio_fotos] : [],
+        premio_fotos: fotosParsed,
         foto_capa: rifa.foto_capa ?? '',
         custo_por_numero: rifa.custo_por_numero,
         data_encerramento: rifa.data_encerramento 
