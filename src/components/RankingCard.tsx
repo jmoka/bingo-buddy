@@ -44,7 +44,7 @@ const RankingCard = ({ player, position }: RankingCardProps) => {
         </div>
         
         <div className="flex items-center gap-3">
-          <PlayerAvatar url={player.avatar_url} />
+          <PlayerAvatar url={player.avatar_url} fallback={player.full_name || 'J'} />
           <div>
             <p className="font-heading font-bold text-foreground">
               {player.full_name || 'Jogador'}
