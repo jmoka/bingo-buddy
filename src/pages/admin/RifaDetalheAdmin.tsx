@@ -603,9 +603,23 @@ const RifaDetalheAdmin = () => {
                 <p className="text-muted-foreground">Nenhuma compra registrada.</p>
               </div>
             ) : (
-              comprasRifa.map(compra => (
-                <CompraCard key={compra.id} compra={compra} custo={rifa.custo_por_numero} />
-              ))
+              comprasRifa.map(compra => {
+                let vendedorNome = '';
+                if (compra.vendedor_id) {
+                  vendedorNome = vendedores.find(v => v.id === compra.vendedor_id)?.nome || '';
+                } else if (compra.ref_vendedor_id) {
+                  vendedorNome = vendedores.find(v => v.id === compra.ref_vendedor_id)?.nome || '';
+                }
+
+                return (
+                  <CompraCard 
+                    key={compra.id} 
+                    compra={compra} 
+                    custo={rifa.custo_por_numero} 
+                    vendedorNome={vendedorNome}
+                  />
+                );
+              })
             )}
           </div>
         </TabsContent>
@@ -973,7 +987,7 @@ const RifaDetalheAdmin = () => {
   );
 };
 
-const CompraCard = ({ compra, custo }: { compra: CompraRifa; custo: number }) => {
+const CompraCard = ({ compra, custo, vendedorNome }: { compra: CompraRifa; custo: number; vendedorNome?: string }) => {
   return (
     <div className="card-container p-4 flex flex-col sm:flex-row sm:items-center gap-3">
       <div className="flex-1 min-w-0">
@@ -987,9 +1001,14 @@ const CompraCard = ({ compra, custo }: { compra: CompraRifa; custo: number }) =>
             </span>
           ))}
         </div>
-        <p className="text-xs text-muted-foreground">
-          {format(new Date(compra.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
-        </p>
+        <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+          <span>{format(new Date(compra.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}</span>
+          {vendedorNome && (
+            <span className="flex items-center gap-1 bg-primary/10 text-primary px-1.5 py-0.5 rounded font-medium">
+              <Store className="w-3 h-3" /> {vendedorNome}
+            </span>
+          )}
+        </div>
       </div>
       <div className="flex flex-col items-end gap-1 shrink-0">
         <span className="font-bold text-primary text-sm">
