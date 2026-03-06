@@ -7,7 +7,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Loader2, Ticket, Calendar, DollarSign, ArrowLeft, Trophy, Crown } from 'lucide-react';
+import { Loader2, Ticket, Calendar, DollarSign, ArrowLeft, Trophy, Crown, Store, Globe } from 'lucide-react';
 import PlayerAvatar from '@/components/PlayerAvatar';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -148,6 +148,9 @@ const Rifas = () => {
                   const winnerPhone = numeroGanhadorInfo?.telefone_comprador;
                   const winnerAvatar = winnerProfile?.avatar_url || null;
 
+                  const isVendaFisica = !!numeroGanhadorInfo?.vendedor_id;
+                  const vendedorNome = (numeroGanhadorInfo as any)?.vendedores_rifa?.nome;
+
                   return (
                     <div
                       key={rifa.id}
@@ -200,17 +203,31 @@ const Rifas = () => {
                                   <Trophy className={`w-5 h-5 ${participou ? 'text-red-400/50' : 'text-muted-foreground/30'}`} />
                                 </div>
                                 
-                                <div className="flex items-center gap-2 pt-2 border-t border-border/50">
+                                <div className="flex items-center gap-3 pt-2 border-t border-border/50">
                                   {winnerProfile ? (
-                                    <PlayerAvatar url={winnerAvatar} fallback={winnerName} className="w-7 h-7 border border-muted" />
+                                    <PlayerAvatar url={winnerAvatar} fallback={winnerName} className="w-9 h-9 border border-muted shadow-sm" />
                                   ) : (
-                                    <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center border border-primary/20 shrink-0">
-                                      <Crown className="w-3.5 h-3.5 text-primary" />
+                                    <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center border border-primary/20 shrink-0 shadow-sm">
+                                      <Crown className="w-4 h-4 text-primary" />
                                     </div>
                                   )}
-                                  <div className="min-w-0">
-                                    <p className="text-xs font-semibold text-foreground truncate">{winnerName}</p>
-                                    {winnerPhone && <p className="text-[10px] text-muted-foreground truncate">{winnerPhone}</p>}
+                                  <div className="min-w-0 flex-1">
+                                    <p className="text-sm font-semibold text-foreground truncate leading-tight">{winnerName}</p>
+                                    {winnerPhone && <p className="text-[10px] text-muted-foreground truncate mt-0.5">{winnerPhone}</p>}
+                                    
+                                    <div className="mt-1">
+                                      {isVendaFisica ? (
+                                        <span className="inline-flex items-center gap-1 text-[9px] bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20 px-1.5 py-0.5 rounded font-medium uppercase tracking-wider">
+                                          <Store className="w-2.5 h-2.5" />
+                                          Vendido por {vendedorNome || 'Vendedor'}
+                                        </span>
+                                      ) : (
+                                        <span className="inline-flex items-center gap-1 text-[9px] bg-primary/10 text-primary border border-primary/20 px-1.5 py-0.5 rounded font-medium uppercase tracking-wider">
+                                          <Globe className="w-2.5 h-2.5" />
+                                          Compra Online (App)
+                                        </span>
+                                      )}
+                                    </div>
                                   </div>
                                 </div>
                               </div>

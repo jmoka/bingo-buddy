@@ -26,10 +26,11 @@ export const useRifas = () => {
   const { data: numerosCache = {} } = useQuery({
     queryKey: ['numerosRifa'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('numeros_rifa').select('*');
+      // Modificado: Agora buscamos também o nome do vendedor caso exista!
+      const { data, error } = await supabase.from('numeros_rifa').select('*, vendedores_rifa(nome)');
       if (error) throw error;
       const map: Record<string, NumeroRifa[]> = {};
-      for (const n of data as NumeroRifa[]) {
+      for (const n of data as any[]) {
         if (!map[n.rifa_id]) map[n.rifa_id] = [];
         map[n.rifa_id].push(n);
       }
