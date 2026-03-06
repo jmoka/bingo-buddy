@@ -1,7 +1,8 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useRifas } from '@/hooks/useRifas';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -16,6 +17,8 @@ import {
   ChevronUp,
   Coins,
   Tag,
+  Store,
+  Globe
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -37,15 +40,28 @@ const RifaView = () => {
   const [searchParams] = useSearchParams();
   const refCodigo = searchParams.get('ref') || undefined;
   const { profile } = useAuth();
-  const { rifas, isLoadingRifas, getRifa, getNumerosRifa, comprarNumeros } = useRifas();
+  const { rifas, isLoadingRifas, getRifa, getNumerosRifa, comprarNumeros, minhasCompras } = useRifas();
 
   const [selectedNumbers, setSelectedNumbers] = useState<number[]>([]);
   const [filter, setFilter] = useState<NumberFilter>('todos');
   const [showRegulamento, setShowRegulamento] = useState(false);
   const [isBuying, setIsBuying] = useState(false);
+  const [winnerProfile, setWinnerProfile] = useState<any>(null);
 
   const rifa = id ? getRifa(id) : undefined;
   const numeros = id ? getNumerosRifa(id) : [];
+
+  // Buscar perfil público do ganhador caso a rifa esteja finalizada
+  useEffect(() => {
+    if (rifa?.status === 'finalizada' && rifa.ganhador_id) {
+      supabase.rpc('get_public_profiles', { p_user_ids: [rifa.ganhador_id] })
+        .then(({ data }) => {
+          if (data && data.length > 0) {
+            setWinnerProfile(data[0]);
+          }
+        });
+    }
+  }, [rifa?.status, rifa?.ganhador_id]);
 
   const stats = useMemo(() => {
     const total = rifa?.quantidade_numeros ?? 0;
@@ -82,11 +98,17 @@ const RifaView = () => {
       try {
         return JSON.parse(rifa.premio_fotos);
       } catch (e) {
-        return [rifa.premio_fotos]; // fallback para string solta
+        return [rifa.premio_fotos];
       }
     }
     return [];
   }, [rifa?.premio_fotos]);
+
+  const meusNumeros = useMemo(() => {
+    const comprasDestaRifa = minhasCompras.filter(c => c.rifa_id === id);
+    const nums = comprasDestaRifa.flatMap(c => c.numeros);
+    return [...new Set(nums)].sort((a,b) => a-b);
+  }, [minhasCompras, id]);
 
   const toggleNumber = (num: number) => {
     const found = numeros.find(n => n.numero === num);
@@ -125,6 +147,12 @@ const RifaView = () => {
       </div>
     );
   }
+
+  // Informações de transparência do ganhador
+  const numeroGanhadorInfo = numeros.find(n => n.numero === rifa?.numero_ganhador);
+  const winnerName = numeroGanhadorInfo?.nome_comprador || winnerProfile?.full_name || 'Usuário não identificado';
+  const isVendaFisica = !!numeroGanhadorInfo?.vendedor_id;
+  const vendedorNome = (numeroGanhadorInfo as any)?.vendedores_rifa?.nome;
 
   return (
     <div className="space-y-6">
@@ -231,21 +259,72 @@ const RifaView = () => {
                 />
               </div>
             </div>
+
+            {/* SEUS NÚMEROS */}
+            {meusNumeros.length > 0 && (
+              <div className="border-t border-border pt-3 mt-3">
+                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-1">
+                  <Ticket className="w-3.5 h-3.5" /> Seus Números ({meusNumeros.length})
+                </p>
+                <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto custom-scrollbar p-1">
+                  {meusNumeros.map(n => (
+                    <span key={n} className="bg-primary/10 text-primary border border-primary/20 text-xs font-bold px-2 py-1 rounded-md">
+                      {String(n).padStart(3, '0')}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
+          {/* PAINEL DE RESULTADO E TRANSPARÊNCIA */}
           {rifa.status === 'finalizada' && (
-            <div className="card-container space-y-2 border-blue-300 dark:border-blue-700 bg-blue-50 dark:bg-blue-900/20">
-              <div className="flex items-center gap-2 text-blue-700 dark:text-blue-300 font-bold">
+            <div className="card-container space-y-4 border-blue-300 dark:border-blue-700 bg-blue-50 dark:bg-blue-900/20">
+              <div className="flex items-center gap-2 text-blue-700 dark:text-blue-300 font-bold border-b border-blue-200 dark:border-blue-800/50 pb-3">
                 <Trophy className="w-5 h-5" />
-                Esta rifa foi encerrada
+                Resultado do Sorteio
               </div>
-              {rifa.numero_ganhador != null && (
-                <p className="text-sm text-blue-700 dark:text-blue-300">
-                  Número ganhador: <span className="font-bold text-lg">{rifa.numero_ganhador}</span>
-                </p>
-              )}
-              {rifa.ganhador_id && (
-                <p className="text-xs text-muted-foreground">ID do ganhador: {rifa.ganhador_id}</p>
+              
+              <div className="flex flex-col items-center gap-1">
+                <span className="text-[10px] uppercase tracking-widest font-bold text-blue-600/70 dark:text-blue-400">Número Sorteado</span>
+                <span className="text-5xl font-black font-heading text-blue-700 dark:text-blue-300 bg-white dark:bg-black/20 px-8 py-3 rounded-2xl border-2 border-blue-200 dark:border-blue-800 shadow-sm">
+                  {rifa.numero_ganhador !== null ? String(rifa.numero_ganhador).padStart(3, '0') : '—'}
+                </span>
+              </div>
+
+              {rifa.numero_ganhador !== null && (
+                <div className="space-y-3 bg-white dark:bg-black/20 rounded-xl p-4 border border-blue-100 dark:border-blue-800/50 mt-2">
+                  <div>
+                    <p className="text-[10px] uppercase font-bold text-muted-foreground mb-0.5">Ganhador</p>
+                    <p className="font-semibold text-foreground text-sm">{winnerName}</p>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3 border-t border-blue-50 dark:border-blue-800/30 pt-3">
+                    <div>
+                      <p className="text-[10px] uppercase font-bold text-muted-foreground mb-0.5">Sorteio em</p>
+                      <p className="text-xs font-medium">{rifa.data_encerramento ? format(new Date(rifa.data_encerramento), 'dd/MM/yyyy HH:mm') : '—'}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] uppercase font-bold text-muted-foreground mb-0.5">Tipo de Compra</p>
+                      {isVendaFisica ? (
+                        <span className="inline-flex items-center gap-1 text-[10px] bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20 px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">
+                          <Store className="w-3 h-3" /> Físico
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-[10px] bg-primary/10 text-primary border border-primary/20 px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">
+                          <Globe className="w-3 h-3" /> App Online
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {isVendaFisica && vendedorNome && (
+                    <div className="border-t border-blue-50 dark:border-blue-800/30 pt-3">
+                      <p className="text-[10px] uppercase font-bold text-muted-foreground mb-0.5">Vendedor Responsável</p>
+                      <p className="text-xs font-medium text-foreground">{vendedorNome}</p>
+                    </div>
+                  )}
+                </div>
               )}
             </div>
           )}
