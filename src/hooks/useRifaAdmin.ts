@@ -256,7 +256,7 @@ export const useRifaAdmin = () => {
   ): Promise<boolean> => {
     const { error: err1 } = await supabase.from('vendedores_rifa').update(payloadRifa).eq('id', vendedorId);
     if (err1) {
-      toast.error('Erro ao atualizar taxas do vendedor.');
+      toast.error(`Erro ao atualizar taxas do vendedor: ${err1.message}`);
       return false;
     }
 
@@ -264,10 +264,10 @@ export const useRifaAdmin = () => {
       const { data: existing } = await supabase.from('cadastro_vendedor').select('id').eq('user_id', userId).maybeSingle();
       if (existing) {
         const { error: err2 } = await supabase.from('cadastro_vendedor').update(payloadCadastro).eq('user_id', userId);
-        if (err2) { toast.error('Erro ao atualizar cadastro.'); return false; }
+        if (err2) { toast.error(`Erro ao atualizar cadastro: ${err2.message}`); return false; }
       } else {
         const { error: err3 } = await supabase.from('cadastro_vendedor').insert({ user_id: userId, ...payloadCadastro });
-        if (err3) { toast.error('Erro ao inserir cadastro.'); return false; }
+        if (err3) { toast.error(`Erro ao inserir cadastro: ${err3.message}`); return false; }
       }
     }
 
