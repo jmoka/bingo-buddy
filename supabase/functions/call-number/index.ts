@@ -6,14 +6,14 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// ---- Lógica de Verificação de Bingo (Garantindo o espaço livre 0) ----
+// ---- Lógica de Verificação de Bingo ----
 type GameType = 'horizontal' | 'vertical' | 'diagonal' | 'full';
 interface BingoCard { id: string; name: string; numbers: number[][]; markedNumbers: Set<number>; }
 interface WinResult { cardId: string; cardName: string; type: GameType; winningNumbers: number[]; }
 
 const isCellMarked = (card: BingoCard, row: number, col: number): boolean => {
   const num = Number(card.numbers[row][col]);
-  if (num === 0) return true; // O espaço do meio é 0 e está sempre marcado
+  if (num === 0) return true; 
   return card.markedNumbers.has(num);
 };
 
@@ -69,16 +69,18 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // 1. Lock
+    console.log(`[call-number] Processando partida ${matchId}`);
+
+    // 1. Lock para evitar processamento duplo
     const { data: gotLock } = await supabaseAdmin.rpc('try_lock_match', { p_match_id: matchId });
     if (!gotLock) return new Response(JSON.stringify({ success: true, message: 'Match busy' }), { headers: corsHeaders });
 
-    // 2. Buscar Partida
+    // 2. Buscar Partida atualizada
     const { data: match, error: matchErr } = await supabaseAdmin.from('partidas').select('*').eq('id', matchId).single();
     if (matchErr || !match) throw new Error("Partida não encontrada");
     if (match.status === 'finished') return new Response(JSON.stringify({ success: true, message: 'Match finished' }), { headers: corsHeaders });
 
-    // 3. Sortear número
+    // 3. Sorteio
     const calledArray = match.called_numbers || [];
     const availableNumbers = Array.from({ length: 75 }, (_, i) => i + 1).filter(n => !calledArray.includes(n));
 
@@ -91,7 +93,7 @@ serve(async (req) => {
       ? specificNumber
       : availableNumbers[Math.floor(Math.random() * availableNumbers.length)];
 
-    // 4. Registrar número no banco
+    // 4. Registrar número e marcar cartelas no banco
     const { data: appendResult } = await supabaseAdmin.rpc('append_called_number', { p_match_id: matchId, p_num: num });
     if (!appendResult || appendResult.already_called) {
        return new Response(JSON.stringify({ success: true, message: 'Number already processed' }), { headers: corsHeaders });
@@ -131,81 +133,73 @@ serve(async (req) => {
       }
     }
 
-    // 6. Processar Conclusão
-    let matchUpdate: any = {};
+    // 6. Processar Distribuição e Fim da Partida
     const updatedWinners = [...(match.winners || []), ...newWinnersFound];
 
     if (newWinnersFound.length > 0) {
       const realWinners = newWinnersFound.filter(w => w.creditType === 'real');
       
       if (realWinners.length > 0) {
-        // MATCH ACABOU! Atualiza IMEDIATAMENTE para evitar que a partida continue aberta
-        matchUpdate = { 
+        // Encerra a partida
+        await supabaseAdmin.from('partidas').update({ 
           status: 'finished', 
           winners: updatedWinners, 
           is_auto_calling: false, 
           next_auto_call_timestamp: null
-        };
-        const { error: updateError } = await supabaseAdmin.from('partidas').update(matchUpdate).eq('id', matchId);
+        }).eq('id', matchId);
+
+        // DISTRIBUIÇÃO DOS CRÉDITOS
+        const safePot = Number(match.pot) || 0;
+        const prizeValConf = Number(match.prize?.value) || 0;
         
-        if (!updateError) {
-            // Se a partida foi finalizada com sucesso, distribui os prêmios
-            const safePot = Number(match.pot) || 0;
-            const prizeValConf = Number(match.prize?.value) || 0;
-            const prizeValue = match.prize?.type === 'fixed' ? prizeValConf : (safePot * prizeValConf) / 100;
-            
-            const adminProfit = Math.max(0, safePot - prizeValue);
-            const prizePerWinner = prizeValue / realWinners.length;
+        // Calcula valor total a ser distribuído como prêmio
+        const totalPrizePool = match.prize?.type === 'fixed' 
+          ? prizeValConf 
+          : (safePot * prizeValConf) / 100;
+        
+        const prizePerWinner = totalPrizePool / realWinners.length;
+        const adminProfit = Math.max(0, safePot - totalPrizePool);
 
-            if (adminProfit > 0) {
-              await supabaseAdmin.rpc('increment_admin_profit', { amount: adminProfit }).catch(() => {});
-            }
+        console.log(`[call-number] Distribuindo prêmio: ${totalPrizePool} entre ${realWinners.length} vencedores.`);
 
-            for (const rw of realWinners) {
-              if (prizePerWinner > 0) {
-                await supabaseAdmin.rpc('increment_player_credits', { p_player_id: rw.playerId, p_amount: prizePerWinner }).catch(() => {});
-              }
-            }
-        } else {
-            console.error("[call-number] Erro CRÍTICO ao finalizar partida:", updateError.message);
+        // 1. Incrementa lucro do Admin (sobra do pote)
+        if (adminProfit > 0) {
+          await supabaseAdmin.rpc('increment_admin_profit', { amount: adminProfit }).catch(e => console.error("Erro Admin Profit:", e));
         }
 
+        // 2. Entrega créditos aos vencedores REAIS
+        for (const rw of realWinners) {
+          if (prizePerWinner > 0) {
+            await supabaseAdmin.rpc('increment_player_credits', { p_player_id: rw.playerId, p_amount: prizePerWinner }).catch(e => console.error("Erro Credit Winner:", e));
+          }
+        }
       } else {
-        // Vitória apenas de cartelas "brincar". Verifica se o jogo deve continuar.
+        // Vitória apenas de cartelas "brincar". Verifica se o jogo deve continuar para os outros.
         const hasRemainingReal = (matchCards || []).some(c => c.credit_type === 'real' && !updatedWinners.some(w => w.cardId === c.id));
         
         if (hasRemainingReal) {
-          matchUpdate = { winners: updatedWinners };
-          if (match.is_auto_calling) {
-            const { data: cfg } = await supabaseAdmin.from('configuracoes').select('intervalo_sorteio_auto_seg').single();
-            const next = new Date(Date.now() + (Number(cfg?.intervalo_sorteio_auto_seg || 120) * 1000)).toISOString();
-            matchUpdate.next_auto_call_timestamp = next;
-          }
+          const { data: cfg } = await supabaseAdmin.from('configuracoes').select('intervalo_sorteio_auto_seg').single();
+          const next = new Date(Date.now() + (Number(cfg?.intervalo_sorteio_auto_seg || 120) * 1000)).toISOString();
+          await supabaseAdmin.from('partidas').update({ winners: updatedWinners, next_auto_call_timestamp: next }).eq('id', matchId);
         } else {
-          matchUpdate = { status: 'finished', winners: updatedWinners, is_auto_calling: false, next_auto_call_timestamp: null };
+          // Se não tem mais ninguém com crédito real, acaba a partida
+          await supabaseAdmin.from('partidas').update({ status: 'finished', winners: updatedWinners, is_auto_calling: false, next_auto_call_timestamp: null }).eq('id', matchId);
         }
-        await supabaseAdmin.from('partidas').update(matchUpdate).eq('id', matchId);
       }
 
-      // Registra os troféus no banco de dados de vitórias de forma robusta e com verificação de nulos
+      // Registra os troféus (histórico)
       for (const w of newWinnersFound) {
-        const { error: winErr } = await supabaseAdmin.from('vitorias').insert({
+        await supabaseAdmin.from('vitorias').insert({
           match_id: matchId,
           player_id: w.playerId,
           player_card_id: w.playerCardId || null,
           match_card_id: w.cardId,
           prize_details: match.prize
-        });
-        
-        if (winErr) {
-          console.error(`[call-number] Erro ao registrar troféu para ${w.playerName}:`, winErr.message);
-        } else {
-          console.log(`[call-number] Troféu registrado com sucesso para ${w.playerName}`);
-        }
+        }).catch(() => {});
       }
 
     } else if (match.is_auto_calling) {
-      // Ninguém ganhou, programa o próximo sorteio
+      // Ninguém ganhou nesta bola, programa o próximo sorteio
       const { data: cfg } = await supabaseAdmin.from('configuracoes').select('intervalo_sorteio_auto_seg').single();
       const next = new Date(Date.now() + (Number(cfg?.intervalo_sorteio_auto_seg || 120) * 1000)).toISOString();
       await supabaseAdmin.from('partidas').update({ next_auto_call_timestamp: next }).eq('id', matchId);
