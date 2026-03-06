@@ -60,6 +60,7 @@ const MatchManager = () => {
   const [callerInput, setCallerInput] = useState<Record<string, string>>({});
   const [now, setNow] = useState(Date.now());
   const [isCallingRandom, setIsCallingRandom] = useState<string | null>(null);
+  const [isCallingManual, setIsCallingManual] = useState<string | null>(null);
 
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 1000);
@@ -188,11 +189,13 @@ const MatchManager = () => {
     setEditingMatch(null);
   };
 
-  const handleCallNumber = (matchId: string) => {
+  const handleCallNumber = async (matchId: string) => {
     const num = parseInt(callerInput[matchId] || '', 10);
     if (num >= 1 && num <= 75) {
-      callNumber(matchId, num);
+      setIsCallingManual(matchId);
+      await callNumber(matchId, num);
       setCallerInput(prev => ({ ...prev, [matchId]: '' }));
+      setIsCallingManual(null);
     }
   };
 
@@ -528,12 +531,19 @@ const MatchManager = () => {
                             value={callerInput[match.id] || ''}
                             onChange={e => setCallerInput(p => ({ ...p, [match.id]: e.target.value }))}
                             onKeyDown={e => e.key === 'Enter' && handleCallNumber(match.id)}
+                            disabled={isCallingManual === match.id || isCallingRandom === match.id}
                         />
-                        <Button variant="outline" onClick={() => handleCallNumber(match.id)}>Sortear</Button>
+                        <Button 
+                            variant="outline" 
+                            onClick={() => handleCallNumber(match.id)}
+                            disabled={isCallingManual === match.id || isCallingRandom === match.id || !callerInput[match.id]}
+                        >
+                            {isCallingManual === match.id ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Sortear'}
+                        </Button>
                         <Button 
                           variant="secondary" 
                           onClick={() => handleRandomCall(match.id)}
-                          disabled={isCallingRandom === match.id}
+                          disabled={isCallingRandom === match.id || isCallingManual === match.id}
                         >
                           {isCallingRandom === match.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Shuffle className="w-4 h-4" />}
                         </Button>
