@@ -4,7 +4,7 @@
 
 Este documento fornece uma análise técnica detalhada do Bingo App. O sistema é uma aplicação web real-time para jogos de bingo, com gerenciamento de partidas, jogadores, cartelas e um sistema financeiro robusto baseado em **créditos decimais**.
 
-## 2. Funcionalidades Principais
+## 2. Funcionalidades Principais..
 
 ### Para Jogadores
 -   **Lobby de Partidas:** Visualização de partidas em tempo real (Ao Vivo, Abertas, Agendadas e Finalizadas).
