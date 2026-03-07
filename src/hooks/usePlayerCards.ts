@@ -147,6 +147,16 @@ export const usePlayerCards = () => {
     }
   };
 
+  const rechargeFakeCredits = async (): Promise<boolean> => {
+    const { data, error } = await supabase.rpc('recarregar_fake_credits');
+    if (error || !data?.success) {
+      toast.error('Erro ao recarregar créditos de brincar.');
+      return false;
+    }
+    queryClient.invalidateQueries({ queryKey: ['profile', user?.id] });
+    return true;
+  };
+
   return {
     playerCards,
     createPlayerCard,
@@ -155,5 +165,6 @@ export const usePlayerCards = () => {
     buyCardUses,
     joinMatch,
     leaveMatch,
+    rechargeFakeCredits,
   };
 };

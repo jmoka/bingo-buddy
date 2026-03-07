@@ -16,7 +16,7 @@ import { toast } from 'sonner';
 export const AppHeader = () => {
   const navigate = useNavigate();
   const { profile, signOut } = useAuth();
-  const { gameSettings, playerCards, updatePlayerFakeCredits } = useGame();
+  const { gameSettings, playerCards, rechargeFakeCredits } = useGame();
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [isRecharging, setIsRecharging] = useState(false);
   const [avatarSrc, setAvatarSrc] = useState<string | null>(null);
@@ -41,7 +41,7 @@ export const AppHeader = () => {
 
   const handleRechargeFake = async () => {
     setIsRecharging(true);
-    const success = await updatePlayerFakeCredits(profile.id, 1000);
+    const success = await rechargeFakeCredits();
     if (success) {
       toast.success('Você recebeu +1000 créditos de brincar!');
     }
