@@ -15,7 +15,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   ArrowLeft, Loader2, Copy, Link2, CheckSquare, ShoppingBag, UserCheck, Ticket,
-  Printer, Plus, Undo2, Grid3X3, DollarSign, Wallet, Upload, Clock, CheckCircle2, XCircle
+  Printer, Plus, Undo2, Grid3X3, DollarSign, Wallet, Upload, Clock, CheckCircle2, XCircle,
+  BadgePercent
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -65,36 +66,55 @@ const VendedorPainel = () => {
   const numerosDisponiveis = useMemo(() => getNumerosRifa(reservarRifaId), [reservarRifaId, getNumerosRifa]);
   const rifasAtivas = useMemo(() => rifas.filter(r => r.status === 'ativa'), [rifas]);
 
-  // Lógica de Pendências (Dívida) com Cálculo de Bruto e Desconto
+  // Pegar o desconto ativo (Se o vendedor for 0, usa a regra Global)
+  const descontoAtivo = useMemo(() => {
+    const vDesc = meuVendedor?.percentual_desconto || 0;
+    return vDesc > 0 ? vDesc : (gameSettings?.desconto_vendedor_global || 0);
+  }, [meuVendedor, gameSettings]);
+
+  // Lógica de Pendências Separadas: Bingo vs Rifa
   const faturasPendentes = useMemo(() => {
     const folhas = folhasEmitidas.filter(f => f.status === 'pendente');
     const rifasCompradas = minhasVendas.filter(v => v.status === 'pendente');
     
-    let totalLiquido = 0;
-    let totalBruto = 0;
-
+    let bingoLiquido = 0;
+    let bingoBruto = 0;
     folhas.forEach(f => {
       const liq = Number(f.valor_pago);
       const descPerc = Number(f.desconto_aplicado || 0);
       const bruto = descPerc < 100 ? liq / (1 - descPerc / 100) : liq;
-      totalLiquido += liq;
-      totalBruto += bruto;
+      bingoLiquido += liq;
+      bingoBruto += bruto;
     });
 
+    let rifaLiquido = 0;
+    let rifaBruto = 0;
     rifasCompradas.forEach(r => {
       const liq = Number(r.valor_total);
       const descPerc = Number(r.desconto_aplicado || 0);
       const bruto = descPerc < 100 ? liq / (1 - descPerc / 100) : liq;
-      totalLiquido += liq;
-      totalBruto += bruto;
+      rifaLiquido += liq;
+      rifaBruto += bruto;
     });
     
     return {
-      folhas,
-      rifasCompradas,
-      totalLiquido,
-      totalBruto,
-      totalDesconto: totalBruto - totalLiquido
+      bingo: {
+          items: folhas,
+          liquido: bingoLiquido,
+          bruto: bingoBruto,
+          desconto: bingoBruto - bingoLiquido
+      },
+      rifa: {
+          items: rifasCompradas,
+          liquido: rifaLiquido,
+          bruto: rifaBruto,
+          desconto: rifaBruto - rifaLiquido
+      },
+      geral: {
+          liquido: bingoLiquido + rifaLiquido,
+          bruto: bingoBruto + rifaBruto,
+          desconto: (bingoBruto - bingoLiquido) + (rifaBruto - rifaLiquido)
+      }
     };
   }, [folhasEmitidas, minhasVendas]);
 
@@ -148,11 +168,11 @@ const VendedorPainel = () => {
   };
 
   const handleEnviarAcerto = async () => {
-    if (!acertoFile || faturasPendentes.totalLiquido <= 0) return;
+    if (!acertoFile || faturasPendentes.geral.liquido <= 0) return;
     setIsEnviandoAcerto(true);
-    const bingoIds = faturasPendentes.folhas.map(f => f.id);
-    const rifaIds = faturasPendentes.rifasCompradas.map(r => r.id);
-    const ok = await enviarAcerto(bingoIds, rifaIds, faturasPendentes.totalLiquido, acertoFile);
+    const bingoIds = faturasPendentes.bingo.items.map(f => f.id);
+    const rifaIds = faturasPendentes.rifa.items.map(r => r.id);
+    const ok = await enviarAcerto(bingoIds, rifaIds, faturasPendentes.geral.liquido, acertoFile);
     setIsEnviandoAcerto(false);
     if (ok) {
       setPagarAcertoOpen(false);
@@ -185,17 +205,17 @@ const VendedorPainel = () => {
         </div>
         <div className="flex flex-col items-end">
            <Badge className="bg-green-500/15 text-green-700 dark:text-green-400 border-green-500/30">Ativo</Badge>
-           <span className="text-[10px] text-muted-foreground mt-1 font-semibold">{meuVendedor.percentual_desconto}% Desconto | {meuVendedor.comissao_percentual}% Comissão</span>
+           <span className="text-[10px] text-muted-foreground mt-1 font-semibold">{descontoAtivo}% Desconto | {gameSettings?.comissao_vendedor_global}% Comissão</span>
         </div>
       </div>
 
-      {faturasPendentes.totalLiquido > 0 && (
+      {faturasPendentes.geral.liquido > 0 && (
         <div className="card-container bg-red-50 dark:bg-red-900/10 border-red-200 dark:border-red-800 flex flex-col sm:flex-row items-center justify-between gap-4 p-4">
           <div className="flex items-center gap-3 text-red-700 dark:text-red-400">
             <DollarSign className="w-8 h-8 shrink-0" />
             <div>
               <h3 className="font-bold text-lg leading-tight">Você possui Acertos Pendentes</h3>
-              <p className="text-xs font-medium">Você deve repassar R$ {faturasPendentes.totalLiquido.toFixed(2).replace('.', ',')} ao sistema. As cartelas geradas no fiado só terão validade após o pagamento.</p>
+              <p className="text-xs font-medium">Você deve repassar R$ {faturasPendentes.geral.liquido.toFixed(2).replace('.', ',')} ao sistema. As cartelas geradas no fiado só terão validade após o pagamento.</p>
             </div>
           </div>
           <Button variant="destructive" className="shrink-0 w-full sm:w-auto font-bold" onClick={() => setActiveTab('acertos')}>
@@ -210,7 +230,7 @@ const VendedorPainel = () => {
           <TabsTrigger value="bingo" className="flex items-center gap-2"><Grid3X3 className="w-4 h-4" /> Bingo Físico</TabsTrigger>
           <TabsTrigger value="acertos" className="flex items-center gap-2 relative">
             <Wallet className="w-4 h-4" /> Acertos
-            {faturasPendentes.totalLiquido > 0 && <span className="absolute top-1 right-1 flex h-2.5 w-2.5 rounded-full bg-destructive" />}
+            {faturasPendentes.geral.liquido > 0 && <span className="absolute top-1 right-1 flex h-2.5 w-2.5 rounded-full bg-destructive" />}
           </TabsTrigger>
         </TabsList>
 
@@ -321,70 +341,115 @@ const VendedorPainel = () => {
 
         <TabsContent value="acertos" className="space-y-4 mt-0">
           <div className="card-container">
-            <h2 className="font-heading text-lg font-bold flex items-center gap-2 mb-4">
-              <Wallet className="w-5 h-5 text-primary" /> Acertos Financeiros
-            </h2>
+            <div className="flex items-center justify-between mb-4">
+                <h2 className="font-heading text-lg font-bold flex items-center gap-2">
+                <Wallet className="w-5 h-5 text-primary" /> Acertos Financeiros
+                </h2>
+                {faturasPendentes.geral.liquido > 0 && (
+                    <Button className="bg-amber-600 hover:bg-amber-700 text-white shadow-sm font-bold" onClick={() => setPagarAcertoOpen(true)}>
+                        Repassar Pagamento
+                    </Button>
+                )}
+            </div>
             
-            {faturasPendentes.totalLiquido > 0 ? (
-              <div className="p-5 border-2 border-amber-500/30 bg-amber-50 dark:bg-amber-900/10 rounded-xl space-y-4">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-amber-500/20 pb-4 gap-4">
-                  <div>
-                    <p className="text-xs uppercase font-bold text-amber-700/70">Total a repassar (Líquido)</p>
-                    <p className="text-3xl font-black font-heading text-amber-700 dark:text-amber-500 mt-1">
-                      R$ {faturasPendentes.totalLiquido.toFixed(2).replace('.', ',')}
-                    </p>
-                  </div>
-                  <Button className="bg-amber-600 hover:bg-amber-700 text-white shadow-sm font-bold w-full sm:w-auto" onClick={() => setPagarAcertoOpen(true)}>
-                    Informar Pagamento
-                  </Button>
-                </div>
+            {faturasPendentes.geral.liquido > 0 ? (
+              <div className="space-y-4">
                 
-                <div className="grid grid-cols-2 gap-4 pb-2">
-                   <div>
-                       <p className="text-[10px] uppercase font-bold text-muted-foreground">Valor Bruto (Vendas)</p>
-                       <p className="text-sm font-bold text-foreground">R$ {faturasPendentes.totalBruto.toFixed(2).replace('.', ',')}</p>
-                   </div>
-                   <div>
-                       <p className="text-[10px] uppercase font-bold text-muted-foreground">Seu Ganho (Desconto)</p>
-                       <p className="text-sm font-bold text-green-600">R$ {faturasPendentes.totalDesconto.toFixed(2).replace('.', ',')}</p>
-                   </div>
+                {/* SESSÃO BINGO */}
+                {faturasPendentes.bingo.items.length > 0 && (
+                    <div className="border-2 border-purple-500/30 bg-purple-50 dark:bg-purple-900/10 rounded-xl overflow-hidden">
+                        <div className="p-3 bg-purple-500/10 border-b border-purple-500/20 flex items-center gap-2 text-purple-800 dark:text-purple-300 font-bold text-sm">
+                            <Grid3X3 className="w-4 h-4" /> Vendas de Bingo ({faturasPendentes.bingo.items.length} folhas)
+                        </div>
+                        <div className="p-4 space-y-3">
+                            <div className="flex items-center justify-between border-b border-purple-500/10 pb-3">
+                                <div>
+                                    <p className="text-[10px] uppercase font-bold text-muted-foreground">Valor Bruto</p>
+                                    <p className="text-sm font-bold">R$ {faturasPendentes.bingo.bruto.toFixed(2).replace('.', ',')}</p>
+                                </div>
+                                <div className="text-center">
+                                    <p className="text-[10px] uppercase font-bold text-muted-foreground">Seu Desconto</p>
+                                    <p className="text-sm font-bold text-green-600">- R$ {faturasPendentes.bingo.desconto.toFixed(2).replace('.', ',')}</p>
+                                </div>
+                                <div className="text-right">
+                                    <p className="text-[10px] uppercase font-bold text-muted-foreground">Repassar (Líquido)</p>
+                                    <p className="text-lg font-black text-purple-700 dark:text-purple-400">R$ {faturasPendentes.bingo.liquido.toFixed(2).replace('.', ',')}</p>
+                                </div>
+                            </div>
+                            <ul className="text-xs space-y-2 text-purple-900/80 dark:text-purple-300/80">
+                                {faturasPendentes.bingo.items.map(f => {
+                                const liq = Number(f.valor_pago);
+                                const descPerc = Number(f.desconto_aplicado || 0);
+                                const bruto = descPerc < 100 ? liq / (1 - descPerc / 100) : liq;
+                                return (
+                                    <li key={f.id} className="flex justify-between items-center border-b border-purple-500/5 pb-1">
+                                        <span className="truncate pr-2">• {f.partidas?.name}</span>
+                                        <div className="flex items-center gap-2 shrink-0">
+                                            <span className="line-through text-[10px] opacity-60" title="Valor Bruto">R$ {bruto.toFixed(2)}</span>
+                                            <Badge variant="outline" className="h-4 text-[9px] bg-white border-purple-300 text-purple-700 px-1">-{descPerc}%</Badge>
+                                            <span className="font-bold">R$ {liq.toFixed(2)}</span>
+                                        </div>
+                                    </li>
+                                );
+                                })}
+                            </ul>
+                        </div>
+                    </div>
+                )}
+
+                {/* SESSÃO RIFA */}
+                {faturasPendentes.rifa.items.length > 0 && (
+                    <div className="border-2 border-blue-500/30 bg-blue-50 dark:bg-blue-900/10 rounded-xl overflow-hidden">
+                        <div className="p-3 bg-blue-500/10 border-b border-blue-500/20 flex items-center gap-2 text-blue-800 dark:text-blue-300 font-bold text-sm">
+                            <Ticket className="w-4 h-4" /> Reservas de Rifa ({faturasPendentes.rifa.items.length} registros)
+                        </div>
+                        <div className="p-4 space-y-3">
+                            <div className="flex items-center justify-between border-b border-blue-500/10 pb-3">
+                                <div>
+                                    <p className="text-[10px] uppercase font-bold text-muted-foreground">Valor Bruto</p>
+                                    <p className="text-sm font-bold">R$ {faturasPendentes.rifa.bruto.toFixed(2).replace('.', ',')}</p>
+                                </div>
+                                <div className="text-center">
+                                    <p className="text-[10px] uppercase font-bold text-muted-foreground">Seu Desconto</p>
+                                    <p className="text-sm font-bold text-green-600">- R$ {faturasPendentes.rifa.desconto.toFixed(2).replace('.', ',')}</p>
+                                </div>
+                                <div className="text-right">
+                                    <p className="text-[10px] uppercase font-bold text-muted-foreground">Repassar (Líquido)</p>
+                                    <p className="text-lg font-black text-blue-700 dark:text-blue-400">R$ {faturasPendentes.rifa.liquido.toFixed(2).replace('.', ',')}</p>
+                                </div>
+                            </div>
+                            <ul className="text-xs space-y-2 text-blue-900/80 dark:text-blue-300/80">
+                                {faturasPendentes.rifa.items.map(r => {
+                                const liq = Number(r.valor_total);
+                                const descPerc = Number(r.desconto_aplicado || 0);
+                                const bruto = descPerc < 100 ? liq / (1 - descPerc / 100) : liq;
+                                return (
+                                    <li key={r.id} className="flex justify-between items-center border-b border-blue-500/5 pb-1">
+                                        <span>• {r.rifas?.nome} ({r.numeros.length} nºs)</span>
+                                        <div className="flex items-center gap-2 shrink-0">
+                                            <span className="line-through text-[10px] opacity-60" title="Valor Bruto">R$ {bruto.toFixed(2)}</span>
+                                            <Badge variant="outline" className="h-4 text-[9px] bg-white border-blue-300 text-blue-700 px-1">-{descPerc}%</Badge>
+                                            <span className="font-bold">R$ {liq.toFixed(2)}</span>
+                                        </div>
+                                    </li>
+                                );
+                                })}
+                            </ul>
+                        </div>
+                    </div>
+                )}
+
+                {/* RESUMO TOTAL */}
+                <div className="flex flex-col sm:flex-row items-center justify-between p-4 bg-amber-100 dark:bg-amber-900/20 border-2 border-amber-400 rounded-xl mt-4">
+                    <div>
+                        <p className="text-sm font-bold text-amber-800 dark:text-amber-500 uppercase tracking-widest flex items-center gap-2">
+                            <BadgePercent className="w-5 h-5" /> TOTAL A REPASSAR 
+                        </p>
+                        <p className="text-xs text-amber-700/80 mt-1">A soma do valor líquido do Bingo e das Rifas.</p>
+                    </div>
+                    <p className="text-3xl font-black font-heading text-amber-700 dark:text-amber-400">R$ {faturasPendentes.geral.liquido.toFixed(2).replace('.', ',')}</p>
                 </div>
 
-                <div className="space-y-2 border-t border-amber-500/20 pt-4">
-                  <p className="text-xs font-bold text-amber-800">Itens que serão validados ao pagar:</p>
-                  <ul className="text-xs space-y-2 text-amber-700/80">
-                    {faturasPendentes.folhas.map(f => {
-                       const liq = Number(f.valor_pago);
-                       const descPerc = Number(f.desconto_aplicado || 0);
-                       const bruto = descPerc < 100 ? liq / (1 - descPerc / 100) : liq;
-                       return (
-                         <li key={f.id} className="flex flex-col sm:flex-row sm:justify-between sm:items-center border-b border-amber-500/10 pb-1.5 gap-1">
-                           <span>• Folha de Bingo: {f.partidas?.name}</span>
-                           <div className="flex items-center sm:justify-end gap-2">
-                             <span className="line-through text-[10px] opacity-60" title="Valor Bruto">R$ {bruto.toFixed(2).replace('.', ',')}</span>
-                             <Badge variant="outline" className="h-4 text-[9px] bg-white/50 border-amber-500/30 text-amber-700 px-1">-{descPerc}%</Badge>
-                             <span className="font-bold">R$ {liq.toFixed(2).replace('.', ',')}</span>
-                           </div>
-                         </li>
-                       );
-                    })}
-                    {faturasPendentes.rifasCompradas.map(r => {
-                       const liq = Number(r.valor_total);
-                       const descPerc = Number(r.desconto_aplicado || 0);
-                       const bruto = descPerc < 100 ? liq / (1 - descPerc / 100) : liq;
-                       return (
-                         <li key={r.id} className="flex flex-col sm:flex-row sm:justify-between sm:items-center border-b border-amber-500/10 pb-1.5 gap-1">
-                           <span>• Rifa ({r.numeros.length} nºs)</span>
-                           <div className="flex items-center sm:justify-end gap-2">
-                             <span className="line-through text-[10px] opacity-60" title="Valor Bruto">R$ {bruto.toFixed(2).replace('.', ',')}</span>
-                             <Badge variant="outline" className="h-4 text-[9px] bg-white/50 border-amber-500/30 text-amber-700 px-1">-{descPerc}%</Badge>
-                             <span className="font-bold">R$ {liq.toFixed(2).replace('.', ',')}</span>
-                           </div>
-                         </li>
-                       );
-                    })}
-                  </ul>
-                </div>
               </div>
             ) : (
               <div className="p-6 text-center border-2 border-dashed border-success/30 rounded-xl bg-success/5">
@@ -455,9 +520,8 @@ const VendedorPainel = () => {
 
             {selectedBingoMatch && qtdFolhasBingo > 0 && (() => {
               const match = manualMatches.find(m => m.id === selectedBingoMatch);
-              const desconto = meuVendedor?.percentual_desconto || 0;
               const precoBase = (match?.card_price || 0) * qtdFolhasBingo;
-              const totalComDesconto = precoBase * (1 - desconto / 100);
+              const totalComDesconto = precoBase * (1 - descontoAtivo / 100);
 
               return (
                 <>
@@ -467,7 +531,7 @@ const VendedorPainel = () => {
                       <span>R$ {precoBase.toFixed(2)}</span>
                     </div>
                     <div className="flex justify-between text-sm">
-                      <span className="text-green-600">Seu Desconto ({desconto}%):</span>
+                      <span className="text-green-600">Seu Desconto ({descontoAtivo}%):</span>
                       <span className="text-green-600">- R$ {(precoBase - totalComDesconto).toFixed(2)}</span>
                     </div>
                     <div className="flex justify-between font-bold text-lg pt-2 border-t border-purple-200 mt-1">
@@ -532,9 +596,8 @@ const VendedorPainel = () => {
                     <div className="p-3 bg-primary/5 border border-primary/20 rounded-lg space-y-1">
                       {(() => { 
                         const rifa = rifasAtivas.find(r => r.id === reservarRifaId); 
-                        const desconto = meuVendedor.percentual_desconto || 0;
                         const bruto = rifa ? reservarSelecionados.length * rifa.custo_por_numero : 0;
-                        const liquido = bruto * (1 - desconto/100);
+                        const liquido = bruto * (1 - descontoAtivo/100);
                         return (
                           <>
                             <div className="flex justify-between text-sm">
@@ -542,7 +605,7 @@ const VendedorPainel = () => {
                               <span>R$ {bruto.toFixed(2)}</span>
                             </div>
                             <div className="flex justify-between text-sm">
-                              <span className="text-green-600">Seu Desconto ({desconto}%):</span>
+                              <span className="text-green-600">Seu Desconto ({descontoAtivo}%):</span>
                               <span className="text-green-600">- R$ {(bruto - liquido).toFixed(2)}</span>
                             </div>
                             <div className="flex justify-between font-bold text-lg text-primary pt-2 border-t border-primary/20 mt-1">
@@ -583,8 +646,8 @@ const VendedorPainel = () => {
           <div className="space-y-4 py-2">
             <div className="p-4 bg-muted rounded-xl text-center space-y-2">
               <p className="text-sm font-medium text-muted-foreground">Valor exato da transferência (Líquido):</p>
-              <p className="text-4xl font-black font-heading text-primary">R$ {faturasPendentes.totalLiquido.toFixed(2).replace('.', ',')}</p>
-              <p className="text-xs text-muted-foreground">Sua comissão (R$ {faturasPendentes.totalDesconto.toFixed(2).replace('.', ',')}) já foi subtraída.</p>
+              <p className="text-4xl font-black font-heading text-primary">R$ {faturasPendentes.geral.liquido.toFixed(2).replace('.', ',')}</p>
+              <p className="text-xs text-muted-foreground">Sua comissão total de <strong>R$ {faturasPendentes.geral.desconto.toFixed(2).replace('.', ',')}</strong> já foi subtraída.</p>
             </div>
             {gameSettings?.pix_key && (
               <div className="space-y-1">
