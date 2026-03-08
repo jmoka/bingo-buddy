@@ -244,17 +244,97 @@ export default function ValidarCartela() {
             )}
           </TabsContent>
 
+          {/* ABA RESTAURADA: NÚMERO DA RIFA */}
           <TabsContent value="rifa" className="space-y-4 mt-4">
-             {/* Componente existente, sem alteração de regras (Rifa por número não costuma falhar o acerto pois não é fiado ao usuário) */}
+            <div className="card-container p-6 space-y-4 bg-blue-50/30 border-blue-500/20">
+              <div className="space-y-2">
+                <Label>Selecione a Rifa (Opcional)</Label>
+                <Select value={rifaIdSelecionada} onValueChange={setRifaIdSelecionada}>
+                  <SelectTrigger className="h-12">
+                    <SelectValue placeholder="Buscar em todas as rifas ativas" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todas">Todas as rifas ativas</SelectItem>
+                    {rifasAbertas.map(r => (
+                      <SelectItem key={r.id} value={r.id}>{r.nome}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="numero">Número da Cota</Label>
+                <div className="flex gap-2">
+                  <Input 
+                    id="numero" 
+                    type="number" 
+                    value={numeroRifa} 
+                    onChange={e => setNumeroRifa(e.target.value)} 
+                    onKeyDown={e => e.key === 'Enter' && buscarNumeroRifa()} 
+                    placeholder="Ex: 42" 
+                    className="font-mono text-lg h-12" 
+                  />
+                  <Button className="h-12 w-12 bg-blue-600 hover:bg-blue-700" onClick={() => buscarNumeroRifa()} disabled={loadingRifa}>
+                    {loadingRifa ? <Loader2 className="h-5 w-5 animate-spin" /> : <Search className="h-5 w-5" />}
+                  </Button>
+                </div>
+              </div>
+            </div>
+
+            {buscadoRifa && !resultadoRifa && (
+              <div className="card-container p-6 border-red-300 bg-red-50 text-center">
+                <XCircle className="h-12 w-12 text-red-500 mx-auto mb-3" />
+                <p className="font-bold text-lg text-red-700">Número não encontrado</p>
+                <p className="text-sm text-red-600/80">Este número não está vendido nem reservado nas rifas selecionadas.</p>
+              </div>
+            )}
+
+            {buscadoRifa && resultadoRifa && resultadoRifa.length > 0 && (
+              <div className="space-y-4">
+                <h3 className="font-heading font-bold text-lg pt-2">Resultados da Busca</h3>
+                {resultadoRifa.map((item: any) => (
+                  <div key={item.id} className="card-container p-5 border-blue-200 shadow-sm relative overflow-hidden">
+                    {/* Borda lateral colorida dependendo do status */}
+                    <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${item.status === 'vendido' ? 'bg-green-500' : 'bg-amber-500'}`} />
+                    
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-border/50 pb-3 mb-3 gap-2">
+                      <div>
+                        <p className="font-bold text-lg leading-tight">{item.rifas?.nome}</p>
+                        <p className="text-sm text-muted-foreground mt-0.5 flex items-center gap-1">
+                          Status da Rifa: <Badge variant="outline" className="text-[10px] uppercase">{item.rifas?.status}</Badge>
+                        </p>
+                      </div>
+                      <div className="text-left sm:text-right bg-blue-50 dark:bg-blue-900/10 px-4 py-2 rounded-lg border border-blue-100 dark:border-blue-800">
+                        <p className="text-[10px] uppercase font-bold text-blue-600/80 dark:text-blue-400">Número</p>
+                        <p className="text-3xl font-black font-mono text-blue-700 dark:text-blue-300 leading-none">{item.numero}</p>
+                      </div>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <p className="text-[10px] uppercase font-bold text-muted-foreground mb-1">Status da Cota</p>
+                        <Badge className={`${item.status === 'vendido' ? 'bg-green-500 hover:bg-green-600' : 'bg-amber-500 hover:bg-amber-600 text-white'}`}>
+                          {item.status === 'vendido' ? 'Pago / Validado' : 'Reservado (Pendente)'}
+                        </Badge>
+                      </div>
+                      <div>
+                        <p className="text-[10px] uppercase font-bold text-muted-foreground">Comprador</p>
+                        <p className="font-semibold mt-1 text-foreground">{item.nome_comprador || 'Não informado'}</p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </TabsContent>
 
           <TabsContent value="cartela" className="space-y-4 mt-4">
-            <div className="card-container p-6 space-y-4">
+            <div className="card-container p-6 space-y-4 bg-emerald-50/30 border-emerald-500/20">
               <div className="space-y-2">
                 <Label htmlFor="codigo">Código de validação (Rifa)</Label>
                 <div className="flex gap-2">
-                  <Input id="codigo" value={codigoCartela} onChange={e => setCodigoCartela(e.target.value.toUpperCase())} onKeyDown={e => e.key === 'Enter' && buscarCartela()} placeholder="Ex: AB12CD34EF" className="font-mono uppercase" />
-                  <Button onClick={() => buscarCartela()} disabled={loadingCartela}>{loadingCartela ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}</Button>
+                  <Input id="codigo" value={codigoCartela} onChange={e => setCodigoCartela(e.target.value.toUpperCase())} onKeyDown={e => e.key === 'Enter' && buscarCartela()} placeholder="Ex: AB12CD34EF" className="font-mono uppercase h-12 text-lg" />
+                  <Button className="h-12 w-12 bg-emerald-600 hover:bg-emerald-700" onClick={() => buscarCartela()} disabled={loadingCartela}>{loadingCartela ? <Loader2 className="h-5 w-5 animate-spin" /> : <Search className="h-5 w-5" />}</Button>
                 </div>
               </div>
             </div>
@@ -281,18 +361,25 @@ export default function ValidarCartela() {
                     </div>
                   </div>
                 ) : (
-                  <div className="card-container p-5 border-green-300 space-y-4">
+                  <div className="card-container p-5 border-emerald-300 shadow-sm relative overflow-hidden">
+                    <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-emerald-500" />
                     <div className="flex items-center gap-3">
-                      <CheckCircle className="h-8 w-8 text-green-500 shrink-0" />
+                      <CheckCircle className="h-10 w-10 text-emerald-500 shrink-0" />
                       <div>
-                        <p className="font-bold text-lg text-green-700">Cartela Válida e Paga</p>
-                        <p className="text-sm text-muted-foreground">{resultadoCartela.compras_rifa?.rifas?.nome}</p>
+                        <p className="font-bold text-xl text-emerald-700">Cartela Válida e Paga</p>
+                        <p className="text-sm font-medium text-foreground mt-0.5">{resultadoCartela.compras_rifa?.rifas?.nome}</p>
                       </div>
                     </div>
-                    {/* Exibe as infos normais da rifa (já existia no código anterior) */}
-                    <div className="grid grid-cols-2 gap-4 text-sm mt-4 border-t pt-4">
-                       <div><p className="text-[10px] uppercase text-muted-foreground">Número Comprado</p><p className="font-bold text-lg">{resultadoCartela.numeros_rifa?.numero}</p></div>
-                       <div><p className="text-[10px] uppercase text-muted-foreground">Status da Rifa</p><p className="font-bold uppercase">{resultadoCartela.compras_rifa?.rifas?.status}</p></div>
+                    
+                    <div className="grid grid-cols-2 gap-4 text-sm mt-5 border-t border-border/50 pt-4">
+                       <div>
+                         <p className="text-[10px] uppercase font-bold text-muted-foreground">Número Comprado</p>
+                         <p className="font-black font-mono text-2xl mt-0.5">{resultadoCartela.numeros_rifa?.numero}</p>
+                       </div>
+                       <div>
+                         <p className="text-[10px] uppercase font-bold text-muted-foreground mb-1">Status da Rifa</p>
+                         <Badge variant="outline" className="uppercase font-bold">{resultadoCartela.compras_rifa?.rifas?.status}</Badge>
+                       </div>
                     </div>
                   </div>
                 )}
