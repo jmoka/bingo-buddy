@@ -14,7 +14,7 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog';
 import {
-  Loader2, CheckCircle2, XCircle, Users, Copy, ShieldBan, ShieldCheck, Edit, Wallet, HandCoins, AlertTriangle, Eye, ExternalLink, Grid3X3, Ticket
+  Loader2, CheckCircle2, XCircle, Users, Copy, ShieldBan, ShieldCheck, Edit, Wallet, HandCoins, AlertTriangle, Eye, ExternalLink, Grid3X3, Ticket, Wrench
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -35,20 +35,21 @@ const VendedoresAdmin = () => {
     resolverAcerto,
   } = useRifaAdmin();
 
-  // Estados dos Modais
   const [editandoVendedor, setEditandoVendedor] = useState<any | null>(null);
   const [isSavingEdit, setIsSavingEdit] = useState(false);
   const [formEdicao, setFormEdicao] = useState({ nome_completo: '', telefone: '', cpf: '', rg: '', endereco: '', comissao: 0, desconto: 0 });
   
-  const [acaoAcerto, setAcaoAcerto] = useState<{tipo: 'aprovar' | 'rejeitar', acerto: AcertoVendedor} | null>(null);
+  // CORREÇÃO: O tipo correto é 'aprovado' | 'rejeitado'
+  const [acaoAcerto, setAcaoAcerto] = useState<{tipo: 'aprovado' | 'rejeitado', acerto: AcertoVendedor} | null>(null);
   const [isProcessandoAcerto, setIsProcessandoAcerto] = useState(false);
   
-  // Estado para visualizar comprovante
   const [comprovanteUrl, setComprovanteUrl] = useState<string | null>(null);
 
   const pendentes = solicitacoesVendedor.filter(s => s.status === 'pendente');
   const acertosParaAnalisar = acertosPendentes.filter(a => a.status === 'pendente' || a.status === 'em_analise');
-  const historicoAcertos = acertosPendentes.filter(a => a.status === 'aprovado' || a.status === 'rejeitado');
+  
+  // Inclui os status bugados antigos para permitir a correção
+  const historicoAcertos = acertosPendentes.filter(a => ['aprovado', 'rejeitado', 'aprovar', 'rejeitar'].includes(a.status));
 
   const handleToggleAtivo = async (vendedorId: string, ativo: boolean) => {
     await atualizarVendedor(vendedorId, { ativo: !ativo });
@@ -84,7 +85,7 @@ const VendedoresAdmin = () => {
 
   const handleViewComprovante = async (path: string) => {
     try {
-      const { data, error } = await supabase.storage.from('receipts').createSignedUrl(path, 3600); // 1 hora de validade
+      const { data, error } = await supabase.storage.from('receipts').createSignedUrl(path, 3600);
       if (error) throw error;
       setComprovanteUrl(data.signedUrl);
     } catch (e) {
@@ -98,6 +99,12 @@ const VendedoresAdmin = () => {
     const ok = await resolverAcerto(acaoAcerto.acerto.id, acaoAcerto.tipo);
     setIsProcessandoAcerto(false);
     if (ok) setAcaoAcerto(null);
+  };
+
+  const handleFixBuggedAcerto = async (acertoId: string, corretoStatus: 'aprovado' | 'rejeitado') => {
+    setIsProcessandoAcerto(true);
+    await resolverAcerto(acertoId, corretoStatus);
+    setIsProcessandoAcerto(false);
   };
 
   const renderAcertoDetails = (a: AcertoVendedor) => {
@@ -115,7 +122,7 @@ const VendedoresAdmin = () => {
                   return (
                       <div key={bId} className="flex justify-between items-center text-xs bg-muted/50 p-2 rounded-lg border border-border/50">
                           <span className="flex items-center gap-1.5 text-muted-foreground"><Grid3X3 className="w-3.5 h-3.5" /> {folha?.partidas?.name || 'Bingo Físico'}</span>
-                          <span className="font-mono font-bold bg-background px-1.5 py-0.5 rounded shadow-sm">{folha ? folha.codigo_validacao : '...'+bId.slice(-6)}</span>
+                          <span className="font-mono font-bold bg-background px-1.5 py-0.5 rounded shadow-sm text-primary">Cod: {folha ? folha.codigo_validacao : '...'+bId.slice(-6)}</span>
                       </div>
                   );
                 })}
@@ -125,10 +132,10 @@ const VendedoresAdmin = () => {
                   return (
                       <div key={rId} className="flex flex-col gap-1 text-xs bg-muted/50 p-2 rounded-lg border border-border/50">
                           <div className="flex justify-between items-center">
-                            <span className="flex items-center gap-1.5 text-muted-foreground font-medium"><Ticket className="w-3.5 h-3.5" /> Rifa ({venda?.rifas?.nome || '...'})</span>
+                            <span className="flex items-center gap-1.5 text-muted-foreground font-medium"><Ticket className="w-3.5 h-3.5" /> {venda?.rifas?.nome || 'Rifa'}</span>
                             <span className="font-mono font-bold bg-background px-1.5 py-0.5 rounded shadow-sm text-[10px]">Cotas: {venda ? venda.numeros.join(', ') : '...'+rId.slice(-6)}</span>
                           </div>
-                          {codigos && <span className="text-[9px] text-muted-foreground font-mono mt-0.5">Códigos: {codigos}</span>}
+                          {codigos && <span className="text-[9px] text-primary font-mono mt-1 pt-1 border-t border-dashed">Cod: {codigos}</span>}
                       </div>
                   );
                 })}
@@ -222,8 +229,8 @@ const VendedoresAdmin = () => {
                         <Eye className="w-4 h-4 mr-2" /> Visualizar Comprovante
                       </Button>
                       <div className="flex gap-2">
-                        <Button size="icon" variant="destructive" className="h-9 w-9" onClick={() => setAcaoAcerto({ tipo: 'rejeitar', acerto: a })}><XCircle className="w-4 h-4" /></Button>
-                        <Button size="icon" className="h-9 w-9 bg-green-600 hover:bg-green-700" onClick={() => setAcaoAcerto({ tipo: 'aprovar', acerto: a })}><CheckCircle2 className="w-4 h-4" /></Button>
+                        <Button size="icon" variant="destructive" className="h-9 w-9" onClick={() => setAcaoAcerto({ tipo: 'rejeitado', acerto: a })}><XCircle className="w-4 h-4" /></Button>
+                        <Button size="icon" className="h-9 w-9 bg-green-600 hover:bg-green-700" onClick={() => setAcaoAcerto({ tipo: 'aprovado', acerto: a })}><CheckCircle2 className="w-4 h-4" /></Button>
                       </div>
                    </div>
                  </div>
@@ -234,20 +241,37 @@ const VendedoresAdmin = () => {
           <div className="space-y-3 pt-6 border-t">
             <h3 className="text-sm font-semibold text-muted-foreground">Histórico de Acertos Resolvidos</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {historicoAcertos.map(a => (
-                 <div key={a.id} className={`p-4 rounded-xl border flex flex-col gap-2 opacity-80 transition-opacity hover:opacity-100 ${a.status === 'aprovado' ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
-                   <div className="flex items-start justify-between">
-                     <div>
-                       <p className="font-bold text-sm">{a.vendedores_rifa?.nome}</p>
-                       <p className="text-xs text-muted-foreground">R$ {Number(a.valor).toFixed(2)} • {format(new Date(a.resolved_at || a.created_at), "dd/MM/yy HH:mm", { locale: ptBR })}</p>
+              {historicoAcertos.map(a => {
+                 const isBugged = a.status === 'aprovar' || a.status === 'rejeitar';
+                 const finalStatus = isBugged ? (a.status === 'aprovar' ? 'aprovado' : 'rejeitado') : a.status;
+
+                 return (
+                   <div key={a.id} className={`p-4 rounded-xl border flex flex-col gap-2 transition-opacity ${finalStatus === 'aprovado' ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
+                     <div className="flex items-start justify-between">
+                       <div>
+                         <p className="font-bold text-sm">{a.vendedores_rifa?.nome}</p>
+                         <p className="text-xs text-muted-foreground">R$ {Number(a.valor).toFixed(2)} • {format(new Date(a.resolved_at || a.created_at), "dd/MM/yy HH:mm", { locale: ptBR })}</p>
+                       </div>
+                       <Badge variant={finalStatus === 'aprovado' ? 'default' : 'destructive'} className={finalStatus === 'aprovado' ? 'bg-green-600' : ''}>
+                         {finalStatus === 'aprovado' ? 'Recebido' : 'Recusado'}
+                       </Badge>
                      </div>
-                     <Badge variant={a.status === 'aprovado' ? 'default' : 'destructive'} className={a.status === 'aprovado' ? 'bg-green-600' : ''}>
-                       {a.status === 'aprovado' ? 'Recebido' : 'Recusado'}
-                     </Badge>
+
+                     {isBugged && (
+                       <div className="bg-amber-100 border border-amber-300 p-2 rounded-lg mt-1 flex flex-col gap-2">
+                         <p className="text-[10px] text-amber-800 font-bold flex items-center gap-1">
+                           <AlertTriangle className="w-3 h-3" /> Este item travou em "Análise" no painel do vendedor.
+                         </p>
+                         <Button size="sm" onClick={() => handleFixBuggedAcerto(a.id, finalStatus)} disabled={isProcessandoAcerto} className="h-7 text-xs bg-amber-600 hover:bg-amber-700">
+                           <Wrench className="w-3 h-3 mr-1" /> Corrigir e Liberar Cartelas
+                         </Button>
+                       </div>
+                     )}
+
+                     {renderAcertoDetails(a)}
                    </div>
-                   {renderAcertoDetails(a)}
-                 </div>
-              ))}
+                 );
+              })}
             </div>
           </div>
         </TabsContent>
@@ -291,13 +315,13 @@ const VendedoresAdmin = () => {
         <DialogContent>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              {acaoAcerto?.tipo === 'aprovar' ? <HandCoins className="w-5 h-5 text-green-600" /> : <AlertTriangle className="w-5 h-5 text-destructive" />}
-              {acaoAcerto?.tipo === 'aprovar' ? 'Confirmar Recebimento' : 'Rejeitar Comprovante'}
+              {acaoAcerto?.tipo === 'aprovado' ? <HandCoins className="w-5 h-5 text-green-600" /> : <AlertTriangle className="w-5 h-5 text-destructive" />}
+              {acaoAcerto?.tipo === 'aprovado' ? 'Confirmar Recebimento' : 'Rejeitar Comprovante'}
             </DialogTitle>
             <DialogDescription className="sr-only">Validar acerto.</DialogDescription>
           </DialogHeader>
           <div className="py-4 space-y-3">
-            {acaoAcerto?.tipo === 'aprovar' ? (
+            {acaoAcerto?.tipo === 'aprovado' ? (
               <>
                 <p className="text-sm text-muted-foreground">Você conferiu o PIX e o valor de <strong>R$ {Number(acaoAcerto.acerto.valor).toFixed(2)}</strong> realmente caiu na conta?</p>
                 <div className="p-3 bg-green-50 text-green-800 border border-green-200 text-xs rounded-lg font-medium">
@@ -316,13 +340,13 @@ const VendedoresAdmin = () => {
           <DialogFooter>
             <Button variant="ghost" onClick={() => setAcaoAcerto(null)}>Cancelar</Button>
             <Button 
-              className={acaoAcerto?.tipo === 'aprovar' ? 'bg-green-600 hover:bg-green-700 text-white' : ''} 
-              variant={acaoAcerto?.tipo === 'rejeitar' ? 'destructive' : 'default'}
+              className={acaoAcerto?.tipo === 'aprovado' ? 'bg-green-600 hover:bg-green-700 text-white' : ''} 
+              variant={acaoAcerto?.tipo === 'rejeitado' ? 'destructive' : 'default'}
               onClick={handleResolverAcerto} 
               disabled={isProcessandoAcerto}
             >
               {isProcessandoAcerto && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-              {acaoAcerto?.tipo === 'aprovar' ? 'Sim, o dinheiro caiu!' : 'Rejeitar Acerto'}
+              {acaoAcerto?.tipo === 'aprovado' ? 'Sim, o dinheiro caiu!' : 'Rejeitar Acerto'}
             </Button>
           </DialogFooter>
         </DialogContent>

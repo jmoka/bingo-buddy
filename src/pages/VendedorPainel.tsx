@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useEffect } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useVendedor, NumeroRifaVendedor } from '@/hooks/useVendedor';
 import { useVendedorBingo } from '@/hooks/useVendedorBingo';
@@ -16,7 +16,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   ArrowLeft, Loader2, Copy, Link2, CheckSquare, ShoppingBag, UserCheck, Ticket,
-  Printer, Plus, Undo2, Grid3X3, DollarSign, Wallet, Upload, Clock, CheckCircle2, XCircle,
+  Printer, Plus, Undo2, Grid3X3, DollarSign, Wallet, Upload, CheckCircle2, XCircle,
   BadgePercent, ListChecks, AlertTriangle, WalletCards
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -67,7 +67,6 @@ const VendedorPainel = () => {
   const [isEnviandoAcerto, setIsEnviandoAcerto] = useState(false);
   const acertoFileRef = useRef<HTMLInputElement>(null);
 
-  // Estados para seleção individual de acertos
   const [selectedAcertosBingo, setSelectedAcertosBingo] = useState<Set<string>>(new Set());
   const [selectedAcertosRifa, setSelectedAcertosRifa] = useState<Set<string>>(new Set());
 
@@ -84,7 +83,6 @@ const VendedorPainel = () => {
   const pendingVendas = useMemo(() => minhasVendas.filter(v => v.status === 'pendente'), [minhasVendas]);
   const pendentesTotais = pendingFolhas.length + pendingVendas.length;
 
-  // Calcula apenas o que foi SELECIONADO para o Acerto
   const selectedFaturas = useMemo(() => {
     const folhas = pendingFolhas.filter(f => selectedAcertosBingo.has(f.id));
     const rifasCompradas = pendingVendas.filter(v => selectedAcertosRifa.has(v.id));
@@ -130,7 +128,6 @@ const VendedorPainel = () => {
     });
   };
 
-  // Cálculos dinâmicos para compras "Fiadas" no modal de validação
   const comprasPendentesRelacionadas = useMemo(() => {
     const comprasMap = new Map();
     validarNumeros.forEach(n => {
@@ -199,14 +196,12 @@ const VendedorPainel = () => {
     if (comprasPendentesRelacionadas.ids.length === 0) return;
     setIsPagando(true);
     
-    // 1. Tenta pagar com saldo primeiro
     const pago = await pagarComprasComSaldo(comprasPendentesRelacionadas.ids);
     if (!pago) {
         setIsPagando(false);
-        return; // Falhou no pagamento (ex: saldo insuficiente)
+        return;
     }
 
-    // 2. Se pagou, valida os dados da venda na sequência
     if (validarForm.nome.trim()) {
         const idsToValidate = validarNumeros.map(n => n.id);
         await validarMultiplasVendas(idsToValidate, validarForm.nome, validarForm.telefone, validarForm.endereco);
@@ -397,7 +392,7 @@ const VendedorPainel = () => {
                           <Printer className="w-3 h-3 mr-1" /> Imprimir
                         </Button>
                       </div>
-                      <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-2">
+                      <div className="grid grid-cols-3 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8 gap-2">
                         {numeros.map(n => {
                           const isSelected = selectedToValidate.has(n.id);
                           const statusCompra = n.cartelas_rifa?.[0]?.compras_rifa?.status;
@@ -427,24 +422,24 @@ const VendedorPainel = () => {
                                             setValidarOpen(true);
                                         }
                                     }}
-                                    className={`w-full rounded-lg p-2 flex flex-col items-center justify-center gap-0.5 transition-all min-h-[70px] border 
+                                    className={`w-full rounded-lg p-2 flex flex-col items-center justify-center gap-0.5 transition-all min-h-[75px] border 
                                         ${n.status === 'vendido' ? 'bg-green-50/50 text-green-700 border-green-200 cursor-default opacity-80' : 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100 cursor-pointer'}
                                         ${modoSelecao && isSelected ? 'ring-2 ring-primary border-primary bg-primary/10 text-primary' : ''}
                                     `}
                                 >
-                                    <span className="text-xl font-bold font-heading leading-none">{n.numero}</span>
+                                    <span className="text-2xl font-bold font-heading leading-none">{n.numero}</span>
                                     
                                     {codigoValidacao && (
-                                        <span className="text-[8px] font-mono text-muted-foreground/70 mt-0.5 tracking-tighter">
+                                        <span className="text-[9px] font-mono text-primary bg-primary/10 px-1.5 py-0.5 rounded mt-1 font-bold tracking-widest border border-primary/20">
                                             {codigoValidacao}
                                         </span>
                                     )}
 
-                                    <span className={`text-[8px] px-1.5 py-0.5 rounded border mt-0.5 uppercase font-black tracking-wider w-full text-center ${badgeClass}`}>
+                                    <span className={`text-[8px] px-1.5 py-0.5 rounded border mt-1.5 uppercase font-black tracking-wider w-full text-center ${badgeClass}`}>
                                       {badgeText}
                                     </span>
                                     
-                                    {n.status === 'vendido' && <CheckSquare className="w-3.5 h-3.5 absolute top-1 left-1 text-green-600 opacity-50" />}
+                                    {n.status === 'vendido' && <CheckSquare className="w-4 h-4 absolute top-1.5 left-1.5 text-green-600 opacity-60" />}
                                 </button>
                                 {n.status === 'reservado' && !modoSelecao && (
                                     <button onClick={e => { e.stopPropagation(); setCancelarNumero(n); }} className="absolute -top-1 -right-1 opacity-0 group-hover:opacity-100 bg-red-500 text-white rounded-full p-1 shadow-md hover:bg-red-600 transition-colors">
@@ -509,10 +504,10 @@ const VendedorPainel = () => {
                       <div>
                         <p className="font-bold text-sm">{folha.partidas?.name || 'Partida'}</p>
                         <div className="flex gap-2 text-[10px] text-muted-foreground mt-1 items-center">
-                          <span className="font-mono bg-muted px-1.5 py-0.5 rounded border">Cod: {folha.codigo_validacao}</span>
-                          <span>{format(new Date(folha.created_at), "dd/MM/yy HH:mm")}</span>
+                          <span className="font-mono font-bold text-primary bg-primary/10 px-1.5 py-0.5 rounded border border-primary/20">Cod: {folha.codigo_validacao}</span>
+                          <span>{format(new Date(folha.created_at), "dd/MM/yy HH:mm", { locale: ptBR })}</span>
                           <Badge variant="outline" className={`h-4 ${folha.status === 'pendente' ? 'text-destructive border-destructive bg-destructive/10 font-bold' : folha.status === 'em_analise' ? 'text-amber-500 border-amber-500' : 'text-success border-success bg-success/10 font-bold'}`}>
-                            {folha.status === 'pendente' ? 'FIADO' : folha.status.toUpperCase()}
+                            {folha.status === 'pendente' ? 'FIADO' : folha.status === 'em_analise' ? 'EM ANÁLISE' : 'PAGO'}
                           </Badge>
                         </div>
                       </div>
@@ -578,7 +573,7 @@ const VendedorPainel = () => {
                         <Checkbox checked={selectedAcertosBingo.has(f.id)} className={selectedAcertosBingo.has(f.id) ? "border-purple-600 data-[state=checked]:bg-purple-600" : ""} />
                         <div className="flex-1">
                           <p className="text-sm font-bold">{f.partidas?.name}</p>
-                          <p className="text-xs text-muted-foreground font-mono">Cod: {f.codigo_validacao}</p>
+                          <p className="text-[11px] text-purple-600 dark:text-purple-400 font-mono mt-0.5">Cod: {f.codigo_validacao}</p>
                         </div>
                         <p className="font-black text-purple-700 dark:text-purple-400">R$ {Number(f.valor_pago).toFixed(2)}</p>
                       </div>
@@ -599,7 +594,14 @@ const VendedorPainel = () => {
                         <Checkbox checked={selectedAcertosRifa.has(v.id)} className={selectedAcertosRifa.has(v.id) ? "border-blue-600 data-[state=checked]:bg-blue-600" : ""} />
                         <div className="flex-1">
                           <p className="text-sm font-bold truncate max-w-[200px]">{v.rifas?.nome}</p>
-                          <p className="text-xs text-muted-foreground font-mono">Cotas: {v.numeros.join(', ')}</p>
+                          <div className="flex flex-col gap-0.5 mt-0.5">
+                            <p className="text-xs font-mono text-muted-foreground">Cotas: {v.numeros.join(', ')}</p>
+                            {v.cartelas_rifa?.length > 0 && (
+                              <p className="text-[10px] font-mono text-blue-600 dark:text-blue-400">
+                                Cods: {v.cartelas_rifa.map((c:any) => c.codigo_validacao).join(', ')}
+                              </p>
+                            )}
+                          </div>
                         </div>
                         <p className="font-black text-blue-700 dark:text-blue-400">R$ {Number(v.valor_total).toFixed(2)}</p>
                       </div>
@@ -626,51 +628,62 @@ const VendedorPainel = () => {
                 {meusAcertos.length === 0 ? (
                   <p className="text-xs text-muted-foreground">Nenhum acerto enviado ainda.</p>
                 ) : (
-                  meusAcertos.map((acerto: any) => (
-                    <div key={acerto.id} className="p-4 border rounded-xl flex flex-col text-sm bg-muted/20 gap-3 shadow-sm hover:shadow-md transition-shadow">
-                      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/50 pb-2">
-                        <div>
-                          <p className="font-black text-lg text-primary">R$ {Number(acerto.valor).toFixed(2).replace('.', ',')}</p>
-                          <p className="text-xs text-muted-foreground">{format(new Date(acerto.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}</p>
+                  meusAcertos.map((acerto: any) => {
+                    const isBugged = acerto.status === 'aprovar' || acerto.status === 'rejeitar';
+                    const finalStatus = isBugged ? (acerto.status === 'aprovar' ? 'aprovado' : 'rejeitado') : acerto.status;
+
+                    return (
+                      <div key={acerto.id} className="p-4 border rounded-xl flex flex-col text-sm bg-muted/20 gap-3 shadow-sm hover:shadow-md transition-shadow">
+                        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/50 pb-2">
+                          <div>
+                            <p className="font-black text-lg text-primary">R$ {Number(acerto.valor).toFixed(2).replace('.', ',')}</p>
+                            <p className="text-xs text-muted-foreground">{format(new Date(acerto.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}</p>
+                          </div>
+                          <Badge variant={finalStatus === 'aprovado' ? 'default' : finalStatus === 'rejeitado' ? 'destructive' : 'secondary'} className={finalStatus === 'aprovado' ? 'bg-success text-white' : ''}>
+                            {finalStatus.toUpperCase()}
+                          </Badge>
                         </div>
-                        <Badge variant={acerto.status === 'aprovado' ? 'default' : acerto.status === 'rejeitado' ? 'destructive' : 'secondary'} className={acerto.status === 'aprovado' ? 'bg-success text-white' : ''}>
-                          {acerto.status.toUpperCase()}
-                        </Badge>
-                      </div>
-                      
-                      <div className="pt-1">
-                        <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-2">Itens Inclusos neste repasse</p>
-                        <div className="space-y-1.5 max-h-32 overflow-y-auto pr-2 custom-scrollbar">
-                           {acerto.bingo_ids && acerto.bingo_ids.map((bId: string) => {
-                              const folha = folhasEmitidas.find(f => f.id === bId);
-                              return (
-                                  <div key={bId} className="flex justify-between items-center text-xs bg-background p-2 rounded-lg border">
-                                      <span className="flex items-center gap-1.5 text-muted-foreground"><Grid3X3 className="w-3.5 h-3.5" /> {folha?.partidas?.name || 'Bingo Físico'}</span>
-                                      <span className="font-mono font-bold bg-muted px-1.5 py-0.5 rounded shadow-sm border">{folha ? folha.codigo_validacao : '...'+bId.slice(-6)}</span>
-                                  </div>
-                              );
-                           })}
-                           {acerto.rifa_ids && acerto.rifa_ids.map((rId: string) => {
-                              const venda = minhasVendas.find(v => v.id === rId);
-                              const codigos = venda?.cartelas_rifa?.map((c:any) => c.codigo_validacao).join(', ');
-                              return (
-                                  <div key={rId} className="flex flex-col gap-1.5 text-xs bg-background p-2.5 rounded-lg border">
-                                      <div className="flex justify-between items-center">
-                                        <span className="flex items-center gap-1.5 text-muted-foreground font-medium"><Ticket className="w-3.5 h-3.5" /> Rifa ({venda?.rifas?.nome || '...'})</span>
-                                        <span className="font-mono font-bold bg-muted px-1.5 py-0.5 rounded border text-[10px]">Cotas: {venda ? venda.numeros.join(', ') : '...'+rId.slice(-6)}</span>
-                                      </div>
-                                      {codigos && (
-                                          <div className="text-[9px] text-muted-foreground mt-1 border-t pt-1.5 border-dashed">
-                                              Códigos de Validação: <span className="font-mono font-medium">{codigos}</span>
-                                          </div>
-                                      )}
-                                  </div>
-                              );
-                           })}
+
+                        {isBugged && (
+                          <div className="text-[10px] bg-amber-100 text-amber-800 p-2 rounded border border-amber-300 mb-1 font-semibold flex items-center gap-1.5">
+                            <AlertTriangle className="w-3 h-3" /> Falha no processamento. O Admin precisa corrigir este item no painel.
+                          </div>
+                        )}
+                        
+                        <div className="pt-1">
+                          <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-2">Itens Inclusos neste repasse</p>
+                          <div className="space-y-1.5 max-h-32 overflow-y-auto pr-2 custom-scrollbar">
+                             {acerto.bingo_ids && acerto.bingo_ids.map((bId: string) => {
+                                const folha = folhasEmitidas.find(f => f.id === bId);
+                                return (
+                                    <div key={bId} className="flex justify-between items-center text-xs bg-background p-2 rounded-lg border">
+                                        <span className="flex items-center gap-1.5 text-muted-foreground"><Grid3X3 className="w-3.5 h-3.5" /> {folha?.partidas?.name || 'Bingo Físico'}</span>
+                                        <span className="font-mono font-bold text-primary bg-primary/10 px-1.5 py-0.5 rounded shadow-sm border border-primary/20">{folha ? folha.codigo_validacao : '...'+bId.slice(-6)}</span>
+                                    </div>
+                                );
+                             })}
+                             {acerto.rifa_ids && acerto.rifa_ids.map((rId: string) => {
+                                const venda = minhasVendas.find(v => v.id === rId);
+                                const codigos = venda?.cartelas_rifa?.map((c:any) => c.codigo_validacao).join(', ');
+                                return (
+                                    <div key={rId} className="flex flex-col gap-1.5 text-xs bg-background p-2.5 rounded-lg border">
+                                        <div className="flex justify-between items-center">
+                                          <span className="flex items-center gap-1.5 text-muted-foreground font-medium"><Ticket className="w-3.5 h-3.5" /> Rifa ({venda?.rifas?.nome || '...'})</span>
+                                          <span className="font-mono font-bold bg-muted px-1.5 py-0.5 rounded border text-[10px]">Cotas: {venda ? venda.numeros.join(', ') : '...'+rId.slice(-6)}</span>
+                                        </div>
+                                        {codigos && (
+                                            <div className="text-[10px] text-primary font-mono mt-1 border-t pt-1.5 border-dashed font-bold tracking-widest">
+                                                Cods: {codigos}
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                             })}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))
+                    );
+                  })
                 )}
               </div>
             </div>
