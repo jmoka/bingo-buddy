@@ -64,9 +64,19 @@ const Lobby = () => {
   const [isAgendaOpen, setIsAgendaOpen] = useState(true);
   
   const [expandedParticipants, setExpandedParticipants] = useState<Set<string>>(new Set());
+  const [expandedPrizes, setExpandedPrizes] = useState<Set<string>>(new Set());
   
   const toggleParticipants = (matchId: string) => {
     setExpandedParticipants(prev => {
+      const next = new Set(prev);
+      if (next.has(matchId)) next.delete(matchId);
+      else next.add(matchId);
+      return next;
+    });
+  };
+
+  const togglePrizes = (matchId: string) => {
+    setExpandedPrizes(prev => {
       const next = new Set(prev);
       if (next.has(matchId)) next.delete(matchId);
       else next.add(matchId);
@@ -282,13 +292,16 @@ const Lobby = () => {
           const countdownMatch = (match.status === 'waiting' || match.status === 'open') ? getMatchCountdown(match.start_time) : null;
           const prizeValue = match.prize.type === 'percentage' ? (Number(match.pot || 0) * (Number(match.prize.value) || 0)) / 100 : (Number(match.prize.value) || 0);
 
+          const isFestival = match.is_festival && match.prizes && match.prizes.length > 0;
+
           return (
-            <div key={match.id} className={cn("card-container p-0 overflow-hidden border-2 transition-all", match.status === 'in_progress' ? 'border-accent ring-2 ring-accent/10' : 'border-transparent')}>
+            <div key={match.id} className={cn("card-container p-0 overflow-hidden border-2 transition-all", match.status === 'in_progress' ? 'border-accent ring-2 ring-accent/10' : isFestival ? 'border-purple-500/30' : 'border-transparent')}>
               <div className="p-4">
                 <div className="flex flex-col sm:flex-row justify-between gap-4">
                   <div className="space-y-2">
                     <div className="flex items-center gap-2 flex-wrap">
                       <h3 className="font-heading font-bold text-lg">{match.name}</h3>
+                      {isFestival && <Badge className="bg-purple-100 text-purple-800 border-purple-300">Festival</Badge>}
                       {match.status === 'in_progress' && <Badge variant="destructive" className="animate-pulse text-[10px]">AO VIVO</Badge>}
                       {countdownMatch && <Badge variant="outline" className="text-[10px] font-mono"><Timer className="w-3 h-3 mr-1" />{countdownMatch}</Badge>}
                     </div>
@@ -306,8 +319,12 @@ const Lobby = () => {
                   </div>
                   <div className="flex gap-2 sm:flex-col items-end justify-between sm:justify-center">
                     <div className="text-right">
-                      <p className="text-[10px] font-bold uppercase text-muted-foreground">Prêmio</p>
-                      <p className="text-lg font-bold text-success leading-none">{Number(prizeValue).toFixed(2)} cr.</p>
+                      <p className="text-[10px] font-bold uppercase text-muted-foreground">
+                        {isFestival ? `Prêmio ${(match.current_round || 0) + 1}/${match.prizes?.length}` : 'Prêmio'}
+                      </p>
+                      <p className="text-lg font-bold text-success leading-none">
+                        {match.prize.type === 'product' ? match.prize.productName : `${Number(prizeValue).toFixed(2)} cr.`}
+                      </p>
                     </div>
                     <div className="text-right">
                       <p className="text-[10px] font-bold uppercase text-muted-foreground">Entrada</p>
@@ -316,6 +333,38 @@ const Lobby = () => {
                   </div>
                 </div>
                 
+                {isFestival && (
+                  <div className="mt-3 pt-3 border-t border-border/50">
+                    <button
+                      onClick={() => togglePrizes(match.id)}
+                      className="flex items-center gap-2 w-full py-1.5 text-[11px] font-bold uppercase text-purple-600 hover:text-purple-700 transition-colors"
+                    >
+                      <Gift className="w-3.5 h-3.5 shrink-0" />
+                      <span>Ver sequência de Prêmios ({match.prizes?.length} rodadas)</span>
+                      {expandedPrizes.has(match.id) ? <ChevronUp className="w-3.5 h-3.5 ml-auto shrink-0" /> : <ChevronDown className="w-3.5 h-3.5 ml-auto shrink-0" />}
+                    </button>
+                    {expandedPrizes.has(match.id) && (
+                      <div className="flex flex-col gap-2 mt-3 p-3 bg-purple-50/50 dark:bg-purple-900/10 rounded-xl border border-purple-100 dark:border-purple-800/30 animate-in fade-in slide-in-from-top-2">
+                        {match.prizes?.map((pz, idx) => {
+                          const isCurrent = match.current_round === idx;
+                          const isPast = (match.current_round || 0) > idx;
+                          const val = pz.type === 'percentage' ? `${pz.value}% do Pote` : pz.type === 'fixed' ? `${pz.value} cr.` : pz.productName;
+                          return (
+                            <div key={idx} className={cn("flex items-center justify-between p-2 rounded-lg border", isCurrent ? "bg-purple-100 border-purple-300 dark:bg-purple-900/40" : isPast ? "bg-muted border-transparent opacity-60" : "bg-background border-border")}>
+                               <div className="flex items-center gap-2">
+                                 <span className="font-bold text-xs text-muted-foreground">{idx + 1}º</span>
+                                 <span className={cn("font-semibold text-sm", isCurrent ? "text-purple-800 dark:text-purple-300" : "text-foreground")}>{val}</span>
+                               </div>
+                               {isCurrent && <Badge className="bg-purple-500 text-[9px] text-white border-none">Atual</Badge>}
+                               {isPast && <Badge variant="outline" className="text-[9px]">Sorteado</Badge>}
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {match.status !== 'finished' && allCardsInMatch.length > 0 && (
                   <div className="mt-3 pt-3 border-t border-border/50">
                     <button
