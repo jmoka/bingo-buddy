@@ -27,6 +27,8 @@ const VendedoresAdmin = () => {
     solicitacoesVendedor,
     vendedoresComStats,
     acertosPendentes,
+    todasFolhasBingo,
+    todasCompras,
     isLoadingSolicitacoes,
     atualizarVendedor,
     salvarEdicaoCompletaVendedor,
@@ -106,18 +108,30 @@ const VendedoresAdmin = () => {
 
     return (
         <div className="mt-3 pt-3 border-t border-border/50 text-xs">
-            <p className="font-semibold text-muted-foreground uppercase tracking-wider text-[9px] mb-1.5">Itens vinculados a este pagamento:</p>
-            <div className="flex flex-wrap gap-1.5">
-                {hasBingo && (
-                    <Badge variant="outline" className="text-[10px] bg-purple-50 text-purple-700 border-purple-200 shadow-sm">
-                        <Grid3X3 className="w-3 h-3 mr-1" /> {a.bingo_ids.length} Folha(s) de Bingo
-                    </Badge>
-                )}
-                {hasRifa && (
-                    <Badge variant="outline" className="text-[10px] bg-blue-50 text-blue-700 border-blue-200 shadow-sm">
-                        <Ticket className="w-3 h-3 mr-1" /> {a.rifa_ids.length} Venda(s) de Rifa
-                    </Badge>
-                )}
+            <p className="font-semibold text-muted-foreground uppercase tracking-wider text-[9px] mb-2">Itens vinculados a este pagamento:</p>
+            <div className="space-y-1.5 max-h-32 overflow-y-auto pr-2 custom-scrollbar">
+                {a.bingo_ids && a.bingo_ids.map((bId: string) => {
+                  const folha = todasFolhasBingo.find(f => f.id === bId);
+                  return (
+                      <div key={bId} className="flex justify-between items-center text-xs bg-muted/50 p-2 rounded-lg border border-border/50">
+                          <span className="flex items-center gap-1.5 text-muted-foreground"><Grid3X3 className="w-3.5 h-3.5" /> {folha?.partidas?.name || 'Bingo Físico'}</span>
+                          <span className="font-mono font-bold bg-background px-1.5 py-0.5 rounded shadow-sm">{folha ? folha.codigo_validacao : '...'+bId.slice(-6)}</span>
+                      </div>
+                  );
+                })}
+                {a.rifa_ids && a.rifa_ids.map((rId: string) => {
+                  const venda = todasCompras.find(v => v.id === rId);
+                  const codigos = venda?.cartelas_rifa?.map((c:any) => c.codigo_validacao).join(', ');
+                  return (
+                      <div key={rId} className="flex flex-col gap-1 text-xs bg-muted/50 p-2 rounded-lg border border-border/50">
+                          <div className="flex justify-between items-center">
+                            <span className="flex items-center gap-1.5 text-muted-foreground font-medium"><Ticket className="w-3.5 h-3.5" /> Rifa ({venda?.rifas?.nome || '...'})</span>
+                            <span className="font-mono font-bold bg-background px-1.5 py-0.5 rounded shadow-sm text-[10px]">Cotas: {venda ? venda.numeros.join(', ') : '...'+rId.slice(-6)}</span>
+                          </div>
+                          {codigos && <span className="text-[9px] text-muted-foreground font-mono mt-0.5">Códigos: {codigos}</span>}
+                      </div>
+                  );
+                })}
             </div>
         </div>
     );
@@ -225,7 +239,7 @@ const VendedoresAdmin = () => {
                    <div className="flex items-start justify-between">
                      <div>
                        <p className="font-bold text-sm">{a.vendedores_rifa?.nome}</p>
-                       <p className="text-xs text-muted-foreground">R$ {Number(a.valor).toFixed(2)} • {format(new Date(a.resolved_at || a.created_at), "dd/MM/yy HH:mm")}</p>
+                       <p className="text-xs text-muted-foreground">R$ {Number(a.valor).toFixed(2)} • {format(new Date(a.resolved_at || a.created_at), "dd/MM/yy HH:mm", { locale: ptBR })}</p>
                      </div>
                      <Badge variant={a.status === 'aprovado' ? 'default' : 'destructive'} className={a.status === 'aprovado' ? 'bg-green-600' : ''}>
                        {a.status === 'aprovado' ? 'Recebido' : 'Recusado'}
