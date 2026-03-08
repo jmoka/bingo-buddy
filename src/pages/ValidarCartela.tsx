@@ -13,7 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { ArrowLeft, Search, CheckCircle, XCircle, Ticket, Loader2, Hash, AlertTriangle, Grid3X3, Trophy } from 'lucide-react';
+import { ArrowLeft, Search, CheckCircle, XCircle, Ticket, Loader2, Hash, AlertTriangle, Grid3X3, Trophy, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
 import { checkWin } from '@/utils/bingoUtils';
 import { BingoCard } from '@/types/bingo';
@@ -190,11 +190,20 @@ export default function ValidarCartela() {
                 ) : (
                   <>
                     <div className="card-container p-5 border-purple-300">
-                      <div className="flex items-center gap-3 mb-4 border-b pb-4">
-                        <CheckCircle className="h-8 w-8 text-green-500 shrink-0" />
-                        <div>
-                          <p className="font-bold text-lg text-green-700 leading-tight">Folha Autêntica do Sistema</p>
-                          <p className="text-sm text-muted-foreground">{resultadoBingo.partidas.name}</p>
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4 border-b pb-4">
+                        <div className="flex items-center gap-3">
+                          <CheckCircle className="h-8 w-8 text-green-500 shrink-0" />
+                          <div>
+                            <p className="font-bold text-lg text-green-700 leading-tight">Folha Autêntica do Sistema</p>
+                            <p className="text-sm text-muted-foreground">{resultadoBingo.partidas.name}</p>
+                          </div>
+                        </div>
+                        <div className="flex flex-col items-start sm:items-end gap-1 bg-green-50/80 p-2.5 rounded-lg border border-green-200">
+                           <Badge className="bg-green-600 hover:bg-green-700 text-white text-xs px-2.5 py-1 uppercase tracking-wider">
+                             <ShieldCheck className="w-3.5 h-3.5 mr-1" />
+                             PAGA E HABILITADA
+                           </Badge>
+                           <span className="text-[10px] text-green-700 font-bold uppercase tracking-wider pl-1">Participando do Sorteio</span>
                         </div>
                       </div>
                       
@@ -313,7 +322,7 @@ export default function ValidarCartela() {
                     <div className="grid grid-cols-2 gap-4 text-sm">
                       <div>
                         <p className="text-[10px] uppercase font-bold text-muted-foreground mb-1">Status da Cota</p>
-                        <Badge className={`${item.status === 'vendido' ? 'bg-green-500 hover:bg-green-600' : 'bg-amber-500 hover:bg-amber-600 text-white'}`}>
+                        <Badge className={`${item.status === 'vendido' ? 'bg-green-500 hover:bg-green-600 text-white' : 'bg-amber-500 hover:bg-amber-600 text-white'}`}>
                           {item.status === 'vendido' ? 'Pago / Validado' : 'Reservado (Pendente)'}
                         </Badge>
                       </div>
@@ -363,18 +372,29 @@ export default function ValidarCartela() {
                 ) : (
                   <div className="card-container p-5 border-emerald-300 shadow-sm relative overflow-hidden">
                     <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-emerald-500" />
-                    <div className="flex items-center gap-3">
-                      <CheckCircle className="h-10 w-10 text-emerald-500 shrink-0" />
-                      <div>
-                        <p className="font-bold text-xl text-emerald-700">Cartela Válida e Paga</p>
-                        <p className="text-sm font-medium text-foreground mt-0.5">{resultadoCartela.compras_rifa?.rifas?.nome}</p>
+                    
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                      <div className="flex items-center gap-3">
+                        <CheckCircle className="h-10 w-10 text-emerald-500 shrink-0" />
+                        <div>
+                          <p className="font-bold text-xl text-emerald-700">Cota Autêntica</p>
+                          <p className="text-sm font-medium text-foreground mt-0.5">{resultadoCartela.compras_rifa?.rifas?.nome}</p>
+                        </div>
+                      </div>
+                      
+                      <div className="flex flex-col items-start sm:items-end gap-1 bg-green-50/80 p-2.5 rounded-lg border border-green-200">
+                         <Badge className="bg-green-600 hover:bg-green-700 text-white text-xs px-2.5 py-1 uppercase tracking-wider">
+                           <ShieldCheck className="w-3.5 h-3.5 mr-1" />
+                           PAGA E HABILITADA
+                         </Badge>
+                         <span className="text-[10px] text-green-700 font-bold uppercase tracking-wider pl-1">Participando do Sorteio</span>
                       </div>
                     </div>
                     
                     <div className="grid grid-cols-2 gap-4 text-sm mt-5 border-t border-border/50 pt-4">
                        <div>
                          <p className="text-[10px] uppercase font-bold text-muted-foreground">Número Comprado</p>
-                         <p className="font-black font-mono text-2xl mt-0.5">{resultadoCartela.numeros_rifa?.numero}</p>
+                         <p className="font-black font-mono text-2xl mt-0.5 text-emerald-700">{resultadoCartela.numeros_rifa?.numero}</p>
                        </div>
                        <div>
                          <p className="text-[10px] uppercase font-bold text-muted-foreground mb-1">Status da Rifa</p>
