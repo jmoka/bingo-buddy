@@ -41,15 +41,30 @@ export const useVendedorBingo = () => {
     refetchInterval: 5000,
   });
 
-  const comprarFolhasBingo = async (matchId: string, quantidade: number, gridsPorFolha: number): Promise<boolean> => {
+  const comprarFolhasBingo = async (matchId: string, quantidade: number, gridsPorFolha: number, pagarDepois: boolean = false): Promise<boolean> => {
     if (!meuVendedor) return false;
 
-    // Gerar os grids e códigos localmente para enviar pro backend
+    // Gerar os grids e códigos localmente para enviar pro backend.
+    // Dicionário Set para garantir que NENHUMA cartela deste lote seja idêntica.
+    const generatedTracker = new Set<string>();
     const folhasPayload = [];
+
     for (let i = 0; i < quantidade; i++) {
       const grids = [];
       for (let j = 0; j < gridsPorFolha; j++) {
-        grids.push(generateBingoCard());
+        let grid;
+        let serialized;
+        let attempts = 0;
+        
+        // Loop de verificação de unicidade extrema (embora a chance de colisão seja ínfima)
+        do {
+            grid = generateBingoCard();
+            serialized = JSON.stringify(grid);
+            attempts++;
+        } while (generatedTracker.has(serialized) && attempts < 100);
+        
+        generatedTracker.add(serialized);
+        grids.push(grid);
       }
       const codigo = Math.random().toString(36).substring(2, 10).toUpperCase();
       folhasPayload.push({ grids, codigo });
@@ -58,20 +73,26 @@ export const useVendedorBingo = () => {
     const { data, error } = await supabase.rpc('comprar_folhas_bingo_vendedor', {
       p_match_id: matchId,
       p_vendedor_id: meuVendedor.id,
-      p_folhas: folhasPayload
+      p_folhas: folhasPayload,
+      p_pagar_depois: pagarDepois
     });
 
     if (error || !data?.success) {
       const msg = data?.error;
-      if (msg === 'insufficient_credits') toast.error('Saldo de créditos reais insuficiente.');
+      if (msg === 'insufficient_credits') toast.error('Saldo de créditos reais insuficiente. Marque a opção "Gerar Fiado" se precisar.');
       else if (msg === 'match_unavailable') toast.error('Partida não disponível ou é automática.');
       else toast.error('Erro ao emitir folhas de bingo.');
       return false;
     }
 
-    toast.success(`${quantidade} folha(s) de bingo gerada(s) com sucesso!`);
+    if (pagarDepois) {
+        toast.success(`${quantidade} folha(s) de bingo gerada(s) no FIADO. Pague para validar.`);
+    } else {
+        toast.success(`${quantidade} folha(s) de bingo gerada(s) com sucesso!`);
+    }
+    
     queryClient.invalidateQueries({ queryKey: ['folhasBingoFisico'] });
-    queryClient.invalidateQueries({ queryKey: ['profile', user?.id] });
+    queryClient.invalidateQueries({ queryKey: ['profile'] });
     queryClient.invalidateQueries({ queryKey: ['matches'] });
     return true;
   };

@@ -2,7 +2,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
-import { Rifa, NumeroRifa, CompraRifa, VendedorRifa, ClienteRifa, CartelaRifa, SolicitacaoVendedor, CadastroVendedor } from '@/types/rifa';
+import { Rifa, NumeroRifa, CompraRifa, VendedorRifa, ClienteRifa, CartelaRifa, SolicitacaoVendedor, CadastroVendedor, AcertoVendedor } from '@/types/rifa';
 
 export const useRifaAdmin = () => {
   const { profile } = useAuth();
@@ -93,6 +93,20 @@ export const useRifaAdmin = () => {
     refetchInterval: 5000,
   });
 
+  const { data: acertosPendentes = [] } = useQuery({
+    queryKey: ['acertosAdmin'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('acertos_vendedor')
+        .select('*, vendedores_rifa(nome)')
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      return data as AcertoVendedor[];
+    },
+    enabled: isAdmin,
+    refetchInterval: 5000,
+  });
+
   const { data: vendedoresComStats = [] } = useQuery({
     queryKey: ['vendedoresComStats'],
     queryFn: async () => {
@@ -173,19 +187,16 @@ export const useRifaAdmin = () => {
     const clean = Object.fromEntries(
       Object.entries(payload).filter(([, v]) => v !== undefined)
     );
-    // Adicionamos o .select() para garantir que linhas foram realmente atualizadas
     const { data, error } = await supabase.from('rifas').update(clean).eq('id', rifaId).select();
     
     if (error) {
       toast.error('Erro ao atualizar rifa: ' + error.message);
       return false;
     }
-    
     if (!data || data.length === 0) {
       toast.error('Erro de permissão: A rifa não foi salva (Atualize as políticas do Supabase).');
       return false;
     }
-    
     toast.success('Rifa atualizada!');
     queryClient.invalidateQueries({ queryKey: ['rifasAdmin'] });
     queryClient.invalidateQueries({ queryKey: ['rifas'] });
@@ -435,6 +446,23 @@ export const useRifaAdmin = () => {
     return true;
   };
 
+  const resolverAcerto = async (acertoId: string, status: 'aprovado' | 'rejeitado'): Promise<boolean> => {
+    const { data, error } = await supabase.rpc('resolver_acerto_vendedor', {
+      p_acerto_id: acertoId,
+      p_status: status
+    });
+
+    if (error || !data?.success) {
+      toast.error(`Erro ao ${status === 'aprovado' ? 'aprovar' : 'rejeitar'} o acerto financeiro.`);
+      return false;
+    }
+
+    toast.success(`Acerto ${status} com sucesso!`);
+    queryClient.invalidateQueries({ queryKey: ['acertosAdmin'] });
+    queryClient.invalidateQueries({ queryKey: ['todasComprasRifa'] });
+    return true;
+  };
+
   return {
     todasRifas,
     vendedores,
@@ -442,6 +470,7 @@ export const useRifaAdmin = () => {
     clientes,
     todasCompras,
     solicitacoesVendedor,
+    acertosPendentes,
     isLoading: isLoadingRifas || isLoadingVendedores || isLoadingCompras,
     isLoadingSolicitacoes,
     criarRifa,
@@ -458,5 +487,6 @@ export const useRifaAdmin = () => {
     getNumerosRifaAdmin,
     getCartelasCompra,
     registrarVendaVendedor,
+    resolverAcerto,
   };
 };

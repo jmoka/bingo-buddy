@@ -2,7 +2,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
-import { VendedorRifa, NumeroRifa, CompraRifa } from '@/types/rifa';
+import { VendedorRifa, NumeroRifa, CompraRifa, AcertoVendedor } from '@/types/rifa';
 
 export const useVendedor = () => {
   const { user, profile } = useAuth();
@@ -58,16 +58,33 @@ export const useVendedor = () => {
     refetchInterval: 5000,
   });
 
-  const reservarNumeros = async (rifaId: string, numeros: number[]): Promise<boolean> => {
+  const { data: meusAcertos = [], isLoading: isLoadingAcertos } = useQuery({
+    queryKey: ['meusAcertosVendedor', meuVendedor?.id],
+    queryFn: async () => {
+      if (!meuVendedor) return [];
+      const { data, error } = await supabase
+        .from('acertos_vendedor')
+        .select('*')
+        .eq('vendedor_id', meuVendedor.id)
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      return data as AcertoVendedor[];
+    },
+    enabled: !!meuVendedor,
+    refetchInterval: 5000,
+  });
+
+  const reservarNumeros = async (rifaId: string, numeros: number[], pagarDepois: boolean = false): Promise<boolean> => {
     const { data, error } = await supabase.rpc('reservar_numeros_vendedor', {
       p_rifa_id: rifaId,
       p_numeros: numeros,
+      p_pagar_depois: pagarDepois,
     });
     if (error || !data?.success) {
       const msg = data?.error;
       if (msg === 'not_a_vendor') toast.error('Você não está cadastrado como vendedor ativo.');
       else if (msg === 'rifa_not_found') toast.error('Rifa não encontrada ou encerrada.');
-      else if (msg === 'insufficient_credits') toast.error('Créditos insuficientes.');
+      else if (msg === 'insufficient_credits') toast.error('Créditos insuficientes. Marque a opção "Gerar Fiado" se precisar.');
       else if (msg?.startsWith('numero_indisponivel')) {
         const num = msg.split(':')[1];
         toast.error(`Número ${num} não está disponível.`);
@@ -75,12 +92,46 @@ export const useVendedor = () => {
       return false;
     }
     const preco = data.preco_unitario;
-    toast.success(`${numeros.length} número(s) reservado(s)! Preço: R$ ${Number(preco).toFixed(2)} cada.`);
-    queryClient.invalidateQueries({ queryKey: ['minhasReservasVendedor', meuVendedor?.id] });
-    queryClient.invalidateQueries({ queryKey: ['minhasVendasVendedor', meuVendedor?.id] });
+    if (pagarDepois) {
+      toast.success(`${numeros.length} número(s) reservado(s) no FIADO. Pague para ativar.`);
+    } else {
+      toast.success(`${numeros.length} número(s) reservado(s)! Preço: R$ ${Number(preco).toFixed(2)} cada.`);
+    }
+    queryClient.invalidateQueries({ queryKey: ['minhasReservasVendedor'] });
+    queryClient.invalidateQueries({ queryKey: ['minhasVendasVendedor'] });
     queryClient.invalidateQueries({ queryKey: ['numerosRifa'] });
-    queryClient.invalidateQueries({ queryKey: ['profile', user?.id] });
+    queryClient.invalidateQueries({ queryKey: ['profile'] });
     return true;
+  };
+
+  const enviarAcerto = async (bingoIds: string[], rifaIds: string[], valor: number, file: File): Promise<boolean> => {
+    if (!meuVendedor || !user) return false;
+    
+    try {
+      const fileName = `acertos/${meuVendedor.id}/${Date.now()}.${file.name.split('.').pop()}`;
+      const { error: uploadError } = await supabase.storage.from('receipts').upload(fileName, file);
+      if (uploadError) throw new Error('Falha ao enviar comprovante.');
+
+      const { data, error } = await supabase.rpc('enviar_acerto_vendedor', {
+        p_vendedor_id: meuVendedor.id,
+        p_bingo_ids: bingoIds,
+        p_rifa_ids: rifaIds,
+        p_valor: valor,
+        p_comprovante: fileName
+      });
+
+      if (error || !data?.success) throw new Error('Falha ao registrar acerto.');
+
+      toast.success('Acerto enviado com sucesso! Aguarde a aprovação do Administrador.');
+      queryClient.invalidateQueries({ queryKey: ['meusAcertosVendedor'] });
+      queryClient.invalidateQueries({ queryKey: ['folhasBingoFisico'] });
+      queryClient.invalidateQueries({ queryKey: ['minhasVendasVendedor'] });
+      return true;
+
+    } catch (e: any) {
+      toast.error(e.message || 'Erro ao enviar acerto.');
+      return false;
+    }
   };
 
   const validarVenda = async (
@@ -108,8 +159,8 @@ export const useVendedor = () => {
     } else {
       toast.success('Venda validada com sucesso!');
     }
-    queryClient.invalidateQueries({ queryKey: ['minhasReservasVendedor', meuVendedor?.id] });
-    queryClient.invalidateQueries({ queryKey: ['profile', user?.id] });
+    queryClient.invalidateQueries({ queryKey: ['minhasReservasVendedor'] });
+    queryClient.invalidateQueries({ queryKey: ['profile'] });
     return true;
   };
 
@@ -125,11 +176,11 @@ export const useVendedor = () => {
       return false;
     }
     const estorno = Number(data.creditos_estornados || 0);
-    toast.success(`Reserva cancelada!${estorno > 0 ? ` +${estorno.toFixed(2)} créditos estornados.` : ''}`);
-    queryClient.invalidateQueries({ queryKey: ['minhasReservasVendedor', meuVendedor?.id] });
-    queryClient.invalidateQueries({ queryKey: ['minhasVendasVendedor', meuVendedor?.id] });
+    toast.success(`Reserva cancelada!${estorno > 0 ? ` +${estorno.toFixed(2)} créditos estornados.` : ' (Fiado estornado)'}`);
+    queryClient.invalidateQueries({ queryKey: ['minhasReservasVendedor'] });
+    queryClient.invalidateQueries({ queryKey: ['minhasVendasVendedor'] });
     queryClient.invalidateQueries({ queryKey: ['numerosRifa'] });
-    queryClient.invalidateQueries({ queryKey: ['profile', user?.id] });
+    queryClient.invalidateQueries({ queryKey: ['profile'] });
     return true;
   };
 
@@ -144,10 +195,12 @@ export const useVendedor = () => {
     meuVendedor,
     minhasReservas,
     minhasVendas,
-    isLoading: isLoadingVendedor || isLoadingReservas || isLoadingVendas,
+    meusAcertos,
+    isLoading: isLoadingVendedor || isLoadingReservas || isLoadingVendas || isLoadingAcertos,
     reservarNumeros,
     cancelarReserva,
     validarVenda,
     gerarLink,
+    enviarAcerto,
   };
 };

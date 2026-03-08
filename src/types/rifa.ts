@@ -52,6 +52,7 @@ export interface CompraRifa {
   valor_total: number;
   desconto_aplicado: number;
   tipo_pagamento: TipoPagamento;
+  status: 'pago' | 'pendente' | 'em_analise';
   created_at: string;
 }
 
@@ -118,4 +119,16 @@ export interface CadastroVendedor {
   documento_url: string | null;
   comprovante_endereco_url: string | null;
   created_at: string;
+}
+
+export interface AcertoVendedor {
+  id: string;
+  vendedor_id: string;
+  valor: number;
+  comprovante_url: string;
+  status: 'pendente' | 'aprovado' | 'rejeitado';
+  bingo_ids: string[];
+  rifa_ids: string[];
+  created_at: string;
+  vendedores_rifa?: { nome: string };
 }

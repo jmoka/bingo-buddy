@@ -105,6 +105,7 @@ export interface FolhaBingoFisico {
   codigo_validacao: string;
   grids: number[][][]; // Array of 5x5 matrices
   valor_pago: number;
+  status: 'pago' | 'pendente' | 'em_analise';
   created_at: string;
   partidas?: Match;
 }
