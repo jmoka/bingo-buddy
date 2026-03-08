@@ -33,12 +33,9 @@ import {
   ShoppingBag,
   UserCheck,
   Ticket,
-  TrendingUp,
   Printer,
   Plus,
   Undo2,
-  Trophy,
-  Calendar,
   Grid3X3
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -57,12 +54,14 @@ const VendedorPainel = () => {
   const { profile } = useAuth();
   
   // Hooks de Rifa
-  const { meuVendedor, minhasReservas, minhasVendas, isLoading, reservarNumeros, cancelarReserva, validarVenda, gerarLink } = useVendedor();
+  const { meuVendedor, minhasReservas, isLoading, reservarNumeros, cancelarReserva, validarVenda, gerarLink } = useVendedor();
   const { rifas, getNumerosRifa } = useRifas();
   
   // Hooks de Bingo
   const { matches, gameSettings } = useGame();
   const { folhasEmitidas, comprarFolhasBingo } = useVendedorBingo();
+
+  const [activeTab, setActiveTab] = useState<'rifas' | 'bingo'>('rifas');
 
   const [validarOpen, setValidarOpen] = useState(false);
   const [validarNumero, setValidarNumero] = useState<(NumeroRifa & { rifas: any }) | null>(null);
@@ -75,8 +74,6 @@ const VendedorPainel = () => {
   const [isReservando, setIsReservando] = useState(false);
 
   const [cancelarNumero, setCancelarNumero] = useState<(NumeroRifa & { rifas: any }) | null>(null);
-  const [isCancelando, setIsCancelando] = useState(false);
-
   const [filtroStatus, setFiltroStatus] = useState<'todas' | 'ativa' | 'finalizada'>('todas');
 
   // Estado Modal de Compra de Bingo Físico
@@ -181,6 +178,21 @@ const VendedorPainel = () => {
     );
   }
 
+  // Cards Dinâmicos com base na aba ativa
+  const rifasStats = [
+    { key: 'total', label: 'Números Reservados', value: minhasReservas.length, color: 'text-primary', bg: 'bg-primary/10 border-primary/30' },
+    { key: 'validados', label: 'Vendas Validadas', value: minhasReservas.filter(n => n.status === 'vendido').length, color: 'text-green-600', bg: 'bg-green-50 border-green-200 dark:bg-green-900/10 dark:border-green-700/30' },
+    { key: 'pendentes', label: 'Pendentes', value: minhasReservas.filter(n => n.status === 'reservado').length, color: 'text-amber-600', bg: 'bg-amber-50 border-amber-200 dark:bg-amber-900/10 dark:border-amber-700/30' },
+  ];
+
+  const bingoStats = [
+    { key: 'folhas', label: 'Folhas Emitidas', value: folhasEmitidas.length, color: 'text-purple-600', bg: 'bg-purple-50 border-purple-200 dark:bg-purple-900/10 dark:border-purple-700/30' },
+    { key: 'grids', label: 'Cartelas Geradas', value: folhasEmitidas.reduce((acc, f) => acc + (f.grids?.length || 0), 0), color: 'text-primary', bg: 'bg-primary/10 border-primary/30' },
+    { key: 'valor', label: 'Valor Investido', value: `R$ ${folhasEmitidas.reduce((acc, f) => acc + Number(f.valor_pago), 0).toFixed(2).replace('.', ',')}`, color: 'text-green-600', bg: 'bg-green-50 border-green-200 dark:bg-green-900/10 dark:border-green-700/30' },
+  ];
+
+  const currentStats = activeTab === 'rifas' ? rifasStats : bingoStats;
+
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3">
@@ -195,11 +207,7 @@ const VendedorPainel = () => {
       </div>
 
       <div className="grid grid-cols-3 gap-3">
-        {([
-          { key: 'todas', label: 'Total Rifas', value: minhasReservas.length, color: 'text-primary', bg: 'bg-primary/10 border-primary/30' },
-          { key: 'ativa', label: 'Rifas Ativas', value: minhasReservas.filter(n => n.rifas?.status === 'ativa').length, color: 'text-amber-600', bg: 'bg-amber-50 border-amber-200 dark:bg-amber-900/10 dark:border-amber-700/30' },
-          { key: 'bingo', label: 'Folhas Bingo', value: folhasEmitidas.length, color: 'text-purple-600', bg: 'bg-purple-50 border-purple-200 dark:bg-purple-900/10 dark:border-purple-700/30' },
-        ] as const).map(({ key, label, value, color, bg }) => (
+        {currentStats.map(({ key, label, value, color, bg }) => (
           <div
             key={key}
             className={`card-container p-3 text-center border-2 ${bg}`}
@@ -210,7 +218,7 @@ const VendedorPainel = () => {
         ))}
       </div>
 
-      <Tabs defaultValue="rifas">
+      <Tabs value={activeTab} onValueChange={(val) => setActiveTab(val as 'rifas' | 'bingo')}>
         <TabsList className="grid w-full grid-cols-2 h-12 bg-muted/50 p-1 mb-4">
           <TabsTrigger value="rifas" className="flex items-center gap-2">
             <Ticket className="w-4 h-4" /> Sistema de Rifas
@@ -258,7 +266,7 @@ const VendedorPainel = () => {
               <Button className="w-full gradient-primary" onClick={() => setReservarOpen(true)}>
                 <Plus className="w-4 h-4 mr-2" /> Nova Reserva de Números
               </Button>
-              {/* Restante do código de reservas de rifas já existente */}
+              
               {Object.keys(reservasPorRifa).length === 0 ? (
                 <div className="text-center py-6 text-muted-foreground text-sm">
                   <ShoppingBag className="w-8 h-8 mx-auto mb-2 opacity-30" />
@@ -454,15 +462,122 @@ const VendedorPainel = () => {
         </DialogContent>
       </Dialog>
 
-      {/* OUTROS MODAIS EXISTENTES (Validar e Cancelar Reserva) */}
       <Dialog open={validarOpen} onOpenChange={setValidarOpen}>
-        {/* ... (mantido igual) ... */}
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Validar Venda - Número {validarNumero?.numero}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Para liberar a cartela, preencha os dados do comprador.
+            </p>
+            <div className="space-y-2">
+              <Label>Nome (Obrigatório)</Label>
+              <Input value={validarForm.nome} onChange={e => setValidarForm(p => ({ ...p, nome: e.target.value }))} />
+            </div>
+            <div className="space-y-2">
+              <Label>WhatsApp</Label>
+              <Input value={validarForm.telefone} onChange={e => setValidarForm(p => ({ ...p, telefone: e.target.value }))} />
+            </div>
+            <div className="space-y-2">
+              <Label>Endereço</Label>
+              <Input value={validarForm.endereco} onChange={e => setValidarForm(p => ({ ...p, endereco: e.target.value }))} />
+            </div>
+            <Button className="w-full gradient-primary" onClick={handleValidar} disabled={isValidando || !validarForm.nome.trim()}>
+              {isValidando ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <CheckSquare className="h-4 w-4 mr-2" />} Confirmar Venda
+            </Button>
+          </div>
+        </DialogContent>
       </Dialog>
 
       <Dialog open={!!cancelarNumero} onOpenChange={open => { if (!open) setCancelarNumero(null); }}>
-        {/* ... (mantido igual) ... */}
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="text-destructive flex items-center gap-2">
+              <Undo2 className="w-5 h-5" /> Cancelar Reserva
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-3">
+            <p>Você tem certeza que deseja cancelar a reserva do número <strong>{cancelarNumero?.numero}</strong>?</p>
+            <p className="text-sm text-muted-foreground">O número voltará a ficar disponível e o valor pago por ele será estornado para o seu saldo.</p>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setCancelarNumero(null)} disabled={isCancelando}>Voltar</Button>
+            <Button variant="destructive" onClick={async () => {
+              if (!cancelarNumero) return;
+              setIsCancelando(true);
+              const ok = await cancelarReserva(cancelarNumero.id);
+              setIsCancelando(false);
+              if (ok) setCancelarNumero(null);
+            }} disabled={isCancelando}>
+              {isCancelando ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null} Confirmar Cancelamento
+            </Button>
+          </DialogFooter>
+        </DialogContent>
       </Dialog>
-
+      
+      {/* Modal de Reservar - código mantido do componente anterior */}
+      <Dialog open={reservarOpen} onOpenChange={setReservarOpen}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Nova Reserva de Números</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label>Selecione a Rifa</Label>
+              <Select value={reservarRifaId} onValueChange={(val) => { setReservarRifaId(val); setReservarSelecionados([]); }}>
+                <SelectTrigger><SelectValue placeholder="Escolha uma rifa ativa" /></SelectTrigger>
+                <SelectContent>
+                  {rifasAtivas.map(r => (
+                    <SelectItem key={r.id} value={r.id}>{r.nome}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {reservarRifaId && (
+              <div className="space-y-2">
+                <Label>Números Disponíveis</Label>
+                <div className="grid grid-cols-8 gap-1 max-h-48 overflow-y-auto p-2 border rounded-md">
+                  {numerosDisponiveis.map(n => (
+                    <button
+                      key={n.id}
+                      disabled={n.status !== 'disponivel'}
+                      onClick={() => n.status === 'disponivel' && toggleReservar(n.numero)}
+                      className={`rounded p-1 text-xs font-semibold transition-colors ${
+                        reservarSelecionados.includes(n.numero)
+                          ? 'bg-primary text-primary-foreground'
+                          : n.status === 'disponivel' ? 'bg-green-100 text-green-800 hover:bg-green-200' : 'bg-muted text-muted-foreground opacity-50 cursor-not-allowed'
+                      }`}
+                    >
+                      {n.numero}
+                    </button>
+                  ))}
+                </div>
+                <div className="flex justify-between text-xs text-muted-foreground">
+                  <span>{reservarSelecionados.length} selecionado(s)</span>
+                  {reservarRifaId && (
+                    <span>
+                      Total: R$ {(() => {
+                        const rifa = rifasAtivas.find(r => r.id === reservarRifaId);
+                        if (!rifa) return '0.00';
+                        const preco = rifa.custo_por_numero * (1 - (meuVendedor.percentual_desconto / 100));
+                        return (reservarSelecionados.length * preco).toFixed(2);
+                      })()}
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setReservarOpen(false)}>Cancelar</Button>
+            <Button className="gradient-primary" onClick={handleReservar} disabled={isReservando || !reservarRifaId || reservarSelecionados.length === 0}>
+              {isReservando ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+              Confirmar Reserva
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
