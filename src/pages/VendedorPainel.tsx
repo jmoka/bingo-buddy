@@ -60,7 +60,6 @@ const VendedorPainel = () => {
   const [bingoFiado, setBingoFiado] = useState(false);
   const [isGerandoFolhas, setIsGerandoFolhas] = useState(false);
 
-  // Filtros
   const [selectedFolhas, setSelectedFolhas] = useState<Set<string>>(new Set());
   const [bingoFilterMatchId, setBingoFilterMatchId] = useState<string>('todas');
   const [rifaFilterId, setRifaFilterId] = useState<string>('todas');
@@ -88,11 +87,12 @@ const VendedorPainel = () => {
   const pendingVendas = useMemo(() => minhasVendas.filter(v => v.status === 'pendente'), [minhasVendas]);
   const pendentesTotais = pendingFolhas.length + pendingVendas.length;
 
-  // -- Listas Únicas para os Filtros --
   const uniqueBingoMatches = useMemo(() => {
     const map = new Map<string, string>();
     folhasEmitidas.forEach(f => {
-      if (f.match_id && f.partidas?.name) map.set(f.match_id, f.partidas.name);
+      if (f.match_id && f.partidas?.name) {
+        map.set(f.match_id, f.partidas.name);
+      }
     });
     return Array.from(map.entries()).map(([id, name]) => ({ id, name }));
   }, [folhasEmitidas]);
@@ -100,7 +100,10 @@ const VendedorPainel = () => {
   const uniqueRifasReservadas = useMemo(() => {
     const map = new Map<string, string>();
     minhasReservas.forEach(r => {
-      if (r.rifa_id && r.rifas?.nome) map.set(r.rifa_id, r.rifas.nome);
+      // Filtrar apenas as que estão ATIVAS
+      if (r.rifa_id && r.rifas?.nome && r.rifas?.status === 'ativa') {
+        map.set(r.rifa_id, r.rifas.nome);
+      }
     });
     return Array.from(map.entries()).map(([id, name]) => ({ id, name }));
   }, [minhasReservas]);
@@ -121,7 +124,6 @@ const VendedorPainel = () => {
     return Array.from(map.entries()).map(([id, name]) => ({ id, name }));
   }, [pendingVendas]);
 
-  // -- Aplicação dos Filtros --
   const filteredFolhas = useMemo(() => {
     if (bingoFilterMatchId === 'todas') return folhasEmitidas;
     return folhasEmitidas.filter(f => f.match_id === bingoFilterMatchId);
@@ -130,7 +132,7 @@ const VendedorPainel = () => {
   const reservasPorRifa = useMemo(() => {
     const map: Record<string, NumeroRifaVendedor[]> = {};
     const filtradas = minhasReservas.filter(r => {
-      if (filtroStatus !== 'todas' && r.rifas?.status !== filtroStatus) return false;
+      if (r.rifas?.status !== 'ativa') return false; // Mostrar apenas reservas de rifas ativas
       if (rifaFilterId !== 'todas' && r.rifa_id !== rifaFilterId) return false;
       return true;
     });
@@ -139,7 +141,7 @@ const VendedorPainel = () => {
       map[r.rifa_id].push(r);
     }
     return map;
-  }, [minhasReservas, filtroStatus, rifaFilterId]);
+  }, [minhasReservas, rifaFilterId]);
 
   const filteredPendingFolhas = useMemo(() => {
     if (acertoBingoFilterId === 'todas') return pendingFolhas;
@@ -452,10 +454,10 @@ const VendedorPainel = () => {
                     <Filter className="w-3.5 h-3.5 text-muted-foreground" />
                     <Select value={rifaFilterId} onValueChange={setRifaFilterId}>
                       <SelectTrigger className="h-8 w-[140px] sm:w-[180px] text-xs">
-                        <SelectValue placeholder="Todas as rifas" />
+                        <SelectValue placeholder="Todas as rifas ativas" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="todas">Todas as rifas</SelectItem>
+                        <SelectItem value="todas">Todas as rifas ativas</SelectItem>
                         {uniqueRifasReservadas.map(r => (
                           <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
                         ))}
@@ -490,10 +492,10 @@ const VendedorPainel = () => {
 
               {Object.keys(reservasPorRifa).length === 0 ? (
                 <div className="text-center py-6 text-muted-foreground text-sm">
-                  <ShoppingBag className="w-8 h-8 mx-auto mb-2 opacity-30" /> Nenhuma reserva para esta seleção.
+                  <ShoppingBag className="w-8 h-8 mx-auto mb-2 opacity-30" /> Nenhuma reserva ativa para a seleção atual.
                 </div>
               ) : (
-                Object.entries(reservasPorRifa).filter(([, nums]) => nums[0]?.rifas?.status === 'ativa').map(([rifaId, numeros]) => (
+                Object.entries(reservasPorRifa).map(([rifaId, numeros]) => (
                     <div key={rifaId} className="space-y-3 bg-muted/30 p-3 rounded-lg border border-border/50">
                       <div className="flex items-center justify-between">
                         <h4 className="font-heading font-bold text-sm">{numeros[0]?.rifas?.nome ?? 'Rifa'}</h4>
