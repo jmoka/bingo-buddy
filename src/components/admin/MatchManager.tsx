@@ -433,6 +433,11 @@ const MatchManager = () => {
     );
   };
 
+  const inProgressMatches = matches.filter(m => m.status === 'in_progress');
+  const openMatches = matches.filter(m => m.status === 'open');
+  const waitingMatches = matches.filter(m => m.status === 'waiting');
+  const finishedMatches = matches.filter(m => m.status === 'finished');
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between mb-4">
@@ -454,15 +459,27 @@ const MatchManager = () => {
       
       <Tabs defaultValue="in_progress" className="w-full">
         <TabsList className="grid w-full h-auto p-1 grid-cols-2 sm:grid-cols-4 mb-6">
-          <TabsTrigger value="in_progress">Ao Vivo</TabsTrigger>
-          <TabsTrigger value="open">Abertas</TabsTrigger>
-          <TabsTrigger value="waiting">Aguardando</TabsTrigger>
-          <TabsTrigger value="finished">Finalizadas</TabsTrigger>
+          <TabsTrigger value="in_progress" className="flex items-center gap-1.5">
+            Ao Vivo
+            {inProgressMatches.length > 0 && <span className="flex h-4 w-4 items-center justify-center rounded-full bg-accent text-[9px] font-bold text-white">{inProgressMatches.length}</span>}
+          </TabsTrigger>
+          <TabsTrigger value="open" className="flex items-center gap-1.5">
+            Abertas
+            {openMatches.length > 0 && <span className="flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[9px] font-bold text-white">{openMatches.length}</span>}
+          </TabsTrigger>
+          <TabsTrigger value="waiting" className="flex items-center gap-1.5">
+            Aguardando
+            {waitingMatches.length > 0 && <span className="flex h-4 w-4 items-center justify-center rounded-full bg-amber-500 text-[9px] font-bold text-white">{waitingMatches.length}</span>}
+          </TabsTrigger>
+          <TabsTrigger value="finished" className="flex items-center gap-1.5">
+            Finalizadas
+            {finishedMatches.length > 0 && <span className="flex h-4 w-4 items-center justify-center rounded-full bg-success text-[9px] font-bold text-white">{finishedMatches.length}</span>}
+          </TabsTrigger>
         </TabsList>
-        <TabsContent value="in_progress" className="mt-2">{renderMatchList(matches.filter(m=>m.status==='in_progress'))}</TabsContent>
-        <TabsContent value="open" className="mt-2">{renderMatchList(matches.filter(m=>m.status==='open'))}</TabsContent>
-        <TabsContent value="waiting" className="mt-2">{renderMatchList(matches.filter(m=>m.status==='waiting'))}</TabsContent>
-        <TabsContent value="finished" className="mt-2">{renderMatchList(matches.filter(m=>m.status==='finished'))}</TabsContent>
+        <TabsContent value="in_progress" className="mt-2">{renderMatchList(inProgressMatches)}</TabsContent>
+        <TabsContent value="open" className="mt-2">{renderMatchList(openMatches)}</TabsContent>
+        <TabsContent value="waiting" className="mt-2">{renderMatchList(waitingMatches)}</TabsContent>
+        <TabsContent value="finished" className="mt-2">{renderMatchList(finishedMatches)}</TabsContent>
       </Tabs>
     </div>
   );
