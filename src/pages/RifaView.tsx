@@ -26,6 +26,7 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Rifa } from '@/types/rifa';
 import { cn } from '@/lib/utils';
+import { CheckCircle2 } from 'lucide-react';
 
 type NumberFilter = 'todos' | 'disponivel' | 'vendido';
 
@@ -160,6 +161,15 @@ const RifaView = () => {
 
   const didIWin = profile && rifa?.ganhador_id === profile.id;
   const didIConfirm = didIWin && rifa?.ganhador_confirmou;
+  const { confirmarRecebimento } = useRifas();
+  const [isConfirming, setIsConfirming] = useState(false);
+
+  const handleConfirmReceipt = async () => {
+    if (!rifa) return;
+    setIsConfirming(true);
+    await confirmarRecebimento(rifa.id);
+    setIsConfirming(false);
+  };
 
   return (
     <div className="space-y-6">
@@ -298,6 +308,34 @@ const RifaView = () => {
                   {rifa.numero_ganhador !== null ? String(rifa.numero_ganhador).padStart(3, '0') : '—'}
                 </span>
               </div>
+
+              {didIWin && !didIConfirm && (
+                <div className="bg-green-500 text-white rounded-xl p-5 shadow-lg animate-pulse flex flex-col items-center text-center gap-3 mt-4">
+                  <Crown className="w-10 h-10 mb-1" />
+                  <h3 className="font-heading font-black text-xl">PARABÉNS, VOCÊ GANHOU!</h3>
+                  <p className="text-sm font-medium opacity-90">
+                    Você foi o grande vencedor desta rifa. Clique no botão abaixo para confirmar que viu e recebeu seu prêmio.
+                  </p>
+                  <Button
+                    variant="secondary"
+                    className="w-full mt-2 font-bold text-green-700 hover:text-green-800 bg-white hover:bg-green-50"
+                    onClick={handleConfirmReceipt}
+                    disabled={isConfirming}
+                  >
+                    {isConfirming ? 'Confirmando...' : 'CONFIRMAR RECEBIMENTO'}
+                  </Button>
+                </div>
+              )}
+
+              {didIWin && didIConfirm && (
+                <div className="bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-200 rounded-xl p-4 border border-green-300 dark:border-green-800 flex items-center gap-3 mt-4">
+                  <CheckCircle2 className="w-8 h-8 text-green-600 dark:text-green-400 shrink-0" />
+                  <div>
+                    <h3 className="font-bold text-sm">Você é o ganhador!</h3>
+                    <p className="text-xs opacity-80">Você já confirmou o recebimento deste prêmio.</p>
+                  </div>
+                </div>
+              )}
 
               {rifa.numero_ganhador !== null && (
                 <div className="space-y-3 bg-white dark:bg-black/20 rounded-xl p-4 border border-blue-100 dark:border-blue-800/50 mt-2">
