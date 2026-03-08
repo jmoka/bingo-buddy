@@ -14,9 +14,10 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog';
 import {
-  Loader2, CheckCircle2, XCircle, Users, Copy, ShieldBan, ShieldCheck, Edit, Wallet, HandCoins, AlertTriangle, Eye, ExternalLink
+  Loader2, CheckCircle2, XCircle, Users, Copy, ShieldBan, ShieldCheck, Edit, Wallet, HandCoins, AlertTriangle, Eye, ExternalLink, Grid3X3, Ticket
 } from 'lucide-react';
 import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 import { AcertoVendedor } from '@/types/rifa';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
@@ -81,7 +82,6 @@ const VendedoresAdmin = () => {
 
   const handleViewComprovante = async (path: string) => {
     try {
-      // Gera uma URL assinada temporária que permite a visualização
       const { data, error } = await supabase.storage.from('receipts').createSignedUrl(path, 3600); // 1 hora de validade
       if (error) throw error;
       setComprovanteUrl(data.signedUrl);
@@ -96,6 +96,31 @@ const VendedoresAdmin = () => {
     const ok = await resolverAcerto(acaoAcerto.acerto.id, acaoAcerto.tipo);
     setIsProcessandoAcerto(false);
     if (ok) setAcaoAcerto(null);
+  };
+
+  const renderAcertoDetails = (a: AcertoVendedor) => {
+    const hasBingo = a.bingo_ids && a.bingo_ids.length > 0;
+    const hasRifa = a.rifa_ids && a.rifa_ids.length > 0;
+    
+    if (!hasBingo && !hasRifa) return null;
+
+    return (
+        <div className="mt-3 pt-3 border-t border-border/50 text-xs">
+            <p className="font-semibold text-muted-foreground uppercase tracking-wider text-[9px] mb-1.5">Itens vinculados a este pagamento:</p>
+            <div className="flex flex-wrap gap-1.5">
+                {hasBingo && (
+                    <Badge variant="outline" className="text-[10px] bg-purple-50 text-purple-700 border-purple-200 shadow-sm">
+                        <Grid3X3 className="w-3 h-3 mr-1" /> {a.bingo_ids.length} Folha(s) de Bingo
+                    </Badge>
+                )}
+                {hasRifa && (
+                    <Badge variant="outline" className="text-[10px] bg-blue-50 text-blue-700 border-blue-200 shadow-sm">
+                        <Ticket className="w-3 h-3 mr-1" /> {a.rifa_ids.length} Venda(s) de Rifa
+                    </Badge>
+                )}
+            </div>
+        </div>
+    );
   };
 
   if (isLoadingSolicitacoes) {
@@ -164,18 +189,21 @@ const VendedoresAdmin = () => {
                 <div className="card-container text-center py-10 text-muted-foreground text-sm border-dashed">Nenhum acerto pendente de validação.</div>
              ) : (
                acertosParaAnalisar.map(a => (
-                 <div key={a.id} className="card-container p-4 border-l-4 border-l-green-500 space-y-3">
+                 <div key={a.id} className="card-container p-4 border-l-4 border-l-green-500 flex flex-col">
                    <div className="flex items-start justify-between">
                      <div>
                        <p className="font-bold text-sm text-foreground">{a.vendedores_rifa?.nome || 'Vendedor'}</p>
-                       <p className="text-xs text-muted-foreground mt-0.5">{format(new Date(a.created_at), "dd/MM/yyyy 'às' HH:mm")}</p>
+                       <p className="text-xs text-muted-foreground mt-0.5">{format(new Date(a.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}</p>
                      </div>
                      <div className="text-right">
                         <p className="text-[10px] uppercase font-bold text-muted-foreground">Valor Declarado</p>
                         <p className="text-xl font-black text-green-600">R$ {Number(a.valor).toFixed(2)}</p>
                      </div>
                    </div>
-                   <div className="flex items-center gap-3 pt-3 border-t">
+                   
+                   {renderAcertoDetails(a)}
+
+                   <div className="flex items-center gap-3 pt-3 mt-3 border-t">
                       <Button variant="outline" size="sm" className="flex-1" onClick={() => handleViewComprovante(a.comprovante_url)}>
                         <Eye className="w-4 h-4 mr-2" /> Visualizar Comprovante
                       </Button>
@@ -193,14 +221,17 @@ const VendedoresAdmin = () => {
             <h3 className="text-sm font-semibold text-muted-foreground">Histórico de Acertos Resolvidos</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {historicoAcertos.map(a => (
-                 <div key={a.id} className={`p-3 rounded-lg border flex items-center justify-between opacity-80 ${a.status === 'aprovado' ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
-                   <div>
-                     <p className="font-bold text-sm">{a.vendedores_rifa?.nome}</p>
-                     <p className="text-xs text-muted-foreground">R$ {Number(a.valor).toFixed(2)} • {format(new Date(a.resolved_at || a.created_at), "dd/MM/yy HH:mm")}</p>
+                 <div key={a.id} className={`p-4 rounded-xl border flex flex-col gap-2 opacity-80 transition-opacity hover:opacity-100 ${a.status === 'aprovado' ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
+                   <div className="flex items-start justify-between">
+                     <div>
+                       <p className="font-bold text-sm">{a.vendedores_rifa?.nome}</p>
+                       <p className="text-xs text-muted-foreground">R$ {Number(a.valor).toFixed(2)} • {format(new Date(a.resolved_at || a.created_at), "dd/MM/yy HH:mm")}</p>
+                     </div>
+                     <Badge variant={a.status === 'aprovado' ? 'default' : 'destructive'} className={a.status === 'aprovado' ? 'bg-green-600' : ''}>
+                       {a.status === 'aprovado' ? 'Recebido' : 'Recusado'}
+                     </Badge>
                    </div>
-                   <Badge variant={a.status === 'aprovado' ? 'default' : 'destructive'} className={a.status === 'aprovado' ? 'bg-green-600' : ''}>
-                     {a.status === 'aprovado' ? 'Recebido' : 'Recusado'}
-                   </Badge>
+                   {renderAcertoDetails(a)}
                  </div>
               ))}
             </div>
@@ -241,7 +272,7 @@ const VendedoresAdmin = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Modal de Resolução de Acerto (Mantido igual) */}
+      {/* Modal de Resolução de Acerto */}
       <Dialog open={!!acaoAcerto} onOpenChange={open => !open && setAcaoAcerto(null)}>
         <DialogContent>
           <DialogHeader>

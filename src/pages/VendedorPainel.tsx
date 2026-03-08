@@ -400,7 +400,18 @@ const VendedorPainel = () => {
                       <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-2">
                         {numeros.map(n => {
                           const isSelected = selectedToValidate.has(n.id);
-                          const isFiado = n.cartelas_rifa?.[0]?.compras_rifa?.status === 'pendente';
+                          const statusCompra = n.cartelas_rifa?.[0]?.compras_rifa?.status;
+                          
+                          let badgeText = 'PAGO';
+                          let badgeClass = 'bg-green-100 text-green-700 border-green-200';
+
+                          if (statusCompra === 'pendente') {
+                            badgeText = 'FIADO';
+                            badgeClass = 'bg-red-100 text-red-700 border-red-200';
+                          } else if (statusCompra === 'em_analise') {
+                            badgeText = 'ANÁLISE';
+                            badgeClass = 'bg-amber-100 text-amber-700 border-amber-200';
+                          }
 
                           return (
                             <div key={n.id} className="relative group">
@@ -422,12 +433,9 @@ const VendedorPainel = () => {
                                 >
                                     <span className="text-base font-bold font-heading">{n.numero}</span>
                                     
-                                    {/* Etiqueta de Pago ou Fiado */}
-                                    {isFiado ? (
-                                      <span className="text-[8px] bg-red-100 text-red-700 px-1 rounded border border-red-200 mt-1 uppercase font-bold tracking-wider">Fiado</span>
-                                    ) : (
-                                      <span className="text-[8px] bg-green-100 text-green-700 px-1 rounded border border-green-200 mt-1 uppercase font-bold tracking-wider">Pago</span>
-                                    )}
+                                    <span className={`text-[8px] px-1.5 rounded border mt-1 uppercase font-bold tracking-wider ${badgeClass}`}>
+                                      {badgeText}
+                                    </span>
                                     
                                     {n.status === 'vendido' && <CheckSquare className="w-3 h-3 mt-0.5 text-green-600" />}
                                 </button>
@@ -607,19 +615,45 @@ const VendedorPainel = () => {
 
             <div className="mt-8 border-t pt-6">
               <h3 className="font-heading font-bold text-sm mb-3">Histórico de Acertos (PIX)</h3>
-              <div className="space-y-3">
+              <div className="space-y-4">
                 {meusAcertos.length === 0 ? (
                   <p className="text-xs text-muted-foreground">Nenhum acerto enviado ainda.</p>
                 ) : (
                   meusAcertos.map((acerto: any) => (
-                    <div key={acerto.id} className="p-3 border rounded-lg flex items-center justify-between text-sm bg-muted/20">
-                      <div>
-                        <p className="font-bold">R$ {Number(acerto.valor).toFixed(2).replace('.', ',')}</p>
-                        <p className="text-xs text-muted-foreground">{format(new Date(acerto.created_at), "dd/MM/yyyy HH:mm")}</p>
+                    <div key={acerto.id} className="p-4 border rounded-xl flex flex-col text-sm bg-muted/20 gap-3 shadow-sm hover:shadow-md transition-shadow">
+                      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/50 pb-2">
+                        <div>
+                          <p className="font-black text-lg text-primary">R$ {Number(acerto.valor).toFixed(2).replace('.', ',')}</p>
+                          <p className="text-xs text-muted-foreground">{format(new Date(acerto.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}</p>
+                        </div>
+                        <Badge variant={acerto.status === 'aprovado' ? 'default' : acerto.status === 'rejeitado' ? 'destructive' : 'secondary'} className={acerto.status === 'aprovado' ? 'bg-success text-white' : ''}>
+                          {acerto.status.toUpperCase()}
+                        </Badge>
                       </div>
-                      <Badge variant={acerto.status === 'aprovado' ? 'default' : acerto.status === 'rejeitado' ? 'destructive' : 'secondary'} className={acerto.status === 'aprovado' ? 'bg-success' : ''}>
-                        {acerto.status}
-                      </Badge>
+                      
+                      <div className="pt-1">
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-2">Itens Inclusos neste repasse</p>
+                        <div className="space-y-1.5 max-h-32 overflow-y-auto pr-2 custom-scrollbar">
+                           {acerto.bingo_ids && acerto.bingo_ids.map((bId: string) => {
+                              const folha = folhasEmitidas.find(f => f.id === bId);
+                              return (
+                                  <div key={bId} className="flex justify-between items-center text-xs bg-background p-2 rounded-lg border">
+                                      <span className="flex items-center gap-1.5 text-muted-foreground"><Grid3X3 className="w-3.5 h-3.5" /> Bingo Físico</span>
+                                      <span className="font-mono font-bold bg-muted px-1.5 py-0.5 rounded">{folha ? folha.codigo_validacao : '...'+bId.slice(-6)}</span>
+                                  </div>
+                              );
+                           })}
+                           {acerto.rifa_ids && acerto.rifa_ids.map((rId: string) => {
+                              const venda = minhasVendas.find(v => v.id === rId);
+                              return (
+                                  <div key={rId} className="flex justify-between items-center text-xs bg-background p-2 rounded-lg border">
+                                      <span className="flex items-center gap-1.5 text-muted-foreground"><Ticket className="w-3.5 h-3.5" /> Rifa ({venda?.rifas?.nome || '...'})</span>
+                                      <span className="font-mono font-bold bg-muted px-1.5 py-0.5 rounded">{venda ? `Cotas ${venda.numeros.join(', ')}` : '...'+rId.slice(-6)}</span>
+                                  </div>
+                              );
+                           })}
+                        </div>
+                      </div>
                     </div>
                   ))
                 )}
