@@ -5,6 +5,8 @@ import { Button } from '@/components/ui/button';
 import { ArrowLeft, Printer, Loader2 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { FolhaBingoFisico } from '@/types/match';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 
 const BASE_URL = window.location.origin;
 
@@ -17,9 +19,10 @@ export default function VendedorImprimirBingo() {
   useEffect(() => {
     async function loadFolha() {
       if (!folhaId) return;
+      // Adicionado vendedores_rifa na query
       const { data, error } = await supabase
         .from('vendas_bingo_fisico')
-        .select('*, partidas(name, start_time, game_type)')
+        .select('*, partidas(name, start_time, game_type), vendedores_rifa(nome, codigo_ref)')
         .eq('id', folhaId)
         .single();
 
@@ -76,7 +79,13 @@ export default function VendedorImprimirBingo() {
           <div className="flex justify-between items-center border-b-2 border-dashed border-gray-400 pb-4 mb-6">
             <div>
               <h2 className="text-2xl font-black uppercase text-gray-900">{folha.partidas?.name}</h2>
-              <p className="text-sm font-bold text-gray-600 mt-1">CÓDIGO OFICIAL: <span className="font-mono text-black text-base ml-1">{folha.codigo_validacao}</span></p>
+              <p className="text-sm font-bold text-gray-600 mt-1">
+                CÓDIGO OFICIAL: <span className="font-mono text-black text-base ml-1">{folha.codigo_validacao}</span>
+              </p>
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2 text-[11px] text-gray-500 uppercase font-bold">
+                <p>Vendedor: <span className="text-gray-900">{folha.vendedores_rifa?.nome || 'Desconhecido'}</span></p>
+                <p>Emitido em: <span className="text-gray-900">{format(new Date(folha.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}</span></p>
+              </div>
             </div>
             <div className="text-right flex items-center gap-4">
               <div className="flex flex-col items-center">

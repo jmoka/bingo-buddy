@@ -108,6 +108,10 @@ export interface FolhaBingoFisico {
   status: 'pago' | 'pendente' | 'em_analise';
   created_at: string;
   partidas?: Match;
+  vendedores_rifa?: {
+    nome: string;
+    codigo_ref?: string;
+  };
 }
 
 export interface CreditRequestMessage {
