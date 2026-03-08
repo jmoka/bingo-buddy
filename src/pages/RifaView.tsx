@@ -26,7 +26,6 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Rifa } from '@/types/rifa';
 import { cn } from '@/lib/utils';
-import { CheckCircle2 } from 'lucide-react';
 
 type NumberFilter = 'todos' | 'disponivel' | 'vendido';
 
