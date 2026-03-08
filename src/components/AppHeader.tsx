@@ -73,7 +73,7 @@ export const AppHeader = () => {
     },
     {
       action: () => navigate('/validar-cartela'),
-      label: 'Validar Cartela de Rifa',
+      label: 'Validar Cartelas / Auditoria',
       icon: Search,
     },
     ...(profile.role === 'vendedor' ? [{
