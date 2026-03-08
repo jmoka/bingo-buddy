@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -56,6 +57,9 @@ const VendedorPainel = () => {
   const [bingoFiado, setBingoFiado] = useState(false);
   const [isGerandoFolhas, setIsGerandoFolhas] = useState(false);
 
+  // Seleção para impressão em lote
+  const [selectedFolhas, setSelectedFolhas] = useState<Set<string>>(new Set());
+
   // Modal Acertos
   const [pagarAcertoOpen, setPagarAcertoOpen] = useState(false);
   const [acertoFile, setAcertoFile] = useState<File | null>(null);
@@ -66,13 +70,11 @@ const VendedorPainel = () => {
   const numerosDisponiveis = useMemo(() => getNumerosRifa(reservarRifaId), [reservarRifaId, getNumerosRifa]);
   const rifasAtivas = useMemo(() => rifas.filter(r => r.status === 'ativa'), [rifas]);
 
-  // Pegar o desconto ativo (Se o vendedor for 0, usa a regra Global)
   const descontoAtivo = useMemo(() => {
     const vDesc = meuVendedor?.percentual_desconto || 0;
     return vDesc > 0 ? vDesc : (gameSettings?.desconto_vendedor_global || 0);
   }, [meuVendedor, gameSettings]);
 
-  // Lógica de Pendências Separadas: Bingo vs Rifa
   const faturasPendentes = useMemo(() => {
     const folhas = folhasEmitidas.filter(f => f.status === 'pendente');
     const rifasCompradas = minhasVendas.filter(v => v.status === 'pendente');
@@ -98,23 +100,9 @@ const VendedorPainel = () => {
     });
     
     return {
-      bingo: {
-          items: folhas,
-          liquido: bingoLiquido,
-          bruto: bingoBruto,
-          desconto: bingoBruto - bingoLiquido
-      },
-      rifa: {
-          items: rifasCompradas,
-          liquido: rifaLiquido,
-          bruto: rifaBruto,
-          desconto: rifaBruto - rifaLiquido
-      },
-      geral: {
-          liquido: bingoLiquido + rifaLiquido,
-          bruto: bingoBruto + rifaBruto,
-          desconto: (bingoBruto - bingoLiquido) + (rifaBruto - rifaLiquido)
-      }
+      bingo: { items: folhas, liquido: bingoLiquido, bruto: bingoBruto, desconto: bingoBruto - bingoLiquido },
+      rifa: { items: rifasCompradas, liquido: rifaLiquido, bruto: rifaBruto, desconto: rifaBruto - rifaLiquido },
+      geral: { liquido: bingoLiquido + rifaLiquido, bruto: bingoBruto + rifaBruto, desconto: (bingoBruto - bingoLiquido) + (rifaBruto - rifaLiquido) }
     };
   }, [folhasEmitidas, minhasVendas]);
 
@@ -178,6 +166,33 @@ const VendedorPainel = () => {
       setPagarAcertoOpen(false);
       setAcertoFile(null);
     }
+  };
+
+  const handleSelectAllFolhas = (checked: boolean) => {
+    if (checked) {
+      setSelectedFolhas(new Set(folhasEmitidas.map(f => f.id)));
+    } else {
+      setSelectedFolhas(new Set());
+    }
+  };
+
+  const handleSelectFolha = (id: string, checked: boolean) => {
+    const newSet = new Set(selectedFolhas);
+    if (checked) newSet.add(id);
+    else newSet.delete(id);
+    setSelectedFolhas(newSet);
+  };
+
+  const handlePrintSelected = () => {
+    if (selectedFolhas.size === 0) return;
+    const idsString = Array.from(selectedFolhas).join(',');
+    navigate(`/vendedor/imprimir-bingo/${idsString}`);
+  };
+
+  const openValidar = (n: any) => {
+    setValidarNumero(n);
+    setValidarForm({ nome: n.nome_comprador || '', telefone: n.telefone_comprador || '', endereco: n.endereco_comprador || '' });
+    setValidarOpen(true);
   };
 
   if (isLoading) {
@@ -313,20 +328,43 @@ const VendedorPainel = () => {
                 <Plus className="w-4 h-4 mr-2" /> Gerar Folhas
               </Button>
             </div>
+
+            <div className="p-3 border-b bg-muted/30 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Checkbox 
+                  id="select-all" 
+                  checked={selectedFolhas.size === folhasEmitidas.length && folhasEmitidas.length > 0}
+                  onCheckedChange={handleSelectAllFolhas}
+                />
+                <Label htmlFor="select-all" className="text-sm cursor-pointer">Selecionar Todas</Label>
+              </div>
+              {selectedFolhas.size > 0 && (
+                <Button size="sm" variant="secondary" onClick={handlePrintSelected} className="border-purple-300 text-purple-700 hover:bg-purple-100">
+                  <Printer className="w-4 h-4 mr-1.5" /> Imprimir ({selectedFolhas.size})
+                </Button>
+              )}
+            </div>
+
             <div className="divide-y max-h-[400px] overflow-y-auto">
               {folhasEmitidas.length === 0 ? (
                 <div className="p-8 text-center text-muted-foreground text-sm">Nenhuma folha gerada.</div>
               ) : (
                 folhasEmitidas.map(folha => (
                   <div key={folha.id} className="p-4 flex items-center justify-between hover:bg-muted/50 transition-colors">
-                    <div>
-                      <p className="font-bold text-sm">{folha.partidas?.name || 'Partida'}</p>
-                      <div className="flex gap-2 text-[10px] text-muted-foreground mt-1 items-center">
-                        <span className="font-mono bg-muted px-1.5 py-0.5 rounded border">Cod: {folha.codigo_validacao}</span>
-                        <span>{format(new Date(folha.created_at), "dd/MM/yy HH:mm")}</span>
-                        <Badge variant="outline" className={`h-4 ${folha.status === 'pendente' ? 'text-destructive border-destructive' : folha.status === 'em_analise' ? 'text-amber-500 border-amber-500' : 'text-success border-success'}`}>
-                          {folha.status}
-                        </Badge>
+                    <div className="flex items-center gap-3">
+                      <Checkbox 
+                        checked={selectedFolhas.has(folha.id)}
+                        onCheckedChange={(checked) => handleSelectFolha(folha.id, !!checked)}
+                      />
+                      <div>
+                        <p className="font-bold text-sm">{folha.partidas?.name || 'Partida'}</p>
+                        <div className="flex gap-2 text-[10px] text-muted-foreground mt-1 items-center">
+                          <span className="font-mono bg-muted px-1.5 py-0.5 rounded border">Cod: {folha.codigo_validacao}</span>
+                          <span>{format(new Date(folha.created_at), "dd/MM/yy HH:mm")}</span>
+                          <Badge variant="outline" className={`h-4 ${folha.status === 'pendente' ? 'text-destructive border-destructive' : folha.status === 'em_analise' ? 'text-amber-500 border-amber-500' : 'text-success border-success'}`}>
+                            {folha.status}
+                          </Badge>
+                        </div>
                       </div>
                     </div>
                     <Button variant="outline" size="sm" onClick={() => navigate(`/vendedor/imprimir-bingo/${folha.id}`)}>
