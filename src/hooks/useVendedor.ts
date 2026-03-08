@@ -164,6 +164,49 @@ export const useVendedor = () => {
     return true;
   };
 
+  const validarMultiplasVendas = async (
+    numeroRifaIds: string[],
+    nome: string,
+    telefone: string,
+    endereco: string,
+  ): Promise<boolean> => {
+    let successCount = 0;
+    let totalComissao = 0;
+
+    for (const id of numeroRifaIds) {
+      const { data, error } = await supabase.rpc('validar_venda_vendedor', {
+        p_numero_rifa_id: id,
+        p_nome_comprador: nome,
+        p_telefone_comprador: telefone || null,
+        p_endereco_comprador: endereco || null,
+      });
+
+      if (!error && data?.success) {
+        successCount++;
+        totalComissao += Number(data.comissao_creditada || 0);
+      }
+    }
+
+    if (successCount === 0) {
+      toast.error('Erro ao validar as vendas. Verifique se os números já não foram validados.');
+      return false;
+    }
+
+    if (successCount < numeroRifaIds.length) {
+      toast.warning(`Atenção: Apenas ${successCount} de ${numeroRifaIds.length} números foram validados com sucesso.`);
+    } else {
+      if (totalComissao > 0) {
+        toast.success(`${successCount} venda(s) validada(s) em lote! +${totalComissao.toFixed(2)} créditos de comissão.`);
+      } else {
+        toast.success(`${successCount} venda(s) validada(s) em lote com sucesso!`);
+      }
+    }
+
+    queryClient.invalidateQueries({ queryKey: ['minhasReservasVendedor'] });
+    queryClient.invalidateQueries({ queryKey: ['profile'] });
+    return true;
+  };
+
   const cancelarReserva = async (numeroRifaId: string): Promise<boolean> => {
     const { data, error } = await supabase.rpc('cancelar_reserva_vendedor', {
       p_numero_rifa_id: numeroRifaId,
@@ -200,6 +243,7 @@ export const useVendedor = () => {
     reservarNumeros,
     cancelarReserva,
     validarVenda,
+    validarMultiplasVendas,
     gerarLink,
     enviarAcerto,
   };
