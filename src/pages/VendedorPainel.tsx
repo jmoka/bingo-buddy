@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useVendedor } from '@/hooks/useVendedor';
+import { useVendedor, NumeroRifaVendedor } from '@/hooks/useVendedor';
 import { useVendedorBingo } from '@/hooks/useVendedorBingo';
 import { useRifas } from '@/hooks/useRifas';
 import { useGame } from '@/contexts/GameContext';
@@ -17,18 +17,17 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import {
   ArrowLeft, Loader2, Copy, Link2, CheckSquare, ShoppingBag, UserCheck, Ticket,
   Printer, Plus, Undo2, Grid3X3, DollarSign, Wallet, Upload, Clock, CheckCircle2, XCircle,
-  BadgePercent, ListChecks
+  BadgePercent, ListChecks, AlertTriangle, WalletCards
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { NumeroRifa } from '@/types/rifa';
 
 const VendedorPainel = () => {
   const navigate = useNavigate();
   const { profile } = useAuth();
   
-  const { meuVendedor, minhasReservas, minhasVendas, meusAcertos, isLoading, reservarNumeros, cancelarReserva, validarMultiplasVendas, enviarAcerto } = useVendedor();
+  const { meuVendedor, minhasReservas, minhasVendas, meusAcertos, isLoading, reservarNumeros, cancelarReserva, validarMultiplasVendas, enviarAcerto, pagarComprasComSaldo } = useVendedor();
   const { rifas, getNumerosRifa } = useRifas();
   
   const { matches, gameSettings } = useGame();
@@ -36,13 +35,12 @@ const VendedorPainel = () => {
 
   const [activeTab, setActiveTab] = useState<'rifas' | 'bingo' | 'acertos'>('rifas');
 
-  // Estado para validação de rifas (agora em lote)
   const [validarOpen, setValidarOpen] = useState(false);
-  const [validarNumeros, setValidarNumeros] = useState<(NumeroRifa & { rifas: any })[]>([]);
+  const [validarNumeros, setValidarNumeros] = useState<NumeroRifaVendedor[]>([]);
   const [validarForm, setValidarForm] = useState({ nome: '', telefone: '', endereco: '' });
   const [isValidando, setIsValidando] = useState(false);
+  const [isPagando, setIsPagando] = useState(false);
   
-  // Seleção múltipla para validação
   const [modoSelecao, setModoSelecao] = useState(false);
   const [selectedToValidate, setSelectedToValidate] = useState<Set<string>>(new Set());
 
@@ -52,7 +50,7 @@ const VendedorPainel = () => {
   const [reservarFiado, setReservarFiado] = useState(false);
   const [isReservando, setIsReservando] = useState(false);
 
-  const [cancelarNumero, setCancelarNumero] = useState<(NumeroRifa & { rifas: any }) | null>(null);
+  const [cancelarNumero, setCancelarNumero] = useState<NumeroRifaVendedor | null>(null);
   const [isCancelando, setIsCancelando] = useState(false);
   const [filtroStatus, setFiltroStatus] = useState<'todas' | 'ativa' | 'finalizada'>('todas');
 
@@ -62,10 +60,8 @@ const VendedorPainel = () => {
   const [bingoFiado, setBingoFiado] = useState(false);
   const [isGerandoFolhas, setIsGerandoFolhas] = useState(false);
 
-  // Seleção para impressão em lote (Bingo)
   const [selectedFolhas, setSelectedFolhas] = useState<Set<string>>(new Set());
 
-  // Modal Acertos
   const [pagarAcertoOpen, setPagarAcertoOpen] = useState(false);
   const [acertoFile, setAcertoFile] = useState<File | null>(null);
   const [isEnviandoAcerto, setIsEnviandoAcerto] = useState(false);
@@ -84,24 +80,20 @@ const VendedorPainel = () => {
     const folhas = folhasEmitidas.filter(f => f.status === 'pendente');
     const rifasCompradas = minhasVendas.filter(v => v.status === 'pendente');
     
-    let bingoLiquido = 0;
-    let bingoBruto = 0;
+    let bingoLiquido = 0, bingoBruto = 0;
     folhas.forEach(f => {
       const liq = Number(f.valor_pago);
       const descPerc = Number(f.desconto_aplicado || 0);
-      const bruto = descPerc < 100 ? liq / (1 - descPerc / 100) : liq;
       bingoLiquido += liq;
-      bingoBruto += bruto;
+      bingoBruto += descPerc < 100 ? liq / (1 - descPerc / 100) : liq;
     });
 
-    let rifaLiquido = 0;
-    let rifaBruto = 0;
+    let rifaLiquido = 0, rifaBruto = 0;
     rifasCompradas.forEach(r => {
       const liq = Number(r.valor_total);
       const descPerc = Number(r.desconto_aplicado || 0);
-      const bruto = descPerc < 100 ? liq / (1 - descPerc / 100) : liq;
       rifaLiquido += liq;
-      rifaBruto += bruto;
+      rifaBruto += descPerc < 100 ? liq / (1 - descPerc / 100) : liq;
     });
     
     return {
@@ -110,6 +102,24 @@ const VendedorPainel = () => {
       geral: { liquido: bingoLiquido + rifaLiquido, bruto: bingoBruto + rifaBruto, desconto: (bingoBruto - bingoLiquido) + (rifaBruto - rifaLiquido) }
     };
   }, [folhasEmitidas, minhasVendas]);
+
+  // Cálculos dinâmicos para compras "Fiadas" no modal de validação
+  const comprasPendentesRelacionadas = useMemo(() => {
+    const comprasMap = new Map();
+    validarNumeros.forEach(n => {
+      const cartela = n.cartelas_rifa?.[0];
+      if (cartela?.compras_rifa?.status === 'pendente') {
+        comprasMap.set(cartela.compra_id, cartela.compras_rifa.valor_total);
+      }
+    });
+    let total = 0;
+    const ids: string[] = [];
+    comprasMap.forEach((valor, id) => {
+      total += Number(valor);
+      ids.push(id);
+    });
+    return { ids, total };
+  }, [validarNumeros]);
 
   const toggleReservar = (numero: number) => {
     setReservarSelecionados(prev => prev.includes(numero) ? prev.filter(n => n !== numero) : [...prev, numero]);
@@ -129,7 +139,7 @@ const VendedorPainel = () => {
   };
 
   const reservasPorRifa = useMemo(() => {
-    const map: Record<string, (NumeroRifa & { rifas: any })[]> = {};
+    const map: Record<string, NumeroRifaVendedor[]> = {};
     const filtradas = filtroStatus === 'todas' ? minhasReservas : minhasReservas.filter(r => r.rifas?.status === filtroStatus);
     for (const r of filtradas) {
       if (!map[r.rifa_id]) map[r.rifa_id] = [];
@@ -148,16 +158,37 @@ const VendedorPainel = () => {
   const handleValidarMultiplos = async () => {
     if (validarNumeros.length === 0 || !validarForm.nome.trim()) return;
     setIsValidando(true);
-    
     const idsToValidate = validarNumeros.map(n => n.id);
     const ok = await validarMultiplasVendas(idsToValidate, validarForm.nome, validarForm.telefone, validarForm.endereco);
-    
     setIsValidando(false);
     if (ok) {
       setValidarOpen(false);
-      setSelectedToValidate(new Set()); // Limpa a seleção após o sucesso
+      setSelectedToValidate(new Set()); 
       setModoSelecao(false);
     }
+  };
+
+  const handleValidarEPagar = async () => {
+    if (comprasPendentesRelacionadas.ids.length === 0) return;
+    setIsPagando(true);
+    
+    // 1. Tenta pagar com saldo primeiro
+    const pago = await pagarComprasComSaldo(comprasPendentesRelacionadas.ids);
+    if (!pago) {
+        setIsPagando(false);
+        return; // Falhou no pagamento (ex: saldo insuficiente)
+    }
+
+    // 2. Se pagou, valida os dados da venda na sequência
+    if (validarForm.nome.trim()) {
+        const idsToValidate = validarNumeros.map(n => n.id);
+        await validarMultiplasVendas(idsToValidate, validarForm.nome, validarForm.telefone, validarForm.endereco);
+    }
+    
+    setIsPagando(false);
+    setValidarOpen(false);
+    setSelectedToValidate(new Set());
+    setModoSelecao(false);
   };
 
   const handleGerarFolhasBingo = async () => {
@@ -187,13 +218,9 @@ const VendedorPainel = () => {
     }
   };
 
-  // Gerenciamento de seleção do Bingo
   const handleSelectAllFolhas = (checked: boolean) => {
-    if (checked) {
-      setSelectedFolhas(new Set(folhasEmitidas.map(f => f.id)));
-    } else {
-      setSelectedFolhas(new Set());
-    }
+    if (checked) setSelectedFolhas(new Set(folhasEmitidas.map(f => f.id)));
+    else setSelectedFolhas(new Set());
   };
 
   const handleSelectFolha = (id: string, checked: boolean) => {
@@ -299,7 +326,7 @@ const VendedorPainel = () => {
           </div>
 
           <div className="card-container p-4 space-y-4">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <h3 className="font-heading font-bold text-lg">Suas Reservas de Rifa</h3>
                 <div className="flex gap-2">
                   <Button variant={modoSelecao ? "secondary" : "outline"} size="sm" onClick={() => {
@@ -344,6 +371,8 @@ const VendedorPainel = () => {
                       <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-2">
                         {numeros.map(n => {
                           const isSelected = selectedToValidate.has(n.id);
+                          const isFiado = n.cartelas_rifa?.[0]?.compras_rifa?.status === 'pendente';
+
                           return (
                             <div key={n.id} className="relative group">
                                 <button
@@ -363,10 +392,18 @@ const VendedorPainel = () => {
                                     `}
                                 >
                                     <span className="text-base font-bold font-heading">{n.numero}</span>
-                                    {n.status === 'vendido' ? <CheckSquare className="w-3 h-3 mt-0.5" /> : <span className="text-[9px] opacity-60">pendente</span>}
+                                    
+                                    {/* Etiqueta de Pago ou Fiado */}
+                                    {isFiado ? (
+                                      <span className="text-[8px] bg-red-100 text-red-700 px-1 rounded border border-red-200 mt-1 uppercase font-bold tracking-wider">Fiado</span>
+                                    ) : (
+                                      <span className="text-[8px] bg-green-100 text-green-700 px-1 rounded border border-green-200 mt-1 uppercase font-bold tracking-wider">Pago</span>
+                                    )}
+                                    
+                                    {n.status === 'vendido' && <CheckSquare className="w-3 h-3 mt-0.5 text-green-600" />}
                                 </button>
                                 {n.status === 'reservado' && !modoSelecao && (
-                                    <button onClick={e => { e.stopPropagation(); setCancelarNumero(n); }} className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 bg-red-100 text-red-600 rounded p-0.5">
+                                    <button onClick={e => { e.stopPropagation(); setCancelarNumero(n); }} className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 bg-red-100 text-red-600 rounded p-0.5 shadow-sm">
                                         <Undo2 className="w-3 h-3" />
                                     </button>
                                 )}
@@ -430,8 +467,8 @@ const VendedorPainel = () => {
                         <div className="flex gap-2 text-[10px] text-muted-foreground mt-1 items-center">
                           <span className="font-mono bg-muted px-1.5 py-0.5 rounded border">Cod: {folha.codigo_validacao}</span>
                           <span>{format(new Date(folha.created_at), "dd/MM/yy HH:mm")}</span>
-                          <Badge variant="outline" className={`h-4 ${folha.status === 'pendente' ? 'text-destructive border-destructive' : folha.status === 'em_analise' ? 'text-amber-500 border-amber-500' : 'text-success border-success'}`}>
-                            {folha.status}
+                          <Badge variant="outline" className={`h-4 ${folha.status === 'pendente' ? 'text-destructive border-destructive bg-destructive/10 font-bold' : folha.status === 'em_analise' ? 'text-amber-500 border-amber-500' : 'text-success border-success bg-success/10 font-bold'}`}>
+                            {folha.status === 'pendente' ? 'FIADO' : folha.status.toUpperCase()}
                           </Badge>
                         </div>
                       </div>
@@ -454,7 +491,7 @@ const VendedorPainel = () => {
                 </h2>
                 {faturasPendentes.geral.liquido > 0 && (
                     <Button className="bg-amber-600 hover:bg-amber-700 text-white shadow-sm font-bold" onClick={() => setPagarAcertoOpen(true)}>
-                        Repassar Pagamento
+                        Repassar Pagamento (PIX)
                     </Button>
                 )}
             </div>
@@ -483,23 +520,6 @@ const VendedorPainel = () => {
                                     <p className="text-lg font-black text-purple-700 dark:text-purple-400">R$ {faturasPendentes.bingo.liquido.toFixed(2).replace('.', ',')}</p>
                                 </div>
                             </div>
-                            <ul className="text-xs space-y-2 text-purple-900/80 dark:text-purple-300/80">
-                                {faturasPendentes.bingo.items.map(f => {
-                                const liq = Number(f.valor_pago);
-                                const descPerc = Number(f.desconto_aplicado || 0);
-                                const bruto = descPerc < 100 ? liq / (1 - descPerc / 100) : liq;
-                                return (
-                                    <li key={f.id} className="flex justify-between items-center border-b border-purple-500/5 pb-1">
-                                        <span className="truncate pr-2">• {f.partidas?.name}</span>
-                                        <div className="flex items-center gap-2 shrink-0">
-                                            <span className="line-through text-[10px] opacity-60" title="Valor Bruto">R$ {bruto.toFixed(2)}</span>
-                                            <Badge variant="outline" className="h-4 text-[9px] bg-white border-purple-300 text-purple-700 px-1">-{descPerc}%</Badge>
-                                            <span className="font-bold">R$ {liq.toFixed(2)}</span>
-                                        </div>
-                                    </li>
-                                );
-                                })}
-                            </ul>
                         </div>
                     </div>
                 )}
@@ -508,7 +528,7 @@ const VendedorPainel = () => {
                 {faturasPendentes.rifa.items.length > 0 && (
                     <div className="border-2 border-blue-500/30 bg-blue-50 dark:bg-blue-900/10 rounded-xl overflow-hidden">
                         <div className="p-3 bg-blue-500/10 border-b border-blue-500/20 flex items-center gap-2 text-blue-800 dark:text-blue-300 font-bold text-sm">
-                            <Ticket className="w-4 h-4" /> Reservas de Rifa ({faturasPendentes.rifa.items.length} registros)
+                            <Ticket className="w-4 h-4" /> Reservas de Rifa ({faturasPendentes.rifa.items.length} pacotes pendentes)
                         </div>
                         <div className="p-4 space-y-3">
                             <div className="flex items-center justify-between border-b border-blue-500/10 pb-3">
@@ -525,23 +545,6 @@ const VendedorPainel = () => {
                                     <p className="text-lg font-black text-blue-700 dark:text-blue-400">R$ {faturasPendentes.rifa.liquido.toFixed(2).replace('.', ',')}</p>
                                 </div>
                             </div>
-                            <ul className="text-xs space-y-2 text-blue-900/80 dark:text-blue-300/80">
-                                {faturasPendentes.rifa.items.map(r => {
-                                const liq = Number(r.valor_total);
-                                const descPerc = Number(r.desconto_aplicado || 0);
-                                const bruto = descPerc < 100 ? liq / (1 - descPerc / 100) : liq;
-                                return (
-                                    <li key={r.id} className="flex justify-between items-center border-b border-blue-500/5 pb-1">
-                                        <span>• {r.rifas?.nome} ({r.numeros.length} nºs)</span>
-                                        <div className="flex items-center gap-2 shrink-0">
-                                            <span className="line-through text-[10px] opacity-60" title="Valor Bruto">R$ {bruto.toFixed(2)}</span>
-                                            <Badge variant="outline" className="h-4 text-[9px] bg-white border-blue-300 text-blue-700 px-1">-{descPerc}%</Badge>
-                                            <span className="font-bold">R$ {liq.toFixed(2)}</span>
-                                        </div>
-                                    </li>
-                                );
-                                })}
-                            </ul>
                         </div>
                     </div>
                 )}
@@ -567,7 +570,7 @@ const VendedorPainel = () => {
             )}
 
             <div className="mt-8">
-              <h3 className="font-heading font-bold text-sm mb-3">Histórico de Acertos</h3>
+              <h3 className="font-heading font-bold text-sm mb-3">Histórico de Acertos (PIX)</h3>
               <div className="space-y-3">
                 {meusAcertos.length === 0 ? (
                   <p className="text-xs text-muted-foreground">Nenhum acerto enviado ainda.</p>
@@ -744,7 +747,7 @@ const VendedorPainel = () => {
         </DialogContent>
       </Dialog>
 
-      {/* MODAL PAGAR ACERTOS */}
+      {/* MODAL PAGAR ACERTOS (PIX) */}
       <Dialog open={pagarAcertoOpen} onOpenChange={setPagarAcertoOpen}>
         <DialogContent>
           <DialogHeader>
@@ -782,7 +785,7 @@ const VendedorPainel = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Modal Validação em Lote ou Única */}
+      {/* Modal Validação em Lote ou Única (COM PAGAMENTO DE SALDO EMBUTIDO) */}
       <Dialog open={validarOpen} onOpenChange={setValidarOpen}>
         <DialogContent>
           <DialogHeader>
@@ -791,7 +794,23 @@ const VendedorPainel = () => {
              </DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-             <p className="text-sm text-muted-foreground">Preencha os dados do comprador para liberar a cartela na auditoria.</p>
+             
+             {comprasPendentesRelacionadas.ids.length > 0 && (
+                <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg space-y-2">
+                  <div className="flex gap-2 text-red-700 dark:text-red-400">
+                     <AlertTriangle className="w-5 h-5 shrink-0" />
+                     <div>
+                       <p className="font-bold text-sm leading-tight">Atenção: Você tem cartelas no Fiado aqui!</p>
+                       <p className="text-xs mt-1">Alguns destes números fazem parte de pacotes gerados no fiado (Total a pagar: <strong>R$ {comprasPendentesRelacionadas.total.toFixed(2)}</strong>). Mesmo preenchendo os dados do cliente, <strong>as cartelas não valerão no sorteio</strong> até serem pagas ao sistema.</p>
+                     </div>
+                  </div>
+                </div>
+             )}
+
+             {comprasPendentesRelacionadas.ids.length === 0 && (
+                 <p className="text-sm text-muted-foreground">Preencha os dados do comprador. (A cartela já está Paga).</p>
+             )}
+
              {validarNumeros.length > 1 && (
                  <div className="p-2 bg-muted rounded-lg text-xs font-bold font-mono break-words">
                      Cotas: {validarNumeros.map(n => n.numero).join(', ')}
@@ -811,10 +830,33 @@ const VendedorPainel = () => {
                      <Input value={validarForm.endereco} onChange={e => setValidarForm(p => ({ ...p, endereco: e.target.value }))} />
                  </div>
              </div>
-             <Button className="w-full gradient-primary" onClick={handleValidarMultiplos} disabled={isValidando || !validarForm.nome.trim()}>
-                {isValidando ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <CheckSquare className="h-4 w-4 mr-2" />} 
-                Confirmar Venda
-             </Button>
+             
+             <div className="flex flex-col gap-2 pt-2">
+                {comprasPendentesRelacionadas.ids.length > 0 ? (
+                    <>
+                        <Button 
+                            className="bg-green-600 hover:bg-green-700 text-white w-full shadow-button h-12" 
+                            onClick={handleValidarEPagar} 
+                            disabled={isPagando || !validarForm.nome.trim()}
+                        >
+                            {isPagando ? <Loader2 className="w-5 h-5 mr-2 animate-spin" /> : <WalletCards className="w-5 h-5 mr-2" />} 
+                            <div className="text-left">
+                                <span className="block font-bold">Validar & Pagar com Meu Saldo</span>
+                                <span className="block text-[10px] opacity-80">Debitar R$ {comprasPendentesRelacionadas.total.toFixed(2)} dos meus créditos</span>
+                            </div>
+                        </Button>
+                        <Button variant="outline" className="w-full text-muted-foreground text-xs h-10" onClick={handleValidarMultiplos} disabled={isValidando || isPagando || !validarForm.nome.trim()}>
+                            {isValidando ? <Loader2 className="h-3 w-3 mr-2 animate-spin" /> : null} 
+                            Apenas Validar Dados (Continuar no Fiado)
+                        </Button>
+                    </>
+                ) : (
+                    <Button className="w-full gradient-primary" onClick={handleValidarMultiplos} disabled={isValidando || !validarForm.nome.trim()}>
+                        {isValidando ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <CheckSquare className="h-4 w-4 mr-2" />} 
+                        Confirmar Validação
+                    </Button>
+                )}
+             </div>
           </div>
         </DialogContent>
       </Dialog>

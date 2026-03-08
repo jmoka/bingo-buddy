@@ -4,6 +4,15 @@ import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { VendedorRifa, NumeroRifa, CompraRifa, AcertoVendedor } from '@/types/rifa';
 
+export type NumeroRifaVendedor = NumeroRifa & { 
+  rifas: any; 
+  cartelas_rifa: { 
+    codigo_validacao: string; 
+    compra_id: string;
+    compras_rifa: { status: string; valor_total: number };
+  }[]; 
+};
+
 export const useVendedor = () => {
   const { user, profile } = useAuth();
   const queryClient = useQueryClient();
@@ -31,12 +40,12 @@ export const useVendedor = () => {
       if (!meuVendedor) return [];
       const { data, error } = await supabase
         .from('numeros_rifa')
-        .select('*, rifas(id, nome, custo_por_numero, status), cartelas_rifa(codigo_validacao)')
+        .select('*, rifas(id, nome, custo_por_numero, status), cartelas_rifa(codigo_validacao, compra_id, compras_rifa(status, valor_total))')
         .eq('vendedor_id', meuVendedor.id)
         .in('status', ['reservado', 'vendido'])
         .order('rifa_id');
       if (error) throw error;
-      return data as (NumeroRifa & { rifas: any; cartelas_rifa: { codigo_validacao: string }[] })[];
+      return data as NumeroRifaVendedor[];
     },
     enabled: !!meuVendedor,
     refetchInterval: 5000,
@@ -106,7 +115,6 @@ export const useVendedor = () => {
 
   const enviarAcerto = async (bingoIds: string[], rifaIds: string[], valor: number, file: File): Promise<boolean> => {
     if (!meuVendedor || !user) return false;
-    
     try {
       const fileName = `acertos/${meuVendedor.id}/${Date.now()}.${file.name.split('.').pop()}`;
       const { error: uploadError } = await supabase.storage.from('receipts').upload(fileName, file);
@@ -127,39 +135,27 @@ export const useVendedor = () => {
       queryClient.invalidateQueries({ queryKey: ['folhasBingoFisico'] });
       queryClient.invalidateQueries({ queryKey: ['minhasVendasVendedor'] });
       return true;
-
     } catch (e: any) {
       toast.error(e.message || 'Erro ao enviar acerto.');
       return false;
     }
   };
 
-  const validarVenda = async (
-    numeroRifaId: string,
-    nome: string,
-    telefone: string,
-    endereco: string,
-  ): Promise<boolean> => {
-    const { data, error } = await supabase.rpc('validar_venda_vendedor', {
-      p_numero_rifa_id: numeroRifaId,
-      p_nome_comprador: nome,
-      p_telefone_comprador: telefone || null,
-      p_endereco_comprador: endereco || null,
+  const pagarComprasComSaldo = async (compraIds: string[]): Promise<boolean> => {
+    if (!user) return false;
+    const { data, error } = await supabase.rpc('pagar_compras_saldo', {
+      p_compra_ids: compraIds
     });
+
     if (error || !data?.success) {
-      const msg = data?.error;
-      if (msg === 'not_a_vendor') toast.error('Acesso negado.');
-      else if (msg === 'numero_not_found') toast.error('Número não encontrado ou já validado.');
-      else toast.error('Erro ao validar venda.');
+      if (data?.error === 'insufficient_credits') toast.error('Saldo de créditos reais insuficiente para pagar esses fiados.');
+      else toast.error('Erro ao processar o pagamento com saldo.');
       return false;
     }
-    const comissao = Number(data.comissao_creditada || 0);
-    if (comissao > 0) {
-      toast.success(`Venda validada! +${comissao.toFixed(2)} créditos de comissão creditados.`);
-    } else {
-      toast.success('Venda validada com sucesso!');
-    }
+
+    toast.success(`Pagamento de R$ ${Number(data.total_pago).toFixed(2)} realizado com seu saldo! As cartelas agora são válidas.`);
     queryClient.invalidateQueries({ queryKey: ['minhasReservasVendedor'] });
+    queryClient.invalidateQueries({ queryKey: ['minhasVendasVendedor'] });
     queryClient.invalidateQueries({ queryKey: ['profile'] });
     return true;
   };
@@ -242,9 +238,9 @@ export const useVendedor = () => {
     isLoading: isLoadingVendedor || isLoadingReservas || isLoadingVendas || isLoadingAcertos,
     reservarNumeros,
     cancelarReserva,
-    validarVenda,
     validarMultiplasVendas,
     gerarLink,
     enviarAcerto,
+    pagarComprasComSaldo,
   };
 };
