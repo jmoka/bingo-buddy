@@ -30,6 +30,7 @@ import SolicitarVendedor from "./pages/SolicitarVendedor";
 import VendedorPainel from "./pages/VendedorPainel";
 import VendedoresAdmin from "./pages/admin/VendedoresAdmin";
 import VendedorPerfilPublico from "./pages/VendedorPerfilPublico";
+import VendedorImprimirBingo from "./pages/VendedorImprimirBingo";
 import { Loader2 } from "lucide-react";
 
 const queryClient = new QueryClient();
@@ -82,6 +83,7 @@ const App = () => (
               <Route path="/validar-cartela" element={<ProtectedRoute><ValidarCartela /></ProtectedRoute>} />
               <Route path="/admin/vendedores" element={<ProtectedRoute><VendedoresAdmin /></ProtectedRoute>} />
               <Route path="/vendedor/perfil/:codigo" element={<VendedorPerfilPublico />} />
+              <Route path="/vendedor/imprimir-bingo/:folhaId" element={<ProtectedRoute><VendedorImprimirBingo /></ProtectedRoute>} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>

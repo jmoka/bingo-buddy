@@ -95,6 +95,18 @@ export interface GameSettings {
   auto_engine_start_hour: number;
   desconto_vendedor_global: number;
   comissao_vendedor_global: number;
+  cartelas_por_folha_bingo: number;
+}
+
+export interface FolhaBingoFisico {
+  id: string;
+  match_id: string;
+  vendedor_id: string;
+  codigo_validacao: string;
+  grids: number[][][]; // Array of 5x5 matrices
+  valor_pago: number;
+  created_at: string;
+  partidas?: Match;
 }
 
 export interface CreditRequestMessage {

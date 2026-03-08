@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { Save, Settings, Check, Loader2, Bot, Link as LinkIcon, DollarSign, Banknote, Play, CalendarDays, Clock } from 'lucide-react';
+import { Save, Settings, Check, Loader2, Bot, Link as LinkIcon, DollarSign, Banknote, Play, CalendarDays, Clock, Ticket } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { supabase } from '@/integrations/supabase/client';
@@ -13,12 +13,11 @@ import { format, startOfDay } from 'date-fns';
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-  DialogClose
+  DialogClose,
+  DialogFooter
 } from "@/components/ui/dialog";
 import { GameType, PrizeType } from '@/types/match';
 import { gameTypeLabels } from '@/utils/bingoUtils';
@@ -47,6 +46,7 @@ const SettingsManager = () => {
     auto_engine_start_hour: 0,
     desconto_vendedor_global: 0,
     comissao_vendedor_global: 0,
+    cartelas_por_folha_bingo: 4,
   });
   const [isSaving, setIsSaving] = useState(false);
   const [justSaved, setJustSaved] = useState(false);
@@ -78,6 +78,7 @@ const SettingsManager = () => {
         auto_engine_start_hour: gameSettings.auto_engine_start_hour || 0,
         desconto_vendedor_global: gameSettings.desconto_vendedor_global || 0,
         comissao_vendedor_global: gameSettings.comissao_vendedor_global || 0,
+        cartelas_por_folha_bingo: gameSettings.cartelas_por_folha_bingo || 4,
       });
     }
   }, [gameSettings]);
@@ -113,6 +114,7 @@ const SettingsManager = () => {
         auto_engine_card_price: Number(currentSettings.auto_engine_card_price),
         auto_engine_prize_value: Number(currentSettings.auto_engine_prize_value),
         auto_engine_start_hour: Number(currentSettings.auto_engine_start_hour),
+        cartelas_por_folha_bingo: Number(currentSettings.cartelas_por_folha_bingo),
     });
     setIsSaving(false);
 
@@ -149,6 +151,7 @@ const SettingsManager = () => {
       auto_engine_start_hour: parseInt(currentSettings.auto_engine_start_hour as any, 10),
       desconto_vendedor_global: Number(currentSettings.desconto_vendedor_global),
       comissao_vendedor_global: Number(currentSettings.comissao_vendedor_global),
+      cartelas_por_folha_bingo: parseInt(currentSettings.cartelas_por_folha_bingo as any, 10),
     });
     
     setIsSaving(false);
@@ -186,8 +189,6 @@ const SettingsManager = () => {
     setIsWithdrawing(false);
   };
 
-  const adminProfitInReais = (gameSettings?.admin_profit || 0) * (gameSettings?.valor_por_credito || 1);
-
   return (
     <div className="card-container">
       <h2 className="font-heading text-xl font-bold text-foreground mb-6 flex items-center gap-2"><Settings className="w-5 h-5" /> Ajustes do Sistema</h2>
@@ -212,9 +213,27 @@ const SettingsManager = () => {
               type="number" 
               value={currentSettings.intervalo_sorteio_auto_seg} 
               onChange={handleSettingsChange} 
-              placeholder="Ex: 20"
             />
             <p className="text-[10px] text-muted-foreground mt-1">Tempo de espera entre cada bola sorteada no modo automático.</p>
+          </div>
+        </div>
+
+        <div className="space-y-6">
+          <h3 className="font-heading font-bold text-primary border-b pb-2 flex items-center gap-2"><Ticket className="w-4 h-4" /> Sistema de Vendedores</h3>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label>Desconto Global (%)</Label>
+              <Input name="desconto_vendedor_global" type="number" step="0.1" min="0" max="100" value={currentSettings.desconto_vendedor_global} onChange={handleSettingsChange} />
+            </div>
+            <div>
+              <Label>Comissão Global (%)</Label>
+              <Input name="comissao_vendedor_global" type="number" step="0.1" min="0" max="100" value={currentSettings.comissao_vendedor_global} onChange={handleSettingsChange} />
+            </div>
+            <div className="col-span-2">
+              <Label>Grids por Folha de Bingo Impressa</Label>
+              <Input name="cartelas_por_folha_bingo" type="number" min="1" max="10" value={currentSettings.cartelas_por_folha_bingo} onChange={handleSettingsChange} />
+              <p className="text-[10px] text-muted-foreground mt-1">Quando o vendedor emite 1 bilhete físico para o bingo, quantas cartelas (chances) o jogador terá na folha.</p>
+            </div>
           </div>
         </div>
 
@@ -338,20 +357,6 @@ const SettingsManager = () => {
                 <SelectItem value="production">Produção</SelectItem>
               </SelectContent>
             </Select>
-          </div>
-        </div>
-
-        <div className="space-y-6">
-          <h3 className="font-heading font-bold text-primary border-b pb-2">Rifas — Vendedores (Padrão)</h3>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label>Desconto Global (%)</Label>
-              <Input name="desconto_vendedor_global" type="number" step="0.1" min="0" max="100" value={currentSettings.desconto_vendedor_global} onChange={handleSettingsChange} />
-            </div>
-            <div>
-              <Label>Comissão Global (%)</Label>
-              <Input name="comissao_vendedor_global" type="number" step="0.1" min="0" max="100" value={currentSettings.comissao_vendedor_global} onChange={handleSettingsChange} />
-            </div>
           </div>
         </div>
 
