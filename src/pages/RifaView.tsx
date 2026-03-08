@@ -19,7 +19,8 @@ import {
   Tag,
   Store,
   Globe,
-  CheckCircle2
+  CheckCircle2,
+  Crown
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
