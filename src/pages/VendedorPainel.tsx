@@ -60,8 +60,12 @@ const VendedorPainel = () => {
   const [bingoFiado, setBingoFiado] = useState(false);
   const [isGerandoFolhas, setIsGerandoFolhas] = useState(false);
 
+  // Filtros
   const [selectedFolhas, setSelectedFolhas] = useState<Set<string>>(new Set());
   const [bingoFilterMatchId, setBingoFilterMatchId] = useState<string>('todas');
+  const [rifaFilterId, setRifaFilterId] = useState<string>('todas');
+  const [acertoBingoFilterId, setAcertoBingoFilterId] = useState<string>('todas');
+  const [acertoRifaFilterId, setAcertoRifaFilterId] = useState<string>('todas');
 
   const [pagarAcertoOpen, setPagarAcertoOpen] = useState(false);
   const [acertoFile, setAcertoFile] = useState<File | null>(null);
@@ -84,22 +88,100 @@ const VendedorPainel = () => {
   const pendingVendas = useMemo(() => minhasVendas.filter(v => v.status === 'pendente'), [minhasVendas]);
   const pendentesTotais = pendingFolhas.length + pendingVendas.length;
 
+  // -- Listas Únicas para os Filtros --
   const uniqueBingoMatches = useMemo(() => {
     const map = new Map<string, string>();
     folhasEmitidas.forEach(f => {
-      if (f.match_id && f.partidas?.name) {
-        map.set(f.match_id, f.partidas.name);
-      }
+      if (f.match_id && f.partidas?.name) map.set(f.match_id, f.partidas.name);
     });
     return Array.from(map.entries()).map(([id, name]) => ({ id, name }));
   }, [folhasEmitidas]);
 
+  const uniqueRifasReservadas = useMemo(() => {
+    const map = new Map<string, string>();
+    minhasReservas.forEach(r => {
+      if (r.rifa_id && r.rifas?.nome) map.set(r.rifa_id, r.rifas.nome);
+    });
+    return Array.from(map.entries()).map(([id, name]) => ({ id, name }));
+  }, [minhasReservas]);
+
+  const uniquePendingBingoMatches = useMemo(() => {
+    const map = new Map<string, string>();
+    pendingFolhas.forEach(f => {
+      if (f.match_id && f.partidas?.name) map.set(f.match_id, f.partidas.name);
+    });
+    return Array.from(map.entries()).map(([id, name]) => ({ id, name }));
+  }, [pendingFolhas]);
+
+  const uniquePendingRifas = useMemo(() => {
+    const map = new Map<string, string>();
+    pendingVendas.forEach(v => {
+      if (v.rifa_id && v.rifas?.nome) map.set(v.rifa_id, v.rifas.nome);
+    });
+    return Array.from(map.entries()).map(([id, name]) => ({ id, name }));
+  }, [pendingVendas]);
+
+  // -- Aplicação dos Filtros --
   const filteredFolhas = useMemo(() => {
     if (bingoFilterMatchId === 'todas') return folhasEmitidas;
     return folhasEmitidas.filter(f => f.match_id === bingoFilterMatchId);
   }, [folhasEmitidas, bingoFilterMatchId]);
 
+  const reservasPorRifa = useMemo(() => {
+    const map: Record<string, NumeroRifaVendedor[]> = {};
+    const filtradas = minhasReservas.filter(r => {
+      if (filtroStatus !== 'todas' && r.rifas?.status !== filtroStatus) return false;
+      if (rifaFilterId !== 'todas' && r.rifa_id !== rifaFilterId) return false;
+      return true;
+    });
+    for (const r of filtradas) {
+      if (!map[r.rifa_id]) map[r.rifa_id] = [];
+      map[r.rifa_id].push(r);
+    }
+    return map;
+  }, [minhasReservas, filtroStatus, rifaFilterId]);
+
+  const filteredPendingFolhas = useMemo(() => {
+    if (acertoBingoFilterId === 'todas') return pendingFolhas;
+    return pendingFolhas.filter(f => f.match_id === acertoBingoFilterId);
+  }, [pendingFolhas, acertoBingoFilterId]);
+
+  const filteredPendingVendas = useMemo(() => {
+    if (acertoRifaFilterId === 'todas') return pendingVendas;
+    return pendingVendas.filter(v => v.rifa_id === acertoRifaFilterId);
+  }, [pendingVendas, acertoRifaFilterId]);
+
   const allFilteredSelected = filteredFolhas.length > 0 && filteredFolhas.every(f => selectedFolhas.has(f.id));
+
+  const isAllFilteredAcertosSelected = () => {
+    const bingoIds = filteredPendingFolhas.map(f => f.id);
+    const rifaIds = filteredPendingVendas.map(v => v.id);
+    if (bingoIds.length === 0 && rifaIds.length === 0) return false;
+    return bingoIds.every(id => selectedAcertosBingo.has(id)) && rifaIds.every(id => selectedAcertosRifa.has(id));
+  };
+
+  const handleSelectAllAcertos = () => {
+    const bingoIds = filteredPendingFolhas.map(f => f.id);
+    const rifaIds = filteredPendingVendas.map(v => v.id);
+    
+    if (isAllFilteredAcertosSelected()) {
+        const nextBingo = new Set(selectedAcertosBingo);
+        bingoIds.forEach(id => nextBingo.delete(id));
+        setSelectedAcertosBingo(nextBingo);
+
+        const nextRifa = new Set(selectedAcertosRifa);
+        rifaIds.forEach(id => nextRifa.delete(id));
+        setSelectedAcertosRifa(nextRifa);
+    } else {
+        const nextBingo = new Set(selectedAcertosBingo);
+        bingoIds.forEach(id => nextBingo.add(id));
+        setSelectedAcertosBingo(nextBingo);
+
+        const nextRifa = new Set(selectedAcertosRifa);
+        rifaIds.forEach(id => nextRifa.add(id));
+        setSelectedAcertosRifa(nextRifa);
+    }
+  };
 
   const selectedFaturas = useMemo(() => {
     const folhas = pendingFolhas.filter(f => selectedAcertosBingo.has(f.id));
@@ -179,16 +261,6 @@ const VendedorPainel = () => {
       setReservarFiado(false);
     }
   };
-
-  const reservasPorRifa = useMemo(() => {
-    const map: Record<string, NumeroRifaVendedor[]> = {};
-    const filtradas = filtroStatus === 'todas' ? minhasReservas : minhasReservas.filter(r => r.rifas?.status === filtroStatus);
-    for (const r of filtradas) {
-      if (!map[r.rifa_id]) map[r.rifa_id] = [];
-      map[r.rifa_id].push(r);
-    }
-    return map;
-  }, [minhasReservas, filtroStatus]);
 
   const toggleValidar = (id: string) => {
     const next = new Set(selectedToValidate);
@@ -375,7 +447,21 @@ const VendedorPainel = () => {
           <div className="card-container p-4 space-y-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <h3 className="font-heading font-bold text-lg">Suas Reservas de Rifa</h3>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="flex items-center gap-1.5 mr-2">
+                    <Filter className="w-3.5 h-3.5 text-muted-foreground" />
+                    <Select value={rifaFilterId} onValueChange={setRifaFilterId}>
+                      <SelectTrigger className="h-8 w-[140px] sm:w-[180px] text-xs">
+                        <SelectValue placeholder="Todas as rifas" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="todas">Todas as rifas</SelectItem>
+                        {uniqueRifasReservadas.map(r => (
+                          <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                   <Button variant={modoSelecao ? "secondary" : "outline"} size="sm" onClick={() => {
                       setModoSelecao(!modoSelecao);
                       setSelectedToValidate(new Set());
@@ -404,7 +490,7 @@ const VendedorPainel = () => {
 
               {Object.keys(reservasPorRifa).length === 0 ? (
                 <div className="text-center py-6 text-muted-foreground text-sm">
-                  <ShoppingBag className="w-8 h-8 mx-auto mb-2 opacity-30" /> Nenhuma reserva ativa.
+                  <ShoppingBag className="w-8 h-8 mx-auto mb-2 opacity-30" /> Nenhuma reserva para esta seleção.
                 </div>
               ) : (
                 Object.entries(reservasPorRifa).filter(([, nums]) => nums[0]?.rifas?.status === 'ativa').map(([rifaId, numeros]) => (
@@ -582,28 +668,45 @@ const VendedorPainel = () => {
               </div>
             ) : (
               <div className="space-y-4">
-                <div className="flex items-center justify-between bg-muted/30 p-2 rounded-lg border border-border/50">
-                  <p className="text-xs font-semibold text-muted-foreground ml-2">Selecione o que deseja pagar:</p>
-                  <Button variant="outline" size="sm" onClick={() => {
-                     const allBingoIds = pendingFolhas.map(f => f.id);
-                     const allRifaIds = pendingVendas.map(v => v.id);
-                     if (selectedAcertosBingo.size === allBingoIds.length && selectedAcertosRifa.size === allRifaIds.length) {
-                       setSelectedAcertosBingo(new Set());
-                       setSelectedAcertosRifa(new Set());
-                     } else {
-                       setSelectedAcertosBingo(new Set(allBingoIds));
-                       setSelectedAcertosRifa(new Set(allRifaIds));
-                     }
-                  }}>
-                     {selectedAcertosBingo.size > 0 || selectedAcertosRifa.size > 0 ? 'Limpar Seleção' : 'Selecionar Tudo'}
-                  </Button>
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between bg-muted/30 p-2 rounded-lg border border-border/50 gap-3">
+                  <p className="text-xs font-semibold text-muted-foreground ml-2 whitespace-nowrap">Filtre para facilitar o acerto:</p>
+                  
+                  <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+                    <Select value={acertoBingoFilterId} onValueChange={setAcertoBingoFilterId}>
+                      <SelectTrigger className="h-8 w-full sm:w-[150px] text-xs">
+                        <SelectValue placeholder="Todos os Bingos" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="todas">Todos os Bingos</SelectItem>
+                        {uniquePendingBingoMatches.map(m => (
+                          <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    
+                    <Select value={acertoRifaFilterId} onValueChange={setAcertoRifaFilterId}>
+                      <SelectTrigger className="h-8 w-full sm:w-[150px] text-xs">
+                        <SelectValue placeholder="Todas as Rifas" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="todas">Todas as Rifas</SelectItem>
+                        {uniquePendingRifas.map(r => (
+                          <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+
+                    <Button variant="outline" size="sm" onClick={handleSelectAllAcertos} className="w-full sm:w-auto">
+                       {isAllFilteredAcertosSelected() ? 'Limpar Visíveis' : 'Selecionar Visíveis'}
+                    </Button>
+                  </div>
                 </div>
 
                 {/* Lista de Vendas Pendentes (Bingo) */}
-                {pendingFolhas.length > 0 && (
+                {filteredPendingFolhas.length > 0 && (
                   <div className="space-y-2">
                     <p className="text-[10px] font-bold uppercase tracking-wider text-purple-700 dark:text-purple-400">Bingo Físico</p>
-                    {pendingFolhas.map(f => (
+                    {filteredPendingFolhas.map(f => (
                       <div 
                         key={f.id} 
                         className={`flex items-center gap-3 p-3 border-2 rounded-lg cursor-pointer transition-all ${selectedAcertosBingo.has(f.id) ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/10' : 'border-transparent bg-card hover:bg-muted/50 shadow-sm'}`} 
@@ -621,10 +724,10 @@ const VendedorPainel = () => {
                 )}
 
                 {/* Lista de Vendas Pendentes (Rifa) */}
-                {pendingVendas.length > 0 && (
+                {filteredPendingVendas.length > 0 && (
                   <div className="space-y-2 mt-4">
                     <p className="text-[10px] font-bold uppercase tracking-wider text-blue-700 dark:text-blue-400">Rifas</p>
-                    {pendingVendas.map(v => (
+                    {filteredPendingVendas.map(v => (
                       <div 
                         key={v.id} 
                         className={`flex items-center gap-3 p-3 border-2 rounded-lg cursor-pointer transition-all ${selectedAcertosRifa.has(v.id) ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/10' : 'border-transparent bg-card hover:bg-muted/50 shadow-sm'}`} 
@@ -645,6 +748,12 @@ const VendedorPainel = () => {
                         <p className="font-black text-blue-700 dark:text-blue-400">R$ {Number(v.valor_total).toFixed(2)}</p>
                       </div>
                     ))}
+                  </div>
+                )}
+                
+                {filteredPendingFolhas.length === 0 && filteredPendingVendas.length === 0 && pendentesTotais > 0 && (
+                  <div className="p-6 text-center text-muted-foreground bg-muted/20 rounded-xl border border-dashed">
+                    Nenhum item pendente para a seleção atual dos filtros.
                   </div>
                 )}
                 
