@@ -4,7 +4,7 @@ import { BingoCell } from '@/components/BingoCell';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { gameTypeLabels, checkWin } from '@/utils/bingoUtils';
-import { ArrowLeft, Coins, Users, Bot, Loader2, Star, Trophy, AlertTriangle, CheckCircle2, Hand } from 'lucide-react';
+import { ArrowLeft, Coins, Users, Bot, Loader2, Star, Trophy, AlertTriangle, CheckCircle2, Hand, PartyPopper } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { playNotificationSound } from '@/utils/soundUtils';
@@ -61,6 +61,7 @@ const MatchView = () => {
   
   const prevCalledNumbersRef = useRef<number[]>([]);
   const prevWinnersCountRef = useRef<number>(0);
+  const prevRoundRef = useRef<number>(0);
 
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 1000);
@@ -69,6 +70,13 @@ const MatchView = () => {
 
   useEffect(() => {
     if (!match) return;
+
+    // Detecção de nova rodada (globo zerou)
+    if (match.is_festival && match.current_round !== prevRoundRef.current) {
+        setLastCalledNumber(null);
+        prevCalledNumbersRef.current = [];
+        prevRoundRef.current = match.current_round || 0;
+    }
 
     const currentNumbers = match.called_numbers || [];
     if (currentNumbers.length > prevCalledNumbersRef.current.length) {
@@ -93,7 +101,7 @@ const MatchView = () => {
         });
         playNotificationSound();
       } else if (match.status === 'finished') {
-        toast.success('BINGO! Partida finalizada!', {
+        toast.success('BINGO!', {
           description: `Parabéns aos vencedores!`,
           duration: 10000,
         });
@@ -104,7 +112,6 @@ const MatchView = () => {
 
   }, [match]);
 
-  // Validação de vitória manual no lado do cliente
   useEffect(() => {
     if (!match || !profile) return;
     if (match.status !== 'in_progress') return;
@@ -135,7 +142,7 @@ const MatchView = () => {
                         warnedCardsRef.current.add(card.id);
                     }
                 } else {
-                    warnedCardsRef.current.delete(card.id); // Limpa o aviso se ele arrumou a cartela
+                    warnedCardsRef.current.delete(card.id);
                     if (!checkedCardsRef.current.has(card.id)) {
                         checkedCardsRef.current.add(card.id);
                         checkWinState(match.id);
@@ -190,6 +197,8 @@ const MatchView = () => {
   const lastCalled = match.called_numbers?.length > 0 ? match.called_numbers[match.called_numbers.length - 1] : null;
   const countdown = match.next_auto_call_timestamp ? Math.max(0, Math.round((new Date(match.next_auto_call_timestamp).getTime() - now) / 1000)) : null;
   const funWinnersInProgress = (match.winners || []).filter(w => (w as any).creditType === 'fake');
+  
+  const hasMoreRounds = match.is_festival && (match.current_round ?? 0) < (match.prizes?.length || 0) - 1;
 
   return (
     <>
@@ -200,11 +209,13 @@ const MatchView = () => {
               <ArrowLeft className="w-5 h-5" />
             </Button>
             <div>
-              <h1 className="font-heading text-lg sm:text-xl font-bold text-primary-foreground">{match.name}</h1>
-              <div className="flex flex-wrap gap-x-3 gap-y-1 text-primary-foreground/70 text-xs">
+              <h1 className="font-heading text-lg sm:text-xl font-bold text-primary-foreground">
+                {match.name}
+              </h1>
+              <div className="flex flex-wrap gap-x-3 gap-y-1 text-primary-foreground/70 text-xs mt-0.5">
                 <span>{gameTypeLabels[match.game_type]}</span>
                 <span className="flex items-center gap-1"><Users className="w-3 h-3" />{playersInMatchCount}</span>
-                <span className="flex items-center gap-1"><Coins className="w-3 h-3" />Pote: {Number(match.pot || 0).toFixed(2)}</span>
+                {!match.is_festival && <span className="flex items-center gap-1"><Coins className="w-3 h-3" />Pote: {Number(match.pot || 0).toFixed(2)}</span>}
               </div>
             </div>
           </div>
@@ -225,6 +236,15 @@ const MatchView = () => {
             <strong> O jogo continua valendo o prêmio real!</strong>
           </AlertDescription>
         </Alert>
+      )}
+
+      {/* AVISO DO FESTIVAL: PREPARANDO PRÓXIMA RODADA */}
+      {match.status === 'finished' && hasMoreRounds && (
+         <div className="card-container text-center bg-purple-600 border-purple-800 text-white mb-6 p-6 animate-pulse">
+            <PartyPopper className="w-12 h-12 mx-auto mb-3 opacity-90" />
+            <h2 className="text-xl font-black font-heading uppercase">Rodada Encerrada!</h2>
+            <p className="font-medium opacity-90 mt-2">Não rasgue sua cartela. Aguarde o locutor limpar o globo para sortear o próximo prêmio!</p>
+         </div>
       )}
 
       <WinnerDisplay match={match} allMatchCards={allCardsForThisMatch} />
@@ -260,6 +280,9 @@ const MatchView = () => {
               {num}
             </span>
           ))}
+          {(match.called_numbers || []).length === 0 && (
+             <span className="text-xs text-muted-foreground italic py-2">Nenhuma bola sorteada nesta rodada ainda.</span>
+          )}
         </div>
       </div>
 
@@ -267,7 +290,7 @@ const MatchView = () => {
         <h2 className="font-heading text-lg font-bold text-foreground">
             Minhas Cartelas ({myCards.length})
         </h2>
-        <div className="flex items-center gap-2 px-3 py-1.5 bg-muted rounded-full border border-border/50">
+        <div className="flex items-center gap-2 px-3 py-1.5 bg-muted rounded-full border border-border/50 hidden sm:flex">
             <Hand className="w-3.5 h-3.5 text-muted-foreground" />
             <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-tight">Clique no número para marcar manual</span>
         </div>
@@ -297,7 +320,6 @@ const MatchView = () => {
                     </div>
                 </div>
                 
-                {/* Interruptor de Modo */}
                 <div className="flex flex-col items-end gap-1">
                     <Label htmlFor={`mode-${card.id}`} className="text-[8px] uppercase font-bold text-muted-foreground">Trocar p/ Manual</Label>
                     <Switch 
@@ -371,7 +393,7 @@ const MatchView = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </>
+    </div>
   );
 };
 

@@ -158,7 +158,7 @@ serve(async (req) => {
       const realWinners = newWinnersFound.filter(w => w.creditType === 'real');
       
       if (realWinners.length > 0) {
-        // Encerra a partida oficialmente pois alguém ganhou prêmio real
+        // Encerra a partida (ou a rodada)
         await supabaseAdmin.from('partidas').update({ 
           status: 'finished', 
           winners: updatedWinners, 
@@ -166,22 +166,39 @@ serve(async (req) => {
           next_auto_call_timestamp: null
         }).eq('id', matchId);
 
-        // Distribuição Financeira
+        // LÓGICA DE DISTRIBUIÇÃO FINANCEIRA
         const safePot = Number(match.pot) || 0;
         const prizeValConf = Number(match.prize?.value) || 0;
-        const totalPrizePool = match.prize?.type === 'fixed' ? prizeValConf : (safePot * prizeValConf) / 100;
+        const totalPrizePool = match.prize?.type === 'fixed' ? prizeValConf : (match.prize?.type === 'percentage' ? (safePot * prizeValConf) / 100 : 0);
         const prizePerWinner = totalPrizePool / realWinners.length;
-        const adminProfit = Math.max(0, safePot - totalPrizePool);
 
-        if (adminProfit > 0) {
-          await supabaseAdmin.rpc('increment_admin_profit', { amount: adminProfit });
+        // SE FOR FESTIVAL, CALCULA O LUCRO DO ADMIN APENAS NA ÚLTIMA RODADA
+        const isFestival = match.is_festival;
+        const isLastRound = !isFestival || (match.current_round >= (match.prizes?.length || 0) - 1);
+
+        if (isLastRound) {
+            let totalSpentAllRounds = totalPrizePool;
+            if (isFestival && match.completed_rounds) {
+                for (const cr of match.completed_rounds) {
+                    const cp = cr.prize;
+                    const cpVal = Number(cp?.value) || 0;
+                    if (cp?.type === 'fixed') totalSpentAllRounds += cpVal;
+                    else if (cp?.type === 'percentage') totalSpentAllRounds += (safePot * cpVal) / 100;
+                }
+            }
+            const adminProfit = Math.max(0, safePot - totalSpentAllRounds);
+            if (adminProfit > 0) {
+              await supabaseAdmin.rpc('increment_admin_profit', { amount: adminProfit });
+            }
         }
 
+        // Pagar aos vencedores desta rodada
         for (const rw of realWinners) {
           if (prizePerWinner > 0) {
             await supabaseAdmin.rpc('increment_player_credits', { p_player_id: rw.playerId, p_amount: prizePerWinner });
           }
         }
+
       } else {
         // Apenas vencedores de "Brincar"
         const hasRemainingReal = (matchCards || []).some(c => c.credit_type === 'real' && !updatedWinners.some(w => w.cardId === c.id));

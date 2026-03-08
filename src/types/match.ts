@@ -39,6 +39,12 @@ export interface Match {
   winners: Winner[];
   min_players: number;
   admin_profit_from_match?: number;
+  
+  // Festival (Bingo Comunitário)
+  is_festival?: boolean;
+  prizes?: Prize[];
+  current_round?: number;
+  completed_rounds?: { round: number; prize: Prize; winners: Winner[] }[];
 }
 
 export interface PlayerCard {

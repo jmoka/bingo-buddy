@@ -101,6 +101,18 @@ export const useMatches = () => {
     updateMatchMutation.mutate({ matchId, updates: { status: 'finished', is_auto_calling: false } });
   };
   
+  const nextFestivalRound = async (matchId: string) => {
+    const { data, error } = await supabase.rpc('next_festival_round', { p_match_id: matchId });
+    if (error || !data?.success) {
+      toast.error("Erro ao avançar rodada.", { description: error?.message || data?.error });
+      return false;
+    }
+    toast.success("Nova rodada iniciada! Globo zerado.");
+    queryClient.invalidateQueries({ queryKey: ['matches'] });
+    queryClient.invalidateQueries({ queryKey: ['matchCards'] });
+    return true;
+  };
+
   const deleteMatch = async (matchId: string) => {
     const { error } = await supabase.from('partidas').delete().eq('id', matchId);
     if (error) toast.error("Erro ao deletar.");
@@ -157,7 +169,7 @@ export const useMatches = () => {
       const realWinners = data.newWinners.filter((w: any) => w.creditType === 'real');
       if (realWinners.length > 0) {
         const winnerNames = realWinners.map((w: any) => w.playerName).join(', ');
-        toast.success('BINGO! Partida finalizada!', {
+        toast.success('BINGO! Partida/Rodada finalizada!', {
           description: `Vencedor(es): ${winnerNames}.`,
           duration: 10000,
         });
@@ -196,6 +208,7 @@ export const useMatches = () => {
     openMatch,
     startMatch,
     finishMatch,
+    nextFestivalRound,
     deleteMatch,
     toggleAutoCall,
     callNumber,

@@ -1,6 +1,7 @@
 import { Match, MatchCard } from '@/types/match';
 import { calculateNumbersToWin } from '@/utils/bingoUtils';
-import { Ticket, Trophy, Flame, Target, Star, Coins } from 'lucide-react';
+import { Ticket, Trophy, Flame, Target, Star, Coins, Gift } from 'lucide-react';
+import { Badge } from './ui/badge';
 
 interface MatchStatsProps {
   match: Match;
@@ -20,53 +21,41 @@ export const MatchStats = ({ match, allMatchCards }: MatchStatsProps) => {
   const fakeCardsCount = allMatchCards.filter(c => c.credit_type === 'fake').length;
   const prizeDisplay = getPrizeDisplay(match);
 
-  const stats = {
-    missing5: 0,
-    missing3: 0,
-    missing1: 0,
-  };
+  const stats = { missing5: 0, missing3: 0, missing1: 0 };
 
   if (match.status === 'in_progress') {
     for (const card of allMatchCards) {
       const needed = calculateNumbersToWin(card, match.game_type);
-      if (needed <= 1) {
-        stats.missing1++;
-      } else if (needed <= 3) {
-        stats.missing3++;
-      } else if (needed <= 5) {
-        stats.missing5++;
-      }
+      if (needed <= 1) stats.missing1++;
+      else if (needed <= 3) stats.missing3++;
+      else if (needed <= 5) stats.missing5++;
     }
   }
 
   return (
-    <div className="card-container mb-6 overflow-hidden">
+    <div className="card-container mb-6 overflow-hidden relative">
+      {match.is_festival && (
+         <div className="absolute top-0 right-0 bg-purple-500 text-white text-[10px] font-bold px-3 py-1 rounded-bl-xl shadow-sm z-10 flex items-center gap-1">
+             <Gift className="w-3 h-3" /> Festival: Rodada {(match.current_round || 0) + 1} de {match.prizes?.length || 1}
+         </div>
+      )}
+
       {match.prize.type === 'product' && match.prize_image_url && (
         <div className="mx-[-1rem] mt-[-1rem] mb-4">
           <img src={match.prize_image_url} alt={match.prize.productName || 'Prêmio'} className="w-full h-32 md:h-40 object-cover" />
         </div>
       )}
       
-      {/* Top Stats - Side by side always */}
-      <div className="grid grid-cols-2 gap-2 sm:gap-4 text-center">
+      <div className="grid grid-cols-2 gap-2 sm:gap-4 text-center mt-2">
         <div className="flex flex-col items-center justify-center p-2 sm:p-4 rounded-lg bg-muted/50 border border-border/50">
           <Ticket className="w-4 h-4 sm:w-6 sm:h-6 text-primary mb-1" />
           <span className="font-bold text-lg sm:text-2xl font-heading">{totalCards}</span>
-          <div className="flex items-center gap-2 text-[9px] sm:text-[10px] font-bold uppercase tracking-wider">
-            <span className="flex items-center gap-0.5 text-primary">
-              <Coins className="w-2.5 h-2.5" /> {realCardsCount}
-            </span>
-            <span className="text-muted-foreground">/</span>
-            <span className="flex items-center gap-0.5 text-amber-600">
-              <Star className="w-2.5 h-2.5" /> {fakeCardsCount}
-            </span>
-          </div>
-          <span className="text-[10px] sm:text-sm text-muted-foreground">Cartelas</span>
+          <span className="text-[10px] sm:text-sm text-muted-foreground">Cartelas em Jogo</span>
         </div>
         <div className="flex flex-col items-center justify-center p-2 sm:p-4 rounded-lg bg-muted/50 border border-border/50">
           <Trophy className="w-4 h-4 sm:w-6 sm:h-6 text-success mb-1" />
           <span className="font-bold text-sm sm:text-lg font-heading leading-tight">{prizeDisplay}</span>
-          <span className="text-[10px] sm:text-sm text-muted-foreground">Prêmio</span>
+          <span className="text-[10px] sm:text-sm text-muted-foreground">Prêmio em Disputa</span>
         </div>
       </div>
 
@@ -74,7 +63,6 @@ export const MatchStats = ({ match, allMatchCards }: MatchStatsProps) => {
         <div className="mt-4 pt-4 border-t border-border">
           <h4 className="text-center font-heading font-bold mb-3 text-sm sm:text-base text-foreground">Quase lá!</h4>
           
-          {/* Progress Stats - 3 columns always */}
           <div className="grid grid-cols-3 gap-1.5 sm:gap-4 text-center">
             <div className="flex flex-col items-center justify-center p-2 sm:p-4 rounded-lg bg-muted/50 border border-border/50">
               <Target className="w-4 h-4 sm:w-6 sm:h-6 text-muted-foreground mb-1" />
