@@ -54,10 +54,23 @@ export const useRifaAdmin = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('compras_rifa')
-        .select('*')
+        .select('*, rifas(nome), cartelas_rifa(codigo_validacao)')
         .order('created_at', { ascending: false });
       if (error) throw error;
-      return data as CompraRifa[];
+      return data as any[];
+    },
+    enabled: isAdmin,
+    refetchInterval: 5000,
+  });
+
+  const { data: todasFolhasBingo = [] } = useQuery({
+    queryKey: ['todasFolhasBingoAdmin'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('vendas_bingo_fisico')
+        .select('id, codigo_validacao, partidas(name)');
+      if (error) throw error;
+      return data as any[];
     },
     enabled: isAdmin,
     refetchInterval: 5000,
@@ -469,6 +482,7 @@ export const useRifaAdmin = () => {
     vendedoresComStats,
     clientes,
     todasCompras,
+    todasFolhasBingo,
     solicitacoesVendedor,
     acertosPendentes,
     isLoading: isLoadingRifas || isLoadingVendedores || isLoadingCompras,

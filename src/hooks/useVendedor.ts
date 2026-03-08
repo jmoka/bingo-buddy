@@ -57,11 +57,11 @@ export const useVendedor = () => {
       if (!meuVendedor) return [];
       const { data, error } = await supabase
         .from('compras_rifa')
-        .select('*, rifas(nome)')
+        .select('*, rifas(nome), cartelas_rifa(codigo_validacao)')
         .eq('vendedor_id', meuVendedor.id)
         .order('created_at', { ascending: false });
       if (error) throw error;
-      return data as (CompraRifa & { rifas: any })[];
+      return data as any[];
     },
     enabled: !!meuVendedor,
     refetchInterval: 5000,
@@ -116,7 +116,6 @@ export const useVendedor = () => {
   const enviarAcerto = async (bingoIds: string[], rifaIds: string[], valor: number, file: File): Promise<boolean> => {
     if (!meuVendedor || !user) return false;
     try {
-      // CORREÇÃO: O path de upload precisa começar estritamente com o ID do usuário logado por conta da regra do Bucket "receipts"
       const fileName = `${user.id}/acerto_${Date.now()}.${file.name.split('.').pop()}`;
       
       const { error: uploadError } = await supabase.storage.from('receipts').upload(fileName, file);
