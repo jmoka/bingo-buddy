@@ -17,7 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import {
   ArrowLeft, Loader2, Copy, Link2, CheckSquare, ShoppingBag, UserCheck, Ticket,
   Printer, Plus, Undo2, Grid3X3, DollarSign, Wallet, Upload, CheckCircle2, XCircle,
-  BadgePercent, ListChecks, AlertTriangle, WalletCards
+  BadgePercent, ListChecks, AlertTriangle, WalletCards, Filter
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -61,6 +61,7 @@ const VendedorPainel = () => {
   const [isGerandoFolhas, setIsGerandoFolhas] = useState(false);
 
   const [selectedFolhas, setSelectedFolhas] = useState<Set<string>>(new Set());
+  const [bingoFilterMatchId, setBingoFilterMatchId] = useState<string>('todas');
 
   const [pagarAcertoOpen, setPagarAcertoOpen] = useState(false);
   const [acertoFile, setAcertoFile] = useState<File | null>(null);
@@ -82,6 +83,23 @@ const VendedorPainel = () => {
   const pendingFolhas = useMemo(() => folhasEmitidas.filter(f => f.status === 'pendente'), [folhasEmitidas]);
   const pendingVendas = useMemo(() => minhasVendas.filter(v => v.status === 'pendente'), [minhasVendas]);
   const pendentesTotais = pendingFolhas.length + pendingVendas.length;
+
+  const uniqueBingoMatches = useMemo(() => {
+    const map = new Map<string, string>();
+    folhasEmitidas.forEach(f => {
+      if (f.match_id && f.partidas?.name) {
+        map.set(f.match_id, f.partidas.name);
+      }
+    });
+    return Array.from(map.entries()).map(([id, name]) => ({ id, name }));
+  }, [folhasEmitidas]);
+
+  const filteredFolhas = useMemo(() => {
+    if (bingoFilterMatchId === 'todas') return folhasEmitidas;
+    return folhasEmitidas.filter(f => f.match_id === bingoFilterMatchId);
+  }, [folhasEmitidas, bingoFilterMatchId]);
+
+  const allFilteredSelected = filteredFolhas.length > 0 && filteredFolhas.every(f => selectedFolhas.has(f.id));
 
   const selectedFaturas = useMemo(() => {
     const folhas = pendingFolhas.filter(f => selectedAcertosBingo.has(f.id));
@@ -243,8 +261,13 @@ const VendedorPainel = () => {
   };
 
   const handleSelectAllFolhas = (checked: boolean) => {
-    if (checked) setSelectedFolhas(new Set(folhasEmitidas.map(f => f.id)));
-    else setSelectedFolhas(new Set());
+    const newSet = new Set(selectedFolhas);
+    if (checked) {
+      filteredFolhas.forEach(f => newSet.add(f.id));
+    } else {
+      filteredFolhas.forEach(f => newSet.delete(f.id));
+    }
+    setSelectedFolhas(newSet);
   };
 
   const handleSelectFolha = (id: string, checked: boolean) => {
@@ -458,9 +481,9 @@ const VendedorPainel = () => {
 
         <TabsContent value="bingo" className="space-y-4 mt-0">
           <div className="grid grid-cols-3 gap-3">
-             <div className="card-container p-3 text-center border-2 border-purple-500/20"><p className="text-[10px] text-muted-foreground">Folhas Emitidas</p><p className="text-xl font-bold font-heading text-purple-600">{folhasEmitidas.length}</p></div>
-             <div className="card-container p-3 text-center border-2 border-primary/20"><p className="text-[10px] text-muted-foreground">Cartelas (Grids)</p><p className="text-xl font-bold font-heading text-primary">{folhasEmitidas.reduce((a,f) => a + (f.grids?.length || 0), 0)}</p></div>
-             <div className="card-container p-3 text-center border-2 border-green-500/20"><p className="text-[10px] text-muted-foreground">Pago</p><p className="text-lg font-bold font-heading text-green-600">R$ {folhasEmitidas.filter(f=>f.status==='pago').reduce((a,f)=>a+Number(f.valor_pago),0).toFixed(2)}</p></div>
+             <div className="card-container p-3 text-center border-2 border-purple-500/20"><p className="text-[10px] text-muted-foreground">Folhas Emitidas</p><p className="text-xl font-bold font-heading text-purple-600">{filteredFolhas.length}</p></div>
+             <div className="card-container p-3 text-center border-2 border-primary/20"><p className="text-[10px] text-muted-foreground">Cartelas (Grids)</p><p className="text-xl font-bold font-heading text-primary">{filteredFolhas.reduce((a,f) => a + (f.grids?.length || 0), 0)}</p></div>
+             <div className="card-container p-3 text-center border-2 border-green-500/20"><p className="text-[10px] text-muted-foreground">Pago</p><p className="text-lg font-bold font-heading text-green-600">R$ {filteredFolhas.filter(f=>f.status==='pago').reduce((a,f)=>a+Number(f.valor_pago),0).toFixed(2)}</p></div>
           </div>
 
           <div className="card-container p-0 overflow-hidden">
@@ -474,27 +497,43 @@ const VendedorPainel = () => {
               </Button>
             </div>
 
-            <div className="p-3 border-b bg-muted/30 flex items-center justify-between">
+            <div className="p-3 border-b bg-muted/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
               <div className="flex items-center gap-2">
                 <Checkbox 
                   id="select-all" 
-                  checked={selectedFolhas.size === folhasEmitidas.length && folhasEmitidas.length > 0}
+                  checked={allFilteredSelected}
                   onCheckedChange={handleSelectAllFolhas}
                 />
-                <Label htmlFor="select-all" className="text-sm cursor-pointer">Selecionar Todas</Label>
+                <Label htmlFor="select-all" className="text-sm cursor-pointer">Selecionar Visíveis</Label>
               </div>
+
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <Label className="text-xs text-muted-foreground whitespace-nowrap"><Filter className="w-3 h-3 inline mr-1" />Filtrar Partida:</Label>
+                <Select value={bingoFilterMatchId} onValueChange={setBingoFilterMatchId}>
+                  <SelectTrigger className="h-8 w-full sm:w-[200px]">
+                    <SelectValue placeholder="Todas as partidas" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todas">Todas as partidas</SelectItem>
+                    {uniqueBingoMatches.map(m => (
+                      <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
               {selectedFolhas.size > 0 && (
-                <Button size="sm" variant="secondary" onClick={handlePrintSelected} className="border-purple-300 text-purple-700 hover:bg-purple-100">
+                <Button size="sm" variant="secondary" onClick={handlePrintSelected} className="border-purple-300 text-purple-700 hover:bg-purple-100 w-full sm:w-auto">
                   <Printer className="w-4 h-4 mr-1.5" /> Imprimir ({selectedFolhas.size})
                 </Button>
               )}
             </div>
 
             <div className="divide-y max-h-[400px] overflow-y-auto">
-              {folhasEmitidas.length === 0 ? (
-                <div className="p-8 text-center text-muted-foreground text-sm">Nenhuma folha gerada.</div>
+              {filteredFolhas.length === 0 ? (
+                <div className="p-8 text-center text-muted-foreground text-sm">Nenhuma folha gerada para esta seleção.</div>
               ) : (
-                folhasEmitidas.map(folha => (
+                filteredFolhas.map(folha => (
                   <div key={folha.id} className="p-4 flex items-center justify-between hover:bg-muted/50 transition-colors">
                     <div className="flex items-center gap-3">
                       <Checkbox 
@@ -503,7 +542,7 @@ const VendedorPainel = () => {
                       />
                       <div>
                         <p className="font-bold text-sm">{folha.partidas?.name || 'Partida'}</p>
-                        <div className="flex gap-2 text-[10px] text-muted-foreground mt-1 items-center">
+                        <div className="flex flex-wrap gap-2 text-[10px] text-muted-foreground mt-1 items-center">
                           <span className="font-mono font-bold text-primary bg-primary/10 px-1.5 py-0.5 rounded border border-primary/20">Cod: {folha.codigo_validacao}</span>
                           <span>{format(new Date(folha.created_at), "dd/MM/yy HH:mm", { locale: ptBR })}</span>
                           <Badge variant="outline" className={`h-4 ${folha.status === 'pendente' ? 'text-destructive border-destructive bg-destructive/10 font-bold' : folha.status === 'em_analise' ? 'text-amber-500 border-amber-500' : 'text-success border-success bg-success/10 font-bold'}`}>
@@ -512,8 +551,8 @@ const VendedorPainel = () => {
                         </div>
                       </div>
                     </div>
-                    <Button variant="outline" size="sm" onClick={() => navigate(`/vendedor/imprimir-bingo/${folha.id}`)}>
-                      <Printer className="w-4 h-4 mr-1.5" /> Imprimir
+                    <Button variant="outline" size="sm" className="shrink-0 ml-2" onClick={() => navigate(`/vendedor/imprimir-bingo/${folha.id}`)}>
+                      <Printer className="w-4 h-4 sm:mr-1.5" /> <span className="hidden sm:inline">Imprimir</span>
                     </Button>
                   </div>
                 ))
