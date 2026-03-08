@@ -74,6 +74,7 @@ const VendedorPainel = () => {
   const [isReservando, setIsReservando] = useState(false);
 
   const [cancelarNumero, setCancelarNumero] = useState<(NumeroRifa & { rifas: any }) | null>(null);
+  const [isCancelando, setIsCancelando] = useState(false);
   const [filtroStatus, setFiltroStatus] = useState<'todas' | 'ativa' | 'finalizada'>('todas');
 
   // Estado Modal de Compra de Bingo Físico
