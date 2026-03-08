@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useVendedor, NumeroRifaVendedor } from '@/hooks/useVendedor';
 import { useVendedorBingo } from '@/hooks/useVendedorBingo';
@@ -67,6 +67,10 @@ const VendedorPainel = () => {
   const [isEnviandoAcerto, setIsEnviandoAcerto] = useState(false);
   const acertoFileRef = useRef<HTMLInputElement>(null);
 
+  // Estados para seleção individual de acertos
+  const [selectedAcertosBingo, setSelectedAcertosBingo] = useState<Set<string>>(new Set());
+  const [selectedAcertosRifa, setSelectedAcertosRifa] = useState<Set<string>>(new Set());
+
   const manualMatches = useMemo(() => matches.filter(m => m.status === 'open' && !m.is_auto_calling), [matches]);
   const numerosDisponiveis = useMemo(() => getNumerosRifa(reservarRifaId), [reservarRifaId, getNumerosRifa]);
   const rifasAtivas = useMemo(() => rifas.filter(r => r.status === 'ativa'), [rifas]);
@@ -76,9 +80,14 @@ const VendedorPainel = () => {
     return vDesc > 0 ? vDesc : (gameSettings?.desconto_vendedor_global || 0);
   }, [meuVendedor, gameSettings]);
 
-  const faturasPendentes = useMemo(() => {
-    const folhas = folhasEmitidas.filter(f => f.status === 'pendente');
-    const rifasCompradas = minhasVendas.filter(v => v.status === 'pendente');
+  const pendingFolhas = useMemo(() => folhasEmitidas.filter(f => f.status === 'pendente'), [folhasEmitidas]);
+  const pendingVendas = useMemo(() => minhasVendas.filter(v => v.status === 'pendente'), [minhasVendas]);
+  const pendentesTotais = pendingFolhas.length + pendingVendas.length;
+
+  // Calcula apenas o que foi SELECIONADO para o Acerto
+  const selectedFaturas = useMemo(() => {
+    const folhas = pendingFolhas.filter(f => selectedAcertosBingo.has(f.id));
+    const rifasCompradas = pendingVendas.filter(v => selectedAcertosRifa.has(v.id));
     
     let bingoLiquido = 0, bingoBruto = 0;
     folhas.forEach(f => {
@@ -101,7 +110,25 @@ const VendedorPainel = () => {
       rifa: { items: rifasCompradas, liquido: rifaLiquido, bruto: rifaBruto, desconto: rifaBruto - rifaLiquido },
       geral: { liquido: bingoLiquido + rifaLiquido, bruto: bingoBruto + rifaBruto, desconto: (bingoBruto - bingoLiquido) + (rifaBruto - rifaLiquido) }
     };
-  }, [folhasEmitidas, minhasVendas]);
+  }, [pendingFolhas, pendingVendas, selectedAcertosBingo, selectedAcertosRifa]);
+
+  const toggleAcertoBingo = (id: string) => {
+    setSelectedAcertosBingo(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleAcertoRifa = (id: string) => {
+    setSelectedAcertosRifa(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
 
   // Cálculos dinâmicos para compras "Fiadas" no modal de validação
   const comprasPendentesRelacionadas = useMemo(() => {
@@ -206,15 +233,17 @@ const VendedorPainel = () => {
   };
 
   const handleEnviarAcerto = async () => {
-    if (!acertoFile || faturasPendentes.geral.liquido <= 0) return;
+    if (!acertoFile || selectedFaturas.geral.liquido <= 0) return;
     setIsEnviandoAcerto(true);
-    const bingoIds = faturasPendentes.bingo.items.map(f => f.id);
-    const rifaIds = faturasPendentes.rifa.items.map(r => r.id);
-    const ok = await enviarAcerto(bingoIds, rifaIds, faturasPendentes.geral.liquido, acertoFile);
+    const bingoIds = selectedFaturas.bingo.items.map(f => f.id);
+    const rifaIds = selectedFaturas.rifa.items.map(r => r.id);
+    const ok = await enviarAcerto(bingoIds, rifaIds, selectedFaturas.geral.liquido, acertoFile);
     setIsEnviandoAcerto(false);
     if (ok) {
       setPagarAcertoOpen(false);
       setAcertoFile(null);
+      setSelectedAcertosBingo(new Set());
+      setSelectedAcertosRifa(new Set());
     }
   };
 
@@ -271,17 +300,17 @@ const VendedorPainel = () => {
         </div>
       </div>
 
-      {faturasPendentes.geral.liquido > 0 && (
+      {pendentesTotais > 0 && (
         <div className="card-container bg-red-50 dark:bg-red-900/10 border-red-200 dark:border-red-800 flex flex-col sm:flex-row items-center justify-between gap-4 p-4">
           <div className="flex items-center gap-3 text-red-700 dark:text-red-400">
             <DollarSign className="w-8 h-8 shrink-0" />
             <div>
-              <h3 className="font-bold text-lg leading-tight">Você possui Acertos Pendentes</h3>
-              <p className="text-xs font-medium">Você deve repassar R$ {faturasPendentes.geral.liquido.toFixed(2).replace('.', ',')} ao sistema. As cartelas geradas no fiado só terão validade após o pagamento.</p>
+              <h3 className="font-bold text-lg leading-tight">Você possui Itens no Fiado</h3>
+              <p className="text-xs font-medium">As cartelas ou números de rifa gerados no fiado só terão validade no sorteio após você registrar o pagamento.</p>
             </div>
           </div>
           <Button variant="destructive" className="shrink-0 w-full sm:w-auto font-bold" onClick={() => setActiveTab('acertos')}>
-            Resolver Pendências
+            Fazer Acerto
           </Button>
         </div>
       )}
@@ -314,7 +343,7 @@ const VendedorPainel = () => {
           <TabsTrigger value="bingo" className="flex items-center gap-2"><Grid3X3 className="w-4 h-4" /> Bingo Físico</TabsTrigger>
           <TabsTrigger value="acertos" className="flex items-center gap-2 relative">
             <Wallet className="w-4 h-4" /> Acertos
-            {faturasPendentes.geral.liquido > 0 && <span className="absolute top-1 right-1 flex h-2.5 w-2.5 rounded-full bg-destructive" />}
+            {pendentesTotais > 0 && <span className="absolute top-1 right-1 flex h-2.5 w-2.5 rounded-full bg-destructive" />}
           </TabsTrigger>
         </TabsList>
 
@@ -484,99 +513,106 @@ const VendedorPainel = () => {
         </TabsContent>
 
         <TabsContent value="acertos" className="space-y-4 mt-0">
-          <div className="card-container">
-            <div className="flex items-center justify-between mb-4">
+          <div className="card-container space-y-4">
+            <div className="flex items-center justify-between mb-2 border-b pb-4">
                 <h2 className="font-heading text-lg font-bold flex items-center gap-2">
                 <Wallet className="w-5 h-5 text-primary" /> Acertos Financeiros
                 </h2>
-                {faturasPendentes.geral.liquido > 0 && (
-                    <Button className="bg-amber-600 hover:bg-amber-700 text-white shadow-sm font-bold" onClick={() => setPagarAcertoOpen(true)}>
-                        Repassar Pagamento (PIX)
+                {selectedFaturas.geral.liquido > 0 && (
+                    <Button className="bg-amber-600 hover:bg-amber-700 text-white shadow-sm font-bold animate-pulse" onClick={() => setPagarAcertoOpen(true)}>
+                        Pagar R$ {selectedFaturas.geral.liquido.toFixed(2)}
                     </Button>
                 )}
             </div>
             
-            {faturasPendentes.geral.liquido > 0 ? (
-              <div className="space-y-4">
-                
-                {/* SESSÃO BINGO */}
-                {faturasPendentes.bingo.items.length > 0 && (
-                    <div className="border-2 border-purple-500/30 bg-purple-50 dark:bg-purple-900/10 rounded-xl overflow-hidden">
-                        <div className="p-3 bg-purple-500/10 border-b border-purple-500/20 flex items-center gap-2 text-purple-800 dark:text-purple-300 font-bold text-sm">
-                            <Grid3X3 className="w-4 h-4" /> Vendas de Bingo ({faturasPendentes.bingo.items.length} folhas)
-                        </div>
-                        <div className="p-4 space-y-3">
-                            <div className="flex items-center justify-between border-b border-purple-500/10 pb-3">
-                                <div>
-                                    <p className="text-[10px] uppercase font-bold text-muted-foreground">Valor Bruto</p>
-                                    <p className="text-sm font-bold">R$ {faturasPendentes.bingo.bruto.toFixed(2).replace('.', ',')}</p>
-                                </div>
-                                <div className="text-center">
-                                    <p className="text-[10px] uppercase font-bold text-muted-foreground">Seu Desconto</p>
-                                    <p className="text-sm font-bold text-green-600">- R$ {faturasPendentes.bingo.desconto.toFixed(2).replace('.', ',')}</p>
-                                </div>
-                                <div className="text-right">
-                                    <p className="text-[10px] uppercase font-bold text-muted-foreground">Repassar (Líquido)</p>
-                                    <p className="text-lg font-black text-purple-700 dark:text-purple-400">R$ {faturasPendentes.bingo.liquido.toFixed(2).replace('.', ',')}</p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                )}
-
-                {/* SESSÃO RIFA */}
-                {faturasPendentes.rifa.items.length > 0 && (
-                    <div className="border-2 border-blue-500/30 bg-blue-50 dark:bg-blue-900/10 rounded-xl overflow-hidden">
-                        <div className="p-3 bg-blue-500/10 border-b border-blue-500/20 flex items-center gap-2 text-blue-800 dark:text-blue-300 font-bold text-sm">
-                            <Ticket className="w-4 h-4" /> Reservas de Rifa ({faturasPendentes.rifa.items.length} pacotes pendentes)
-                        </div>
-                        <div className="p-4 space-y-3">
-                            <div className="flex items-center justify-between border-b border-blue-500/10 pb-3">
-                                <div>
-                                    <p className="text-[10px] uppercase font-bold text-muted-foreground">Valor Bruto</p>
-                                    <p className="text-sm font-bold">R$ {faturasPendentes.rifa.bruto.toFixed(2).replace('.', ',')}</p>
-                                </div>
-                                <div className="text-center">
-                                    <p className="text-[10px] uppercase font-bold text-muted-foreground">Seu Desconto</p>
-                                    <p className="text-sm font-bold text-green-600">- R$ {faturasPendentes.rifa.desconto.toFixed(2).replace('.', ',')}</p>
-                                </div>
-                                <div className="text-right">
-                                    <p className="text-[10px] uppercase font-bold text-muted-foreground">Repassar (Líquido)</p>
-                                    <p className="text-lg font-black text-blue-700 dark:text-blue-400">R$ {faturasPendentes.rifa.liquido.toFixed(2).replace('.', ',')}</p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                )}
-
-                {/* RESUMO TOTAL */}
-                <div className="flex flex-col sm:flex-row items-center justify-between p-4 bg-amber-100 dark:bg-amber-900/20 border-2 border-amber-400 rounded-xl mt-4">
-                    <div>
-                        <p className="text-sm font-bold text-amber-800 dark:text-amber-500 uppercase tracking-widest flex items-center gap-2">
-                            <BadgePercent className="w-5 h-5" /> TOTAL A REPASSAR 
-                        </p>
-                        <p className="text-xs text-amber-700/80 mt-1">A soma do valor líquido do Bingo e das Rifas.</p>
-                    </div>
-                    <p className="text-3xl font-black font-heading text-amber-700 dark:text-amber-400">R$ {faturasPendentes.geral.liquido.toFixed(2).replace('.', ',')}</p>
-                </div>
-
-              </div>
-            ) : (
+            {pendentesTotais === 0 ? (
               <div className="p-6 text-center border-2 border-dashed border-success/30 rounded-xl bg-success/5">
                 <CheckCircle2 className="w-10 h-10 text-success mx-auto mb-2" />
                 <p className="font-bold text-success">Tudo em dia!</p>
                 <p className="text-sm text-muted-foreground mt-1">Você não possui cartelas pendentes de repasse.</p>
               </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between bg-muted/30 p-2 rounded-lg border border-border/50">
+                  <p className="text-xs font-semibold text-muted-foreground ml-2">Selecione o que deseja pagar:</p>
+                  <Button variant="outline" size="sm" onClick={() => {
+                     const allBingoIds = pendingFolhas.map(f => f.id);
+                     const allRifaIds = pendingVendas.map(v => v.id);
+                     if (selectedAcertosBingo.size === allBingoIds.length && selectedAcertosRifa.size === allRifaIds.length) {
+                       setSelectedAcertosBingo(new Set());
+                       setSelectedAcertosRifa(new Set());
+                     } else {
+                       setSelectedAcertosBingo(new Set(allBingoIds));
+                       setSelectedAcertosRifa(new Set(allRifaIds));
+                     }
+                  }}>
+                     {selectedAcertosBingo.size > 0 || selectedAcertosRifa.size > 0 ? 'Limpar Seleção' : 'Selecionar Tudo'}
+                  </Button>
+                </div>
+
+                {/* Lista de Vendas Pendentes (Bingo) */}
+                {pendingFolhas.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-purple-700 dark:text-purple-400">Bingo Físico</p>
+                    {pendingFolhas.map(f => (
+                      <div 
+                        key={f.id} 
+                        className={`flex items-center gap-3 p-3 border-2 rounded-lg cursor-pointer transition-all ${selectedAcertosBingo.has(f.id) ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/10' : 'border-transparent bg-card hover:bg-muted/50 shadow-sm'}`} 
+                        onClick={() => toggleAcertoBingo(f.id)}
+                      >
+                        <Checkbox checked={selectedAcertosBingo.has(f.id)} className={selectedAcertosBingo.has(f.id) ? "border-purple-600 data-[state=checked]:bg-purple-600" : ""} />
+                        <div className="flex-1">
+                          <p className="text-sm font-bold">{f.partidas?.name}</p>
+                          <p className="text-xs text-muted-foreground font-mono">Cod: {f.codigo_validacao}</p>
+                        </div>
+                        <p className="font-black text-purple-700 dark:text-purple-400">R$ {Number(f.valor_pago).toFixed(2)}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Lista de Vendas Pendentes (Rifa) */}
+                {pendingVendas.length > 0 && (
+                  <div className="space-y-2 mt-4">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-blue-700 dark:text-blue-400">Rifas</p>
+                    {pendingVendas.map(v => (
+                      <div 
+                        key={v.id} 
+                        className={`flex items-center gap-3 p-3 border-2 rounded-lg cursor-pointer transition-all ${selectedAcertosRifa.has(v.id) ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/10' : 'border-transparent bg-card hover:bg-muted/50 shadow-sm'}`} 
+                        onClick={() => toggleAcertoRifa(v.id)}
+                      >
+                        <Checkbox checked={selectedAcertosRifa.has(v.id)} className={selectedAcertosRifa.has(v.id) ? "border-blue-600 data-[state=checked]:bg-blue-600" : ""} />
+                        <div className="flex-1">
+                          <p className="text-sm font-bold truncate max-w-[200px]">{v.rifas?.nome}</p>
+                          <p className="text-xs text-muted-foreground font-mono">Cotas: {v.numeros.join(', ')}</p>
+                        </div>
+                        <p className="font-black text-blue-700 dark:text-blue-400">R$ {Number(v.valor_total).toFixed(2)}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                
+                {/* RESUMO TOTAL */}
+                <div className="flex flex-col sm:flex-row items-center justify-between p-4 bg-amber-100 dark:bg-amber-900/20 border-2 border-amber-400 rounded-xl mt-6">
+                    <div>
+                        <p className="text-sm font-bold text-amber-800 dark:text-amber-500 uppercase tracking-widest flex items-center gap-2">
+                            <BadgePercent className="w-5 h-5" /> SELECIONADO PARA REPASSE 
+                        </p>
+                        <p className="text-xs text-amber-700/80 mt-1">Soma líquida apenas dos itens marcados acima.</p>
+                    </div>
+                    <p className="text-3xl font-black font-heading text-amber-700 dark:text-amber-400">R$ {selectedFaturas.geral.liquido.toFixed(2).replace('.', ',')}</p>
+                </div>
+              </div>
             )}
 
-            <div className="mt-8">
+            <div className="mt-8 border-t pt-6">
               <h3 className="font-heading font-bold text-sm mb-3">Histórico de Acertos (PIX)</h3>
               <div className="space-y-3">
                 {meusAcertos.length === 0 ? (
                   <p className="text-xs text-muted-foreground">Nenhum acerto enviado ainda.</p>
                 ) : (
                   meusAcertos.map((acerto: any) => (
-                    <div key={acerto.id} className="p-3 border rounded-lg flex items-center justify-between text-sm">
+                    <div key={acerto.id} className="p-3 border rounded-lg flex items-center justify-between text-sm bg-muted/20">
                       <div>
                         <p className="font-bold">R$ {Number(acerto.valor).toFixed(2).replace('.', ',')}</p>
                         <p className="text-xs text-muted-foreground">{format(new Date(acerto.created_at), "dd/MM/yyyy HH:mm")}</p>
@@ -756,8 +792,8 @@ const VendedorPainel = () => {
           <div className="space-y-4 py-2">
             <div className="p-4 bg-muted rounded-xl text-center space-y-2">
               <p className="text-sm font-medium text-muted-foreground">Valor exato da transferência (Líquido):</p>
-              <p className="text-4xl font-black font-heading text-primary">R$ {faturasPendentes.geral.liquido.toFixed(2).replace('.', ',')}</p>
-              <p className="text-xs text-muted-foreground">Sua comissão total de <strong>R$ {faturasPendentes.geral.desconto.toFixed(2).replace('.', ',')}</strong> já foi subtraída.</p>
+              <p className="text-4xl font-black font-heading text-primary">R$ {selectedFaturas.geral.liquido.toFixed(2).replace('.', ',')}</p>
+              <p className="text-xs text-muted-foreground">Sua comissão total de <strong>R$ {selectedFaturas.geral.desconto.toFixed(2).replace('.', ',')}</strong> já foi subtraída.</p>
             </div>
             {gameSettings?.pix_key && (
               <div className="space-y-1">
@@ -778,7 +814,7 @@ const VendedorPainel = () => {
           </div>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setPagarAcertoOpen(false)}>Cancelar</Button>
-            <Button className="gradient-primary" onClick={handleEnviarAcerto} disabled={isEnviandoAcerto || !acertoFile}>
+            <Button className="gradient-primary" onClick={handleEnviarAcerto} disabled={isEnviandoAcerto || !acertoFile || selectedFaturas.geral.liquido <= 0}>
               {isEnviandoAcerto ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <CheckSquare className="w-4 h-4 mr-2" />} Enviar para Análise
             </Button>
           </DialogFooter>
