@@ -116,9 +116,14 @@ export const useVendedor = () => {
   const enviarAcerto = async (bingoIds: string[], rifaIds: string[], valor: number, file: File): Promise<boolean> => {
     if (!meuVendedor || !user) return false;
     try {
-      const fileName = `acertos/${meuVendedor.id}/${Date.now()}.${file.name.split('.').pop()}`;
+      // CORREÇÃO: O path de upload precisa começar estritamente com o ID do usuário logado por conta da regra do Bucket "receipts"
+      const fileName = `${user.id}/acerto_${Date.now()}.${file.name.split('.').pop()}`;
+      
       const { error: uploadError } = await supabase.storage.from('receipts').upload(fileName, file);
-      if (uploadError) throw new Error('Falha ao enviar comprovante.');
+      if (uploadError) {
+          console.error("Storage upload error:", uploadError);
+          throw new Error('Falha ao enviar comprovante de PIX.');
+      }
 
       const { data, error } = await supabase.rpc('enviar_acerto_vendedor', {
         p_vendedor_id: meuVendedor.id,

@@ -12,7 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   ArrowLeft, Loader2, Copy, Link2, CheckSquare, ShoppingBag, UserCheck, Ticket,
@@ -637,6 +637,7 @@ const VendedorPainel = () => {
               <Grid3X3 className="w-5 h-5 text-purple-600" />
               Emitir Folhas de Bingo
             </DialogTitle>
+            <DialogDescription className="sr-only">Gerar novas cartelas de bingo físico.</DialogDescription>
           </DialogHeader>
           
           <div className="space-y-4 py-3">
@@ -711,7 +712,10 @@ const VendedorPainel = () => {
       {/* MODAL DE RESERVA RIFA */}
       <Dialog open={reservarOpen} onOpenChange={setReservarOpen}>
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-          <DialogHeader><DialogTitle>Nova Reserva de Números</DialogTitle></DialogHeader>
+          <DialogHeader>
+            <DialogTitle>Nova Reserva de Números</DialogTitle>
+            <DialogDescription className="sr-only">Escolha os números que quer reservar.</DialogDescription>
+          </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-2">
               <Label>Selecione a Rifa</Label>
@@ -788,6 +792,7 @@ const VendedorPainel = () => {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Repassar Valor ao Sistema</DialogTitle>
+            <DialogDescription className="sr-only">Faça o upload do seu comprovante de PIX.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="p-4 bg-muted rounded-xl text-center space-y-2">
@@ -828,6 +833,7 @@ const VendedorPainel = () => {
              <DialogTitle>
                  Validar Venda - {validarNumeros.length > 1 ? `${validarNumeros.length} Números` : `Número ${validarNumeros[0]?.numero}`}
              </DialogTitle>
+             <DialogDescription className="sr-only">Confirme os dados do comprador para os números selecionados.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
              
@@ -899,7 +905,14 @@ const VendedorPainel = () => {
 
       {/* Modal Cancelar */}
       <Dialog open={!!cancelarNumero} onOpenChange={open => { if (!open) setCancelarNumero(null); }}>
-        <DialogContent><DialogHeader><DialogTitle className="text-destructive flex items-center gap-2"><Undo2 className="w-5 h-5" /> Cancelar Reserva</DialogTitle></DialogHeader><div className="space-y-3 py-3"><p>Você tem certeza que deseja cancelar a reserva do número <strong>{cancelarNumero?.numero}</strong>?</p><p className="text-sm text-muted-foreground">O número voltará a ficar disponível e o valor pago por ele será estornado para o seu saldo.</p></div><DialogFooter><Button variant="ghost" onClick={() => setCancelarNumero(null)} disabled={isCancelando}>Voltar</Button><Button variant="destructive" onClick={async () => { if (!cancelarNumero) return; setIsCancelando(true); const ok = await cancelarReserva(cancelarNumero.id); setIsCancelando(false); if (ok) setCancelarNumero(null); }} disabled={isCancelando}>{isCancelando ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null} Confirmar Cancelamento</Button></DialogFooter></DialogContent>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="text-destructive flex items-center gap-2"><Undo2 className="w-5 h-5" /> Cancelar Reserva</DialogTitle>
+            <DialogDescription className="sr-only">Confirmar o cancelamento e devolução.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-3"><p>Você tem certeza que deseja cancelar a reserva do número <strong>{cancelarNumero?.numero}</strong>?</p><p className="text-sm text-muted-foreground">O número voltará a ficar disponível e o valor pago por ele será estornado para o seu saldo.</p></div>
+          <DialogFooter><Button variant="ghost" onClick={() => setCancelarNumero(null)} disabled={isCancelando}>Voltar</Button><Button variant="destructive" onClick={async () => { if (!cancelarNumero) return; setIsCancelando(true); const ok = await cancelarReserva(cancelarNumero.id); setIsCancelando(false); if (ok) setCancelarNumero(null); }} disabled={isCancelando}>{isCancelando ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null} Confirmar Cancelamento</Button></DialogFooter>
+        </DialogContent>
       </Dialog>
     </div>
   );
