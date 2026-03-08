@@ -105,7 +105,7 @@ const Lobby = () => {
   // Verificação de vitória nas Rifas
   const rifasGanhas = useMemo(() => {
     if (!profile) return [];
-    return rifas.filter(r => r.status === 'finalizada' && r.ganhador_id === profile.id);
+    return rifas.filter(r => r.status === 'finalizada' && r.ganhador_id === profile.id && !r.ganhador_confirmou);
   }, [rifas, profile]);
   const hasWonRifa = rifasGanhas.length > 0;
   const activeRifasCount = rifas.filter(r => r.status === 'ativa').length;

@@ -158,6 +158,9 @@ const RifaView = () => {
   const isVendaFisica = !!numeroGanhadorInfo?.vendedor_id;
   const vendedorNome = (numeroGanhadorInfo as any)?.vendedores_rifa?.nome;
 
+  const didIWin = profile && rifa?.ganhador_id === profile.id;
+  const didIConfirm = didIWin && rifa?.ganhador_confirmou;
+
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3">

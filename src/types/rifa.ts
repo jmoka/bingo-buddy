@@ -22,6 +22,7 @@ export interface Rifa {
   status: RifaStatus;
   numero_ganhador: number | null;
   ganhador_id: string | null;
+  ganhador_confirmou: boolean | null;
   created_at: string;
   created_by: string | null;
 }

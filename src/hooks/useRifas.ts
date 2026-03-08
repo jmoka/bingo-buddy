@@ -102,6 +102,17 @@ export const useRifas = () => {
     return true;
   };
 
+  const confirmarRecebimento = async (rifaId: string): Promise<boolean> => {
+    const { data, error } = await supabase.rpc('confirmar_ganho_rifa', { p_rifa_id: rifaId });
+    if (error || !data) {
+      toast.error('Erro ao confirmar recebimento.');
+      return false;
+    }
+    toast.success('Parabéns! Recebimento confirmado.');
+    queryClient.invalidateQueries({ queryKey: ['rifas'] });
+    return true;
+  };
+
   return {
     rifas,
     isLoadingRifas,
@@ -111,5 +122,6 @@ export const useRifas = () => {
     minhasCartelas,
     isLoadingCompras,
     comprarNumeros,
+    confirmarRecebimento,
   };
 };

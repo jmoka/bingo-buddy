@@ -138,6 +138,7 @@ const Rifas = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 {finishedRifas.map(rifa => {
                   const didIWin = profile && rifa.ganhador_id === profile.id;
+                  const didIConfirm = didIWin && rifa.ganhador_confirmou;
                   const participou = profile && minhasCompras.some(c => c.rifa_id === rifa.id);
                   
                   // Busca dados do ganhador (físico ou via app)
@@ -154,7 +155,7 @@ const Rifas = () => {
                   return (
                     <div
                       key={rifa.id}
-                      className={`card-container p-0 overflow-hidden cursor-pointer transition-transform hover:-translate-y-1 shadow-md border-2 ${didIWin ? 'border-green-500 bg-green-50/50 dark:bg-green-900/10' : 'border-border'}`}
+                      className={`card-container p-0 overflow-hidden cursor-pointer transition-transform hover:-translate-y-1 shadow-md border-2 ${didIWin ? (didIConfirm ? 'border-green-300 bg-green-50 dark:bg-green-900/5' : 'border-green-500 bg-green-50/50 dark:bg-green-900/10') : 'border-border'}`}
                       onClick={() => navigate(`/rifas/${rifa.id}`)}
                     >
                       <div className="flex flex-col sm:flex-row h-full">
@@ -182,7 +183,7 @@ const Rifas = () => {
                           
                           <div className="mt-auto pt-2">
                             {didIWin ? (
-                              <div className="bg-green-500 text-white rounded-xl p-3 flex items-center justify-between shadow-sm animate-pulse">
+                              <div className={`rounded-xl p-3 flex items-center justify-between shadow-sm ${didIConfirm ? 'bg-green-100 text-green-900 border border-green-200 dark:bg-green-900/30 dark:text-green-100 dark:border-green-800' : 'bg-green-500 text-white animate-pulse'}`}>
                                 <div>
                                   <p className="text-[10px] font-bold uppercase tracking-widest opacity-90">VOCÊ GANHOU!</p>
                                   <p className="text-xl font-heading font-bold mt-0.5">Nº {rifa.numero_ganhador}</p>
