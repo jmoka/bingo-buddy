@@ -568,7 +568,7 @@ const VendedorPainel = () => {
                 <Wallet className="w-5 h-5 text-primary" /> Acertos Financeiros
                 </h2>
                 {selectedFaturas.geral.liquido > 0 && (
-                    <Button className="bg-amber-600 hover:bg-amber-700 text-white shadow-sm font-bold animate-pulse" onClick={() => setPagarAcertoOpen(true)}>
+                    <Button className="bg-amber-600 hover:bg-amber-700 text-white shadow-sm font-bold animate-pulse hidden sm:flex" onClick={() => setPagarAcertoOpen(true)}>
                         Pagar R$ {selectedFaturas.geral.liquido.toFixed(2)}
                     </Button>
                 )}
@@ -649,14 +649,21 @@ const VendedorPainel = () => {
                 )}
                 
                 {/* RESUMO TOTAL */}
-                <div className="flex flex-col sm:flex-row items-center justify-between p-4 bg-amber-100 dark:bg-amber-900/20 border-2 border-amber-400 rounded-xl mt-6">
-                    <div>
-                        <p className="text-sm font-bold text-amber-800 dark:text-amber-500 uppercase tracking-widest flex items-center gap-2">
+                <div className="flex flex-col sm:flex-row items-center justify-between p-4 bg-amber-100 dark:bg-amber-900/20 border-2 border-amber-400 rounded-xl mt-6 gap-4">
+                    <div className="text-center sm:text-left">
+                        <p className="text-sm font-bold text-amber-800 dark:text-amber-500 uppercase tracking-widest flex items-center justify-center sm:justify-start gap-2">
                             <BadgePercent className="w-5 h-5" /> SELECIONADO PARA REPASSE 
                         </p>
                         <p className="text-xs text-amber-700/80 mt-1">Soma líquida apenas dos itens marcados acima.</p>
                     </div>
-                    <p className="text-3xl font-black font-heading text-amber-700 dark:text-amber-400">R$ {selectedFaturas.geral.liquido.toFixed(2).replace('.', ',')}</p>
+                    <div className="flex flex-col items-center sm:items-end gap-2 w-full sm:w-auto">
+                        <p className="text-3xl font-black font-heading text-amber-700 dark:text-amber-400">R$ {selectedFaturas.geral.liquido.toFixed(2).replace('.', ',')}</p>
+                        {selectedFaturas.geral.liquido > 0 && (
+                            <Button className="bg-amber-600 hover:bg-amber-700 text-white shadow-sm font-bold animate-pulse w-full sm:w-auto" onClick={() => setPagarAcertoOpen(true)} size="lg">
+                                Pagar R$ {selectedFaturas.geral.liquido.toFixed(2)}
+                            </Button>
+                        )}
+                    </div>
                 </div>
               </div>
             )}
