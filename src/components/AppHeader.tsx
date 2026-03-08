@@ -29,7 +29,20 @@ export const AppHeader = () => {
     });
   }, [profile?.avatar_url]);
 
-  if (!profile) return null;
+  if (!profile) {
+    return (
+      <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="container max-w-6xl mx-auto flex h-16 items-center justify-between">
+          <a href="/" className="font-heading text-2xl font-bold text-foreground">
+            🎱 Bingo
+          </a>
+          <Button onClick={() => navigate('/login')} className="gradient-primary shadow-sm font-bold">
+            Entrar / Cadastrar
+          </Button>
+        </div>
+      </header>
+    );
+  }
 
   const myOwnedCards = playerCards.filter(c => c.player_id === profile.id);
 

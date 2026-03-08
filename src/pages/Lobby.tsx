@@ -67,12 +67,12 @@ const Lobby = () => {
   const [expandedParticipants, setExpandedParticipants] = useState<Set<string>>(new Set());
   const [expandedPrizes, setExpandedPrizes] = useState<Set<string>>(new Set());
 
-  // Captura o link de indicação da URL se existir
+  // Captura o link de indicação da URL se existir (mesmo sem estar logado)
   useEffect(() => {
     const ref = searchParams.get('ref');
     if (ref) {
       localStorage.setItem('bingo_ref', ref);
-      window.history.replaceState({}, document.title, window.location.pathname); // limpa a URL visualmente
+      window.history.replaceState({}, document.title, window.location.pathname);
       toast.success("Código de indicação ativado para as suas compras!", { duration: 4000 });
     }
   }, [searchParams]);
@@ -94,12 +94,6 @@ const Lobby = () => {
       return next;
     });
   };
-
-  useEffect(() => {
-    if (!session) {
-      navigate('/login');
-    }
-  }, [session, navigate]);
 
   const participantIds = useMemo(() => {
     return Array.from(new Set(matchCards.map(mc => mc.player_id)));
@@ -123,7 +117,6 @@ const Lobby = () => {
   const activeCards = myOwnedCards.filter(c => !c.is_archived);
   const archivedCards = myOwnedCards.filter(c => c.is_archived);
 
-  // Verificação de vitória nas Rifas
   const rifasGanhas = useMemo(() => {
     if (!profile) return [];
     return rifas.filter(r => r.status === 'finalizada' && r.ganhador_id === profile.id && !r.ganhador_confirmou);
@@ -163,6 +156,10 @@ const Lobby = () => {
   };
 
   const openJoinDialog = (match: Match) => {
+    if (!profile) {
+      navigate('/login');
+      return;
+    }
     setSelectedMatch(match);
     setCardsToJoin(new Set());
     setJoinDialogOpen(true);
@@ -173,7 +170,7 @@ const Lobby = () => {
     setIsJoining(true);
     try {
       const cardIds = Array.from(cardsToJoin);
-      const refCode = localStorage.getItem('bingo_ref') || undefined; // Pega o código caso exista
+      const refCode = localStorage.getItem('bingo_ref') || undefined; 
       const newMatchCards = await joinMatch(selectedMatch.id, cardIds, refCode);
       if (newMatchCards && newMatchCards.length > 0) {
         toast.success('🎉 Você entrou na partida!');
@@ -209,8 +206,6 @@ const Lobby = () => {
     const statusOrder: Record<MatchStatus, number> = { 'in_progress': 1, 'open': 2, 'waiting': 3, 'finished': 4 };
     return statusOrder[a.status] - statusOrder[b.status];
   });
-
-  if (!profile) return null;
 
   const activeMatchIds = new Set(matches.filter(m => m.status === 'in_progress').map(m => m.id));
   const inProgressMatches = sortedMatches.filter(m => m.status === 'in_progress');
@@ -299,8 +294,10 @@ const Lobby = () => {
           const realCardsCount = allCardsInMatch.filter(c => c.credit_type === 'real').length;
           const fakeCardsCount = allCardsInMatch.filter(c => c.credit_type === 'fake').length;
           const playersInMatchCount = new Set(allCardsInMatch.map(mc => mc.player_id)).size;
-          const myMatchCards = getPlayerMatchCards(match.id, profile.id);
+          
+          const myMatchCards = profile ? getPlayerMatchCards(match.id, profile.id) : [];
           const alreadyJoined = myMatchCards.length > 0;
+          
           const countdownMatch = (match.status === 'waiting' || match.status === 'open') ? getMatchCountdown(match.start_time) : null;
           const prizeValue = match.prize.type === 'percentage' ? (Number(match.pot || 0) * (Number(match.prize.value) || 0)) / 100 : (Number(match.prize.value) || 0);
 
@@ -431,7 +428,7 @@ const Lobby = () => {
                 
                 <div className="mt-4 pt-4 border-t flex flex-wrap gap-2 justify-end">
                   {match.status === 'in_progress' && (
-                    <Button size="sm" className="bg-accent hover:bg-accent/90 text-white font-bold" onClick={() => navigate(`/match/${match.id}`)}>
+                    <Button size="sm" className="bg-accent hover:bg-accent/90 text-white font-bold" onClick={() => profile ? navigate(`/match/${match.id}`) : navigate('/login')}>
                       <Tv className="w-4 h-4 mr-2" /> ASSISTIR
                     </Button>
                   )}
@@ -441,7 +438,7 @@ const Lobby = () => {
                         <Button variant="ghost" size="sm" className="text-destructive" onClick={() => leaveMatch(match.id)}>Sair</Button>
                       )}
                       <Button size="sm" className="gradient-accent text-white font-bold" onClick={() => openJoinDialog(match)}>
-                        {alreadyJoined ? 'ADICIONAR MAIS' : 'ENTRAR'}
+                        {!profile ? 'LOGIN PARA ENTRAR' : alreadyJoined ? 'ADICIONAR MAIS' : 'ENTRAR'}
                       </Button>
                     </>
                   )}
@@ -456,7 +453,7 @@ const Lobby = () => {
 
   return (
     <div className="space-y-6">
-      {profile.role === 'admin' && (
+      {profile?.role === 'admin' && (
         <Button className="w-full h-9 text-xs" variant="outline" onClick={() => navigate('/admin')}>
           <Settings className="w-3.5 h-3.5 mr-2" /> Painel Administrativo
         </Button>
@@ -562,78 +559,80 @@ const Lobby = () => {
             </Tabs>
           </section>
 
-          <section>
-            <div className="flex items-center justify-between mb-4 gap-2">
-              <div className="flex items-center gap-2">
-                <Ticket className="w-5 h-5 text-primary" />
-                <h2 className="font-heading text-lg font-bold">Minhas Cartelas</h2>
-              </div>
-              <Dialog open={isCreateCardOpen} onOpenChange={setCreateCardOpen}>
-                <DialogTrigger asChild>
-                  <Button size="sm" className="gradient-primary font-bold h-8 text-[11px] px-3">
-                    <Plus className="w-3.5 h-3.5 mr-1" /> NOVA
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
-                  <DialogHeader>
-                    <DialogTitle>Criar Cartela</DialogTitle>
-                  </DialogHeader>
-                  <div className="space-y-4 py-2">
-                    <div className="space-y-2">
-                      <Label className="text-xs">Tipo de Crédito</Label>
-                      <RadioGroup value={creditType} onValueChange={(v: 'real' | 'fake') => setCreditType(v)} className="grid grid-cols-2 gap-2">
-                        <Label 
-                          htmlFor="real" 
-                          className={cn(
-                            "flex flex-col items-center p-4 border-2 rounded-xl cursor-pointer transition-all",
-                            creditType === 'real' 
-                              ? "border-primary bg-primary/10 text-primary" 
-                              : "border-muted bg-muted/30 text-muted-foreground hover:border-muted-foreground/30"
-                          )}
-                        >
-                          <RadioGroupItem value="real" id="real" className="sr-only" />
-                          <Coins className={cn("w-6 h-6 mb-2", creditType === 'real' ? "text-primary" : "text-muted-foreground")} />
-                          <span className="text-xs font-bold uppercase tracking-wider">Reais</span>
-                        </Label>
-                        <Label 
-                          htmlFor="fake" 
-                          className={cn(
-                            "flex flex-col items-center p-4 border-2 rounded-xl cursor-pointer transition-all",
-                            creditType === 'fake' 
-                              ? "border-primary bg-primary/10 text-primary" 
-                              : "border-muted bg-muted/30 text-muted-foreground hover:border-muted-foreground/30"
-                          )}
-                        >
-                          <RadioGroupItem value="fake" id="fake" className="sr-only" />
-                          <Star className={cn("w-6 h-6 mb-2", creditType === 'fake' ? "text-primary" : "text-muted-foreground")} />
-                          <span className="text-xs font-bold uppercase tracking-wider">Brincar</span>
-                        </Label>
-                      </RadioGroup>
-                    </div>
-                    <div className="space-y-1">
-                      <Label className="text-xs">Nome</Label>
-                      <Input placeholder="Ex: Sorte" value={newCardName} onChange={e => setNewCardName(e.target.value)} />
-                    </div>
-                    <CardCreator onCardChange={setNewCardNumbers} />
-                  </div>
-                  <DialogFooter>
-                    <Button size="sm" onClick={handleCreateCard} disabled={!newCardName.trim() || !newCardNumbers} className="w-full">
-                      Salvar Cartela
+          {profile && (
+            <section>
+              <div className="flex items-center justify-between mb-4 gap-2">
+                <div className="flex items-center gap-2">
+                  <Ticket className="w-5 h-5 text-primary" />
+                  <h2 className="font-heading text-lg font-bold">Minhas Cartelas</h2>
+                </div>
+                <Dialog open={isCreateCardOpen} onOpenChange={setCreateCardOpen}>
+                  <DialogTrigger asChild>
+                    <Button size="sm" className="gradient-primary font-bold h-8 text-[11px] px-3">
+                      <Plus className="w-3.5 h-3.5 mr-1" /> NOVA
                     </Button>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
-            </div>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
+                    <DialogHeader>
+                      <DialogTitle>Criar Cartela</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4 py-2">
+                      <div className="space-y-2">
+                        <Label className="text-xs">Tipo de Crédito</Label>
+                        <RadioGroup value={creditType} onValueChange={(v: 'real' | 'fake') => setCreditType(v)} className="grid grid-cols-2 gap-2">
+                          <Label 
+                            htmlFor="real" 
+                            className={cn(
+                              "flex flex-col items-center p-4 border-2 rounded-xl cursor-pointer transition-all",
+                              creditType === 'real' 
+                                ? "border-primary bg-primary/10 text-primary" 
+                                : "border-muted bg-muted/30 text-muted-foreground hover:border-muted-foreground/30"
+                            )}
+                          >
+                            <RadioGroupItem value="real" id="real" className="sr-only" />
+                            <Coins className={cn("w-6 h-6 mb-2", creditType === 'real' ? "text-primary" : "text-muted-foreground")} />
+                            <span className="text-xs font-bold uppercase tracking-wider">Reais</span>
+                          </Label>
+                          <Label 
+                            htmlFor="fake" 
+                            className={cn(
+                              "flex flex-col items-center p-4 border-2 rounded-xl cursor-pointer transition-all",
+                              creditType === 'fake' 
+                                ? "border-primary bg-primary/10 text-primary" 
+                                : "border-muted bg-muted/30 text-muted-foreground hover:border-muted-foreground/30"
+                            )}
+                          >
+                            <RadioGroupItem value="fake" id="fake" className="sr-only" />
+                            <Star className={cn("w-6 h-6 mb-2", creditType === 'fake' ? "text-primary" : "text-muted-foreground")} />
+                            <span className="text-xs font-bold uppercase tracking-wider">Brincar</span>
+                          </Label>
+                        </RadioGroup>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Nome</Label>
+                        <Input placeholder="Ex: Sorte" value={newCardName} onChange={e => setNewCardName(e.target.value)} />
+                      </div>
+                      <CardCreator onCardChange={setNewCardNumbers} />
+                    </div>
+                    <DialogFooter>
+                      <Button size="sm" onClick={handleCreateCard} disabled={!newCardName.trim() || !newCardNumbers} className="w-full">
+                        Salvar Cartela
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+              </div>
 
-            <Tabs defaultValue="active" className="w-full">
-              <TabsList className="grid w-full grid-cols-2 h-8 bg-muted/30 mb-4">
-                <TabsTrigger value="active" className="text-[10px]">Ativas ({activeCards.length})</TabsTrigger>
-                <TabsTrigger value="archived" className="text-[10px]">Arquivadas ({archivedCards.length})</TabsTrigger>
-              </TabsList>
-              <TabsContent value="active" className="mt-0">{renderCardList(activeCards)}</TabsContent>
-              <TabsContent value="archived" className="mt-0">{renderCardList(archivedCards)}</TabsContent>
-            </Tabs>
-          </section>
+              <Tabs defaultValue="active" className="w-full">
+                <TabsList className="grid w-full grid-cols-2 h-8 bg-muted/30 mb-4">
+                  <TabsTrigger value="active" className="text-[10px]">Ativas ({activeCards.length})</TabsTrigger>
+                  <TabsTrigger value="archived" className="text-[10px]">Arquivadas ({archivedCards.length})</TabsTrigger>
+                </TabsList>
+                <TabsContent value="active" className="mt-0">{renderCardList(activeCards)}</TabsContent>
+                <TabsContent value="archived" className="mt-0">{renderCardList(archivedCards)}</TabsContent>
+              </Tabs>
+            </section>
+          )}
         </div>
       </div>
 
@@ -641,7 +640,7 @@ const Lobby = () => {
         <DialogContent className="max-w-md max-h-[80vh] overflow-y-auto">
           <DialogHeader><DialogTitle>Entrar na Partida</DialogTitle></DialogHeader>
           <div className="space-y-3 py-2">
-            {activeCards.filter(card => !new Set(getPlayerMatchCards(selectedMatch?.id || '', profile.id).map(c => c.player_card_id)).has(card.id)).map(card => {
+            {profile && activeCards.filter(card => !new Set(getPlayerMatchCards(selectedMatch?.id || '', profile.id).map(c => c.player_card_id)).has(card.id)).map(card => {
               const isSelected = cardsToJoin.has(card.id);
               const isDisabled = card.uses_left === 0;
               return (

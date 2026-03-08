@@ -54,7 +54,14 @@ const RifaView = () => {
   const rifa = id ? getRifa(id) : undefined;
   const numeros = id ? getNumerosRifa(id) : [];
 
-  // Buscar perfil público do ganhador caso a rifa esteja finalizada
+  // Salva o link de indicação na sessão local caso a pessoa tenha clicado e ainda não fez login
+  useEffect(() => {
+    if (refCodigo) {
+      localStorage.setItem('bingo_ref', refCodigo);
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  }, [refCodigo]);
+
   useEffect(() => {
     if (rifa?.status === 'finalizada' && rifa.ganhador_id) {
       supabase.rpc('get_public_profiles', { p_user_ids: [rifa.ganhador_id] })
@@ -107,7 +114,6 @@ const RifaView = () => {
     return [];
   }, [rifa?.premio_fotos]);
 
-  // Melhorada a busca dos números do usuário (busca tanto no histórico de compras quanto na tabela de números)
   const meusNumeros = useMemo(() => {
     if (!profile) return [];
     const comprasDestaRifa = minhasCompras.filter(c => c.rifa_id === id).flatMap(c => c.numeros);
@@ -127,7 +133,8 @@ const RifaView = () => {
   const handleComprar = async () => {
     if (!id || selectedNumbers.length === 0) return;
     setIsBuying(true);
-    const success = await comprarNumeros(id, selectedNumbers, refCodigo);
+    const ref = localStorage.getItem('bingo_ref') || undefined;
+    const success = await comprarNumeros(id, selectedNumbers, ref);
     if (success) setSelectedNumbers([]);
     setIsBuying(false);
   };
@@ -154,7 +161,6 @@ const RifaView = () => {
     );
   }
 
-  // Informações de transparência do ganhador
   const numeroGanhadorInfo = numeros.find(n => n.numero === rifa?.numero_ganhador);
   const winnerName = numeroGanhadorInfo?.nome_comprador || winnerProfile?.full_name || 'Usuário não identificado';
   const isVendaFisica = !!numeroGanhadorInfo?.vendedor_id;
@@ -182,10 +188,10 @@ const RifaView = () => {
         {statusBadge(rifa.status)}
       </div>
 
-      {refCodigo && (
+      {(refCodigo || localStorage.getItem('bingo_ref')) && (
         <div className="flex items-center gap-2 p-2.5 bg-primary/10 border border-primary/30 rounded-lg text-sm text-primary font-medium">
           <Tag className="w-4 h-4 shrink-0" />
-          Indicação ativa: código <span className="font-mono font-bold">{refCodigo}</span>
+          Indicação ativa: código <span className="font-mono font-bold">{refCodigo || localStorage.getItem('bingo_ref')}</span>
         </div>
       )}
 
@@ -276,7 +282,6 @@ const RifaView = () => {
               </div>
             </div>
 
-            {/* SEUS NÚMEROS AQUI - EM DESTAQUE */}
             {meusNumeros.length > 0 && (
               <div className="bg-primary/5 border-2 border-primary/20 rounded-xl p-4 mt-2">
                 <p className="text-[11px] font-bold text-primary uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
@@ -293,7 +298,6 @@ const RifaView = () => {
             )}
           </div>
 
-          {/* PAINEL DE RESULTADO E TRANSPARÊNCIA */}
           {rifa.status === 'finalizada' && (
             <div className="card-container space-y-4 border-blue-300 dark:border-blue-700 bg-blue-50 dark:bg-blue-900/20">
               <div className="flex items-center gap-2 text-blue-700 dark:text-blue-300 font-bold border-b border-blue-200 dark:border-blue-800/50 pb-3">
@@ -412,7 +416,6 @@ const RifaView = () => {
                 const isSelected = selectedNumbers.includes(num);
                 const isMine = meusNumeros.includes(num);
 
-                // Se o número é meu, eu o destaco com a cor principal mas informo que já é meu
                 if (isMine) {
                   return (
                     <button
@@ -481,18 +484,24 @@ const RifaView = () => {
                 </span>
               </div>
 
-              <Button
-                className="w-full gradient-primary font-bold h-12"
-                disabled={selectedNumbers.length === 0 || isBuying}
-                onClick={handleComprar}
-              >
-                {isBuying ? (
-                  <Loader2 className="w-5 h-5 animate-spin mr-2" />
-                ) : (
-                  <Ticket className="w-5 h-5 mr-2" />
-                )}
-                Comprar {selectedNumbers.length > 0 ? `${selectedNumbers.length} ` : ''}número{selectedNumbers.length !== 1 ? 's' : ''}
-              </Button>
+              {!profile ? (
+                <Button className="w-full gradient-primary font-bold h-12" onClick={() => navigate('/login')}>
+                  Fazer Login para Comprar
+                </Button>
+              ) : (
+                <Button
+                  className="w-full gradient-primary font-bold h-12"
+                  disabled={selectedNumbers.length === 0 || isBuying}
+                  onClick={handleComprar}
+                >
+                  {isBuying ? (
+                    <Loader2 className="w-5 h-5 animate-spin mr-2" />
+                  ) : (
+                    <Ticket className="w-5 h-5 mr-2" />
+                  )}
+                  Comprar {selectedNumbers.length > 0 ? `${selectedNumbers.length} ` : ''}número{selectedNumbers.length !== 1 ? 's' : ''}
+                </Button>
+              )}
 
               {profile != null && (
                 <p className="text-xs text-muted-foreground text-center flex items-center justify-center gap-1">

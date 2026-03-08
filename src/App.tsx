@@ -60,7 +60,13 @@ const App = () => (
           <BrowserRouter>
             <Routes>
               <Route path="/login" element={<Login />} />
-              <Route path="/" element={<ProtectedRoute><Lobby /></ProtectedRoute>} />
+              {/* Rotas Públicas */}
+              <Route path="/" element={<Layout><Lobby /></Layout>} />
+              <Route path="/rifas" element={<Layout><Rifas /></Layout>} />
+              <Route path="/rifas/:id" element={<Layout><RifaView /></Layout>} />
+              <Route path="/vendedor/perfil/:codigo" element={<VendedorPerfilPublico />} />
+              
+              {/* Rotas Privadas */}
               <Route path="/account" element={<ProtectedRoute><Account /></ProtectedRoute>} />
               <Route path="/admin" element={<ProtectedRoute><Admin /></ProtectedRoute>} />
               <Route path="/admin/players" element={<ProtectedRoute><PlayersAdmin /></ProtectedRoute>} />
@@ -71,8 +77,6 @@ const App = () => (
               <Route path="/active-players" element={<ProtectedRoute><ActivePlayers /></ProtectedRoute>} />
               <Route path="/trophies" element={<ProtectedRoute><Trophies /></ProtectedRoute>} />
               <Route path="/ranking" element={<ProtectedRoute><Ranking /></ProtectedRoute>} />
-              <Route path="/rifas" element={<ProtectedRoute><Rifas /></ProtectedRoute>} />
-              <Route path="/rifas/:id" element={<ProtectedRoute><RifaView /></ProtectedRoute>} />
               <Route path="/admin/rifas" element={<ProtectedRoute><RifasAdmin /></ProtectedRoute>} />
               <Route path="/admin/rifas/:id" element={<ProtectedRoute><RifaDetalheAdmin /></ProtectedRoute>} />
               <Route path="/vendedor" element={<ProtectedRoute><VendedorRifa /></ProtectedRoute>} />
@@ -82,7 +86,6 @@ const App = () => (
               <Route path="/solicitar-vendedor" element={<ProtectedRoute><SolicitarVendedor /></ProtectedRoute>} />
               <Route path="/validar-cartela" element={<ProtectedRoute><ValidarCartela /></ProtectedRoute>} />
               <Route path="/admin/vendedores" element={<ProtectedRoute><VendedoresAdmin /></ProtectedRoute>} />
-              <Route path="/vendedor/perfil/:codigo" element={<VendedorPerfilPublico />} />
               <Route path="/vendedor/imprimir-bingo/:folhaId" element={<ProtectedRoute><VendedorImprimirBingo /></ProtectedRoute>} />
               <Route path="*" element={<NotFound />} />
             </Routes>
