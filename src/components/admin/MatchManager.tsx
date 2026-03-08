@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { GameType } from '@/types/bingo';
 import { PrizeType, MatchStatus, Match, Prize } from '@/types/match';
 import { gameTypeLabels, calculateNumbersToWin } from '@/utils/bingoUtils';
-import { Plus, Trash2, Trophy, Edit, Shuffle, Clock, Coins, Users, TrendingUp, Ticket, User, Flame, Target, Loader2, ArrowRight } from 'lucide-react';
+import { Plus, Trash2, Trophy, Edit, Shuffle, Clock, Coins, Users, TrendingUp, Ticket, User, Flame, Target, Loader2, ArrowRight, Eye } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { useToast } from '@/hooks/use-toast';
@@ -18,6 +18,7 @@ import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from '@/lib/utils';
+import { MatchDetailsModal } from './MatchDetailsModal';
 
 const statusLabels: Record<MatchStatus, string> = {
   waiting: 'Aguardando',
@@ -43,6 +44,7 @@ const MatchManager = () => {
 
   const [showCreate, setShowCreate] = useState(false);
   const [editingMatch, setEditingMatch] = useState<Match | null>(null);
+  const [detailsMatch, setDetailsMatch] = useState<Match | null>(null);
   
   // Estado Unificado
   const [matchForm, setMatchForm] = useState({
@@ -347,7 +349,17 @@ const MatchManager = () => {
                   <div className="text-sm text-muted-foreground flex gap-3"><span className="flex items-center gap-1"><Trophy className="w-3.5 h-3.5" />{gameTypeLabels[match.game_type]}</span></div>
                 </div>
                 <div className="flex gap-2">
-                  {match.status === 'waiting' && <Button size="sm" variant="outline" onClick={() => handleOpenEditDialog(match)}><Edit className="w-4 h-4 mr-2" />Editar</Button>}
+                  <Button size="sm" variant="secondary" onClick={() => setDetailsMatch(match)}>
+                    <Eye className="w-4 h-4 mr-1" /> Detalhes
+                  </Button>
+                  
+                  {/* EDITAR PERMITIDO PARA WAITING OU OPEN */}
+                  {(match.status === 'waiting' || match.status === 'open') && (
+                    <Button size="sm" variant="outline" onClick={() => handleOpenEditDialog(match)}>
+                      <Edit className="w-4 h-4 mr-1" /> Editar
+                    </Button>
+                  )}
+
                   {match.status === 'waiting' && <Button size="sm" onClick={() => openMatch(match.id)}>Abrir</Button>}
                   
                   {match.status === 'open' && (
@@ -456,6 +468,23 @@ const MatchManager = () => {
           </DialogContent>
         </Dialog>
       </div>
+
+      {/* Modal de Edição */}
+      <Dialog open={!!editingMatch} onOpenChange={(open) => !open && setEditingMatch(null)}>
+        <DialogContent className="max-w-md flex flex-col max-h-[90vh]">
+          <DialogHeader className="flex-shrink-0">
+            <DialogTitle className="font-heading">Editar Partida</DialogTitle>
+          </DialogHeader>
+          <div className="flex-grow overflow-y-auto -mx-6 px-6">{matchDialogContent}</div>
+          <DialogFooter className="flex-shrink-0 pt-4">
+            <DialogClose asChild><Button variant="ghost">Cancelar</Button></DialogClose>
+            <Button onClick={handleUpdateMatch}>Salvar Alterações</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Modal de Detalhes Completo */}
+      <MatchDetailsModal match={detailsMatch} onClose={() => setDetailsMatch(null)} />
       
       <Tabs defaultValue="in_progress" className="w-full">
         <TabsList className="grid w-full h-auto p-1 grid-cols-2 sm:grid-cols-4 mb-6">
