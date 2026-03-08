@@ -65,18 +65,36 @@ const VendedorPainel = () => {
   const numerosDisponiveis = useMemo(() => getNumerosRifa(reservarRifaId), [reservarRifaId, getNumerosRifa]);
   const rifasAtivas = useMemo(() => rifas.filter(r => r.status === 'ativa'), [rifas]);
 
-  // Lógica de Pendências (Dívida)
+  // Lógica de Pendências (Dívida) com Cálculo de Bruto e Desconto
   const faturasPendentes = useMemo(() => {
     const folhas = folhasEmitidas.filter(f => f.status === 'pendente');
     const rifasCompradas = minhasVendas.filter(v => v.status === 'pendente');
     
-    const valorFolhas = folhas.reduce((acc, f) => acc + Number(f.valor_pago), 0);
-    const valorRifas = rifasCompradas.reduce((acc, r) => acc + Number(r.valor_total), 0);
+    let totalLiquido = 0;
+    let totalBruto = 0;
+
+    folhas.forEach(f => {
+      const liq = Number(f.valor_pago);
+      const descPerc = Number(f.desconto_aplicado || 0);
+      const bruto = descPerc < 100 ? liq / (1 - descPerc / 100) : liq;
+      totalLiquido += liq;
+      totalBruto += bruto;
+    });
+
+    rifasCompradas.forEach(r => {
+      const liq = Number(r.valor_total);
+      const descPerc = Number(r.desconto_aplicado || 0);
+      const bruto = descPerc < 100 ? liq / (1 - descPerc / 100) : liq;
+      totalLiquido += liq;
+      totalBruto += bruto;
+    });
     
     return {
       folhas,
       rifasCompradas,
-      totalValor: valorFolhas + valorRifas
+      totalLiquido,
+      totalBruto,
+      totalDesconto: totalBruto - totalLiquido
     };
   }, [folhasEmitidas, minhasVendas]);
 
@@ -130,11 +148,11 @@ const VendedorPainel = () => {
   };
 
   const handleEnviarAcerto = async () => {
-    if (!acertoFile || faturasPendentes.totalValor <= 0) return;
+    if (!acertoFile || faturasPendentes.totalLiquido <= 0) return;
     setIsEnviandoAcerto(true);
     const bingoIds = faturasPendentes.folhas.map(f => f.id);
     const rifaIds = faturasPendentes.rifasCompradas.map(r => r.id);
-    const ok = await enviarAcerto(bingoIds, rifaIds, faturasPendentes.totalValor, acertoFile);
+    const ok = await enviarAcerto(bingoIds, rifaIds, faturasPendentes.totalLiquido, acertoFile);
     setIsEnviandoAcerto(false);
     if (ok) {
       setPagarAcertoOpen(false);
@@ -171,13 +189,13 @@ const VendedorPainel = () => {
         </div>
       </div>
 
-      {faturasPendentes.totalValor > 0 && (
+      {faturasPendentes.totalLiquido > 0 && (
         <div className="card-container bg-red-50 dark:bg-red-900/10 border-red-200 dark:border-red-800 flex flex-col sm:flex-row items-center justify-between gap-4 p-4">
           <div className="flex items-center gap-3 text-red-700 dark:text-red-400">
             <DollarSign className="w-8 h-8 shrink-0" />
             <div>
               <h3 className="font-bold text-lg leading-tight">Você possui Acertos Pendentes</h3>
-              <p className="text-xs font-medium">Cartelas geradas no fiado totalizam R$ {faturasPendentes.totalValor.toFixed(2)}. Elas só terão validade após o pagamento.</p>
+              <p className="text-xs font-medium">Você deve repassar R$ {faturasPendentes.totalLiquido.toFixed(2).replace('.', ',')} ao sistema. As cartelas geradas no fiado só terão validade após o pagamento.</p>
             </div>
           </div>
           <Button variant="destructive" className="shrink-0 w-full sm:w-auto font-bold" onClick={() => setActiveTab('acertos')}>
@@ -192,7 +210,7 @@ const VendedorPainel = () => {
           <TabsTrigger value="bingo" className="flex items-center gap-2"><Grid3X3 className="w-4 h-4" /> Bingo Físico</TabsTrigger>
           <TabsTrigger value="acertos" className="flex items-center gap-2 relative">
             <Wallet className="w-4 h-4" /> Acertos
-            {faturasPendentes.totalValor > 0 && <span className="absolute top-1 right-1 flex h-2.5 w-2.5 rounded-full bg-destructive" />}
+            {faturasPendentes.totalLiquido > 0 && <span className="absolute top-1 right-1 flex h-2.5 w-2.5 rounded-full bg-destructive" />}
           </TabsTrigger>
         </TabsList>
 
@@ -307,27 +325,64 @@ const VendedorPainel = () => {
               <Wallet className="w-5 h-5 text-primary" /> Acertos Financeiros
             </h2>
             
-            {faturasPendentes.totalValor > 0 ? (
+            {faturasPendentes.totalLiquido > 0 ? (
               <div className="p-5 border-2 border-amber-500/30 bg-amber-50 dark:bg-amber-900/10 rounded-xl space-y-4">
-                <div className="flex items-center justify-between border-b border-amber-500/20 pb-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-amber-500/20 pb-4 gap-4">
                   <div>
-                    <p className="text-xs uppercase font-bold text-amber-700/70">Total a repassar</p>
-                    <p className="text-3xl font-black font-heading text-amber-700 dark:text-amber-500 mt-1">R$ {faturasPendentes.totalValor.toFixed(2)}</p>
+                    <p className="text-xs uppercase font-bold text-amber-700/70">Total a repassar (Líquido)</p>
+                    <p className="text-3xl font-black font-heading text-amber-700 dark:text-amber-500 mt-1">
+                      R$ {faturasPendentes.totalLiquido.toFixed(2).replace('.', ',')}
+                    </p>
                   </div>
-                  <Button className="bg-amber-600 hover:bg-amber-700 text-white shadow-sm font-bold" onClick={() => setPagarAcertoOpen(true)}>
+                  <Button className="bg-amber-600 hover:bg-amber-700 text-white shadow-sm font-bold w-full sm:w-auto" onClick={() => setPagarAcertoOpen(true)}>
                     Informar Pagamento
                   </Button>
                 </div>
                 
-                <div className="space-y-2">
+                <div className="grid grid-cols-2 gap-4 pb-2">
+                   <div>
+                       <p className="text-[10px] uppercase font-bold text-muted-foreground">Valor Bruto (Vendas)</p>
+                       <p className="text-sm font-bold text-foreground">R$ {faturasPendentes.totalBruto.toFixed(2).replace('.', ',')}</p>
+                   </div>
+                   <div>
+                       <p className="text-[10px] uppercase font-bold text-muted-foreground">Seu Ganho (Desconto)</p>
+                       <p className="text-sm font-bold text-green-600">R$ {faturasPendentes.totalDesconto.toFixed(2).replace('.', ',')}</p>
+                   </div>
+                </div>
+
+                <div className="space-y-2 border-t border-amber-500/20 pt-4">
                   <p className="text-xs font-bold text-amber-800">Itens que serão validados ao pagar:</p>
-                  <ul className="text-xs space-y-1 text-amber-700/80">
-                    {faturasPendentes.folhas.map(f => (
-                      <li key={f.id}>• Folha de Bingo: {f.partidas?.name} - R$ {Number(f.valor_pago).toFixed(2)}</li>
-                    ))}
-                    {faturasPendentes.rifasCompradas.map(r => (
-                      <li key={r.id}>• Reserva Rifa: {r.numeros.length} números - R$ {Number(r.valor_total).toFixed(2)}</li>
-                    ))}
+                  <ul className="text-xs space-y-2 text-amber-700/80">
+                    {faturasPendentes.folhas.map(f => {
+                       const liq = Number(f.valor_pago);
+                       const descPerc = Number(f.desconto_aplicado || 0);
+                       const bruto = descPerc < 100 ? liq / (1 - descPerc / 100) : liq;
+                       return (
+                         <li key={f.id} className="flex flex-col sm:flex-row sm:justify-between sm:items-center border-b border-amber-500/10 pb-1.5 gap-1">
+                           <span>• Folha de Bingo: {f.partidas?.name}</span>
+                           <div className="flex items-center sm:justify-end gap-2">
+                             <span className="line-through text-[10px] opacity-60" title="Valor Bruto">R$ {bruto.toFixed(2).replace('.', ',')}</span>
+                             <Badge variant="outline" className="h-4 text-[9px] bg-white/50 border-amber-500/30 text-amber-700 px-1">-{descPerc}%</Badge>
+                             <span className="font-bold">R$ {liq.toFixed(2).replace('.', ',')}</span>
+                           </div>
+                         </li>
+                       );
+                    })}
+                    {faturasPendentes.rifasCompradas.map(r => {
+                       const liq = Number(r.valor_total);
+                       const descPerc = Number(r.desconto_aplicado || 0);
+                       const bruto = descPerc < 100 ? liq / (1 - descPerc / 100) : liq;
+                       return (
+                         <li key={r.id} className="flex flex-col sm:flex-row sm:justify-between sm:items-center border-b border-amber-500/10 pb-1.5 gap-1">
+                           <span>• Rifa ({r.numeros.length} nºs)</span>
+                           <div className="flex items-center sm:justify-end gap-2">
+                             <span className="line-through text-[10px] opacity-60" title="Valor Bruto">R$ {bruto.toFixed(2).replace('.', ',')}</span>
+                             <Badge variant="outline" className="h-4 text-[9px] bg-white/50 border-amber-500/30 text-amber-700 px-1">-{descPerc}%</Badge>
+                             <span className="font-bold">R$ {liq.toFixed(2).replace('.', ',')}</span>
+                           </div>
+                         </li>
+                       );
+                    })}
                   </ul>
                 </div>
               </div>
@@ -348,7 +403,7 @@ const VendedorPainel = () => {
                   meusAcertos.map((acerto: any) => (
                     <div key={acerto.id} className="p-3 border rounded-lg flex items-center justify-between text-sm">
                       <div>
-                        <p className="font-bold">R$ {Number(acerto.valor).toFixed(2)}</p>
+                        <p className="font-bold">R$ {Number(acerto.valor).toFixed(2).replace('.', ',')}</p>
                         <p className="text-xs text-muted-foreground">{format(new Date(acerto.created_at), "dd/MM/yyyy HH:mm")}</p>
                       </div>
                       <Badge variant={acerto.status === 'aprovado' ? 'default' : acerto.status === 'rejeitado' ? 'destructive' : 'secondary'} className={acerto.status === 'aprovado' ? 'bg-success' : ''}>
@@ -407,9 +462,17 @@ const VendedorPainel = () => {
               return (
                 <>
                   <div className="p-3 bg-purple-50 border border-purple-200 rounded-lg space-y-1">
-                    <div className="flex justify-between font-bold text-lg text-purple-700">
-                      <span>Valor Final:</span>
-                      <span>R$ {totalComDesconto.toFixed(2)}</span>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Valor Bruto:</span>
+                      <span>R$ {precoBase.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-green-600">Seu Desconto ({desconto}%):</span>
+                      <span className="text-green-600">- R$ {(precoBase - totalComDesconto).toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between font-bold text-lg pt-2 border-t border-purple-200 mt-1">
+                      <span>Valor a Pagar:</span>
+                      <span className="text-purple-700">R$ {totalComDesconto.toFixed(2)}</span>
                     </div>
                   </div>
                   
@@ -457,7 +520,7 @@ const VendedorPainel = () => {
                     <button
                       key={n.id} disabled={n.status !== 'disponivel'}
                       onClick={() => n.status === 'disponivel' && toggleReservar(n.numero)}
-                      className={`rounded p-1 text-xs font-semibold transition-colors ${reservarSelecionados.includes(n.numero) ? 'bg-primary text-primary-foreground' : n.status === 'disponivel' ? 'bg-green-100 text-green-800' : 'bg-muted opacity-50'}`}
+                      className={`rounded p-1 text-xs font-semibold transition-colors ${reservarSelecionados.includes(n.numero) ? 'bg-primary text-primary-foreground' : n.status === 'disponivel' ? 'bg-green-100 text-green-800 hover:bg-green-200' : 'bg-muted text-muted-foreground opacity-50 cursor-not-allowed'}`}
                     >
                       {n.numero}
                     </button>
@@ -466,9 +529,29 @@ const VendedorPainel = () => {
                 
                 {reservarSelecionados.length > 0 && (
                   <div className="mt-4 space-y-3">
-                    <div className="flex justify-between font-bold text-lg text-primary">
-                      <span>Total ({reservarSelecionados.length} nºs):</span>
-                      <span>R$ {(() => { const r = rifasAtivas.find(r => r.id === reservarRifaId); return r ? (reservarSelecionados.length * r.custo_por_numero * (1 - (meuVendedor.percentual_desconto / 100))).toFixed(2) : '0.00'; })()}</span>
+                    <div className="p-3 bg-primary/5 border border-primary/20 rounded-lg space-y-1">
+                      {(() => { 
+                        const rifa = rifasAtivas.find(r => r.id === reservarRifaId); 
+                        const desconto = meuVendedor.percentual_desconto || 0;
+                        const bruto = rifa ? reservarSelecionados.length * rifa.custo_por_numero : 0;
+                        const liquido = bruto * (1 - desconto/100);
+                        return (
+                          <>
+                            <div className="flex justify-between text-sm">
+                              <span className="text-muted-foreground">Valor Bruto ({reservarSelecionados.length} nºs):</span>
+                              <span>R$ {bruto.toFixed(2)}</span>
+                            </div>
+                            <div className="flex justify-between text-sm">
+                              <span className="text-green-600">Seu Desconto ({desconto}%):</span>
+                              <span className="text-green-600">- R$ {(bruto - liquido).toFixed(2)}</span>
+                            </div>
+                            <div className="flex justify-between font-bold text-lg text-primary pt-2 border-t border-primary/20 mt-1">
+                              <span>Valor a Pagar:</span>
+                              <span>R$ {liquido.toFixed(2)}</span>
+                            </div>
+                          </>
+                        );
+                      })()}
                     </div>
                     <div className="flex items-center justify-between p-3 border rounded-lg">
                       <div>
@@ -499,8 +582,9 @@ const VendedorPainel = () => {
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="p-4 bg-muted rounded-xl text-center space-y-2">
-              <p className="text-sm font-medium text-muted-foreground">Valor exato da transferência:</p>
-              <p className="text-4xl font-black font-heading text-primary">R$ {faturasPendentes.totalValor.toFixed(2)}</p>
+              <p className="text-sm font-medium text-muted-foreground">Valor exato da transferência (Líquido):</p>
+              <p className="text-4xl font-black font-heading text-primary">R$ {faturasPendentes.totalLiquido.toFixed(2).replace('.', ',')}</p>
+              <p className="text-xs text-muted-foreground">Sua comissão (R$ {faturasPendentes.totalDesconto.toFixed(2).replace('.', ',')}) já foi subtraída.</p>
             </div>
             {gameSettings?.pix_key && (
               <div className="space-y-1">
@@ -528,14 +612,14 @@ const VendedorPainel = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Outros Modais (Validar, Cancelar) mantidos ocultos no resumo para economizar espaço visual, eles permanecem iguais */}
+      {/* Outros Modais (Validar, Cancelar) */}
       <Dialog open={validarOpen} onOpenChange={setValidarOpen}>
         <DialogContent><DialogHeader><DialogTitle>Validar Venda - Número {validarNumero?.numero}</DialogTitle></DialogHeader><div className="space-y-4"><p className="text-sm text-muted-foreground">Para liberar a cartela, preencha os dados do comprador.</p><div className="space-y-2"><Label>Nome (Obrigatório)</Label><Input value={validarForm.nome} onChange={e => setValidarForm(p => ({ ...p, nome: e.target.value }))} /></div><div className="space-y-2"><Label>WhatsApp</Label><Input value={validarForm.telefone} onChange={e => setValidarForm(p => ({ ...p, telefone: e.target.value }))} /></div><Button className="w-full gradient-primary" onClick={handleValidar} disabled={isValidando || !validarForm.nome.trim()}>{isValidando ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <CheckSquare className="h-4 w-4 mr-2" />} Confirmar Venda</Button></div></DialogContent>
       </Dialog>
-      <Dialog open={!!cancelarNumero} onOpenChange={open => { if (!open) setCancelarNumero(null); }}>
-        <DialogContent><DialogHeader><DialogTitle className="text-destructive flex items-center gap-2"><Undo2 className="w-5 h-5" /> Cancelar Reserva</DialogTitle></DialogHeader><div className="space-y-3 py-3"><p>Você tem certeza que deseja cancelar a reserva do número <strong>{cancelarNumero?.numero}</strong>?</p></div><DialogFooter><Button variant="ghost" onClick={() => setCancelarNumero(null)} disabled={isCancelando}>Voltar</Button><Button variant="destructive" onClick={async () => { if (!cancelarNumero) return; setIsCancelando(true); const ok = await cancelarReserva(cancelarNumero.id); setIsCancelando(false); if (ok) setCancelarNumero(null); }} disabled={isCancelando}>{isCancelando ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null} Confirmar Cancelamento</Button></DialogFooter></DialogContent>
-      </Dialog>
 
+      <Dialog open={!!cancelarNumero} onOpenChange={open => { if (!open) setCancelarNumero(null); }}>
+        <DialogContent><DialogHeader><DialogTitle className="text-destructive flex items-center gap-2"><Undo2 className="w-5 h-5" /> Cancelar Reserva</DialogTitle></DialogHeader><div className="space-y-3 py-3"><p>Você tem certeza que deseja cancelar a reserva do número <strong>{cancelarNumero?.numero}</strong>?</p><p className="text-sm text-muted-foreground">O número voltará a ficar disponível e o valor pago por ele será estornado para o seu saldo.</p></div><DialogFooter><Button variant="ghost" onClick={() => setCancelarNumero(null)} disabled={isCancelando}>Voltar</Button><Button variant="destructive" onClick={async () => { if (!cancelarNumero) return; setIsCancelando(true); const ok = await cancelarReserva(cancelarNumero.id); setIsCancelando(false); if (ok) setCancelarNumero(null); }} disabled={isCancelando}>{isCancelando ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null} Confirmar Cancelamento</Button></DialogFooter></DialogContent>
+      </Dialog>
     </div>
   );
 };
