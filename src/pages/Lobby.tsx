@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useGame } from '@/contexts/GameContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRifas } from '@/hooks/useRifas';
@@ -41,6 +41,7 @@ import { ptBR } from 'date-fns/locale';
 
 const Lobby = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { session, profile } = useAuth();
   const { 
     matches, joinMatch, getPlayerMatchCards, playerCards, 
@@ -65,7 +66,17 @@ const Lobby = () => {
   
   const [expandedParticipants, setExpandedParticipants] = useState<Set<string>>(new Set());
   const [expandedPrizes, setExpandedPrizes] = useState<Set<string>>(new Set());
-  
+
+  // Captura o link de indicação da URL se existir
+  useEffect(() => {
+    const ref = searchParams.get('ref');
+    if (ref) {
+      localStorage.setItem('bingo_ref', ref);
+      window.history.replaceState({}, document.title, window.location.pathname); // limpa a URL visualmente
+      toast.success("Código de indicação ativado para as suas compras!", { duration: 4000 });
+    }
+  }, [searchParams]);
+
   const toggleParticipants = (matchId: string) => {
     setExpandedParticipants(prev => {
       const next = new Set(prev);
@@ -162,7 +173,8 @@ const Lobby = () => {
     setIsJoining(true);
     try {
       const cardIds = Array.from(cardsToJoin);
-      const newMatchCards = await joinMatch(selectedMatch.id, cardIds);
+      const refCode = localStorage.getItem('bingo_ref') || undefined; // Pega o código caso exista
+      const newMatchCards = await joinMatch(selectedMatch.id, cardIds, refCode);
       if (newMatchCards && newMatchCards.length > 0) {
         toast.success('🎉 Você entrou na partida!');
         setJoinDialogOpen(false);

@@ -12,7 +12,7 @@ serve(async (req) => {
   }
 
   try {
-    const { matchId, playerCardIds } = await req.json()
+    const { matchId, playerCardIds, refCode } = await req.json()
     
     if (!matchId || !playerCardIds || !Array.isArray(playerCardIds) || playerCardIds.length === 0) {
       throw new Error("matchId e playerCardIds são obrigatórios.");
@@ -24,9 +24,7 @@ serve(async (req) => {
     )
 
     const authHeader = req.headers.get('Authorization')
-    if (!authHeader) {
-      throw new Error("Token de autorização não encontrado.");
-    }
+    if (!authHeader) throw new Error("Token de autorização não encontrado.");
     
     const userSupabaseClient = createClient(
         Deno.env.get('SUPABASE_URL') ?? '',
@@ -73,12 +71,45 @@ serve(async (req) => {
       throw new Error(`Créditos insuficientes! Você precisa de ${totalCost} créditos.`);
     }
 
+    // --- LÓGICA DE COMISSÃO DO BINGO VIA LINK DE INDICAÇÃO ---
+    let commissionAmount = 0;
+    let sellerUserId = null;
+
+    if (refCode && totalCost > 0) {
+      const { data: seller } = await supabaseAdmin
+        .from('vendedores_rifa')
+        .select('user_id, comissao_percentual')
+        .eq('codigo_ref', refCode)
+        .eq('ativo', true)
+        .single();
+
+      if (seller && seller.user_id) {
+        let comissao = seller.comissao_percentual;
+        if (!comissao || comissao === 0) {
+          const { data: cfg } = await supabaseAdmin.from('configuracoes').select('comissao_vendedor_global').single();
+          comissao = cfg?.comissao_vendedor_global || 0;
+        }
+        if (comissao > 0) {
+          commissionAmount = totalCost * (comissao / 100.0);
+          sellerUserId = seller.user_id;
+        }
+      }
+    }
+
+    // 1. Desconta o custo total do jogador
     if (totalCost > 0) {
       const { error: creditError } = await supabaseAdmin
         .from('perfis')
         .update({ credits: profile.credits - totalCost })
         .eq('id', user.id);
       if (creditError) throw new Error(`Falha ao processar o pagamento.`);
+    }
+
+    // 2. Paga a comissão ao vendedor e desconta do lucro do admin para manter a economia perfeita
+    if (sellerUserId && commissionAmount > 0) {
+      console.log(`[join-match] Pagando comissão de ${commissionAmount} ao vendedor ${sellerUserId}`);
+      await supabaseAdmin.rpc('increment_player_credits', { p_player_id: sellerUserId, p_amount: commissionAmount });
+      await supabaseAdmin.rpc('increment_admin_profit', { amount: -commissionAmount });
     }
 
     for (const card of playerCards) {
@@ -119,7 +150,6 @@ serve(async (req) => {
 
   } catch (error: any) {
     console.error("[join-match] Erro:", error.message);
-    // RETORNAMOS 200 COM SUCCESS = FALSE PARA O SUPABASE NÃO ESCONDER O ERRO!
     return new Response(JSON.stringify({ success: false, error: error.message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,

@@ -17,7 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import {
   ArrowLeft, Loader2, Copy, Link2, CheckSquare, ShoppingBag, UserCheck, Ticket,
   Printer, Plus, Undo2, Grid3X3, DollarSign, Wallet, Upload, Clock, CheckCircle2, XCircle,
-  BadgePercent
+  BadgePercent, ListChecks
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -28,7 +28,7 @@ const VendedorPainel = () => {
   const navigate = useNavigate();
   const { profile } = useAuth();
   
-  const { meuVendedor, minhasReservas, minhasVendas, meusAcertos, isLoading, reservarNumeros, cancelarReserva, validarVenda, gerarLink, enviarAcerto } = useVendedor();
+  const { meuVendedor, minhasReservas, minhasVendas, meusAcertos, isLoading, reservarNumeros, cancelarReserva, validarMultiplasVendas, enviarAcerto } = useVendedor();
   const { rifas, getNumerosRifa } = useRifas();
   
   const { matches, gameSettings } = useGame();
@@ -36,10 +36,15 @@ const VendedorPainel = () => {
 
   const [activeTab, setActiveTab] = useState<'rifas' | 'bingo' | 'acertos'>('rifas');
 
+  // Estado para validação de rifas (agora em lote)
   const [validarOpen, setValidarOpen] = useState(false);
-  const [validarNumero, setValidarNumero] = useState<(NumeroRifa & { rifas: any }) | null>(null);
+  const [validarNumeros, setValidarNumeros] = useState<(NumeroRifa & { rifas: any })[]>([]);
   const [validarForm, setValidarForm] = useState({ nome: '', telefone: '', endereco: '' });
   const [isValidando, setIsValidando] = useState(false);
+  
+  // Seleção múltipla para validação
+  const [modoSelecao, setModoSelecao] = useState(false);
+  const [selectedToValidate, setSelectedToValidate] = useState<Set<string>>(new Set());
 
   const [reservarOpen, setReservarOpen] = useState(false);
   const [reservarRifaId, setReservarRifaId] = useState('');
@@ -57,7 +62,7 @@ const VendedorPainel = () => {
   const [bingoFiado, setBingoFiado] = useState(false);
   const [isGerandoFolhas, setIsGerandoFolhas] = useState(false);
 
-  // Seleção para impressão em lote
+  // Seleção para impressão em lote (Bingo)
   const [selectedFolhas, setSelectedFolhas] = useState<Set<string>>(new Set());
 
   // Modal Acertos
@@ -133,12 +138,26 @@ const VendedorPainel = () => {
     return map;
   }, [minhasReservas, filtroStatus]);
 
-  const handleValidar = async () => {
-    if (!validarNumero || !validarForm.nome.trim()) return;
+  const toggleValidar = (id: string) => {
+    const next = new Set(selectedToValidate);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    setSelectedToValidate(next);
+  };
+
+  const handleValidarMultiplos = async () => {
+    if (validarNumeros.length === 0 || !validarForm.nome.trim()) return;
     setIsValidando(true);
-    const ok = await validarVenda(validarNumero.id, validarForm.nome, validarForm.telefone, validarForm.endereco);
+    
+    const idsToValidate = validarNumeros.map(n => n.id);
+    const ok = await validarMultiplasVendas(idsToValidate, validarForm.nome, validarForm.telefone, validarForm.endereco);
+    
     setIsValidando(false);
-    if (ok) setValidarOpen(false);
+    if (ok) {
+      setValidarOpen(false);
+      setSelectedToValidate(new Set()); // Limpa a seleção após o sucesso
+      setModoSelecao(false);
+    }
   };
 
   const handleGerarFolhasBingo = async () => {
@@ -168,6 +187,7 @@ const VendedorPainel = () => {
     }
   };
 
+  // Gerenciamento de seleção do Bingo
   const handleSelectAllFolhas = (checked: boolean) => {
     if (checked) {
       setSelectedFolhas(new Set(folhasEmitidas.map(f => f.id)));
@@ -189,10 +209,10 @@ const VendedorPainel = () => {
     navigate(`/vendedor/imprimir-bingo/${idsString}`);
   };
 
-  const openValidar = (n: any) => {
-    setValidarNumero(n);
-    setValidarForm({ nome: n.nome_comprador || '', telefone: n.telefone_comprador || '', endereco: n.endereco_comprador || '' });
-    setValidarOpen(true);
+  const gerarLinkBase = (path: string) => {
+    const base = window.location.origin;
+    const ref = meuVendedor?.codigo_ref ?? '';
+    return `${base}${path}?ref=${ref}`;
   };
 
   if (isLoading) {
@@ -239,6 +259,28 @@ const VendedorPainel = () => {
         </div>
       )}
 
+      {/* LINKS DE INDICAÇÃO */}
+      <div className="card-container space-y-3">
+        <h3 className="font-heading font-bold text-sm flex items-center gap-2"><Link2 className="w-4 h-4 text-primary" /> Seus Links de Indicação (Ganhe Comissão!)</h3>
+        <p className="text-xs text-muted-foreground mb-2">Envie estes links para seus clientes. Se eles comprarem online, você ganha <strong>{gameSettings?.comissao_vendedor_global || 0}%</strong> de comissão no saldo!</p>
+        <div className="space-y-2">
+          <div className="flex items-center justify-between gap-2 p-2 bg-muted rounded-lg">
+            <div className="flex-1 min-w-0">
+                <span className="text-[10px] uppercase font-bold text-primary block mb-0.5">Link para Vender Bingo Online</span>
+                <span className="text-xs font-mono text-muted-foreground truncate block">{gerarLinkBase('/')}</span>
+            </div>
+            <Button size="sm" variant="outline" className="shrink-0 h-8 text-xs" onClick={() => { navigator.clipboard.writeText(gerarLinkBase('/')); toast.success('Copiado!'); }}><Copy className="w-3 h-3 mr-1" /> Copiar</Button>
+          </div>
+          <div className="flex items-center justify-between gap-2 p-2 bg-muted rounded-lg">
+            <div className="flex-1 min-w-0">
+                <span className="text-[10px] uppercase font-bold text-blue-600 block mb-0.5">Link para Vender Rifas Online</span>
+                <span className="text-xs font-mono text-muted-foreground truncate block">{gerarLinkBase('/rifas')}</span>
+            </div>
+            <Button size="sm" variant="outline" className="shrink-0 h-8 text-xs" onClick={() => { navigator.clipboard.writeText(gerarLinkBase('/rifas')); toast.success('Copiado!'); }}><Copy className="w-3 h-3 mr-1" /> Copiar</Button>
+          </div>
+        </div>
+      </div>
+
       <Tabs value={activeTab} onValueChange={(val: any) => setActiveTab(val)}>
         <TabsList className="grid w-full grid-cols-3 h-12 bg-muted/50 p-1 mb-4">
           <TabsTrigger value="rifas" className="flex items-center gap-2"><Ticket className="w-4 h-4" /> Rifas</TabsTrigger>
@@ -256,23 +298,35 @@ const VendedorPainel = () => {
              <div className="card-container p-3 text-center border-2 border-amber-500/20"><p className="text-[10px] text-muted-foreground">Pendentes</p><p className="text-xl font-bold font-heading text-amber-600">{minhasReservas.filter(n => n.status === 'reservado').length}</p></div>
           </div>
 
-          <div className="card-container space-y-3">
-            <h3 className="font-heading font-bold text-sm flex items-center gap-2"><Link2 className="w-4 h-4 text-primary" /> Links de Indicação (Ganha Comissão)</h3>
-            <div className="space-y-2">
-              <div className="flex items-center justify-between gap-2 p-2 bg-muted rounded-lg">
-                <span className="text-xs text-muted-foreground truncate flex-1">{gerarLink()} (Geral)</span>
-                <Button size="sm" variant="outline" className="shrink-0 h-7 text-xs" onClick={() => { navigator.clipboard.writeText(gerarLink()); toast.success('Copiado!'); }}><Copy className="w-3 h-3 mr-1" /> Copiar</Button>
-              </div>
-            </div>
-          </div>
-
           <div className="card-container p-4 space-y-4">
               <div className="flex items-center justify-between">
-                <h3 className="font-heading font-bold text-lg">Suas Reservas e Vendas Físicas</h3>
-                <Button className="gradient-primary" onClick={() => setReservarOpen(true)}>
-                  <Plus className="w-4 h-4 mr-2" /> Vender / Reservar
-                </Button>
+                <h3 className="font-heading font-bold text-lg">Suas Reservas de Rifa</h3>
+                <div className="flex gap-2">
+                  <Button variant={modoSelecao ? "secondary" : "outline"} size="sm" onClick={() => {
+                      setModoSelecao(!modoSelecao);
+                      setSelectedToValidate(new Set());
+                  }}>
+                      {modoSelecao ? 'Cancelar Seleção' : <><ListChecks className="w-4 h-4 mr-1.5" /> Selecionar Vários</>}
+                  </Button>
+                  <Button className="gradient-primary" size="sm" onClick={() => setReservarOpen(true)}>
+                    <Plus className="w-4 h-4 mr-1.5" /> Nova Reserva
+                  </Button>
+                </div>
               </div>
+
+              {modoSelecao && selectedToValidate.size > 0 && (
+                <div className="p-3 bg-primary/10 border border-primary/30 rounded-lg flex items-center justify-between animate-in fade-in slide-in-from-top-2">
+                   <span className="text-sm font-bold text-primary">{selectedToValidate.size} números selecionados</span>
+                   <Button size="sm" onClick={() => {
+                      const nums = minhasReservas.filter(n => selectedToValidate.has(n.id));
+                      setValidarNumeros(nums);
+                      setValidarForm({ nome: '', telefone: '', endereco: '' });
+                      setValidarOpen(true);
+                   }}>
+                      Validar Selecionados
+                   </Button>
+                </div>
+              )}
 
               {Object.keys(reservasPorRifa).length === 0 ? (
                 <div className="text-center py-6 text-muted-foreground text-sm">
@@ -287,23 +341,38 @@ const VendedorPainel = () => {
                           <Printer className="w-3 h-3 mr-1" /> Imprimir
                         </Button>
                       </div>
-                      <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-                        {numeros.map(n => (
-                          <div key={n.id} className="relative group">
-                            <button
-                              onClick={() => n.status === 'reservado' && openValidar(n)}
-                              className={`w-full rounded-lg p-2 flex flex-col items-center justify-center gap-0.5 transition-colors min-h-[64px] ${n.status === 'vendido' ? 'bg-green-100 text-green-700 cursor-default' : 'bg-amber-100 text-amber-700 hover:bg-amber-200 cursor-pointer'}`}
-                            >
-                              <span className="text-base font-bold font-heading">{n.numero}</span>
-                              {n.status === 'vendido' ? <CheckSquare className="w-3 h-3 mt-0.5" /> : <span className="text-[9px] opacity-60">pendente</span>}
-                            </button>
-                            {n.status === 'reservado' && (
-                              <button onClick={e => { e.stopPropagation(); setCancelarNumero(n); }} className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 bg-red-100 text-red-600 rounded p-0.5">
-                                <Undo2 className="w-3 h-3" />
-                              </button>
-                            )}
-                          </div>
-                        ))}
+                      <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-2">
+                        {numeros.map(n => {
+                          const isSelected = selectedToValidate.has(n.id);
+                          return (
+                            <div key={n.id} className="relative group">
+                                <button
+                                    onClick={() => {
+                                        if (n.status === 'vendido') return;
+                                        if (modoSelecao) {
+                                            toggleValidar(n.id);
+                                        } else {
+                                            setValidarNumeros([n]);
+                                            setValidarForm({ nome: n.nome_comprador || '', telefone: n.telefone_comprador || '', endereco: n.endereco_comprador || '' });
+                                            setValidarOpen(true);
+                                        }
+                                    }}
+                                    className={`w-full rounded-lg p-2 flex flex-col items-center justify-center gap-0.5 transition-all min-h-[60px] 
+                                        ${n.status === 'vendido' ? 'bg-green-100 text-green-700 cursor-default opacity-70' : 'bg-amber-100 text-amber-700 hover:bg-amber-200 cursor-pointer'}
+                                        ${modoSelecao && isSelected ? 'ring-2 ring-primary border-primary bg-primary/20 text-primary' : ''}
+                                    `}
+                                >
+                                    <span className="text-base font-bold font-heading">{n.numero}</span>
+                                    {n.status === 'vendido' ? <CheckSquare className="w-3 h-3 mt-0.5" /> : <span className="text-[9px] opacity-60">pendente</span>}
+                                </button>
+                                {n.status === 'reservado' && !modoSelecao && (
+                                    <button onClick={e => { e.stopPropagation(); setCancelarNumero(n); }} className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 bg-red-100 text-red-600 rounded p-0.5">
+                                        <Undo2 className="w-3 h-3" />
+                                    </button>
+                                )}
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
                 ))
@@ -713,11 +782,44 @@ const VendedorPainel = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Outros Modais (Validar, Cancelar) */}
+      {/* Modal Validação em Lote ou Única */}
       <Dialog open={validarOpen} onOpenChange={setValidarOpen}>
-        <DialogContent><DialogHeader><DialogTitle>Validar Venda - Número {validarNumero?.numero}</DialogTitle></DialogHeader><div className="space-y-4"><p className="text-sm text-muted-foreground">Para liberar a cartela, preencha os dados do comprador.</p><div className="space-y-2"><Label>Nome (Obrigatório)</Label><Input value={validarForm.nome} onChange={e => setValidarForm(p => ({ ...p, nome: e.target.value }))} /></div><div className="space-y-2"><Label>WhatsApp</Label><Input value={validarForm.telefone} onChange={e => setValidarForm(p => ({ ...p, telefone: e.target.value }))} /></div><Button className="w-full gradient-primary" onClick={handleValidar} disabled={isValidando || !validarForm.nome.trim()}>{isValidando ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <CheckSquare className="h-4 w-4 mr-2" />} Confirmar Venda</Button></div></DialogContent>
+        <DialogContent>
+          <DialogHeader>
+             <DialogTitle>
+                 Validar Venda - {validarNumeros.length > 1 ? `${validarNumeros.length} Números` : `Número ${validarNumeros[0]?.numero}`}
+             </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+             <p className="text-sm text-muted-foreground">Preencha os dados do comprador para liberar a cartela na auditoria.</p>
+             {validarNumeros.length > 1 && (
+                 <div className="p-2 bg-muted rounded-lg text-xs font-bold font-mono break-words">
+                     Cotas: {validarNumeros.map(n => n.numero).join(', ')}
+                 </div>
+             )}
+             <div className="space-y-2">
+                 <Label>Nome do Comprador (Obrigatório)</Label>
+                 <Input value={validarForm.nome} onChange={e => setValidarForm(p => ({ ...p, nome: e.target.value }))} />
+             </div>
+             <div className="grid grid-cols-2 gap-4">
+                 <div className="space-y-2">
+                     <Label>WhatsApp</Label>
+                     <Input value={validarForm.telefone} onChange={e => setValidarForm(p => ({ ...p, telefone: e.target.value }))} />
+                 </div>
+                 <div className="space-y-2">
+                     <Label>Endereço</Label>
+                     <Input value={validarForm.endereco} onChange={e => setValidarForm(p => ({ ...p, endereco: e.target.value }))} />
+                 </div>
+             </div>
+             <Button className="w-full gradient-primary" onClick={handleValidarMultiplos} disabled={isValidando || !validarForm.nome.trim()}>
+                {isValidando ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <CheckSquare className="h-4 w-4 mr-2" />} 
+                Confirmar Venda
+             </Button>
+          </div>
+        </DialogContent>
       </Dialog>
 
+      {/* Modal Cancelar */}
       <Dialog open={!!cancelarNumero} onOpenChange={open => { if (!open) setCancelarNumero(null); }}>
         <DialogContent><DialogHeader><DialogTitle className="text-destructive flex items-center gap-2"><Undo2 className="w-5 h-5" /> Cancelar Reserva</DialogTitle></DialogHeader><div className="space-y-3 py-3"><p>Você tem certeza que deseja cancelar a reserva do número <strong>{cancelarNumero?.numero}</strong>?</p><p className="text-sm text-muted-foreground">O número voltará a ficar disponível e o valor pago por ele será estornado para o seu saldo.</p></div><DialogFooter><Button variant="ghost" onClick={() => setCancelarNumero(null)} disabled={isCancelando}>Voltar</Button><Button variant="destructive" onClick={async () => { if (!cancelarNumero) return; setIsCancelando(true); const ok = await cancelarReserva(cancelarNumero.id); setIsCancelando(false); if (ok) setCancelarNumero(null); }} disabled={isCancelando}>{isCancelando ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null} Confirmar Cancelamento</Button></DialogFooter></DialogContent>
       </Dialog>

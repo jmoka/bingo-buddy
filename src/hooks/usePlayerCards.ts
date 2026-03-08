@@ -91,9 +91,10 @@ export const usePlayerCards = () => {
     return true;
   };
 
-  const joinMatch = async (matchId: string, playerCardIds: string[]): Promise<MatchCard[] | null> => {
+  // Alterado para suportar o refCode de Indicação
+  const joinMatch = async (matchId: string, playerCardIds: string[], refCode?: string): Promise<MatchCard[] | null> => {
     try {
-      const { data, error } = await supabase.functions.invoke('join-match', { body: { matchId, playerCardIds } });
+      const { data, error } = await supabase.functions.invoke('join-match', { body: { matchId, playerCardIds, refCode } });
       
       if (error) {
         toast.error("Falha de conexão com o servidor.");
