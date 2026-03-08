@@ -39,7 +39,6 @@ const VendedoresAdmin = () => {
   const [isSavingEdit, setIsSavingEdit] = useState(false);
   const [formEdicao, setFormEdicao] = useState({ nome_completo: '', telefone: '', cpf: '', rg: '', endereco: '', comissao: 0, desconto: 0 });
   
-  // CORREÇÃO: O tipo correto é 'aprovado' | 'rejeitado'
   const [acaoAcerto, setAcaoAcerto] = useState<{tipo: 'aprovado' | 'rejeitado', acerto: AcertoVendedor} | null>(null);
   const [isProcessandoAcerto, setIsProcessandoAcerto] = useState(false);
   
@@ -48,7 +47,6 @@ const VendedoresAdmin = () => {
   const pendentes = solicitacoesVendedor.filter(s => s.status === 'pendente');
   const acertosParaAnalisar = acertosPendentes.filter(a => a.status === 'pendente' || a.status === 'em_analise');
   
-  // Inclui os status bugados antigos para permitir a correção
   const historicoAcertos = acertosPendentes.filter(a => ['aprovado', 'rejeitado', 'aprovar', 'rejeitar'].includes(a.status));
 
   const handleToggleAtivo = async (vendedorId: string, ativo: boolean) => {
@@ -76,8 +74,20 @@ const VendedoresAdmin = () => {
   const handleSaveEdit = async () => {
     if (!editandoVendedor) return;
     setIsSavingEdit(true);
-    const payloadRifa = { nome: formEdicao.nome_completo, telefone: formEdicao.telefone, documento: formEdicao.cpf, comissao_percentual: Number(formEdicao.comissao), percentual_desconto: Number(formEdicao.desconto) };
-    const payloadCadastro = { nome_completo: formEdicao.nome_completo, telefone: formEdicao.telefone, cpf: formEdicao.cpf, rg: formEdicao.rg, endereco: formEdicao.endereco };
+    const payloadRifa = { 
+      nome: formEdicao.nome_completo, 
+      telefone: formEdicao.telefone, 
+      documento: formEdicao.cpf, 
+      comissao_percentual: Number(formEdicao.comissao), 
+      percentual_desconto: Number(formEdicao.desconto) 
+    };
+    const payloadCadastro = { 
+      nome_completo: formEdicao.nome_completo, 
+      telefone: formEdicao.telefone, 
+      cpf: formEdicao.cpf, 
+      rg: formEdicao.rg, 
+      endereco: formEdicao.endereco 
+    };
     const ok = await salvarEdicaoCompletaVendedor(editandoVendedor.id, editandoVendedor.user_id, payloadRifa, payloadCadastro);
     setIsSavingEdit(false);
     if (ok) setEditandoVendedor(null);
@@ -158,7 +168,7 @@ const VendedoresAdmin = () => {
         </div>
       </div>
 
-      <Tabs defaultValue="acertos">
+      <Tabs defaultValue="vendedores">
         <TabsList className="grid w-full grid-cols-3 h-auto p-1">
           <TabsTrigger value="vendedores" className="py-3">Vendedores</TabsTrigger>
           <TabsTrigger value="solicitacoes" className="relative py-3">
@@ -280,6 +290,100 @@ const VendedoresAdmin = () => {
            <p className="text-sm text-muted-foreground">Veja a listagem de solicitações e inscrições aqui.</p>
         </TabsContent>
       </Tabs>
+
+      {/* MODAL DE EDIÇÃO DE VENDEDOR */}
+      <Dialog open={!!editandoVendedor} onOpenChange={(open) => !open && setEditandoVendedor(null)}>
+        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Edit className="w-5 h-5 text-primary" />
+              Editar Vendedor
+            </DialogTitle>
+            <DialogDescription>
+              Atualize as taxas de desconto/comissão e os dados cadastrais do vendedor.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label>Nome Completo</Label>
+              <Input 
+                value={formEdicao.nome_completo} 
+                onChange={e => setFormEdicao(p => ({...p, nome_completo: e.target.value}))} 
+              />
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>CPF</Label>
+                <Input 
+                  value={formEdicao.cpf} 
+                  onChange={e => setFormEdicao(p => ({...p, cpf: e.target.value}))} 
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>RG</Label>
+                <Input 
+                  value={formEdicao.rg} 
+                  onChange={e => setFormEdicao(p => ({...p, rg: e.target.value}))} 
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Telefone / WhatsApp</Label>
+              <Input 
+                value={formEdicao.telefone} 
+                onChange={e => setFormEdicao(p => ({...p, telefone: e.target.value}))} 
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Endereço</Label>
+              <Input 
+                value={formEdicao.endereco} 
+                onChange={e => setFormEdicao(p => ({...p, endereco: e.target.value}))} 
+              />
+            </div>
+
+            <div className="border-t pt-4 grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Desconto Físico (%)</Label>
+                <Input 
+                  type="number" 
+                  step="0.1" 
+                  min="0" 
+                  max="100" 
+                  value={formEdicao.desconto} 
+                  onChange={e => setFormEdicao(p => ({...p, desconto: Number(e.target.value)}))} 
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Comissão Online (%)</Label>
+                <Input 
+                  type="number" 
+                  step="0.1" 
+                  min="0" 
+                  max="100" 
+                  value={formEdicao.comissao} 
+                  onChange={e => setFormEdicao(p => ({...p, comissao: Number(e.target.value)}))} 
+                />
+              </div>
+            </div>
+            <p className="text-[10px] text-muted-foreground mt-1">
+              Se deixar 0%, o vendedor usará as taxas globais definidas nas configurações gerais do sistema.
+            </p>
+          </div>
+
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setEditandoVendedor(null)}>Cancelar</Button>
+            <Button onClick={handleSaveEdit} disabled={isSavingEdit}>
+              {isSavingEdit ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <CheckCircle2 className="w-4 h-4 mr-2" />}
+              Salvar Alterações
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Modal de Visualização de Comprovante */}
       <Dialog open={!!comprovanteUrl} onOpenChange={(open) => !open && setComprovanteUrl(null)}>
