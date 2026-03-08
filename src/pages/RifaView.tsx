@@ -42,13 +42,14 @@ const RifaView = () => {
   const [searchParams] = useSearchParams();
   const refCodigo = searchParams.get('ref') || undefined;
   const { profile } = useAuth();
-  const { rifas, isLoadingRifas, getRifa, getNumerosRifa, comprarNumeros, minhasCompras } = useRifas();
+  const { rifas, isLoadingRifas, getRifa, getNumerosRifa, comprarNumeros, minhasCompras, confirmarRecebimento } = useRifas();
 
   const [selectedNumbers, setSelectedNumbers] = useState<number[]>([]);
   const [filter, setFilter] = useState<NumberFilter>('todos');
   const [showRegulamento, setShowRegulamento] = useState(false);
   const [isBuying, setIsBuying] = useState(false);
   const [winnerProfile, setWinnerProfile] = useState<any>(null);
+  const [isConfirming, setIsConfirming] = useState(false);
 
   const rifa = id ? getRifa(id) : undefined;
   const numeros = id ? getNumerosRifa(id) : [];
@@ -161,8 +162,6 @@ const RifaView = () => {
 
   const didIWin = profile && rifa?.ganhador_id === profile.id;
   const didIConfirm = didIWin && rifa?.ganhador_confirmou;
-  const { confirmarRecebimento } = useRifas();
-  const [isConfirming, setIsConfirming] = useState(false);
 
   const handleConfirmReceipt = async () => {
     if (!rifa) return;
