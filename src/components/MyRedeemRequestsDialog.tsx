@@ -6,7 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { ScrollArea } from './ui/scroll-area';
-import { Coins, Calendar, Info, CheckCircle2, AlertCircle, Clock, Banknote, Download, RefreshCw } from 'lucide-react';
+import { Coins, Calendar, Info, CheckCircle2, AlertCircle, Clock, Banknote, Download, RefreshCw, ExternalLink } from 'lucide-react';
 import { RedeemRequest } from '@/types/match';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -23,7 +23,7 @@ const statusConfig = {
 };
 
 export const MyRedeemRequestsDialog = ({ children }: MyRedeemRequestsDialogProps) => {
-  const { redeemRequests = [] } = useGame(); // Fallback para array vazio
+  const { redeemRequests = [] } = useGame();
 
   const safeRequests = Array.isArray(redeemRequests) ? redeemRequests : [];
   const pending = safeRequests.filter(r => r.status === 'pending');
@@ -31,15 +31,13 @@ export const MyRedeemRequestsDialog = ({ children }: MyRedeemRequestsDialogProps
   const rejected = safeRequests.filter(r => r.status === 'rejected');
 
   const handleDownloadReceipt = async (path: string) => {
-    const { data, error } = await supabase.storage.from('receipts').download(path);
-    if (error) { toast.error('Erro ao baixar comprovante.'); return; }
-    const url = URL.createObjectURL(data);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `comprovante-resgate.png`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+    try {
+      const { data, error } = await supabase.storage.from('receipts').createSignedUrl(path, 3600);
+      if (error) throw error;
+      window.open(data.signedUrl, '_blank');
+    } catch (e) {
+      toast.error('Erro ao abrir o comprovante.');
+    }
   };
 
   const renderList = (requests: RedeemRequest[]) => {
@@ -84,7 +82,7 @@ export const MyRedeemRequestsDialog = ({ children }: MyRedeemRequestsDialogProps
               
               {req.receipt_url && (
                 <Button variant="outline" size="sm" className="w-full" onClick={() => handleDownloadReceipt(req.receipt_url!)}>
-                    <Download className="w-4 h-4 mr-2" /> Baixar Comprovante de Transferência
+                    <ExternalLink className="w-4 h-4 mr-2" /> Ver Comprovante de Transferência
                 </Button>
               )}
 

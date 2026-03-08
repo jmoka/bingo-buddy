@@ -12,7 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose, DialogDescription } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Check, X, Download, MessageSquare, Trash2, Coins, RefreshCw, Undo2, User, ShieldCheck, Loader2 } from 'lucide-react';
+import { ArrowLeft, Check, X, Eye, ExternalLink, MessageSquare, Trash2, Coins, RefreshCw, Undo2, User, ShieldCheck, Loader2 } from 'lucide-react';
 import PlayerAvatar from '@/components/PlayerAvatar';
 import { CreditRequest, CreditRequestMessage } from '@/types/match';
 import { format, formatDistanceToNow } from 'date-fns';
@@ -44,6 +44,8 @@ const CreditRequestsAdmin = () => {
   const [isResolveDialogOpen, setIsResolveDialogOpen] = useState(false);
   const [actionType, setActionType] = useState<'approve' | 'reject' | 'delete' | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const [comprovanteUrl, setComprovanteUrl] = useState<string | null>(null);
 
   useEffect(() => {
     if (!profile || profile.role !== 'admin') {
@@ -93,16 +95,23 @@ const CreditRequestsAdmin = () => {
     setIsResolveDialogOpen(false);
   };
 
-  const handleDownloadReceipt = async (path: string) => {
-    const { data, error } = await supabase.storage.from('receipts').download(path);
-    if (error) { toast.error('Erro ao baixar comprovante.'); return; }
-    const url = URL.createObjectURL(data);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `comprovante-${path.split('/').pop()}`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+  const handleViewReceipt = async (path: string) => {
+    if (!path) {
+      toast.error('Nenhum comprovante anexado.');
+      return;
+    }
+    if (path === 'AUTOMATIC_PAYMENT') {
+        toast.info('Este pagamento foi aprovado automaticamente via sistema (não possui comprovante de imagem).');
+        return;
+    }
+
+    try {
+      const { data, error } = await supabase.storage.from('receipts').createSignedUrl(path, 3600);
+      if (error) throw error;
+      setComprovanteUrl(data.signedUrl);
+    } catch (e) {
+      toast.error('Erro ao carregar o comprovante.');
+    }
   };
 
   const pendingRequests = allCreditRequests.filter(r => r.status === 'pending');
@@ -182,8 +191,8 @@ const CreditRequestsAdmin = () => {
                       <div className="text-xs text-muted-foreground">R$ {Number(req.amount_paid || 0).toFixed(2).replace('.', ',')}</div>
                     </TableCell>
                     <TableCell className="text-center">
-                      <Button variant="outline" size="sm" onClick={() => handleDownloadReceipt(req.receipt_url)}>
-                        <Download className="w-3.5 h-3.5 mr-1" /> Ver
+                      <Button variant="outline" size="sm" onClick={() => handleViewReceipt(req.receipt_url)}>
+                        <Eye className="w-3.5 h-3.5 mr-1" /> Ver Anexo
                       </Button>
                     </TableCell>
                     <TableCell className="text-right">
@@ -230,6 +239,7 @@ const CreditRequestsAdmin = () => {
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1.5">
+                        <Button size="icon" variant="ghost" className="h-8 w-8" title="Ver Comprovante" onClick={() => handleViewReceipt(req.receipt_url)}><Eye className="w-4 h-4" /></Button>
                         {req.status === 'rejected' && <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground" onClick={() => unblockCreditRequest(req.id)}><Undo2 className="w-4 h-4" /></Button>}
                         <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground" onClick={() => handleOpenDialog(req, 'delete')}><Trash2 className="w-4 h-4" /></Button>
                       </div>
@@ -241,6 +251,34 @@ const CreditRequestsAdmin = () => {
           </div>
         </TabsContent>
       </Tabs>
+
+      <Dialog open={!!comprovanteUrl} onOpenChange={(open) => !open && setComprovanteUrl(null)}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Visualizador de Comprovante</DialogTitle>
+            <DialogDescription className="sr-only">Visualize a imagem ou o PDF enviado.</DialogDescription>
+          </DialogHeader>
+          <div className="flex items-center justify-center p-2 bg-muted/30 rounded-lg min-h-[50vh]">
+            {comprovanteUrl && (
+              comprovanteUrl.toLowerCase().includes('.pdf') || comprovanteUrl.toLowerCase().includes('.pdf?') ? (
+                <iframe src={comprovanteUrl} className="w-full h-[65vh] rounded-md border shadow-sm bg-white" title="Visualizador de PDF" />
+              ) : (
+                <img src={comprovanteUrl} alt="Comprovante" className="max-w-full max-h-[65vh] object-contain rounded-md shadow-sm" />
+              )
+            )}
+          </div>
+          <DialogFooter>
+            {comprovanteUrl && (
+              <Button asChild variant="outline" className="gap-2">
+                <a href={comprovanteUrl} target="_blank" rel="noopener noreferrer">
+                  <ExternalLink className="w-4 h-4" /> Abrir Original / Baixar
+                </a>
+              </Button>
+            )}
+            <Button variant="default" onClick={() => setComprovanteUrl(null)}>Fechar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={!!conversationRequest} onOpenChange={(open) => !open && setConversationRequest(null)}>
         <DialogContent className="max-w-md h-[70vh] flex flex-col p-0">

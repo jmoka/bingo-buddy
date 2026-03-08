@@ -3,7 +3,6 @@ import { useRifaAdmin } from '@/hooks/useRifaAdmin';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
@@ -12,14 +11,13 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
-  DialogClose,
+  DialogDescription,
 } from '@/components/ui/dialog';
 import {
-  Loader2, Clock, CheckCircle2, XCircle, Users, Copy, ShieldBan, ShieldCheck, Edit, Download, Image as ImageIcon, Save, Wallet, HandCoins, AlertTriangle
+  Loader2, CheckCircle2, XCircle, Users, Copy, ShieldBan, ShieldCheck, Edit, Wallet, HandCoins, AlertTriangle, Eye, ExternalLink
 } from 'lucide-react';
 import { format } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
-import { SolicitacaoVendedor, AcertoVendedor } from '@/types/rifa';
+import { AcertoVendedor } from '@/types/rifa';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -29,8 +27,6 @@ const VendedoresAdmin = () => {
     vendedoresComStats,
     acertosPendentes,
     isLoadingSolicitacoes,
-    aprovarVendedor,
-    rejeitarVendedor,
     atualizarVendedor,
     salvarEdicaoCompletaVendedor,
     resolverAcerto,
@@ -40,8 +36,12 @@ const VendedoresAdmin = () => {
   const [editandoVendedor, setEditandoVendedor] = useState<any | null>(null);
   const [isSavingEdit, setIsSavingEdit] = useState(false);
   const [formEdicao, setFormEdicao] = useState({ nome_completo: '', telefone: '', cpf: '', rg: '', endereco: '', comissao: 0, desconto: 0 });
+  
   const [acaoAcerto, setAcaoAcerto] = useState<{tipo: 'aprovar' | 'rejeitar', acerto: AcertoVendedor} | null>(null);
   const [isProcessandoAcerto, setIsProcessandoAcerto] = useState(false);
+  
+  // Estado para visualizar comprovante
+  const [comprovanteUrl, setComprovanteUrl] = useState<string | null>(null);
 
   const pendentes = solicitacoesVendedor.filter(s => s.status === 'pendente');
   const acertosParaAnalisar = acertosPendentes.filter(a => a.status === 'pendente' || a.status === 'em_analise');
@@ -79,14 +79,15 @@ const VendedoresAdmin = () => {
     if (ok) setEditandoVendedor(null);
   };
 
-  const handleDownload = async (path: string, bucket: string, nomeArquivo: string) => {
+  const handleViewComprovante = async (path: string) => {
     try {
-      const { data, error } = await supabase.storage.from(bucket).download(path);
+      // Gera uma URL assinada temporária que permite a visualização
+      const { data, error } = await supabase.storage.from('receipts').createSignedUrl(path, 3600); // 1 hora de validade
       if (error) throw error;
-      const url = URL.createObjectURL(data);
-      const a = document.createElement('a'); a.href = url; a.download = nomeArquivo;
-      document.body.appendChild(a); a.click(); document.body.removeChild(a);
-    } catch (e) { toast.error('Erro ao baixar o arquivo.'); }
+      setComprovanteUrl(data.signedUrl);
+    } catch (e) {
+      toast.error('Erro ao carregar o comprovante. Verifique as permissões de Storage.');
+    }
   };
 
   const handleResolverAcerto = async () => {
@@ -175,8 +176,8 @@ const VendedoresAdmin = () => {
                      </div>
                    </div>
                    <div className="flex items-center gap-3 pt-3 border-t">
-                      <Button variant="outline" size="sm" className="flex-1" onClick={() => handleDownload(a.comprovante_url, 'receipts', 'comprovante_vendedor.jpg')}>
-                        <Download className="w-4 h-4 mr-2" /> Baixar Comprovante
+                      <Button variant="outline" size="sm" className="flex-1" onClick={() => handleViewComprovante(a.comprovante_url)}>
+                        <Eye className="w-4 h-4 mr-2" /> Visualizar Comprovante
                       </Button>
                       <div className="flex gap-2">
                         <Button size="icon" variant="destructive" className="h-9 w-9" onClick={() => setAcaoAcerto({ tipo: 'rejeitar', acerto: a })}><XCircle className="w-4 h-4" /></Button>
@@ -207,17 +208,40 @@ const VendedoresAdmin = () => {
         </TabsContent>
 
         <TabsContent value="solicitacoes" className="mt-4 space-y-4">
-           {/* O código de solicitações já existente continua operando normalmente */}
            <p className="text-sm text-muted-foreground">Veja a listagem de solicitações e inscrições aqui.</p>
         </TabsContent>
       </Tabs>
 
-      {/* Modal de Edição (Já existia, mantido) */}
-      <Dialog open={!!editandoVendedor} onOpenChange={open => !open && setEditandoVendedor(null)}>
-         {/* ... (mantido do componente original) ... */}
+      {/* Modal de Visualização de Comprovante */}
+      <Dialog open={!!comprovanteUrl} onOpenChange={(open) => !open && setComprovanteUrl(null)}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Visualizador de Comprovante</DialogTitle>
+            <DialogDescription className="sr-only">Visualize a imagem ou o PDF enviado.</DialogDescription>
+          </DialogHeader>
+          <div className="flex items-center justify-center p-2 bg-muted/30 rounded-lg min-h-[50vh]">
+            {comprovanteUrl && (
+              comprovanteUrl.toLowerCase().includes('.pdf') || comprovanteUrl.toLowerCase().includes('.pdf?') ? (
+                <iframe src={comprovanteUrl} className="w-full h-[65vh] rounded-md border shadow-sm bg-white" title="Visualizador de PDF" />
+              ) : (
+                <img src={comprovanteUrl} alt="Comprovante" className="max-w-full max-h-[65vh] object-contain rounded-md shadow-sm" />
+              )
+            )}
+          </div>
+          <DialogFooter>
+            {comprovanteUrl && (
+              <Button asChild variant="outline" className="gap-2">
+                <a href={comprovanteUrl} target="_blank" rel="noopener noreferrer">
+                  <ExternalLink className="w-4 h-4" /> Abrir Original / Baixar
+                </a>
+              </Button>
+            )}
+            <Button variant="default" onClick={() => setComprovanteUrl(null)}>Fechar</Button>
+          </DialogFooter>
+        </DialogContent>
       </Dialog>
 
-      {/* Modal de Resolução de Acerto (Novo) */}
+      {/* Modal de Resolução de Acerto (Mantido igual) */}
       <Dialog open={!!acaoAcerto} onOpenChange={open => !open && setAcaoAcerto(null)}>
         <DialogContent>
           <DialogHeader>
@@ -225,6 +249,7 @@ const VendedoresAdmin = () => {
               {acaoAcerto?.tipo === 'aprovar' ? <HandCoins className="w-5 h-5 text-green-600" /> : <AlertTriangle className="w-5 h-5 text-destructive" />}
               {acaoAcerto?.tipo === 'aprovar' ? 'Confirmar Recebimento' : 'Rejeitar Comprovante'}
             </DialogTitle>
+            <DialogDescription className="sr-only">Validar acerto.</DialogDescription>
           </DialogHeader>
           <div className="py-4 space-y-3">
             {acaoAcerto?.tipo === 'aprovar' ? (
