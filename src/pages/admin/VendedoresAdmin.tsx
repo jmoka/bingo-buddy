@@ -21,7 +21,6 @@ const VendedoresAdmin = () => {
     vendedoresComStats,
     acertosPendentes,
     todasFolhasBingo,
-    todasCompras,
     isLoadingSolicitacoes,
     atualizarVendedor,
     salvarEdicaoCompletaVendedor,
@@ -38,7 +37,6 @@ const VendedoresAdmin = () => {
 
   const pendentes = solicitacoesVendedor.filter(s => s.status === 'pendente');
   const acertosParaAnalisar = acertosPendentes.filter(a => a.status === 'pendente' || a.status === 'em_analise');
-  const historicoAcertos = acertosPendentes.filter(a => ['aprovado', 'rejeitado', 'aprovar', 'rejeitar'].includes(a.status));
 
   // Novas Vendas (PIX Direto do Cliente)
   const pagamentosClientes = todasFolhasBingo.filter(f => f.status === 'em_analise' && f.comprovante_url);
@@ -72,7 +70,7 @@ const VendedoresAdmin = () => {
   const openEditModal = (vendedor: any) => {
     setEditandoVendedor(vendedor);
     setFormEdicao({
-      nome_completo: vendedor.cadastro?.nome_completo || vendedor.nome || '',
+      nome_completo: vendedor.cadastro?.nome_completo || vendedor.nome || vendedor.perfis?.full_name || '',
       telefone: vendedor.cadastro?.telefone || vendedor.telefone || '',
       cpf: vendedor.cadastro?.cpf || vendedor.documento || '',
       rg: vendedor.cadastro?.rg || '',
@@ -85,8 +83,20 @@ const VendedoresAdmin = () => {
   const handleSaveEdit = async () => {
     if (!editandoVendedor) return;
     setIsSavingEdit(true);
-    const payloadRifa = { nome: formEdicao.nome_completo, telefone: formEdicao.telefone, documento: formEdicao.cpf, comissao_percentual: Number(formEdicao.comissao), percentual_desconto: Number(formEdicao.desconto) };
-    const payloadCadastro = { nome_completo: formEdicao.nome_completo, telefone: formEdicao.telefone, cpf: formEdicao.cpf, rg: formEdicao.rg, endereco: formEdicao.endereco };
+    const payloadRifa = { 
+      nome: formEdicao.nome_completo, 
+      telefone: formEdicao.telefone, 
+      documento: formEdicao.cpf, 
+      comissao_percentual: Number(formEdicao.comissao), 
+      percentual_desconto: Number(formEdicao.desconto) 
+    };
+    const payloadCadastro = { 
+      nome_completo: formEdicao.nome_completo, 
+      telefone: formEdicao.telefone, 
+      cpf: formEdicao.cpf, 
+      rg: formEdicao.rg, 
+      endereco: formEdicao.endereco 
+    };
     const ok = await salvarEdicaoCompletaVendedor(editandoVendedor.id, editandoVendedor.user_id, payloadRifa, payloadCadastro);
     setIsSavingEdit(false);
     if (ok) setEditandoVendedor(null);
@@ -121,7 +131,7 @@ const VendedoresAdmin = () => {
       <div className="flex items-center justify-between">
         <h2 className="font-heading text-xl font-bold flex items-center gap-2"><Users className="w-5 h-5" /> Gestão de Vendedores</h2>
         <div className="flex gap-2">
-          {pagamentosClientes.length > 0 && <Badge className="bg-blue-500 animate-pulse">{pagamentosClientes.length} PIX Cliente</Badge>}
+          {pagamentosClientes.length > 0 && <Badge className="bg-blue-50 animate-pulse">{pagamentosClientes.length} PIX Cliente</Badge>}
         </div>
       </div>
 
@@ -134,23 +144,38 @@ const VendedoresAdmin = () => {
         </TabsList>
 
         <TabsContent value="vendedores" className="space-y-3 mt-4">
-          {vendedoresComStats.map((v: any) => (
-             <div key={v.id} className={`card-container space-y-3 ${!v.ativo ? 'opacity-80 border-destructive/30' : ''}`}>
-               <div className="flex items-start justify-between gap-2">
-                 <div className="min-w-0 flex-1">
-                   <div className="flex items-center gap-2"><p className="font-medium text-sm truncate">{v.nome}</p><Badge variant={v.ativo ? 'default' : 'destructive'} className={`text-[10px] shrink-0 ${v.ativo ? 'bg-green-500/15 text-green-700 border-green-500/30' : ''}`}>{v.ativo ? 'Ativo' : 'Bloqueado'}</Badge></div>
-                   <div className="flex flex-wrap gap-x-4 gap-y-0.5 mt-1 text-xs text-muted-foreground">{v.telefone && <span>{v.telefone}</span>}<span>Desconto: {v.percentual_desconto}%</span><span>Comissão: {v.comissao_percentual}%</span></div>
+          {vendedoresComStats.map((v: any) => {
+             const displayNome = v.cadastro?.nome_completo || v.nome || v.perfis?.full_name || 'Vendedor Sem Nome';
+             return (
+               <div key={v.id} className={`card-container space-y-3 ${!v.ativo ? 'opacity-80 border-destructive/30' : ''}`}>
+                 <div className="flex items-start justify-between gap-2">
+                   <div className="min-w-0 flex-1">
+                     <div className="flex items-center gap-2">
+                       <p className="font-bold text-sm truncate text-foreground">{displayNome}</p>
+                       <Badge variant={v.ativo ? 'default' : 'destructive'} className={`text-[10px] shrink-0 ${v.ativo ? 'bg-green-500/15 text-green-700 border-green-500/30' : ''}`}>
+                         {v.ativo ? 'Ativo' : 'Bloqueado'}
+                       </Badge>
+                     </div>
+                     <div className="flex flex-wrap gap-x-4 gap-y-0.5 mt-1 text-xs text-muted-foreground">
+                       {v.telefone && <span>{v.telefone}</span>}
+                       <span>Desconto: {v.percentual_desconto}%</span>
+                       <span>Comissão: {v.comissao_percentual}%</span>
+                     </div>
+                   </div>
+                   <div className="flex flex-col gap-1.5 shrink-0">
+                     <Button size="sm" variant={v.ativo ? 'outline' : 'default'} className={`text-xs h-8 ${v.ativo ? 'text-destructive border-destructive/30' : 'bg-green-600 hover:bg-green-700'}`} onClick={() => handleToggleAtivo(v.id, v.ativo)}>
+                       {v.ativo ? <ShieldBan className="w-3.5 h-3.5 mr-1.5" /> : <ShieldCheck className="w-3.5 h-3.5 mr-1.5" />} 
+                       {v.ativo ? 'Bloquear' : 'Desbloquear'}
+                     </Button>
+                   </div>
                  </div>
-                 <div className="flex flex-col gap-1.5 shrink-0">
-                   <Button size="sm" variant={v.ativo ? 'outline' : 'default'} className={`text-xs h-8 ${v.ativo ? 'text-destructive border-destructive/30' : 'bg-green-600 hover:bg-green-700'}`} onClick={() => handleToggleAtivo(v.id, v.ativo)}>{v.ativo ? <ShieldBan className="w-3.5 h-3.5 mr-1.5" /> : <ShieldCheck className="w-3.5 h-3.5 mr-1.5" />} {v.ativo ? 'Bloquear' : 'Desbloquear'}</Button>
+                 <div className="flex items-center justify-between border-t border-border pt-3">
+                   <div className="flex items-center gap-1.5 bg-muted rounded px-2 py-1"><span className="text-[10px] text-muted-foreground">Ref:</span><span className="text-xs font-mono font-bold">{v.codigo_ref}</span><Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => handleCopyRef(v.codigo_ref)}><Copy className="w-3 h-3" /></Button></div>
+                   <Button size="sm" variant="secondary" className="h-8 text-xs font-semibold" onClick={() => openEditModal(v)}><Edit className="w-3.5 h-3.5 mr-1.5" /> Ver / Editar</Button>
                  </div>
                </div>
-               <div className="flex items-center justify-between border-t border-border pt-3">
-                 <div className="flex items-center gap-1.5 bg-muted rounded px-2 py-1"><span className="text-[10px] text-muted-foreground">Ref:</span><span className="text-xs font-mono font-bold">{v.codigo_ref}</span><Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => handleCopyRef(v.codigo_ref)}><Copy className="w-3 h-3" /></Button></div>
-                 <Button size="sm" variant="secondary" className="h-8 text-xs font-semibold" onClick={() => openEditModal(v)}><Edit className="w-3.5 h-3.5 mr-1.5" /> Ver / Editar</Button>
-               </div>
-             </div>
-          ))}
+             );
+          })}
         </TabsContent>
 
         <TabsContent value="clientes" className="mt-4 space-y-4">
