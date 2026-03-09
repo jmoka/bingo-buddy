@@ -1,19 +1,21 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ArrowLeft, Search, CheckCircle, XCircle, Ticket, Loader2, Hash, AlertTriangle, Grid3X3, Trophy, ShieldCheck, UploadCloud, Clock } from 'lucide-react';
+import { ArrowLeft, Search, CheckCircle, XCircle, Ticket, Loader2, Hash, AlertTriangle, Grid3X3, Trophy, ShieldCheck, UploadCloud, Clock, UserPlus } from 'lucide-react';
 import { toast } from 'sonner';
 import { checkWin } from '@/utils/bingoUtils';
 import { BingoCard } from '@/types/bingo';
 
 export default function ValidarCartela() {
   const navigate = useNavigate();
+  const { session } = useAuth();
   const [searchParams] = useSearchParams();
   const urlCodigoRifa = searchParams.get('codigo');
   const urlCodigoBingo = searchParams.get('bingo');
@@ -89,26 +91,28 @@ export default function ValidarCartela() {
   };
 
   const handleEnviarComprovante = async () => {
+    if (!session) {
+        toast.error("Você precisa estar logado para enviar.");
+        return;
+    }
     if (!clienteNome.trim() || !comprovanteFile || !resultadoBingo) return;
     
     setIsEnviandoComprovante(true);
     try {
       const ext = comprovanteFile.name.split('.').pop();
-      const fileName = `client_${Date.now()}_${Math.random().toString(36).substring(2, 7)}.${ext}`;
+      // Salva em uma pasta identificada pelo usuário
+      const fileName = `user_${session.user.id}/${Date.now()}.${ext}`;
       
-      // 1. Upload do arquivo ( Bucket: comprovantes_bingo )
       const { error: uploadError } = await supabase.storage
         .from('comprovantes_bingo')
         .upload(fileName, comprovanteFile);
 
-      if (uploadError) throw new Error('Erro ao enviar arquivo: ' + uploadError.message);
+      if (uploadError) throw new Error('Erro no upload: ' + uploadError.message);
 
-      // 2. Pegar a URL pública do arquivo enviado
       const { data: { publicUrl } } = supabase.storage
         .from('comprovantes_bingo')
         .getPublicUrl(fileName);
 
-      // 3. Chamar a RPC para salvar os dados no banco
       const { data, error: rpcError } = await supabase.rpc('enviar_comprovante_cliente_bingo', {
         p_codigo: resultadoBingo.codigo_validacao,
         p_nome: clienteNome.trim(),
@@ -118,14 +122,14 @@ export default function ValidarCartela() {
       });
 
       if (rpcError) {
-          console.error("Erro na RPC:", rpcError);
-          throw new Error('O servidor recusou a validação (Erro 400). Tente novamente em instantes.');
+          console.error("Erro técnico na RPC:", rpcError);
+          throw new Error('Servidor não aceitou os dados: ' + (rpcError.message || 'Erro 400'));
       }
 
-      if (!data?.success) throw new Error(data?.error || 'Erro desconhecido ao processar.');
+      if (!data?.success) throw new Error(data?.error || 'Erro ao processar.');
 
       toast.success('Comprovante enviado com sucesso!');
-      buscarBingo(resultadoBingo.codigo_validacao); // Atualiza a tela
+      buscarBingo(resultadoBingo.codigo_validacao);
     } catch (e: any) {
       toast.error(e.message);
     } finally {
@@ -197,36 +201,47 @@ export default function ValidarCartela() {
                       </div>
                     </div>
                     
-                    <div className="bg-white p-4 rounded-xl border border-amber-200 space-y-4">
-                      <div className="space-y-2">
-                        <Label>Seu Nome Completo *</Label>
-                        <Input value={clienteNome} onChange={e => setClienteNome(e.target.value)} placeholder="Nome para identificar o prêmio" />
-                      </div>
-                      
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label>Seu Telefone/WhatsApp</Label>
-                          <Input value={clienteTelefone} onChange={e => setClienteTelefone(e.target.value)} placeholder="(00) 00000-0000" />
+                    {!session ? (
+                        <div className="bg-white p-8 rounded-xl border border-amber-200 text-center space-y-4">
+                            <UserPlus className="w-12 h-12 text-amber-500 mx-auto opacity-50" />
+                            <h3 className="font-bold text-lg">Login Obrigatório</h3>
+                            <p className="text-sm text-muted-foreground">Para validar sua cartela e garantir seu prêmio, você precisa estar cadastrado no sistema.</p>
+                            <Button className="w-full gradient-primary h-12 font-bold" onClick={() => navigate('/login')}>
+                                ENTRAR OU CADASTRAR AGORA
+                            </Button>
                         </div>
+                    ) : (
+                        <div className="bg-white p-4 rounded-xl border border-amber-200 space-y-4">
                         <div className="space-y-2">
-                          <Label>Endereço de Entrega</Label>
-                          <Input value={clienteEndereco} onChange={e => setClienteEndereco(e.target.value)} placeholder="Rua, Bairro, Cidade..." />
+                            <Label>Seu Nome Completo *</Label>
+                            <Input value={clienteNome} onChange={e => setClienteNome(e.target.value)} placeholder="Nome para identificar o prêmio" />
                         </div>
-                      </div>
+                        
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                            <Label>Seu Telefone/WhatsApp</Label>
+                            <Input value={clienteTelefone} onChange={e => setClienteTelefone(e.target.value)} placeholder="(00) 00000-0000" />
+                            </div>
+                            <div className="space-y-2">
+                            <Label>Endereço de Entrega</Label>
+                            <Input value={clienteEndereco} onChange={e => setClienteEndereco(e.target.value)} placeholder="Rua, Bairro, Cidade..." />
+                            </div>
+                        </div>
 
-                      <div className="space-y-2 pt-2">
-                        <Label>Comprovante do PIX *</Label>
-                        <input ref={fileRef} type="file" accept="image/*,application/pdf" className="hidden" onChange={e => setComprovanteFile(e.target.files?.[0] || null)} />
-                        <Button type="button" variant="outline" className="w-full h-12 border-dashed border-2 bg-muted/30" onClick={() => fileRef.current?.click()}>
-                          <UploadCloud className="w-5 h-5 mr-2 text-muted-foreground" />
-                          <span className="truncate max-w-[200px]">{comprovanteFile ? comprovanteFile.name : 'Anexar imagem ou PDF do PIX pago'}</span>
+                        <div className="space-y-2 pt-2">
+                            <Label>Comprovante do PIX *</Label>
+                            <input ref={fileRef} type="file" accept="image/*,application/pdf" className="hidden" onChange={e => setComprovanteFile(e.target.files?.[0] || null)} />
+                            <Button type="button" variant="outline" className="w-full h-12 border-dashed border-2 bg-muted/30" onClick={() => fileRef.current?.click()}>
+                            <UploadCloud className="w-5 h-5 mr-2 text-muted-foreground" />
+                            <span className="truncate max-w-[200px]">{comprovanteFile ? comprovanteFile.name : 'Anexar imagem ou PDF do PIX pago'}</span>
+                            </Button>
+                        </div>
+                        <Button className="w-full bg-amber-600 hover:bg-amber-700 h-12 text-white font-bold" onClick={handleEnviarComprovante} disabled={!clienteNome || !comprovanteFile || isEnviandoComprovante}>
+                            {isEnviandoComprovante ? <Loader2 className="w-5 h-5 mr-2 animate-spin" /> : <CheckCircle className="w-5 h-5 mr-2" />}
+                            ENVIAR PARA VALIDAÇÃO
                         </Button>
-                      </div>
-                      <Button className="w-full bg-amber-600 hover:bg-amber-700 h-12 text-white font-bold" onClick={handleEnviarComprovante} disabled={!clienteNome || !comprovanteFile || isEnviandoComprovante}>
-                        {isEnviandoComprovante ? <Loader2 className="w-5 h-5 mr-2 animate-spin" /> : <CheckCircle className="w-5 h-5 mr-2" />}
-                        ENVIAR COMPROVANTE AGORA
-                      </Button>
-                    </div>
+                        </div>
+                    )}
                   </div>
                 ) : resultadoBingo.status === 'em_analise' ? (
                   <div className="card-container p-8 border-blue-400 bg-blue-50 shadow-md text-center">
@@ -274,8 +289,9 @@ export default function ValidarCartela() {
             )}
           </TabsContent>
 
-          {/* Rifas tab remains intact... */}
+          {/* Rifas tab... */}
           <TabsContent value="rifa" className="space-y-4 mt-4">
+             {/* ... conteúdo inalterado ... */}
              <div className="card-container p-6 space-y-4 bg-muted/30">
                <div className="space-y-2">
                  <Label>Sorteio Específico (Opcional)</Label>
@@ -328,6 +344,7 @@ export default function ValidarCartela() {
           </TabsContent>
 
           <TabsContent value="cartela" className="space-y-4 mt-4">
+             {/* ... conteúdo inalterado ... */}
              <div className="card-container p-6 space-y-4 bg-muted/30">
                <div className="space-y-2">
                  <Label>Código de Validação da Cota (Rifa)</Label>
