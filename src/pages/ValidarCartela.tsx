@@ -80,7 +80,7 @@ export default function ValidarCartela() {
 
     let query = supabase
       .from('numeros_rifa')
-      .select('*, rifas(id, nome, status, numero_ganhador, custo_por_numero, data_encerramento)')
+      .select('*, rifas(id, nome, status, numero_ganhador, custo_por_numero, data_encerramento), cartelas_rifa(compras_rifa(status))')
       .eq('numero', parseInt(numeroRifa))
       .in('status', ['reservado', 'vendido']);
 
@@ -253,7 +253,6 @@ export default function ValidarCartela() {
             )}
           </TabsContent>
 
-          {/* ABA RESTAURADA: NÚMERO DA RIFA */}
           <TabsContent value="rifa" className="space-y-4 mt-4">
             <div className="card-container p-6 space-y-4 bg-blue-50/30 border-blue-500/20">
               <div className="space-y-2">
@@ -301,10 +300,14 @@ export default function ValidarCartela() {
             {buscadoRifa && resultadoRifa && resultadoRifa.length > 0 && (
               <div className="space-y-4">
                 <h3 className="font-heading font-bold text-lg pt-2">Resultados da Busca</h3>
-                {resultadoRifa.map((item: any) => (
+                {resultadoRifa.map((item: any) => {
+                  const statusCompra = item.cartelas_rifa?.[0]?.compras_rifa?.status;
+                  // O número é considerado pago se o vendedor validou (vendido) OU se o admin já aprovou o repasse financeiro
+                  const isPago = item.status === 'vendido' || statusCompra === 'pago';
+
+                  return (
                   <div key={item.id} className="card-container p-5 border-blue-200 shadow-sm relative overflow-hidden">
-                    {/* Borda lateral colorida dependendo do status */}
-                    <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${item.status === 'vendido' ? 'bg-green-500' : 'bg-amber-500'}`} />
+                    <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${isPago ? 'bg-green-500' : 'bg-amber-500'}`} />
                     
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-border/50 pb-3 mb-3 gap-2">
                       <div>
@@ -322,8 +325,8 @@ export default function ValidarCartela() {
                     <div className="grid grid-cols-2 gap-4 text-sm">
                       <div>
                         <p className="text-[10px] uppercase font-bold text-muted-foreground mb-1">Status da Cota</p>
-                        <Badge className={`${item.status === 'vendido' ? 'bg-green-500 hover:bg-green-600 text-white' : 'bg-amber-500 hover:bg-amber-600 text-white'}`}>
-                          {item.status === 'vendido' ? 'Pago / Validado' : 'Reservado (Pendente)'}
+                        <Badge className={`${isPago ? 'bg-green-500 hover:bg-green-600 text-white' : 'bg-amber-500 hover:bg-amber-600 text-white'}`}>
+                          {isPago ? 'Pago / Validado' : 'Reservado (Pendente)'}
                         </Badge>
                       </div>
                       <div>
@@ -332,7 +335,7 @@ export default function ValidarCartela() {
                       </div>
                     </div>
                   </div>
-                ))}
+                )})}
               </div>
             )}
           </TabsContent>
