@@ -168,9 +168,12 @@ const VendedoresAdmin = () => {
                      <div className="flex items-start justify-between">
                        <div>
                          <p className="font-bold text-sm text-foreground">{venda.nome_comprador}</p>
-                         <p className="text-xs text-muted-foreground">{venda.telefone_comprador || 'Sem telefone'}</p>
+                         <p className="text-xs text-muted-foreground">
+                           {venda.telefone_comprador || 'Sem telefone'} 
+                           {venda.endereco_comprador ? ` • ${venda.endereco_comprador}` : ''}
+                         </p>
                        </div>
-                       <div className="text-right">
+                       <div className="text-right shrink-0">
                           <p className="text-[10px] uppercase font-bold text-muted-foreground">Valor Cobrado (Pix)</p>
                           <p className="text-xl font-black text-blue-600">R$ {valorCheio.toFixed(2)}</p>
                        </div>
@@ -232,7 +235,6 @@ const VendedoresAdmin = () => {
         </TabsContent>
       </Tabs>
 
-      {/* Edit Modal e outros modais existem abaixo, mantidos intactos na versão compacta... */}
       <Dialog open={!!editandoVendedor} onOpenChange={(open) => !open && setEditandoVendedor(null)}>
         <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle className="flex items-center gap-2"><Edit className="w-5 h-5 text-primary" /> Editar Vendedor</DialogTitle></DialogHeader>

@@ -29,6 +29,7 @@ export default function ValidarCartela() {
   // Envio de Comprovante pelo Cliente
   const [clienteNome, setClienteNome] = useState('');
   const [clienteTelefone, setClienteTelefone] = useState('');
+  const [clienteEndereco, setClienteEndereco] = useState('');
   const [comprovanteFile, setComprovanteFile] = useState<File | null>(null);
   const [isEnviandoComprovante, setIsEnviandoComprovante] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -103,6 +104,7 @@ export default function ValidarCartela() {
         p_codigo: resultadoBingo.codigo_validacao,
         p_nome: clienteNome,
         p_telefone: clienteTelefone,
+        p_endereco: clienteEndereco,
         p_comprovante: publicUrl
       });
 
@@ -186,10 +188,18 @@ export default function ValidarCartela() {
                         <Label>Seu Nome Completo *</Label>
                         <Input value={clienteNome} onChange={e => setClienteNome(e.target.value)} placeholder="Nome para identificar o prêmio" />
                       </div>
-                      <div className="space-y-2">
-                        <Label>Seu Telefone/WhatsApp</Label>
-                        <Input value={clienteTelefone} onChange={e => setClienteTelefone(e.target.value)} placeholder="(00) 00000-0000" />
+                      
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label>Seu Telefone/WhatsApp</Label>
+                          <Input value={clienteTelefone} onChange={e => setClienteTelefone(e.target.value)} placeholder="(00) 00000-0000" />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Endereço de Entrega</Label>
+                          <Input value={clienteEndereco} onChange={e => setClienteEndereco(e.target.value)} placeholder="Rua, Bairro, Cidade..." />
+                        </div>
                       </div>
+
                       <div className="space-y-2 pt-2">
                         <Label>Comprovante do PIX *</Label>
                         <input ref={fileRef} type="file" accept="image/*,application/pdf" className="hidden" onChange={e => setComprovanteFile(e.target.files?.[0] || null)} />
