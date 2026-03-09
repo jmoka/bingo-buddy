@@ -49,22 +49,6 @@ export default function ValidarCartela() {
     supabase.from('rifas').select('id, nome').eq('status', 'ativa').order('nome').then(({ data }) => {
       if (data) setRifasAbertas(data);
     });
-    
-    // Limpa tokens bugados do LocalStorage para evitar o "Invalid Refresh Token" no console de usuários anônimos
-    for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (key && key.includes('supabase.auth.token')) {
-            const tokenStr = localStorage.getItem(key);
-            if (tokenStr && tokenStr.includes('expires_at')) {
-                try {
-                    const tokenData = JSON.parse(tokenStr);
-                    if (tokenData.expires_at && tokenData.expires_at < Math.floor(Date.now() / 1000)) {
-                        localStorage.removeItem(key);
-                    }
-                } catch (e) {}
-            }
-        }
-    }
   }, []);
 
   useEffect(() => {
@@ -106,33 +90,42 @@ export default function ValidarCartela() {
 
   const handleEnviarComprovante = async () => {
     if (!clienteNome.trim() || !comprovanteFile || !resultadoBingo) return;
+    
     setIsEnviandoComprovante(true);
     try {
-      console.log("Iniciando upload de comprovante para o bucket: comprovantes_bingo");
       const ext = comprovanteFile.name.split('.').pop();
-      const path = `file_${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${ext}`;
+      const fileName = `client_${Date.now()}_${Math.random().toString(36).substring(2, 7)}.${ext}`;
       
-      // Enviando para o bucket comprovantes_bingo (Aceita imagens e PDFs)
-      const { error: uploadError } = await supabase.storage.from('comprovantes_bingo').upload(path, comprovanteFile);
-      if (uploadError) {
-          console.error("Erro de upload:", uploadError);
-          throw new Error('Falha no upload do arquivo. Detalhe: ' + uploadError.message);
-      }
+      // 1. Upload do arquivo ( Bucket: comprovantes_bingo )
+      const { error: uploadError } = await supabase.storage
+        .from('comprovantes_bingo')
+        .upload(fileName, comprovanteFile);
 
-      const { data: publicUrlData } = supabase.storage.from('comprovantes_bingo').getPublicUrl(path);
+      if (uploadError) throw new Error('Erro ao enviar arquivo: ' + uploadError.message);
 
-      const { data, error } = await supabase.rpc('enviar_comprovante_cliente_bingo', {
+      // 2. Pegar a URL pública do arquivo enviado
+      const { data: { publicUrl } } = supabase.storage
+        .from('comprovantes_bingo')
+        .getPublicUrl(fileName);
+
+      // 3. Chamar a RPC para salvar os dados no banco
+      const { data, error: rpcError } = await supabase.rpc('enviar_comprovante_cliente_bingo', {
         p_codigo: resultadoBingo.codigo_validacao,
-        p_nome: clienteNome,
+        p_nome: clienteNome.trim(),
         p_telefone: clienteTelefone.trim() || null,
         p_endereco: clienteEndereco.trim() || null,
-        p_comprovante: publicUrlData.publicUrl
+        p_comprovante: publicUrl
       });
 
-      if (error || !data?.success) throw new Error(data?.error || 'Erro ao vincular comprovante.');
+      if (rpcError) {
+          console.error("Erro na RPC:", rpcError);
+          throw new Error('O servidor recusou a validação (Erro 400). Tente novamente em instantes.');
+      }
 
-      toast.success('Comprovante enviado! Aguarde a liberação da sua cartela.');
-      buscarBingo(resultadoBingo.codigo_validacao); // Recarrega a tela
+      if (!data?.success) throw new Error(data?.error || 'Erro desconhecido ao processar.');
+
+      toast.success('Comprovante enviado com sucesso!');
+      buscarBingo(resultadoBingo.codigo_validacao); // Atualiza a tela
     } catch (e: any) {
       toast.error(e.message);
     } finally {
@@ -231,7 +224,7 @@ export default function ValidarCartela() {
                       </div>
                       <Button className="w-full bg-amber-600 hover:bg-amber-700 h-12 text-white font-bold" onClick={handleEnviarComprovante} disabled={!clienteNome || !comprovanteFile || isEnviandoComprovante}>
                         {isEnviandoComprovante ? <Loader2 className="w-5 h-5 mr-2 animate-spin" /> : <CheckCircle className="w-5 h-5 mr-2" />}
-                        ENVIAR COMPROVANTE SEGURO
+                        ENVIAR COMPROVANTE AGORA
                       </Button>
                     </div>
                   </div>
@@ -254,7 +247,6 @@ export default function ValidarCartela() {
                         </div>
                       </div>
                     </div>
-                    {/* ... grid renders existings ... */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       {resultadoBingo.processedGrids.map((g: any, i: number) => (
                         <div key={i} className={`card-container p-4 border-2 transition-all ${g.isWinner ? 'border-success bg-success/5 shadow-lg shadow-success/10 scale-[1.02]' : 'border-border opacity-80'}`}>
