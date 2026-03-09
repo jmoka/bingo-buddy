@@ -54,7 +54,7 @@ export default function VendedorImprimirBingo() {
           const pagarUrl = `${BASE_URL}/pagar-cartela?codigo=${folha.codigo_validacao}`;
           
           return (
-            <div key={folha.id} className={cn("max-w-[210mm] mx-auto p-4 sm:p-8 print:p-0 w-full", index < folhas.length - 1 && "print:break-after-page")}>
+            <div key={folha.id} className={cn("max-w-4xl mx-auto p-4 sm:p-8 print:p-0 w-full", index < folhas.length - 1 && "print:break-after-page")}>
               <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200 print:shadow-none print:border-none print:p-0">
                 
                 <div className="flex justify-between items-start border-b-2 border-dashed border-gray-400 pb-4 mb-5">
@@ -97,23 +97,48 @@ export default function VendedorImprimirBingo() {
                   </div>
                 </div>
 
-                <div className={`grid gap-4 ${grids.length > 2 ? 'grid-cols-2' : 'grid-cols-1 max-w-sm mx-auto'}`}>
+                <div className={cn(
+                  "grid gap-4 print:gap-2",
+                  grids.length > 1 ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-1 max-w-md mx-auto"
+                )}>
                   {grids.map((grid, gridIdx) => (
-                    <div key={gridIdx} className="border-2 border-gray-800 rounded-lg p-2 bg-gray-50/50">
-                      <div className="flex justify-between items-center mb-2 px-1">
-                        <p className="text-[10px] font-bold text-gray-400">CARTELA {gridIdx + 1}</p>
-                        <p className="text-[10px] font-mono text-gray-400">{folha.codigo_validacao}-{gridIdx+1}</p>
+                    <div key={gridIdx} className="border-2 border-gray-800 rounded-lg p-2 bg-white break-inside-avoid overflow-hidden">
+                      <div className="flex justify-between items-center mb-1 px-1">
+                        <p className="text-[9px] font-bold text-gray-500">CARTELA {gridIdx + 1}</p>
+                        <p className="text-[9px] font-mono text-gray-400">{folha.codigo_validacao}-{gridIdx+1}</p>
                       </div>
-                      <table className="w-full text-center border-collapse bg-white">
+                      <table className="w-full text-center border-collapse bg-white table-fixed border-2 border-gray-800">
                         <thead>
-                          <tr>{['B', 'I', 'N', 'G', 'O'].map((letra, i) => (<th key={letra} className={`w-1/5 py-1.5 text-xl font-black border-2 border-gray-800 ${['bg-blue-100', 'bg-red-100', 'bg-gray-100', 'bg-green-100', 'bg-orange-100'][i]}`}>{letra}</th>))}</tr>
+                          <tr>
+                            {['B', 'I', 'N', 'G', 'O'].map((letra, i) => (
+                              <th
+                                key={letra}
+                                className={cn(
+                                  "w-1/5 py-1 text-lg sm:text-xl font-black border-2 border-gray-800",
+                                  ['bg-blue-100', 'bg-red-100', 'bg-gray-100', 'bg-green-100', 'bg-orange-100'][i]
+                                )}
+                              >
+                                {letra}
+                              </th>
+                            ))}
+                          </tr>
                         </thead>
                         <tbody>
                           {grid.map((linha, rowIndex) => (
                             <tr key={rowIndex}>
                               {linha.map((num, colIndex) => {
                                 const isMeio = rowIndex === 2 && colIndex === 2;
-                                return <td key={colIndex} className={`py-2 text-xl sm:text-2xl font-bold border-2 border-gray-800 ${isMeio ? 'bg-gray-200' : ''}`}>{isMeio ? '★' : num}</td>;
+                                return (
+                                  <td
+                                    key={colIndex}
+                                    className={cn(
+                                      "py-1.5 text-lg sm:text-2xl font-bold border-2 border-gray-800",
+                                      isMeio ? 'bg-gray-100' : 'bg-white'
+                                    )}
+                                  >
+                                    {isMeio ? '★' : num}
+                                  </td>
+                                );
                               })}
                             </tr>
                           ))}
