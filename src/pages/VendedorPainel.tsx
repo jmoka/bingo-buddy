@@ -63,6 +63,9 @@ const VendedorPainel = () => {
   const [selectedFolhas, setSelectedFolhas] = useState<Set<string>>(new Set());
   const [bingoFilterMatchId, setBingoFilterMatchId] = useState<string>('todas');
   const [rifaFilterId, setRifaFilterId] = useState<string>('todas');
+  
+  // Filtros Acertos
+  const [acertoTipoFilter, setAcertoTipoFilter] = useState<'todos' | 'bingo' | 'rifa'>('todos');
   const [acertoBingoFilterId, setAcertoBingoFilterId] = useState<string>('todas');
   const [acertoRifaFilterId, setAcertoRifaFilterId] = useState<string>('todas');
 
@@ -100,7 +103,6 @@ const VendedorPainel = () => {
   const uniqueRifasReservadas = useMemo(() => {
     const map = new Map<string, string>();
     minhasReservas.forEach(r => {
-      // Filtrar apenas as que estão ATIVAS
       if (r.rifa_id && r.rifas?.nome && r.rifas?.status === 'ativa') {
         map.set(r.rifa_id, r.rifas.nome);
       }
@@ -156,15 +158,15 @@ const VendedorPainel = () => {
   const allFilteredSelected = filteredFolhas.length > 0 && filteredFolhas.every(f => selectedFolhas.has(f.id));
 
   const isAllFilteredAcertosSelected = () => {
-    const bingoIds = filteredPendingFolhas.map(f => f.id);
-    const rifaIds = filteredPendingVendas.map(v => v.id);
+    const bingoIds = acertoTipoFilter !== 'rifa' ? filteredPendingFolhas.map(f => f.id) : [];
+    const rifaIds = acertoTipoFilter !== 'bingo' ? filteredPendingVendas.map(v => v.id) : [];
     if (bingoIds.length === 0 && rifaIds.length === 0) return false;
     return bingoIds.every(id => selectedAcertosBingo.has(id)) && rifaIds.every(id => selectedAcertosRifa.has(id));
   };
 
   const handleSelectAllAcertos = () => {
-    const bingoIds = filteredPendingFolhas.map(f => f.id);
-    const rifaIds = filteredPendingVendas.map(v => v.id);
+    const bingoIds = acertoTipoFilter !== 'rifa' ? filteredPendingFolhas.map(f => f.id) : [];
+    const rifaIds = acertoTipoFilter !== 'bingo' ? filteredPendingVendas.map(v => v.id) : [];
     
     if (isAllFilteredAcertosSelected()) {
         const nextBingo = new Set(selectedAcertosBingo);
@@ -376,6 +378,9 @@ const VendedorPainel = () => {
     );
   }
 
+  const showBingoSection = acertoTipoFilter !== 'rifa' && filteredPendingFolhas.length > 0;
+  const showRifaSection = acertoTipoFilter !== 'bingo' && filteredPendingVendas.length > 0;
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -495,7 +500,7 @@ const VendedorPainel = () => {
                   <ShoppingBag className="w-8 h-8 mx-auto mb-2 opacity-30" /> Nenhuma reserva ativa para a seleção atual.
                 </div>
               ) : (
-                Object.entries(reservasPorRifa).map(([rifaId, numeros]) => (
+                Object.entries(reservasPorRifa).filter(([, nums]) => nums[0]?.rifas?.status === 'ativa').map(([rifaId, numeros]) => (
                     <div key={rifaId} className="space-y-3 bg-muted/30 p-3 rounded-lg border border-border/50">
                       <div className="flex items-center justify-between">
                         <h4 className="font-heading font-bold text-sm">{numeros[0]?.rifas?.nome ?? 'Rifa'}</h4>
@@ -674,29 +679,44 @@ const VendedorPainel = () => {
                   <p className="text-xs font-semibold text-muted-foreground ml-2 whitespace-nowrap">Filtre para facilitar o acerto:</p>
                   
                   <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-                    <Select value={acertoBingoFilterId} onValueChange={setAcertoBingoFilterId}>
+                    <Select value={acertoTipoFilter} onValueChange={(v: any) => setAcertoTipoFilter(v)}>
                       <SelectTrigger className="h-8 w-full sm:w-[150px] text-xs">
-                        <SelectValue placeholder="Todos os Bingos" />
+                        <SelectValue placeholder="Tipo" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="todas">Todos os Bingos</SelectItem>
-                        {uniquePendingBingoMatches.map(m => (
-                          <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>
-                        ))}
+                        <SelectItem value="todos">Todos (Bingo+Rifa)</SelectItem>
+                        <SelectItem value="bingo">Somente Bingos</SelectItem>
+                        <SelectItem value="rifa">Somente Rifas</SelectItem>
                       </SelectContent>
                     </Select>
+
+                    {acertoTipoFilter !== 'rifa' && (
+                      <Select value={acertoBingoFilterId} onValueChange={setAcertoBingoFilterId}>
+                        <SelectTrigger className="h-8 w-full sm:w-[150px] text-xs">
+                          <SelectValue placeholder="Todos os Bingos" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="todas">Todos os Bingos</SelectItem>
+                          {uniquePendingBingoMatches.map(m => (
+                            <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
                     
-                    <Select value={acertoRifaFilterId} onValueChange={setAcertoRifaFilterId}>
-                      <SelectTrigger className="h-8 w-full sm:w-[150px] text-xs">
-                        <SelectValue placeholder="Todas as Rifas" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="todas">Todas as Rifas</SelectItem>
-                        {uniquePendingRifas.map(r => (
-                          <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    {acertoTipoFilter !== 'bingo' && (
+                      <Select value={acertoRifaFilterId} onValueChange={setAcertoRifaFilterId}>
+                        <SelectTrigger className="h-8 w-full sm:w-[150px] text-xs">
+                          <SelectValue placeholder="Todas as Rifas" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="todas">Todas as Rifas</SelectItem>
+                          {uniquePendingRifas.map(r => (
+                            <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
 
                     <Button variant="outline" size="sm" onClick={handleSelectAllAcertos} className="w-full sm:w-auto">
                        {isAllFilteredAcertosSelected() ? 'Limpar Visíveis' : 'Selecionar Visíveis'}
@@ -705,7 +725,7 @@ const VendedorPainel = () => {
                 </div>
 
                 {/* Lista de Vendas Pendentes (Bingo) */}
-                {filteredPendingFolhas.length > 0 && (
+                {showBingoSection && (
                   <div className="space-y-2">
                     <p className="text-[10px] font-bold uppercase tracking-wider text-purple-700 dark:text-purple-400">Bingo Físico</p>
                     {filteredPendingFolhas.map(f => (
@@ -726,7 +746,7 @@ const VendedorPainel = () => {
                 )}
 
                 {/* Lista de Vendas Pendentes (Rifa) */}
-                {filteredPendingVendas.length > 0 && (
+                {showRifaSection && (
                   <div className="space-y-2 mt-4">
                     <p className="text-[10px] font-bold uppercase tracking-wider text-blue-700 dark:text-blue-400">Rifas</p>
                     {filteredPendingVendas.map(v => (
@@ -753,7 +773,7 @@ const VendedorPainel = () => {
                   </div>
                 )}
                 
-                {filteredPendingFolhas.length === 0 && filteredPendingVendas.length === 0 && pendentesTotais > 0 && (
+                {!showBingoSection && !showRifaSection && pendentesTotais > 0 && (
                   <div className="p-6 text-center text-muted-foreground bg-muted/20 rounded-xl border border-dashed">
                     Nenhum item pendente para a seleção atual dos filtros.
                   </div>
