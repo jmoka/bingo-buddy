@@ -450,12 +450,20 @@ const Lobby = () => {
                   )}
                   {match.status === 'open' && (
                     <>
-                      {alreadyJoined && (
-                        <Button variant="ghost" size="sm" className="text-destructive" onClick={() => leaveMatch(match.id)}>Sair</Button>
+                      {isAdmin ? (
+                        <Button size="sm" className="gradient-accent text-white font-bold" onClick={() => navigate(`/admin`)}>
+                          <Settings className="w-4 h-4 mr-2" /> GERENCIAR
+                        </Button>
+                      ) : (
+                        <>
+                          {alreadyJoined && (
+                            <Button variant="ghost" size="sm" className="text-destructive" onClick={() => leaveMatch(match.id)}>Sair</Button>
+                          )}
+                          <Button size="sm" className="gradient-accent text-white font-bold" onClick={() => openJoinDialog(match)}>
+                            {!profile ? 'LOGIN PARA ENTRAR' : alreadyJoined ? 'ADICIONAR MAIS' : 'ENTRAR'}
+                          </Button>
+                        </>
                       )}
-                      <Button size="sm" className="gradient-accent text-white font-bold" onClick={() => openJoinDialog(match)}>
-                        {!profile ? 'LOGIN PARA ENTRAR' : alreadyJoined ? 'ADICIONAR MAIS' : 'ENTRAR'}
-                      </Button>
                     </>
                   )}
                 </div>
@@ -618,7 +626,7 @@ const Lobby = () => {
             </Tabs>
           </section>
 
-          {profile && (
+          {profile && !isAdmin && (
             <section>
               <div className="flex items-center justify-between mb-4 gap-2">
                 <div className="flex items-center gap-2">

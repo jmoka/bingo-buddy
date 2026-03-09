@@ -61,19 +61,21 @@ export const AppHeader = () => {
     setIsRecharging(false);
   };
 
+  const isAdmin = profile.role === 'admin';
+
   const menuItems = [
-    {
+    ...(!isAdmin ? [{
       dialog: <CreditRequestDialog gameSettings={gameSettings}><Button variant="ghost" className="w-full justify-start text-base py-6"><Plus className="w-5 h-5 mr-4" />Solicitar Créditos</Button></CreditRequestDialog>,
-    },
-    {
+    }] : []),
+    ...(!isAdmin ? [{
       dialog: <RedeemRequestDialog><Button variant="ghost" className="w-full justify-start text-base py-6"><Banknote className="w-5 h-5 mr-4" />Resgatar Créditos</Button></RedeemRequestDialog>,
-    },
-    {
+    }] : []),
+    ...(!isAdmin ? [{
       dialog: <MyCreditRequestsDialog><Button variant="ghost" className="w-full justify-start text-base py-6"><History className="w-5 h-5 mr-4" />Histórico de Créditos</Button></MyCreditRequestsDialog>,
-    },
-    {
+    }] : []),
+    ...(!isAdmin ? [{
       dialog: <MyRedeemRequestsDialog><Button variant="ghost" className="w-full justify-start text-base py-6"><Banknote className="w-5 h-5 mr-4" />Meus Resgates</Button></MyRedeemRequestsDialog>,
-    },
+    }] : []),
     {
       action: () => navigate('/ranking'),
       label: 'Hall da Fama (Ranking)',
@@ -94,22 +96,22 @@ export const AppHeader = () => {
       label: 'Painel do Vendedor',
       icon: UserCheck,
     }] : []),
-    ...(profile.role !== 'vendedor' ? [{
+    ...(!isAdmin && profile.role !== 'vendedor' ? [{
       action: () => navigate('/solicitar-vendedor'),
       label: 'Ser Vendedor de Rifas',
       icon: UserCheck,
     }] : []),
-    ...(profile.role === 'admin' ? [{
+    ...(isAdmin ? [{
       action: () => navigate('/admin'),
       label: 'Painel Admin',
       icon: ShieldCheck,
     }] : []),
-    {
+    ...(!isAdmin ? [{
       action: () => navigate('/print'),
       label: 'Imprimir Cartelas',
       icon: Printer,
       disabled: myOwnedCards.length === 0,
-    },
+    }] : []),
   ];
 
   return (
@@ -120,25 +122,29 @@ export const AppHeader = () => {
         </a>
         <div className="flex items-center gap-1 sm:gap-2">
           {/* Saldo Real */}
-          <div className="flex items-center gap-1 bg-muted rounded-full px-2 py-1.5 sm:px-3" title="Créditos Reais">
-            <Wallet className="w-3.5 h-3.5 text-foreground" />
-            <span className="font-heading font-bold text-sm sm:text-base text-foreground">{Number(profile.credits || 0).toFixed(2)}</span>
-          </div>
+          {!isAdmin && (
+            <div className="flex items-center gap-1 bg-muted rounded-full px-2 py-1.5 sm:px-3" title="Créditos Reais">
+              <Wallet className="w-3.5 h-3.5 text-foreground" />
+              <span className="font-heading font-bold text-sm sm:text-base text-foreground">{Number(profile.credits || 0).toFixed(2)}</span>
+            </div>
+          )}
           
           {/* Saldo de Brincar com Botão de Recarga */}
-          <div className="flex items-center gap-1 bg-amber-400/10 rounded-full pl-2 pr-1 py-1 sm:pl-3 border border-amber-400/20" title="Créditos de Brincar">
-            <Star className="w-3.5 h-3.5 text-amber-600" />
-            <span className="font-heading font-bold text-sm sm:text-base text-amber-600 mr-1">{Number(profile.fake_credits || 0).toFixed(2)}</span>
-            <Button 
-                variant="ghost" 
-                size="icon" 
-                className="h-6 w-6 rounded-full hover:bg-amber-400/20 text-amber-600"
-                onClick={handleRechargeFake}
-                disabled={isRecharging}
-            >
-                <Plus className={`w-3 h-3 ${isRecharging ? 'animate-spin' : ''}`} />
-            </Button>
-          </div>
+          {!isAdmin && (
+            <div className="flex items-center gap-1 bg-amber-400/10 rounded-full pl-2 pr-1 py-1 sm:pl-3 border border-amber-400/20" title="Créditos de Brincar">
+              <Star className="w-3.5 h-3.5 text-amber-600" />
+              <span className="font-heading font-bold text-sm sm:text-base text-amber-600 mr-1">{Number(profile.fake_credits || 0).toFixed(2)}</span>
+              <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="h-6 w-6 rounded-full hover:bg-amber-400/20 text-amber-600"
+                  onClick={handleRechargeFake}
+                  disabled={isRecharging}
+              >
+                  <Plus className={`w-3 h-3 ${isRecharging ? 'animate-spin' : ''}`} />
+              </Button>
+            </div>
+          )}
 
           <button
             onClick={() => navigate('/account')}
