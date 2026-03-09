@@ -65,6 +65,7 @@ const App = () => (
               <Route path="/rifas" element={<Layout><Rifas /></Layout>} />
               <Route path="/rifas/:id" element={<Layout><RifaView /></Layout>} />
               <Route path="/vendedor/perfil/:codigo" element={<VendedorPerfilPublico />} />
+              <Route path="/validar-cartela" element={<Layout><ValidarCartela /></Layout>} />
               
               {/* Rotas Privadas */}
               <Route path="/account" element={<ProtectedRoute><Account /></ProtectedRoute>} />
@@ -84,7 +85,6 @@ const App = () => (
               <Route path="/vendedor/imprimir/:rifaId" element={<ProtectedRoute><VendedorCartelas /></ProtectedRoute>} />
               <Route path="/vendedor/painel" element={<ProtectedRoute><VendedorPainel /></ProtectedRoute>} />
               <Route path="/solicitar-vendedor" element={<ProtectedRoute><SolicitarVendedor /></ProtectedRoute>} />
-              <Route path="/validar-cartela" element={<ProtectedRoute><ValidarCartela /></ProtectedRoute>} />
               <Route path="/admin/vendedores" element={<ProtectedRoute><VendedoresAdmin /></ProtectedRoute>} />
               <Route path="/vendedor/imprimir-bingo/:folhaId" element={<ProtectedRoute><VendedorImprimirBingo /></ProtectedRoute>} />
               <Route path="*" element={<NotFound />} />
