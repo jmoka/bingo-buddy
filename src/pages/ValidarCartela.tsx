@@ -49,6 +49,22 @@ export default function ValidarCartela() {
     supabase.from('rifas').select('id, nome').eq('status', 'ativa').order('nome').then(({ data }) => {
       if (data) setRifasAbertas(data);
     });
+    
+    // Limpa tokens bugados do LocalStorage para evitar o "Invalid Refresh Token" no console de usuários anônimos
+    for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.includes('supabase.auth.token')) {
+            const tokenStr = localStorage.getItem(key);
+            if (tokenStr && tokenStr.includes('expires_at')) {
+                try {
+                    const tokenData = JSON.parse(tokenStr);
+                    if (tokenData.expires_at && tokenData.expires_at < Math.floor(Date.now() / 1000)) {
+                        localStorage.removeItem(key);
+                    }
+                } catch (e) {}
+            }
+        }
+    }
   }, []);
 
   useEffect(() => {
@@ -92,26 +108,31 @@ export default function ValidarCartela() {
     if (!clienteNome.trim() || !comprovanteFile || !resultadoBingo) return;
     setIsEnviandoComprovante(true);
     try {
+      console.log("Iniciando upload de comprovante para o bucket: comprovantes_bingo");
       const ext = comprovanteFile.name.split('.').pop();
-      const path = `comprovantes_anon/${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${ext}`;
+      const path = `file_${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${ext}`;
       
-      const { error: uploadError } = await supabase.storage.from('avatars').upload(path, comprovanteFile);
-      if (uploadError) throw new Error('Falha no upload do arquivo.');
+      // Enviando para o bucket comprovantes_bingo (Aceita imagens e PDFs)
+      const { error: uploadError } = await supabase.storage.from('comprovantes_bingo').upload(path, comprovanteFile);
+      if (uploadError) {
+          console.error("Erro de upload:", uploadError);
+          throw new Error('Falha no upload do arquivo. Detalhe: ' + uploadError.message);
+      }
 
-      const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(path);
+      const { data: publicUrlData } = supabase.storage.from('comprovantes_bingo').getPublicUrl(path);
 
       const { data, error } = await supabase.rpc('enviar_comprovante_cliente_bingo', {
         p_codigo: resultadoBingo.codigo_validacao,
         p_nome: clienteNome,
-        p_telefone: clienteTelefone,
-        p_endereco: clienteEndereco,
-        p_comprovante: publicUrl
+        p_telefone: clienteTelefone.trim() || null,
+        p_endereco: clienteEndereco.trim() || null,
+        p_comprovante: publicUrlData.publicUrl
       });
 
       if (error || !data?.success) throw new Error(data?.error || 'Erro ao vincular comprovante.');
 
       toast.success('Comprovante enviado! Aguarde a liberação da sua cartela.');
-      buscarBingo(resultadoBingo.codigo_validacao); // Recarrega
+      buscarBingo(resultadoBingo.codigo_validacao); // Recarrega a tela
     } catch (e: any) {
       toast.error(e.message);
     } finally {
@@ -205,12 +226,12 @@ export default function ValidarCartela() {
                         <input ref={fileRef} type="file" accept="image/*,application/pdf" className="hidden" onChange={e => setComprovanteFile(e.target.files?.[0] || null)} />
                         <Button type="button" variant="outline" className="w-full h-12 border-dashed border-2 bg-muted/30" onClick={() => fileRef.current?.click()}>
                           <UploadCloud className="w-5 h-5 mr-2 text-muted-foreground" />
-                          <span className="truncate max-w-[200px]">{comprovanteFile ? comprovanteFile.name : 'Anexar imagem do PIX pago'}</span>
+                          <span className="truncate max-w-[200px]">{comprovanteFile ? comprovanteFile.name : 'Anexar imagem ou PDF do PIX pago'}</span>
                         </Button>
                       </div>
                       <Button className="w-full bg-amber-600 hover:bg-amber-700 h-12 text-white font-bold" onClick={handleEnviarComprovante} disabled={!clienteNome || !comprovanteFile || isEnviandoComprovante}>
                         {isEnviandoComprovante ? <Loader2 className="w-5 h-5 mr-2 animate-spin" /> : <CheckCircle className="w-5 h-5 mr-2" />}
-                        ENVIAR PARA VALIDAÇÃO
+                        ENVIAR COMPROVANTE SEGURO
                       </Button>
                     </div>
                   </div>
@@ -263,10 +284,94 @@ export default function ValidarCartela() {
 
           {/* Rifas tab remains intact... */}
           <TabsContent value="rifa" className="space-y-4 mt-4">
-             {/* ... */}
+             <div className="card-container p-6 space-y-4 bg-muted/30">
+               <div className="space-y-2">
+                 <Label>Sorteio Específico (Opcional)</Label>
+                 <Select value={rifaIdSelecionada} onValueChange={setRifaIdSelecionada}>
+                   <SelectTrigger><SelectValue placeholder="Todas as rifas" /></SelectTrigger>
+                   <SelectContent>
+                     <SelectItem value="todas">Todas as rifas ativas</SelectItem>
+                     {rifasAbertas.map(r => <SelectItem key={r.id} value={r.id}>{r.nome}</SelectItem>)}
+                   </SelectContent>
+                 </Select>
+               </div>
+               <div className="space-y-2">
+                 <Label>Número da Cota</Label>
+                 <div className="flex gap-2">
+                   <Input type="number" value={numeroRifa} onChange={e => setNumeroRifa(e.target.value)} onKeyDown={e => e.key === 'Enter' && buscarNumeroRifa()} placeholder="Ex: 42" className="text-lg h-12" />
+                   <Button className="h-12 w-12" onClick={buscarNumeroRifa} disabled={loadingRifa}>{loadingRifa ? <Loader2 className="h-5 w-5 animate-spin" /> : <Search className="h-5 w-5" />}</Button>
+                 </div>
+               </div>
+             </div>
+             {buscadoRifa && (!resultadoRifa || resultadoRifa.length === 0) && (
+               <div className="card-container p-6 border-muted bg-muted/20 text-center"><Hash className="h-12 w-12 text-muted-foreground/30 mx-auto mb-3" /><p className="font-bold text-lg text-muted-foreground">Número não encontrado ou ainda está disponível.</p></div>
+             )}
+             {buscadoRifa && resultadoRifa && resultadoRifa.length > 0 && (
+               <div className="space-y-4">
+                 {resultadoRifa.map((num: any, idx: number) => {
+                   const isGanhador = num.rifas?.status === 'finalizada' && num.rifas?.numero_ganhador === num.numero;
+                   const isPago = num.status === 'vendido';
+                   const isFiado = num.status === 'reservado';
+                   return (
+                     <div key={idx} className={`card-container p-6 border-2 ${isGanhador ? 'border-success bg-success/10' : isPago ? 'border-primary/30 bg-primary/5' : 'border-amber-400 bg-amber-50'}`}>
+                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4 border-b pb-4">
+                         <div className="flex items-center gap-3">
+                           {isGanhador ? <Trophy className="h-8 w-8 text-success" /> : isPago ? <CheckCircle className="h-8 w-8 text-primary" /> : <AlertTriangle className="h-8 w-8 text-amber-500" />}
+                           <div><p className={`font-bold text-lg leading-tight ${isGanhador ? 'text-success' : isPago ? 'text-primary' : 'text-amber-700'}`}>{isGanhador ? 'Cota Vencedora!' : isPago ? 'Cota Válida e Paga' : 'Cota Reservada (Fiado)'}</p><p className="text-sm font-medium opacity-80">{num.rifas?.nome}</p></div>
+                         </div>
+                         <div className="text-center sm:text-right">
+                           <p className="text-[10px] uppercase font-bold text-muted-foreground mb-1">Número</p>
+                           <p className={`text-4xl font-black font-heading ${isGanhador ? 'text-success' : 'text-foreground'}`}>{String(num.numero).padStart(3, '0')}</p>
+                         </div>
+                       </div>
+                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+                         <div className="space-y-1"><p className="text-xs text-muted-foreground font-bold uppercase">Comprador</p><p className="font-semibold text-base">{num.nome_comprador || 'Nome não registrado'}</p></div>
+                         <div className="space-y-1"><p className="text-xs text-muted-foreground font-bold uppercase">Situação Financeira</p><p className="font-semibold flex items-center gap-1.5">{isPago ? <Badge className="bg-success text-white border-none">PAGO</Badge> : <Badge variant="outline" className="text-amber-600 border-amber-400 bg-amber-100">AGUARDANDO PAGAMENTO</Badge>}</p></div>
+                       </div>
+                     </div>
+                   );
+                 })}
+               </div>
+             )}
           </TabsContent>
+
           <TabsContent value="cartela" className="space-y-4 mt-4">
-             {/* ... */}
+             <div className="card-container p-6 space-y-4 bg-muted/30">
+               <div className="space-y-2">
+                 <Label>Código de Validação da Cota (Rifa)</Label>
+                 <div className="flex gap-2">
+                   <Input value={codigoCartela} onChange={e => setCodigoCartela(e.target.value.toUpperCase())} onKeyDown={e => e.key === 'Enter' && buscarCartela()} placeholder="Ex: AB12CD" className="font-mono uppercase text-lg h-12" />
+                   <Button className="h-12 w-12" onClick={() => buscarCartela()} disabled={loadingCartela}>{loadingCartela ? <Loader2 className="h-5 w-5 animate-spin" /> : <Search className="h-5 w-5" />}</Button>
+                 </div>
+               </div>
+             </div>
+             {buscadoCartela && !resultadoCartela && (
+               <div className="card-container p-6 border-red-300 bg-red-50 text-center"><XCircle className="h-12 w-12 text-red-500 mx-auto mb-3" /><p className="font-bold text-lg text-red-700">Código não encontrado</p></div>
+             )}
+             {buscadoCartela && resultadoCartela && (() => {
+               const c = resultadoCartela;
+               const isPago = c.compras_rifa?.status === 'pago';
+               const isFiado = c.compras_rifa?.status === 'pendente';
+               const isGanhador = c.compras_rifa?.rifas?.status === 'finalizada' && c.compras_rifa?.rifas?.numero_ganhador === c.numeros_rifa?.numero;
+               return (
+                 <div className={`card-container p-6 border-2 ${isGanhador ? 'border-success bg-success/10' : isPago ? 'border-primary/30 bg-primary/5' : 'border-amber-400 bg-amber-50'}`}>
+                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4 border-b pb-4">
+                     <div className="flex items-center gap-3">
+                       {isGanhador ? <Trophy className="h-8 w-8 text-success" /> : isPago ? <CheckCircle className="h-8 w-8 text-primary" /> : <AlertTriangle className="h-8 w-8 text-amber-500" />}
+                       <div><p className={`font-bold text-lg leading-tight ${isGanhador ? 'text-success' : isPago ? 'text-primary' : 'text-amber-700'}`}>{isGanhador ? 'Cota Vencedora!' : isPago ? 'Cota Válida e Paga' : 'Cota Reservada (Fiado)'}</p><p className="text-sm font-medium opacity-80">{c.compras_rifa?.rifas?.nome}</p></div>
+                     </div>
+                     <div className="text-center sm:text-right">
+                       <p className="text-[10px] uppercase font-bold text-muted-foreground mb-1">Número</p>
+                       <p className={`text-4xl font-black font-heading ${isGanhador ? 'text-success' : 'text-foreground'}`}>{String(c.numeros_rifa?.numero).padStart(3, '0')}</p>
+                     </div>
+                   </div>
+                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+                     <div className="space-y-1"><p className="text-xs text-muted-foreground font-bold uppercase">Comprador</p><p className="font-semibold text-base">{c.numeros_rifa?.nome_comprador || 'Nome não registrado'}</p></div>
+                     <div className="space-y-1"><p className="text-xs text-muted-foreground font-bold uppercase">Situação Financeira</p><p className="font-semibold flex items-center gap-1.5">{isPago ? <Badge className="bg-success text-white border-none">PAGO</Badge> : <Badge variant="outline" className="text-amber-600 border-amber-400 bg-amber-100">AGUARDANDO PAGAMENTO</Badge>}</p></div>
+                   </div>
+                 </div>
+               );
+             })()}
           </TabsContent>
         </Tabs>
       </div>
