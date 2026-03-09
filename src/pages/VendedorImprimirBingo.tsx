@@ -57,18 +57,18 @@ export default function VendedorImprimirBingo() {
             <div key={folha.id} className={cn("max-w-4xl mx-auto p-4 sm:p-8 print:p-0 w-full", index < folhas.length - 1 && "print:break-after-page")}>
               <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200 print:shadow-none print:border-none print:p-0">
                 
-                <div className="flex justify-between items-start border-b-2 border-dashed border-gray-400 pb-4 mb-5">
-                  <div className="flex flex-col h-full justify-between flex-1 pr-4">
+                <div className="flex flex-col sm:flex-row justify-between items-start border-b-2 border-dashed border-gray-400 pb-4 mb-5 gap-4">
+                  <div className="flex flex-col h-full justify-between flex-1 w-full">
                     <div>
-                      <h2 className="text-2xl font-black uppercase text-gray-900">{folha.partidas?.name}</h2>
-                      <p className="text-sm font-bold text-gray-600 mt-0.5 mb-3">
-                        CÓDIGO OFICIAL: <span className="font-mono text-black text-base ml-1">{folha.codigo_validacao}</span>
+                      <h2 className="text-xl sm:text-2xl font-black uppercase text-gray-900 leading-tight">{folha.partidas?.name}</h2>
+                      <p className="text-xs sm:text-sm font-bold text-gray-600 mt-1 mb-3">
+                        CÓDIGO OFICIAL: <span className="font-mono text-black text-sm sm:text-base ml-1">{folha.codigo_validacao}</span>
                       </p>
                     </div>
 
                     <div className="flex items-center gap-3">
                       <div className="shrink-0 flex flex-col items-center">
-                        {folha.vendedores_rifa?.codigo_ref && <QRCodeSVG value={`${BASE_URL}/vendedor/perfil/${folha.vendedores_rifa.codigo_ref}`} size={45} />}
+                        {folha.vendedores_rifa?.codigo_ref && <QRCodeSVG value={`${BASE_URL}/vendedor/perfil/${folha.vendedores_rifa.codigo_ref}`} size={35} />}
                         <p className="text-[6px] text-gray-400 font-bold mt-1 uppercase">Vendedor</p>
                       </div>
                       <div className="flex-1 min-w-0">
@@ -82,17 +82,17 @@ export default function VendedorImprimirBingo() {
                     </div>
                   </div>
                   
-                  <div className="flex gap-4 shrink-0">
+                  <div className="flex flex-row gap-2 sm:gap-4 shrink-0 items-start ml-auto sm:ml-0">
                     {folha.status === 'pendente' && (
-                      <div className="text-center flex flex-col items-center border border-green-500 bg-green-50 rounded p-1.5">
-                        <p className="text-[8px] font-black text-green-700 flex items-center gap-1 mb-0.5"><Banknote className="w-3 h-3" /> PAGAR PIX (R$ {valorCheio.toFixed(2)})</p>
-                        <div className="p-1 bg-white rounded shadow-sm"><QRCodeSVG value={pagarUrl} size={60} /></div>
-                        <p className="text-[6px] text-green-700 font-bold mt-0.5 max-w-[70px] leading-tight">Escaneie para pagar e validar</p>
+                      <div className="text-center flex flex-col items-center border border-green-500 bg-green-50 rounded p-1.5 min-w-[75px]">
+                        <p className="text-[7px] font-black text-green-700 flex items-center gap-1 mb-0.5 uppercase"><Banknote className="w-2.5 h-2.5" /> PAGAR PIX</p>
+                        <div className="p-1 bg-white rounded shadow-sm"><QRCodeSVG value={pagarUrl} size={45} /></div>
+                        <p className="text-[8px] font-bold text-green-800 mt-0.5">R$ {valorCheio.toFixed(2)}</p>
                       </div>
                     )}
-                    <div className="text-center flex flex-col items-center">
-                      <p className="text-[8px] font-black text-gray-600 mb-1 pt-1">VALIDAR BINGO</p>
-                      <div className="p-1.5 border border-gray-300 rounded bg-white"><QRCodeSVG value={`${BASE_URL}/validar-cartela?bingo=${folha.codigo_validacao}`} size={60} /></div>
+                    <div className="text-center flex flex-col items-center min-w-[75px]">
+                      <p className="text-[7px] font-black text-gray-600 mb-1 pt-1 uppercase">VALIDAR BINGO</p>
+                      <div className="p-1 border border-gray-300 rounded bg-white shadow-sm"><QRCodeSVG value={`${BASE_URL}/validar-cartela?bingo=${folha.codigo_validacao}`} size={45} /></div>
                     </div>
                   </div>
                 </div>
