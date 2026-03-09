@@ -2,7 +2,7 @@ import { useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
-import { ArrowRight, Users, ShieldCheck, Coins, Ticket } from 'lucide-react';
+import { ArrowRight, Users, ShieldCheck, Coins, Ticket, SmartphoneNfc } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useGame } from '@/contexts/GameContext';
 import { useRifaAdmin } from '@/hooks/useRifaAdmin';
@@ -14,7 +14,7 @@ const Admin = () => {
   const navigate = useNavigate();
   const { profile } = useAuth();
   const { allCreditRequests, allRedeemRequests, players, gameSettings } = useGame();
-  const { solicitacoesVendedor } = useRifaAdmin();
+  const { solicitacoesVendedor, todasFolhasBingo } = useRifaAdmin();
 
   useEffect(() => {
     if (profile && profile.role !== 'admin') {
@@ -35,13 +35,31 @@ const Admin = () => {
 
   const pendingRequestsCount = (allCreditRequests || []).filter(r => r.status === 'pending').length;
   const pendingRedeemsCount = (allRedeemRequests || []).filter(r => r.status === 'pending').length;
+  
+  // LOGICA DE VENDEDORES: Inscrições + Pagamentos Diretos de Clientes
   const pendingVendedoresCount = solicitacoesVendedor.filter(s => s.status === 'pendente').length;
+  const pendingPixClientesCount = todasFolhasBingo.filter(f => f.status === 'em_analise').length;
+  const totalVendedoresPendencies = pendingVendedoresCount + pendingPixClientesCount;
 
   return (
     <>
       <div className="flex items-center justify-between mb-6">
         <h1 className="font-heading text-2xl md:text-3xl font-bold text-foreground">Painel Admin</h1>
       </div>
+
+      {/* Alerta de Pagamento Direto de Cliente */}
+      {pendingPixClientesCount > 0 && (
+        <div className="card-container bg-blue-50 border-2 border-blue-200 mb-6 p-4 flex items-center justify-between animate-pulse">
+          <div className="flex items-center gap-3 text-blue-700">
+            <SmartphoneNfc className="w-8 h-8" />
+            <div>
+              <p className="font-bold">Atenção: Pagamento de Cliente via PIX</p>
+              <p className="text-xs">Existem {pendingPixClientesCount} comprovante(s) enviado(s) por clientes de bingo físico para você conferir.</p>
+            </div>
+          </div>
+          <p className="text-[10px] font-black uppercase bg-blue-600 text-white px-2 py-1 rounded">Confira na aba Vendedores</p>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
         <div className="card-container p-4">
@@ -82,7 +100,14 @@ const Admin = () => {
           <TabsTrigger value="rifas" className="py-3">Rifas</TabsTrigger>
           <TabsTrigger value="vendedores" className="py-3 relative">
             Vendedores
-            {pendingVendedoresCount > 0 && <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-amber-500 text-[9px] font-bold text-white border border-background">{pendingVendedoresCount}</span>}
+            {totalVendedoresPendencies > 0 && (
+              <span className={cn(
+                "absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full text-[9px] font-bold text-white border border-background",
+                pendingPixClientesCount > 0 ? "bg-blue-600 animate-bounce" : "bg-amber-500"
+              )}>
+                {totalVendedoresPendencies}
+              </span>
+            )}
           </TabsTrigger>
           <TabsTrigger value="settings" className="py-3">Ajustes</TabsTrigger>
         </TabsList>
