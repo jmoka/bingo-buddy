@@ -62,6 +62,8 @@ const App = () => (
               <Route path="/login" element={<Login />} />
               {/* Rotas Públicas */}
               <Route path="/" element={<Layout><Lobby /></Layout>} />
+              <Route path="/active-players" element={<Layout><ActivePlayers /></Layout>} />
+              <Route path="/ranking" element={<Layout><Ranking /></Layout>} />
               <Route path="/rifas" element={<Layout><Rifas /></Layout>} />
               <Route path="/rifas/:id" element={<Layout><RifaView /></Layout>} />
               <Route path="/vendedor/perfil/:codigo" element={<VendedorPerfilPublico />} />
@@ -75,9 +77,7 @@ const App = () => (
               <Route path="/admin/redeem-requests" element={<ProtectedRoute><RedeemRequestsAdmin /></ProtectedRoute>} />
               <Route path="/match/:id" element={<ProtectedRoute><MatchView /></ProtectedRoute>} />
               <Route path="/print" element={<ProtectedRoute><PrintView /></ProtectedRoute>} />
-              <Route path="/active-players" element={<ProtectedRoute><ActivePlayers /></ProtectedRoute>} />
               <Route path="/trophies" element={<ProtectedRoute><Trophies /></ProtectedRoute>} />
-              <Route path="/ranking" element={<ProtectedRoute><Ranking /></ProtectedRoute>} />
               <Route path="/admin/rifas" element={<ProtectedRoute><RifasAdmin /></ProtectedRoute>} />
               <Route path="/admin/rifas/:id" element={<ProtectedRoute><RifaDetalheAdmin /></ProtectedRoute>} />
               <Route path="/vendedor" element={<ProtectedRoute><VendedorRifa /></ProtectedRoute>} />
