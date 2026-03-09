@@ -17,11 +17,10 @@ interface CreditRequestDialogProps {
 }
 
 export const CreditRequestDialog = ({ gameSettings, children }: CreditRequestDialogProps) => {
-  const { requestCredits, buyCreditsAutomatically } = useGame();
+  const { requestCredits } = useGame();
   const { profile } = useAuth();
   const [file, setFile] = useState<File | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [isAutoLoading, setIsAutoLoading] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   const [credits, setCredits] = useState<number>(10);
 
@@ -72,21 +71,6 @@ export const CreditRequestDialog = ({ gameSettings, children }: CreditRequestDia
       }
     } finally {
       setIsLoading(false);
-    }
-  };
-
-  const handleAutoBuy = async () => {
-    setIsAutoLoading(true);
-    try {
-      const success = await buyCreditsAutomatically(credits, amount);
-      if (success) {
-        toast.success('Compra concluída!', {
-          description: `${credits} créditos foram adicionados à sua conta instantaneamente.`,
-        });
-        setIsOpen(false);
-      }
-    } finally {
-      setIsAutoLoading(false);
     }
   };
 
@@ -148,12 +132,12 @@ export const CreditRequestDialog = ({ gameSettings, children }: CreditRequestDia
               <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Escolha como prosseguir</p>
               
               <Button 
-                className="w-full h-12 gradient-primary shadow-button font-bold" 
-                onClick={handleAutoBuy}
-                disabled={isAutoLoading || isLoading}
+                className="w-full h-12 bg-primary/20 text-primary/70 shadow-none font-bold" 
+                disabled={true}
+                title="Integração bancária em desenvolvimento"
               >
-                {isAutoLoading ? <Loader2 className="w-5 h-5 mr-2 animate-spin" /> : <Zap className="w-5 h-5 mr-2" />}
-                PAGAMENTO AUTOMÁTICO (PIX)
+                <Zap className="w-5 h-5 mr-2 opacity-50" />
+                PAGAMENTO AUTOMÁTICO (EM BREVE)
               </Button>
 
               <div className="relative py-2">
@@ -174,7 +158,7 @@ export const CreditRequestDialog = ({ gameSettings, children }: CreditRequestDia
                   variant="outline" 
                   className="w-full h-10" 
                   onClick={handleSubmit} 
-                  disabled={!file || isLoading || isAutoLoading}
+                  disabled={!file || isLoading}
                 >
                   {isLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Upload className="w-4 h-4 mr-2" />}
                   Enviar para Revisão Admin
