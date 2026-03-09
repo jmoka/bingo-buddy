@@ -68,7 +68,7 @@ export const useRifaAdmin = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('vendas_bingo_fisico')
-        .select('id, codigo_validacao, partidas(name)');
+        .select('*, partidas(name), vendedores_rifa(nome, codigo_ref)'); // CORREÇÃO: Puxa todas as colunas para o admin ver status e URL
       if (error) throw error;
       return data as any[];
     },
