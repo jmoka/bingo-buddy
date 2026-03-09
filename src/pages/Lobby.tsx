@@ -471,7 +471,7 @@ const Lobby = () => {
     <div className="space-y-6">
       {/* Banner Admin */}
       {isAdmin && totalPendingAdminActions > 0 && (
-         <div className="bg-amber-500/10 border-2 border-amber-500/50 rounded-xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm relative overflow-hidden">
+         <div className="bg-amber-500/10 border-2 border-amber-500/50 rounded-xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm relative overflow-hidden mb-6">
             <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/10 rounded-full blur-3xl -z-10" />
             <div className="flex items-start gap-3 z-10">
               <div className="bg-amber-500 p-2 rounded-full text-white animate-pulse shrink-0 shadow-md">
