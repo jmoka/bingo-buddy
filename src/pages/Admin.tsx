@@ -9,6 +9,7 @@ import { useRifaAdmin } from '@/hooks/useRifaAdmin';
 import MatchManager from '@/components/admin/MatchManager';
 import SettingsManager from '@/components/admin/SettingsManager';
 import VendedoresAdmin from './admin/VendedoresAdmin';
+import { cn } from '@/lib/utils';
 
 const Admin = () => {
   const navigate = useNavigate();
