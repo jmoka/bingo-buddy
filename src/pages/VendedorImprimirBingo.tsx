@@ -6,7 +6,6 @@ import { ArrowLeft, Printer, Loader2, ShieldCheck, Banknote } from 'lucide-react
 import { QRCodeSVG } from 'qrcode.react';
 import { FolhaBingoFisico } from '@/types/match';
 import { format } from 'date-fns';
-import { QrCodePix } from 'qrcode-pix';
 import { cn } from '@/lib/utils';
 
 const BASE_URL = window.location.origin;
@@ -16,7 +15,6 @@ export default function VendedorImprimirBingo() {
   const navigate = useNavigate();
   const [folhas, setFolhas] = useState<FolhaBingoFisico[]>([]);
   const [loading, setLoading] = useState(true);
-  const [pixKey, setPixKey] = useState<string | null>(null);
 
   useEffect(() => {
     async function loadFolhas() {
@@ -25,27 +23,13 @@ export default function VendedorImprimirBingo() {
       const ids = folhaId.split(',').filter(id => id.trim() !== '');
       if (ids.length === 0) return;
 
-      const [{ data }, { data: configData }] = await Promise.all([
-        supabase.from('vendas_bingo_fisico').select('*, partidas(name, start_time, game_type), vendedores_rifa(nome, codigo_ref)').in('id', ids).order('created_at', { ascending: false }),
-        supabase.from('configuracoes').select('pix_key').single()
-      ]);
+      const { data } = await supabase.from('vendas_bingo_fisico').select('*, partidas(name, start_time, game_type), vendedores_rifa(nome, codigo_ref)').in('id', ids).order('created_at', { ascending: false });
 
       if (data) setFolhas(data as FolhaBingoFisico[]);
-      if (configData) setPixKey(configData.pix_key);
       setLoading(false);
     }
     loadFolhas();
   }, [folhaId]);
-
-  const gerarPixPayload = (folha: FolhaBingoFisico) => {
-    if (!pixKey) return null;
-    const valorCheio = Number(folha.valor_pago) / (1 - (Number(folha.desconto_aplicado || 0) / 100));
-    try {
-      return QrCodePix({
-        version: '01', key: pixKey, name: 'Bingo App', city: 'WEB', transactionId: folha.codigo_validacao, message: `Bingo ${folha.codigo_validacao}`, value: parseFloat(valorCheio.toFixed(2)),
-      }).payload();
-    } catch { return null; }
-  };
 
   if (loading) {
     return <div className="flex justify-center items-center h-screen"><Loader2 className="w-10 h-10 animate-spin text-purple-600" /></div>;
@@ -66,8 +50,8 @@ export default function VendedorImprimirBingo() {
       <div className="flex flex-col gap-8 print:gap-0 print:bg-white">
         {folhas.map((folha, index) => {
           const grids = folha.grids;
-          const pixPayload = folha.status === 'pendente' ? gerarPixPayload(folha) : null;
           const valorCheio = Number(folha.valor_pago) / (1 - (Number(folha.desconto_aplicado || 0) / 100));
+          const pagarUrl = `${BASE_URL}/pagar-cartela?codigo=${folha.codigo_validacao}`;
           
           return (
             <div key={folha.id} className={cn("max-w-[210mm] mx-auto p-4 sm:p-8 print:p-0 w-full", index < folhas.length - 1 && "print:break-after-page")}>
@@ -99,11 +83,11 @@ export default function VendedorImprimirBingo() {
                   </div>
                   
                   <div className="flex gap-4 shrink-0">
-                    {pixPayload && (
+                    {folha.status === 'pendente' && (
                       <div className="text-center flex flex-col items-center border border-green-500 bg-green-50 rounded p-1.5">
                         <p className="text-[8px] font-black text-green-700 flex items-center gap-1 mb-0.5"><Banknote className="w-3 h-3" /> PAGAR PIX (R$ {valorCheio.toFixed(2)})</p>
-                        <div className="p-1 bg-white rounded shadow-sm"><QRCodeSVG value={pixPayload} size={60} /></div>
-                        <p className="text-[6px] text-green-700 font-bold mt-0.5 max-w-[70px] leading-tight">Pague e Valide a cartela ao lado</p>
+                        <div className="p-1 bg-white rounded shadow-sm"><QRCodeSVG value={pagarUrl} size={60} /></div>
+                        <p className="text-[6px] text-green-700 font-bold mt-0.5 max-w-[70px] leading-tight">Escaneie para pagar e validar</p>
                       </div>
                     )}
                     <div className="text-center flex flex-col items-center">

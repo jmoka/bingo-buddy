@@ -31,6 +31,7 @@ import VendedorPainel from "./pages/VendedorPainel";
 import VendedoresAdmin from "./pages/admin/VendedoresAdmin";
 import VendedorPerfilPublico from "./pages/VendedorPerfilPublico";
 import VendedorImprimirBingo from "./pages/VendedorImprimirBingo";
+import PagarCartela from "./pages/PagarCartela";
 import { Loader2 } from "lucide-react";
 
 const queryClient = new QueryClient();
@@ -68,6 +69,7 @@ const App = () => (
               <Route path="/rifas/:id" element={<Layout><RifaView /></Layout>} />
               <Route path="/vendedor/perfil/:codigo" element={<VendedorPerfilPublico />} />
               <Route path="/validar-cartela" element={<Layout><ValidarCartela /></Layout>} />
+              <Route path="/pagar-cartela" element={<Layout><PagarCartela /></Layout>} />
               
               {/* Rotas Privadas */}
               <Route path="/account" element={<ProtectedRoute><Account /></ProtectedRoute>} />
