@@ -48,7 +48,7 @@ const Lobby = () => {
     matches, joinMatch, getPlayerMatchCards, playerCards, 
     buyCardUses, createPlayerCard, deletePlayerCard,
     toggleArchivePlayerCard, matchCards, wins, leaveMatch, gameSettings,
-    allCreditRequests, allRedeemRequests
+    allCreditRequests, allRedeemRequests, creditRequests, redeemRequests
   } = useGame();
   
   const { rifas } = useRifas();
@@ -77,6 +77,11 @@ const Lobby = () => {
   const pendingAcertosCount = acertosPendentes?.filter(a => a.status === 'pendente' || a.status === 'em_analise').length || 0;
   const pendingVendedorCount = solicitacoesVendedor?.filter(s => s.status === 'pendente').length || 0;
   const totalPendingAdminActions = pendingCreditsCount + pendingRedeemsCount + pendingAcertosCount + pendingVendedorCount;
+
+  // Lógica de Notificações do Usuário (Pendências próprias)
+  const myPendingCreditsCount = creditRequests?.filter(r => r.status === 'pending').length || 0;
+  const myPendingRedeemsCount = redeemRequests?.filter(r => r.status === 'pending').length || 0;
+  const hasMyPendingActions = myPendingCreditsCount > 0 || myPendingRedeemsCount > 0;
 
   // Captura o link de indicação da URL se existir (mesmo sem estar logado)
   useEffect(() => {
@@ -464,6 +469,7 @@ const Lobby = () => {
 
   return (
     <div className="space-y-6">
+      {/* Banner Admin */}
       {isAdmin && totalPendingAdminActions > 0 && (
          <div className="bg-amber-500/10 border-2 border-amber-500/50 rounded-xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm relative overflow-hidden">
             <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/10 rounded-full blur-3xl -z-10" />
@@ -484,6 +490,25 @@ const Lobby = () => {
             <Button className="shrink-0 w-full sm:w-auto bg-amber-600 hover:bg-amber-700 text-white shadow-sm z-10" onClick={() => navigate('/admin')}>
               Abrir Painel Admin
             </Button>
+         </div>
+      )}
+
+      {/* Banner Usuário Comum */}
+      {!isAdmin && hasMyPendingActions && (
+         <div className="bg-amber-500/10 border-2 border-amber-500/50 rounded-xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm relative overflow-hidden mb-6">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/10 rounded-full blur-3xl -z-10" />
+            <div className="flex items-start gap-3 z-10">
+              <div className="bg-amber-500 p-2 rounded-full text-white animate-pulse shrink-0 shadow-md">
+                <Clock className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="font-heading font-bold text-lg text-amber-800 dark:text-amber-500 leading-tight">Solicitação em Pendente</h3>
+                <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1 text-xs font-semibold text-amber-700/80 dark:text-amber-400/80">
+                   {myPendingCreditsCount > 0 && <span className="flex items-center gap-1">• {myPendingCreditsCount} solicitação(ões) de crédito em análise</span>}
+                   {myPendingRedeemsCount > 0 && <span className="flex items-center gap-1">• {myPendingRedeemsCount} resgate(s) em andamento</span>}
+                </div>
+              </div>
+            </div>
          </div>
       )}
 
