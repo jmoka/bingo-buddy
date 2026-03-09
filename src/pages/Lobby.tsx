@@ -5,13 +5,14 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useGame } from '@/contexts/GameContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRifas } from '@/hooks/useRifas';
+import { useRifaAdmin } from '@/hooks/useRifaAdmin';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Match, MatchStatus, PlayerCard } from '@/types/match';
 import { gameTypeLabels } from '@/utils/bingoUtils';
 import { 
   Coins, Plus, Trophy, Users, Settings, 
-  Timer, DoorOpen, Ticket, Zap, ZapOff, Tv, Archive, Trash2, RotateCcw, Star, Loader2, CalendarDays, Clock, Crown, ChevronDown, ChevronUp, Gift
+  Timer, DoorOpen, Ticket, Zap, ZapOff, Tv, Archive, Trash2, RotateCcw, Star, Loader2, CalendarDays, Clock, Crown, ChevronDown, ChevronUp, Gift, BellRing
 } from 'lucide-react';
 import PlayerAvatar from '@/components/PlayerAvatar';
 import { 
@@ -46,10 +47,12 @@ const Lobby = () => {
   const { 
     matches, joinMatch, getPlayerMatchCards, playerCards, 
     buyCardUses, createPlayerCard, deletePlayerCard,
-    toggleArchivePlayerCard, matchCards, wins, leaveMatch, gameSettings
+    toggleArchivePlayerCard, matchCards, wins, leaveMatch, gameSettings,
+    allCreditRequests, allRedeemRequests
   } = useGame();
   
   const { rifas } = useRifas();
+  const { acertosPendentes, solicitacoesVendedor } = useRifaAdmin();
 
   const [now, setNow] = useState(Date.now());
   const [isCreateCardOpen, setCreateCardOpen] = useState(false);
@@ -66,6 +69,14 @@ const Lobby = () => {
   
   const [expandedParticipants, setExpandedParticipants] = useState<Set<string>>(new Set());
   const [expandedPrizes, setExpandedPrizes] = useState<Set<string>>(new Set());
+
+  // Lógica de Notificações do Admin
+  const isAdmin = profile?.role === 'admin';
+  const pendingCreditsCount = allCreditRequests?.filter(r => r.status === 'pending').length || 0;
+  const pendingRedeemsCount = allRedeemRequests?.filter(r => r.status === 'pending').length || 0;
+  const pendingAcertosCount = acertosPendentes?.filter(a => a.status === 'pendente' || a.status === 'em_analise').length || 0;
+  const pendingVendedorCount = solicitacoesVendedor?.filter(s => s.status === 'pendente').length || 0;
+  const totalPendingAdminActions = pendingCreditsCount + pendingRedeemsCount + pendingAcertosCount + pendingVendedorCount;
 
   // Captura o link de indicação da URL se existir (mesmo sem estar logado)
   useEffect(() => {
@@ -453,6 +464,29 @@ const Lobby = () => {
 
   return (
     <div className="space-y-6">
+      {isAdmin && totalPendingAdminActions > 0 && (
+         <div className="bg-amber-500/10 border-2 border-amber-500/50 rounded-xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/10 rounded-full blur-3xl -z-10" />
+            <div className="flex items-start gap-3 z-10">
+              <div className="bg-amber-500 p-2 rounded-full text-white animate-pulse shrink-0 shadow-md">
+                <BellRing className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="font-heading font-bold text-lg text-amber-800 dark:text-amber-500 leading-tight">Ações Pendentes (Admin)</h3>
+                <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1 text-xs font-semibold text-amber-700/80 dark:text-amber-400/80">
+                   {pendingCreditsCount > 0 && <span className="flex items-center gap-1">• {pendingCreditsCount} recarga(s) via PIX</span>}
+                   {pendingAcertosCount > 0 && <span className="flex items-center gap-1">• {pendingAcertosCount} acerto(s) de vendedor</span>}
+                   {pendingRedeemsCount > 0 && <span className="flex items-center gap-1">• {pendingRedeemsCount} resgate(s)</span>}
+                   {pendingVendedorCount > 0 && <span className="flex items-center gap-1">• {pendingVendedorCount} inscrição(ões) de vendedor</span>}
+                </div>
+              </div>
+            </div>
+            <Button className="shrink-0 w-full sm:w-auto bg-amber-600 hover:bg-amber-700 text-white shadow-sm z-10" onClick={() => navigate('/admin')}>
+              Abrir Painel Admin
+            </Button>
+         </div>
+      )}
+
       {profile?.role === 'admin' && (
         <Button className="w-full h-9 text-xs" variant="outline" onClick={() => navigate('/admin')}>
           <Settings className="w-3.5 h-3.5 mr-2" /> Painel Administrativo
