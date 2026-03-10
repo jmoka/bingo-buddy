@@ -32,7 +32,9 @@ import VendedoresAdmin from "./pages/admin/VendedoresAdmin";
 import VendedorPerfilPublico from "./pages/VendedorPerfilPublico";
 import VendedorImprimirBingo from "./pages/VendedorImprimirBingo";
 import PagarCartela from "./pages/PagarCartela";
+import LandingPage from "./pages/Landing";
 import { Loader2 } from "lucide-react";
+import path from "path/win32";
 
 const queryClient = new QueryClient();
 
@@ -61,7 +63,9 @@ const App = () => (
           <BrowserRouter>
             <Routes>
               <Route path="/login" element={<Login />} />
-              {/* Rotas Públicas */}
+              
+{/* Rotas Públicas */ }
+              <Route path="/venda" element={<LandingPage />} />
               <Route path="/" element={<Layout><Lobby /></Layout>} />
               <Route path="/active-players" element={<Layout><ActivePlayers /></Layout>} />
               <Route path="/ranking" element={<Layout><Ranking /></Layout>} />
