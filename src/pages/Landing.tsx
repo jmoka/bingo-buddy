@@ -42,8 +42,8 @@ export default function LandingPage() {
           < Button className = "m-2 bg-red-500 text-white" size = "lg" onClick = {() => window.location.href = '/'}>          
             Partidas
           </Button>
-          < Button className = "m-2 bg-green-500 text-white" size = "lg" onClick = {() => window.location.href = '/'}>          
-            Jogar 
+          < Button className = "m-2 bg-green-500 text-white" size = "lg" onClick = {() => window.location.href = '/login'}>          
+            Logar 
           </Button>
         </section>
 
