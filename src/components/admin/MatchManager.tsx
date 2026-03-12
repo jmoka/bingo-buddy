@@ -72,6 +72,7 @@ const MatchManager = () => {
   const [isCallingRandom, setIsCallingRandom] = useState<string | null>(null);
   const [isCallingManual, setIsCallingManual] = useState<string | null>(null);
   const [isAdvancingRound, setIsAdvancingRound] = useState<string | null>(null);
+  const [expandedNumbers, setExpandedNumbers] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 1000);
@@ -423,23 +424,50 @@ const MatchManager = () => {
               {/* Lista de Números Sorteados (Sempre visível se houver números) */}
               {(match.called_numbers || []).length > 0 && (
                 <div className="mb-6 p-4 bg-muted/20 rounded-xl border border-border/50">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-3 flex items-center gap-2">
-                    <Target className="w-3 h-3" /> Números Sorteados (Último em destaque)
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    {[...(match.called_numbers || [])].reverse().map((num, idx) => (
-                      <div
-                        key={`${match.id}-${num}-${idx}`}
-                        className={cn(
-                          "w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold shadow-sm border transition-all",
-                          idx === 0
-                            ? "bg-accent text-accent-foreground border-accent scale-110 ring-2 ring-accent/20 animate-pulse"
-                            : "bg-white dark:bg-background text-foreground border-border"
-                        )}
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                      <Target className="w-3 h-3" /> Números Sorteados (Último em destaque)
+                    </p>
+                    {(match.called_numbers || []).length > 10 && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 text-[10px] font-bold uppercase sm:hidden"
+                        onClick={() => setExpandedNumbers(prev => ({ ...prev, [match.id]: !prev[match.id] }))}
                       >
-                        {num}
-                      </div>
-                    ))}
+                        {expandedNumbers[match.id] ? 'Ver Menos' : `Ver Todos (${match.called_numbers.length})`}
+                      </Button>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {(() => {
+                      const allNums = [...(match.called_numbers || [])].reverse();
+                      const isExpanded = expandedNumbers[match.id];
+                      const displayNums = isExpanded ? allNums : allNums.slice(0, 10);
+                      
+                      return (
+                        <>
+                          {displayNums.map((num, idx) => (
+                            <div
+                              key={`${match.id}-${num}-${idx}`}
+                              className={cn(
+                                "w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold shadow-sm border transition-all",
+                                idx === 0
+                                  ? "bg-accent text-accent-foreground border-accent scale-110 ring-2 ring-accent/20 animate-pulse"
+                                  : "bg-white dark:bg-background text-foreground border-border"
+                              )}
+                            >
+                              {num}
+                            </div>
+                          ))}
+                          {!isExpanded && allNums.length > 10 && (
+                            <div className="hidden sm:flex w-9 h-9 rounded-full items-center justify-center text-[10px] font-bold bg-muted text-muted-foreground border border-dashed border-border">
+                              +{allNums.length - 10}
+                            </div>
+                          )}
+                        </>
+                      );
+                    })()}
                   </div>
                 </div>
               )}
