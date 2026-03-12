@@ -88,18 +88,18 @@ const Admin = () => {
 
       <Tabs defaultValue="matches" className="w-full">
         <TabsList className="flex flex-wrap h-auto gap-1 mb-8 bg-muted p-1 rounded-lg">
-          <TabsTrigger value="matches" className="py-3">Partidas</TabsTrigger>
-          <TabsTrigger value="credits" className="py-3 relative">
+          <TabsTrigger value="matches" className="flex-1 py-3 min-w-[80px]">Partidas</TabsTrigger>
+          <TabsTrigger value="credits" className="flex-1 py-3 min-w-[80px] relative">
             Entradas
             {pendingRequestsCount > 0 && <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-[9px] font-bold text-white border border-background">{pendingRequestsCount}</span>}
           </TabsTrigger>
-          <TabsTrigger value="redeems" className="py-3 relative">
+          <TabsTrigger value="redeems" className="flex-1 py-3 min-w-[80px] relative">
             Saídas
             {pendingRedeemsCount > 0 && <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-amber-500 text-[9px] font-bold text-white border border-background">{pendingRedeemsCount}</span>}
           </TabsTrigger>
-          <TabsTrigger value="players" className="py-3">Jogadores</TabsTrigger>
-          <TabsTrigger value="rifas" className="py-3">Rifas</TabsTrigger>
-          <TabsTrigger value="vendedores" className="py-3 relative">
+          <TabsTrigger value="players" className="flex-1 py-3 min-w-[80px]">Jogadores</TabsTrigger>
+          <TabsTrigger value="rifas" className="flex-1 py-3 min-w-[80px]">Rifas</TabsTrigger>
+          <TabsTrigger value="vendedores" className="flex-1 py-3 min-w-[80px] relative">
             Vendedores
             {totalVendedoresPendencies > 0 && (
               <span className={cn(
@@ -110,7 +110,7 @@ const Admin = () => {
               </span>
             )}
           </TabsTrigger>
-          <TabsTrigger value="settings" className="py-3">Ajustes</TabsTrigger>
+          <TabsTrigger value="settings" className="flex-1 py-3 min-w-[80px]">Ajustes</TabsTrigger>
         </TabsList>
 
         <TabsContent value="matches">

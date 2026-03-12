@@ -348,25 +348,25 @@ const MatchManager = () => {
                   </div>
                   <div className="text-sm text-muted-foreground flex gap-3"><span className="flex items-center gap-1"><Trophy className="w-3.5 h-3.5" />{gameTypeLabels[match.game_type]}</span></div>
                 </div>
-                <div className="flex gap-2">
-                  <Button size="sm" variant="secondary" onClick={() => setDetailsMatch(match)}>
+                <div className="flex flex-wrap gap-2">
+                  <Button size="sm" variant="secondary" className="flex-1 sm:flex-none" onClick={() => setDetailsMatch(match)}>
                     <Eye className="w-4 h-4 mr-1" /> Detalhes
                   </Button>
                   
                   {/* EDITAR PERMITIDO PARA WAITING OU OPEN */}
                   {(match.status === 'waiting' || match.status === 'open') && (
-                    <Button size="sm" variant="outline" onClick={() => handleOpenEditDialog(match)}>
+                    <Button size="sm" variant="outline" className="flex-1 sm:flex-none" onClick={() => handleOpenEditDialog(match)}>
                       <Edit className="w-4 h-4 mr-1" /> Editar
                     </Button>
                   )}
 
-                  {match.status === 'waiting' && <Button size="sm" onClick={() => openMatch(match.id)}>Abrir</Button>}
+                  {match.status === 'waiting' && <Button size="sm" className="flex-1 sm:flex-none" onClick={() => openMatch(match.id)}>Abrir</Button>}
                   
                   {match.status === 'open' && (
                     !canStart ? (
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
-                          <Button size="sm" title={`Requer ${match.min_players} jogadores. Atualmente: ${playersInMatchCount}.`}>Iniciar</Button>
+                          <Button size="sm" className="flex-1 sm:flex-none" title={`Requer ${match.min_players} jogadores. Atualmente: ${playersInMatchCount}.`}>Iniciar</Button>
                         </AlertDialogTrigger>
                         <AlertDialogContent>
                           <AlertDialogHeader>
@@ -380,16 +380,16 @@ const MatchManager = () => {
                         </AlertDialogContent>
                       </AlertDialog>
                     ) : (
-                      <Button size="sm" onClick={() => startMatch(match.id)}>Iniciar</Button>
+                      <Button size="sm" className="flex-1 sm:flex-none" onClick={() => startMatch(match.id)}>Iniciar</Button>
                     )
                   )}
 
-                  {match.status === 'in_progress' && <Button size="sm" variant="outline" onClick={() => finishMatch(match.id)}>Finalizar</Button>}
-                  {(match.status === 'waiting' || (match.status === 'finished' && !hasMoreRounds)) && <Button size="sm" variant="destructive" onClick={() => deleteMatch(match.id)}><Trash2 className="w-4 h-4" /></Button>}
+                  {match.status === 'in_progress' && <Button size="sm" variant="outline" className="flex-1 sm:flex-none" onClick={() => finishMatch(match.id)}>Finalizar</Button>}
+                  {(match.status === 'waiting' || (match.status === 'finished' && !hasMoreRounds)) && <Button size="sm" variant="destructive" className="flex-1 sm:flex-none" onClick={() => deleteMatch(match.id)}><Trash2 className="w-4 h-4" /></Button>}
                   
                   {/* BOTÃO MÁGICO DO FESTIVAL */}
                   {match.status === 'finished' && hasMoreRounds && (
-                      <Button size="sm" className="bg-purple-600 hover:bg-purple-700 text-white font-bold animate-pulse" onClick={() => handleNextRound(match.id)} disabled={isAdvancingRound === match.id}>
+                      <Button size="sm" className="w-full sm:w-auto bg-purple-600 hover:bg-purple-700 text-white font-bold animate-pulse" onClick={() => handleNextRound(match.id)} disabled={isAdvancingRound === match.id}>
                           {isAdvancingRound === match.id ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <ArrowRight className="w-4 h-4 mr-2" />}
                           Iniciar Rodada {(match.current_round||0)+2}
                       </Button>
@@ -427,12 +427,28 @@ const MatchManager = () => {
                             Mesa de Operação <Badge variant="outline" className="text-xs bg-muted">Bolas: {(match.called_numbers || []).length}</Badge>
                         </h4>
                     </div>
-                    <div className="flex gap-2">
-                        <Input placeholder="Nº" type="number" className="w-20 font-bold text-center text-lg" value={callerInput[match.id] || ''} onChange={e => setCallerInput(p => ({ ...p, [match.id]: e.target.value }))} onKeyDown={e => e.key === 'Enter' && handleCallNumber(match.id)} disabled={isCallingManual === match.id || isCallingRandom === match.id} />
-                        <Button className="h-10 px-8" onClick={() => handleCallNumber(match.id)} disabled={isCallingManual === match.id || isCallingRandom === match.id || !callerInput[match.id]}>
+                    <div className="flex flex-wrap gap-2">
+                        <Input
+                          placeholder="Nº"
+                          type="number"
+                          className="w-16 sm:w-20 font-bold text-center text-lg"
+                          value={callerInput[match.id] || ''}
+                          onChange={e => setCallerInput(p => ({ ...p, [match.id]: e.target.value }))}
+                          onKeyDown={e => e.key === 'Enter' && handleCallNumber(match.id)}
+                          disabled={isCallingManual === match.id || isCallingRandom === match.id}
+                        />
+                        <Button
+                          className="flex-1 sm:flex-none h-10 px-4 sm:px-8"
+                          onClick={() => handleCallNumber(match.id)}
+                          disabled={isCallingManual === match.id || isCallingRandom === match.id || !callerInput[match.id]}
+                        >
                             {isCallingManual === match.id ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Cantar Manual'}
                         </Button>
-                        <Button className="h-10 px-8 gradient-primary" onClick={() => handleRandomCall(match.id)} disabled={isCallingRandom === match.id || isCallingManual === match.id}>
+                        <Button
+                          className="w-full sm:w-auto h-10 px-4 sm:px-8 gradient-primary"
+                          onClick={() => handleRandomCall(match.id)}
+                          disabled={isCallingRandom === match.id || isCallingManual === match.id}
+                        >
                           {isCallingRandom === match.id ? <Loader2 className="w-5 h-5 animate-spin" /> : <><Shuffle className="w-5 h-5 mr-2" /> Sortear Automático</>}
                         </Button>
                     </div>
@@ -452,10 +468,10 @@ const MatchManager = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-3">
         <h2 className="font-heading text-xl font-bold text-foreground">Gestão de Partidas</h2>
         <Dialog open={showCreate} onOpenChange={setShowCreate}>
-          <DialogTrigger asChild><Button><Plus className="w-4 h-4 mr-2" />Nova Partida</Button></DialogTrigger>
+          <DialogTrigger asChild><Button className="w-full sm:w-auto"><Plus className="w-4 h-4 mr-2" />Nova Partida</Button></DialogTrigger>
           <DialogContent className="max-w-md flex flex-col max-h-[90vh]">
             <DialogHeader className="flex-shrink-0">
               <DialogTitle className="font-heading">Criar Partida</DialogTitle>
