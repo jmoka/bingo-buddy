@@ -36,10 +36,10 @@ const statusColors: Record<MatchStatus, string> = {
 
 const MatchManager = () => {
   const { toast } = useToast();
-  const { 
+  const {
     matches, createMatch, updateMatch, matchCards,
     openMatch, startMatch, finishMatch, deleteMatch, callNumber,
-    toggleAutoCall, nextFestivalRound
+    toggleAutoCall, nextFestivalRound, gameSettings
   } = useGame();
 
   const [showCreate, setShowCreate] = useState(false);
@@ -469,12 +469,24 @@ const MatchManager = () => {
                             {isCallingManual === match.id ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Cantar Manual'}
                         </Button>
                         <Button
-                          className="w-full sm:w-auto h-10 px-4 sm:px-8 gradient-primary"
+                          variant="outline"
+                          className="flex-1 sm:flex-none h-10 px-4 sm:px-8"
                           onClick={() => handleRandomCall(match.id)}
                           disabled={isCallingRandom === match.id || isCallingManual === match.id}
                         >
-                          {isCallingRandom === match.id ? <Loader2 className="w-5 h-5 animate-spin" /> : <><Shuffle className="w-5 h-5 mr-2" /> Sortear Automático</>}
+                          {isCallingRandom === match.id ? <Loader2 className="w-5 h-5 animate-spin" /> : <><Shuffle className="w-5 h-5 mr-2" /> Sortear Aleatório</>}
                         </Button>
+                        <div className="flex items-center gap-2 bg-muted/50 px-4 py-2 rounded-lg border border-border/50 w-full sm:w-auto">
+                          <Switch
+                            id={`auto-call-${match.id}`}
+                            checked={match.is_auto_calling}
+                            onCheckedChange={() => toggleAutoCall(match.id)}
+                          />
+                          <Label htmlFor={`auto-call-${match.id}`} className="text-xs font-bold cursor-pointer flex flex-col">
+                            <span>Sorteio Automático</span>
+                            <span className="text-[9px] text-muted-foreground font-normal">Intervalo: {gameSettings?.intervalo_sorteio_auto_seg}s</span>
+                          </Label>
+                        </div>
                     </div>
                 </div>
               )}
