@@ -419,6 +419,30 @@ const MatchManager = () => {
                 </div>
               </div>
 
+              {/* Lista de Números Sorteados (Sempre visível se houver números) */}
+              {(match.called_numbers || []).length > 0 && (
+                <div className="mb-6 p-4 bg-muted/20 rounded-xl border border-border/50">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-3 flex items-center gap-2">
+                    <Target className="w-3 h-3" /> Números Sorteados (Último em destaque)
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {[...(match.called_numbers || [])].reverse().map((num, idx) => (
+                      <div
+                        key={`${match.id}-${num}-${idx}`}
+                        className={cn(
+                          "w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold shadow-sm border transition-all",
+                          idx === 0
+                            ? "bg-accent text-accent-foreground border-accent scale-110 ring-2 ring-accent/20 animate-pulse"
+                            : "bg-white dark:bg-background text-foreground border-border"
+                        )}
+                      >
+                        {num}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Painel Operacional em Progresso */}
               {match.status === 'in_progress' && (
                 <div className="mt-4 pt-4 border-t">

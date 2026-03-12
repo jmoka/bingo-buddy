@@ -6,7 +6,8 @@ import { Match } from '@/types/match';
 import { useGame } from '@/contexts/GameContext';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Loader2, Users, Ticket, Coins, Store, Globe, Trophy, AlertTriangle } from 'lucide-react';
+import { Loader2, Users, Ticket, Coins, Store, Globe, Trophy, AlertTriangle, Target } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import PlayerAvatar from '../PlayerAvatar';
 
 interface Props {
@@ -144,6 +145,26 @@ export function MatchDetailsModal({ match, onClose }: Props) {
                         </div>
                     </div>
                 </div>
+
+                {/* Números Sorteados no Detalhe */}
+                {(match.called_numbers || []).length > 0 && (
+                    <div className="card-container p-4 bg-muted/30">
+                        <h3 className="font-bold text-sm mb-3 flex items-center gap-2"><Target className="w-4 h-4" /> Números Sorteados (Total: {match.called_numbers?.length})</h3>
+                        <div className="flex flex-wrap gap-2">
+                            {[...(match.called_numbers || [])].reverse().map((num, idx) => (
+                                <div
+                                    key={idx}
+                                    className={cn(
+                                        "w-10 h-10 rounded-full flex items-center justify-center font-bold border shadow-sm",
+                                        idx === 0 ? "bg-accent text-accent-foreground border-accent scale-110" : "bg-white text-foreground border-border"
+                                    )}
+                                >
+                                    {num}
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
             </TabsContent>
 
             <TabsContent value="vendedores" className="mt-4">
