@@ -304,8 +304,9 @@ const MatchManager = () => {
     </div>
   );
 
-  const getCountdown = (startTime: string) => {
-    const diff = new Date(startTime).getTime() - now;
+  const getCountdown = (time: string | number | undefined | null) => {
+    if (!time) return null;
+    const diff = new Date(time).getTime() - now;
     if (diff <= 0) return null;
     const h = Math.floor(diff / 3600000);
     const m = Math.floor((diff % 3600000) / 60000);
@@ -483,7 +484,15 @@ const MatchManager = () => {
                             onCheckedChange={() => toggleAutoCall(match.id)}
                           />
                           <Label htmlFor={`auto-call-${match.id}`} className="text-xs font-bold cursor-pointer flex flex-col">
-                            <span>Sorteio Automático</span>
+                            <span className="flex items-center gap-2">
+                              Sorteio Automático
+                              {match.is_auto_calling && match.status === 'in_progress' && (
+                                <Badge variant="secondary" className="h-4 px-1 text-[9px] bg-accent/10 text-accent border-accent/20 animate-pulse">
+                                  <Clock className="w-2 h-2 mr-1" />
+                                  {getCountdown(match.next_auto_call_timestamp) || '00:00'}
+                                </Badge>
+                              )}
+                            </span>
                             <span className="text-[9px] text-muted-foreground font-normal">Intervalo: {gameSettings?.intervalo_sorteio_auto_seg}s</span>
                           </Label>
                         </div>

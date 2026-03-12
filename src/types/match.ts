@@ -35,7 +35,7 @@ export interface Match {
   pot: number;
   created_at: string;
   is_auto_calling?: boolean;
-  next_auto_call_timestamp?: number;
+  next_auto_call_timestamp?: string | number;
   winners: Winner[];
   min_players: number;
   admin_profit_from_match?: number;
