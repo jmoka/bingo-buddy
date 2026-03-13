@@ -50,16 +50,14 @@ export default function PagarCartela() {
   const pixPayload = useMemo(() => {
     if (!pixKey || !venda) return '';
     try {
-      // TXID deve ser alfanumérico e sem espaços para máxima compatibilidade
-      const txid = `BINGO${venda.codigo_validacao}`.substring(0, 25);
-      
+      // Para máxima compatibilidade, usamos o TXID padrão '***' para PIX estático
+      // e removemos o campo de mensagem que causa erro em alguns bancos.
       return QrCodePix({
         version: '01',
-        key: pixKey.replace(/\s/g, ''), // Remove espaços da chave
-        name: 'Bingo Show',
-        city: 'SAO PAULO', // Cidade padrão para evitar erros em alguns bancos
-        transactionId: txid,
-        message: `Bingo ${venda.codigo_validacao}`,
+        key: pixKey.replace(/\s/g, ''), 
+        name: 'BINGO SHOW', 
+        city: 'SAO PAULO',
+        transactionId: '***', 
         value: parseFloat(valorCheio.toFixed(2)),
       }).payload();
     } catch (e) {
@@ -178,16 +176,19 @@ export default function PagarCartela() {
               Valide sua Cartela
             </h3>
             <p className="text-sm text-muted-foreground leading-relaxed">
-              Após realizar o PIX no app do seu banco, clique no botão abaixo para anexar o comprovante e inserir seu nome.
+              Após realizar o PIX no app do seu banco, anexe o comprovante abaixo.
             </p>
 
-            <Button 
-              className="w-full h-14 text-lg font-bold bg-green-600 hover:bg-green-700 text-white shadow-button animate-pulse mt-2"
-              onClick={() => navigate(`/validar-cartela?bingo=${venda.codigo_validacao}`)}
-            >
-              <Camera className="w-5 h-5 mr-2" />
-              JÁ PAGUEI, QUERO VALIDAR
-            </Button>
+            <div className="text-center pt-2">
+              <p className="text-sm font-bold text-foreground mb-2">Já pagou?</p>
+              <Button 
+                className="w-full h-14 text-xl font-bold bg-green-600 hover:bg-green-700 text-white shadow-button animate-pulse"
+                onClick={() => navigate(`/validar-cartela?bingo=${venda.codigo_validacao}`)}
+              >
+                <Camera className="w-5 h-5 mr-2" />
+                Validar
+              </Button>
+            </div>
           </div>
         </div>
       </div>
