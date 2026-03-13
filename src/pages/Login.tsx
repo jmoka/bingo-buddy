@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import { Loader2, Mail, Lock, Wand2, KeyRound, UserPlus } from 'lucide-react';
+import { Loader2, Mail, Lock, Wand2, UserPlus } from 'lucide-react';
 
 const Login = () => {
   const { session } = useAuth();
@@ -18,11 +18,7 @@ const Login = () => {
   const [view, setView] = useState<'login' | 'signup'>('login');
 
   useEffect(() => {
-    // Verifica se estamos em um fluxo de recuperação de senha (pelo hash da URL)
-    const isRecovery = window.location.hash.includes('type=recovery') || 
-                       window.location.search.includes('type=recovery');
-
-    if (session && !isRecovery) {
+    if (session) {
       navigate('/');
     }
   }, [session, navigate]);
@@ -65,17 +61,6 @@ const Login = () => {
     });
     if (error) toast.error(error.message);
     else toast.success("Link mágico enviado para seu e-mail!");
-    setLoading(false);
-  };
-
-  const handleResetPassword = async () => {
-    if (!email) return toast.error("Digite seu e-mail primeiro.");
-    setLoading(true);
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/update-password`,
-    });
-    if (error) toast.error(error.message);
-    else toast.success("Link para troca de senha enviado para seu e-mail!");
     setLoading(false);
   };
 
@@ -137,17 +122,7 @@ const Login = () => {
               disabled={loading}
             >
               <Wand2 className="w-4 h-4 mr-2" />
-              Acessar sem senha (Link Mágico)
-            </Button>
-
-            <Button 
-              variant="ghost" 
-              className="w-full h-11 text-muted-foreground hover:text-foreground font-medium" 
-              onClick={handleResetPassword}
-              disabled={loading}
-            >
-              <KeyRound className="w-4 h-4 mr-2" />
-              Esqueci minha senha / Trocar senha
+              Entrar sem senha!
             </Button>
           </div>
         )}
