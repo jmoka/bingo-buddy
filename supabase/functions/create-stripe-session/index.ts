@@ -13,6 +13,8 @@ serve(async (req) => {
   try {
     const { amount, type, metadata = {} } = await req.json()
     
+    console.log("[create-stripe-session] Iniciando criação de sessão", { amount, type });
+
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -25,6 +27,7 @@ serve(async (req) => {
       .single();
 
     if (settingsError || !settings?.stripe_secret_key) {
+        console.error("[create-stripe-session] Erro: Stripe Secret Key não encontrada no banco.");
         throw new Error("Stripe Secret Key não configurada no painel administrativo.");
     }
 
@@ -34,15 +37,20 @@ serve(async (req) => {
     })
 
     const authHeader = req.headers.get('Authorization')
+    if (!authHeader) throw new Error("Token de autorização ausente");
+
     const userSupabaseClient = createClient(
         Deno.env.get('SUPABASE_URL') ?? '',
         Deno.env.get('SUPABASE_ANON_KEY') ?? '',
         { global: { headers: { Authorization: authHeader } } }
     )
     const { data: { user }, error: userError } = await userSupabaseClient.auth.getUser()
-    if (userError || !user) throw new Error("Não autorizado")
+    if (userError || !user) {
+        console.error("[create-stripe-session] Erro de autenticação", userError);
+        throw new Error("Usuário não autenticado ou token inválido");
+    }
 
-    console.log(`[stripe] Criando sessão para ${user.email}, valor: ${amount}`);
+    console.log(`[create-stripe-session] Criando checkout para ${user.email}`);
 
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card', 'pix'],
@@ -71,7 +79,7 @@ serve(async (req) => {
     })
 
     // Registra a sessão no banco para controle
-    await supabaseAdmin.from('stripe_payments').insert({
+    const { error: dbError } = await supabaseAdmin.from('stripe_payments').insert({
       user_id: user.id,
       stripe_session_id: session.id,
       amount: amount,
@@ -79,13 +87,17 @@ serve(async (req) => {
       metadata: metadata
     })
 
+    if (dbError) {
+        console.warn("[create-stripe-session] Aviso: Falha ao registrar sessão no banco, mas o checkout foi criado.", dbError);
+    }
+
     return new Response(JSON.stringify({ url: session.url }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
     })
 
   } catch (error) {
-    console.error("[stripe] Erro:", error.message);
+    console.error("[create-stripe-session] Erro fatal:", error.message);
     return new Response(JSON.stringify({ error: error.message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 500,

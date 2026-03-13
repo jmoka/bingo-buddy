@@ -14,7 +14,7 @@ serve(async (req) => {
     .single();
 
   if (settingsError || !settings?.stripe_secret_key || !settings?.stripe_webhook_secret) {
-      console.error("[webhook] Erro: Chaves do Stripe não configuradas no banco.");
+      console.error("[stripe-webhook] Erro: Chaves do Stripe não configuradas no banco.");
       return new Response('Config Error', { status: 500 });
   }
 
@@ -24,7 +24,10 @@ serve(async (req) => {
   })
 
   const signature = req.headers.get('stripe-signature')
-  if (!signature) return new Response('No signature', { status: 400 })
+  if (!signature) {
+      console.error("[stripe-webhook] Assinatura ausente");
+      return new Response('No signature', { status: 400 });
+  }
 
   try {
     const body = await req.text()
@@ -34,13 +37,13 @@ serve(async (req) => {
       settings.stripe_webhook_secret
     )
 
-    // Processamos tanto o fechamento da sessão quanto a confirmação assíncrona (PIX)
+    console.log(`[stripe-webhook] Evento recebido: ${event.type}`);
+
     if (event.type === 'checkout.session.completed' || event.type === 'checkout.session.async_payment_succeeded') {
       const session = event.data.object
       
-      // Evita processar duas vezes se ambos os eventos dispararem
       if (session.payment_status !== 'paid') {
-          console.log(`[webhook] Sessão ${session.id} ainda não está paga. Aguardando confirmação.`);
+          console.log(`[stripe-webhook] Sessão ${session.id} ainda não está paga.`);
           return new Response(JSON.stringify({ received: true }), { status: 200 });
       }
 
@@ -48,7 +51,6 @@ serve(async (req) => {
       const paymentType = session.metadata?.payment_type
       const amount = session.amount_total / 100
 
-      // Verifica se já processamos este pagamento para evitar duplicidade
       const { data: existingPayment } = await supabaseAdmin
         .from('stripe_payments')
         .select('status')
@@ -56,11 +58,11 @@ serve(async (req) => {
         .single();
 
       if (existingPayment?.status === 'completed') {
-          console.log(`[webhook] Pagamento ${session.id} já foi processado anteriormente.`);
+          console.log(`[stripe-webhook] Pagamento ${session.id} já processado.`);
           return new Response(JSON.stringify({ received: true }), { status: 200 });
       }
 
-      console.log(`[webhook] Processando pagamento confirmado: ${session.id} para usuário ${userId}`);
+      console.log(`[stripe-webhook] Confirmando pagamento: ${session.id} para usuário ${userId}`);
 
       await supabaseAdmin
         .from('stripe_payments')
@@ -90,7 +92,7 @@ serve(async (req) => {
 
     return new Response(JSON.stringify({ received: true }), { status: 200 })
   } catch (err) {
-    console.error(`[webhook] Erro: ${err.message}`);
+    console.error(`[stripe-webhook] Erro no processamento: ${err.message}`);
     return new Response(`Webhook Error: ${err.message}`, { status: 400 })
   }
 })
