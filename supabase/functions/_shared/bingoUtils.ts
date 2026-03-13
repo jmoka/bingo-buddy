@@ -74,8 +74,9 @@ export const checkFullCardWin = (card: BingoCard): number[] | null => {
 
 export const checkWin = (card: BingoCard, gameType: GameType): WinResult | null => {
   let winningNumbers: number[] | null = null;
+  const type = String(gameType).toLowerCase().trim() as GameType;
 
-  switch (gameType) {
+  switch (type) {
     case 'horizontal':
       winningNumbers = checkHorizontalWin(card);
       break;
@@ -83,7 +84,8 @@ export const checkWin = (card: BingoCard, gameType: GameType): WinResult | null 
       winningNumbers = checkVerticalWin(card);
       break;
     case 'diagonal':
-      winningNumbers = checkDiagonalWin(card);
+      // No modo "Qualquer Linha (D-V-H)", aceita qualquer uma das três
+      winningNumbers = checkHorizontalWin(card) || checkVerticalWin(card) || checkDiagonalWin(card);
       break;
     case 'full':
       winningNumbers = checkFullCardWin(card);
@@ -94,7 +96,7 @@ export const checkWin = (card: BingoCard, gameType: GameType): WinResult | null 
     return {
       cardId: card.id,
       cardName: card.name,
-      type: gameType,
+      type: type,
       winningNumbers,
     };
   }

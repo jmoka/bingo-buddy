@@ -87,12 +87,23 @@ export const checkFullCardWin = (card: BingoCard): number[] | null => {
 export const checkWin = (card: BingoCard, gameType: GameType): WinResult | null => {
   let winningNumbers: number[] | null = null;
   const type = String(gameType).toLowerCase().trim() as GameType;
+  
   switch (type) {
-    case 'horizontal': winningNumbers = checkHorizontalWin(card); break;
-    case 'vertical': winningNumbers = checkVerticalWin(card); break;
-    case 'diagonal': winningNumbers = checkDiagonalWin(card); break;
-    case 'full': winningNumbers = checkFullCardWin(card); break;
+    case 'horizontal': 
+      winningNumbers = checkHorizontalWin(card); 
+      break;
+    case 'vertical': 
+      winningNumbers = checkVerticalWin(card); 
+      break;
+    case 'diagonal': 
+      // No modo "Diagonal (D-V-H)", qualquer linha ganha
+      winningNumbers = checkHorizontalWin(card) || checkVerticalWin(card) || checkDiagonalWin(card);
+      break;
+    case 'full': 
+      winningNumbers = checkFullCardWin(card); 
+      break;
   }
+  
   return winningNumbers ? { cardId: card.id, cardName: card.name, type, winningNumbers } : null;
 };
 
@@ -118,19 +129,35 @@ export const calculateNumbersToWin = (card: MatchCard, gameType: GameType): numb
       return minH;
     case 'vertical':
       let minV = 5;
-      for (let c = 0; c < 5; c++) {
+      for (let c = 0; c < 5; col++) {
         let n = 0;
         for (let r = 0; r < 5; r++) if (!isCellMarked(tempCard, r, c)) n++;
         minV = Math.min(minV, n);
       }
       return minV;
     case 'diagonal':
+      // No modo D-V-H, calculamos o mínimo necessário para qualquer uma das opções
+      let minAny = 5;
+      // Horizontais
+      for (let r = 0; r < 5; r++) {
+        let n = 0;
+        for (let c = 0; c < 5; c++) if (!isCellMarked(tempCard, r, c)) n++;
+        minAny = Math.min(minAny, n);
+      }
+      // Verticais
+      for (let c = 0; c < 5; c++) {
+        let n = 0;
+        for (let r = 0; r < 5; r++) if (!isCellMarked(tempCard, r, c)) n++;
+        minAny = Math.min(minAny, n);
+      }
+      // Diagonais
       let d1 = 0, d2 = 0;
       for (let i = 0; i < 5; i++) {
           if (!isCellMarked(tempCard, i, i)) d1++;
           if (!isCellMarked(tempCard, i, 4 - i)) d2++;
       }
-      return Math.min(d1, d2);
+      minAny = Math.min(minAny, d1, d2);
+      return minAny;
     default: return 99;
   }
 };
@@ -139,7 +166,7 @@ export const gameTypeLabels: Record<GameType, string> = {
   full: 'Cartela Cheia',
   horizontal: 'Linha Horizontal',
   vertical: 'Linha Vertical',
-  diagonal: 'Diagonal',
+  diagonal: 'Qualquer Linha (D-V-H)',
 };
 
 export const BINGO_RANGES = [

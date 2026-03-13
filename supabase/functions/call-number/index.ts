@@ -17,34 +17,53 @@ const isCellMarked = (card: BingoCard, row: number, col: number): boolean => {
   return card.markedNumbers.has(num);
 };
 
+const checkHorizontalWin = (card: BingoCard): number[] | null => {
+  for (let row = 0; row < 5; row++) {
+    if ([0,1,2,3,4].every(col => isCellMarked(card, row, col))) return card.numbers[row].map(Number);
+  }
+  return null;
+};
+
+const checkVerticalWin = (card: BingoCard): number[] | null => {
+  for (let col = 0; col < 5; col++) {
+    if ([0,1,2,3,4].every(row => isCellMarked(card, row, col))) return card.numbers.map(r => Number(r[col]));
+  }
+  return null;
+};
+
+const checkDiagonalWin = (card: BingoCard): number[] | null => {
+  if ([0,1,2,3,4].every(i => isCellMarked(card, i, i))) return [0,1,2,3,4].map(i => Number(card.numbers[i][i]));
+  if ([0,1,2,3,4].every(i => isCellMarked(card, i, 4-i))) return [0,1,2,3,4].map(i => Number(card.numbers[i][4-i]));
+  return null;
+};
+
+const checkFullCardWin = (card: BingoCard): number[] | null => {
+  const all: number[] = [];
+  for (let r = 0; r < 5; r++) for (let c = 0; c < 5; c++) {
+    if (!isCellMarked(card, r, c)) return null;
+    if (Number(card.numbers[r][c]) !== 0) all.push(Number(card.numbers[r][c]));
+  }
+  return all;
+};
+
 const checkWin = (card: BingoCard, gameType: GameType): WinResult | null => {
   let winning: number[] | null = null;
   const type = String(gameType).toLowerCase().trim() as GameType;
   
-  // Horizontal
-  for (let row = 0; row < 5; row++) {
-    if ([0,1,2,3,4].every(col => isCellMarked(card, row, col))) winning = card.numbers[row].map(Number);
-  }
-  // Vertical
-  if (!winning) {
-    for (let col = 0; col < 5; col++) {
-      if ([0,1,2,3,4].every(row => isCellMarked(card, row, col))) winning = card.numbers.map(r => Number(r[col]));
-    }
-  }
-  // Diagonal
-  if (!winning) {
-    if ([0,1,2,3,4].every(i => isCellMarked(card, i, i))) winning = [0,1,2,3,4].map(i => Number(card.numbers[i][i]));
-    else if ([0,1,2,3,4].every(i => isCellMarked(card, i, 4-i))) winning = [0,1,2,3,4].map(i => Number(card.numbers[i][4-i]));
-  }
-  // Full
-  if (!winning && type === 'full') {
-    const all: number[] = [];
-    let isFull = true;
-    for (let r = 0; r < 5; r++) for (let c = 0; c < 5; c++) {
-      if (!isCellMarked(card, r, c)) { isFull = false; break; }
-      if (Number(card.numbers[r][c]) !== 0) all.push(Number(card.numbers[r][c]));
-    }
-    if (isFull) winning = all;
+  switch (type) {
+    case 'horizontal':
+      winning = checkHorizontalWin(card);
+      break;
+    case 'vertical':
+      winning = checkVerticalWin(card);
+      break;
+    case 'diagonal':
+      // No modo "Qualquer Linha (D-V-H)", aceita qualquer uma das três
+      winning = checkHorizontalWin(card) || checkVerticalWin(card) || checkDiagonalWin(card);
+      break;
+    case 'full':
+      winning = checkFullCardWin(card);
+      break;
   }
   
   if (!winning) return null;
