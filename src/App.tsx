@@ -9,6 +9,7 @@ import { Layout } from "@/components/Layout";
 import Lobby from "./pages/Lobby";
 import Admin from "./pages/Admin";
 import Login from "./pages/Login";
+import UpdatePassword from "./pages/UpdatePassword";
 import Account from "./pages/Account";
 import MatchView from "./pages/MatchView";
 import PrintView from "./pages/PrintView";
@@ -34,7 +35,6 @@ import VendedorImprimirBingo from "./pages/VendedorImprimirBingo";
 import PagarCartela from "./pages/PagarCartela";
 import LandingPage from "./pages/Landing";
 import { Loader2 } from "lucide-react";
-import path from "path/win32";
 
 const queryClient = new QueryClient();
 
@@ -63,8 +63,9 @@ const App = () => (
           <BrowserRouter>
             <Routes>
               <Route path="/login" element={<Login />} />
+              <Route path="/update-password" element={<UpdatePassword />} />
               
-{/* Rotas Públicas */ }
+              {/* Rotas Públicas */ }
               <Route path="/venda" element={<LandingPage />} />
               <Route path="/" element={<Layout><Lobby /></Layout>} />
               <Route path="/active-players" element={<Layout><ActivePlayers /></Layout>} />
