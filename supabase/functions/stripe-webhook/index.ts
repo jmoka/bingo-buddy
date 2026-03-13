@@ -8,6 +8,7 @@ serve(async (req) => {
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
   )
 
+  // Busca as chaves live do banco
   const { data: settings, error: settingsError } = await supabaseAdmin
     .from('configuracoes')
     .select('stripe_secret_key, stripe_webhook_secret')
@@ -15,25 +16,30 @@ serve(async (req) => {
     .single();
 
   if (settingsError || !settings?.stripe_secret_key || !settings?.stripe_webhook_secret) {
-      console.error("[stripe-webhook] Erro: Configurações ausentes.");
+      console.error("[stripe-webhook] Erro: Chaves do Stripe não configuradas no banco.");
       return new Response('Config Error', { status: 500 });
   }
 
-  const stripe = new Stripe(settings.stripe_secret_key, {
+  const stripe = new Stripe(settings.stripe_secret_key.trim(), {
     apiVersion: '2023-10-16',
     httpClient: Stripe.createFetchHttpClient(),
   })
 
   const signature = req.headers.get('stripe-signature')
-  if (!signature) return new Response('No signature', { status: 400 });
+  if (!signature) {
+      console.error("[stripe-webhook] Erro: Assinatura ausente.");
+      return new Response('No signature', { status: 400 });
+  }
 
   try {
     const body = await req.text()
     const event = stripe.webhooks.constructEvent(
       body,
       signature,
-      settings.stripe_webhook_secret
+      settings.stripe_webhook_secret.trim()
     )
+
+    console.log(`[stripe-webhook] Evento recebido: ${event.type}`);
 
     if (event.type === 'checkout.session.completed' || event.type === 'checkout.session.async_payment_succeeded') {
       const session = event.data.object
@@ -43,6 +49,9 @@ serve(async (req) => {
         const paymentType = session.metadata?.payment_type
         const amount = session.amount_total / 100
 
+        console.log(`[stripe-webhook] Pagamento confirmado para usuário ${userId}. Valor: R$ ${amount}`);
+
+        // Evita duplicidade
         const { data: existing } = await supabaseAdmin
           .from('stripe_payments')
           .select('status')
@@ -58,6 +67,8 @@ serve(async (req) => {
           if (paymentType === 'credits') {
             const creditsToGrant = Number(session.metadata?.credits_requested || amount);
             
+            console.log(`[stripe-webhook] Liberando ${creditsToGrant} créditos para o usuário.`);
+
             await supabaseAdmin.rpc('increment_player_credits', {
               p_player_id: userId,
               p_amount: creditsToGrant
@@ -80,7 +91,7 @@ serve(async (req) => {
 
     return new Response(JSON.stringify({ received: true }), { status: 200 })
   } catch (err) {
-    console.error(`[stripe-webhook] Erro: ${err.message}`);
+    console.error(`[stripe-webhook] Erro ao processar evento: ${err.message}`);
     return new Response(`Webhook Error: ${err.message}`, { status: 400 })
   }
 })
