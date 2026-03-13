@@ -8,81 +8,61 @@ const corsHeaders = {
 }
 
 serve(async (req) => {
-  // Lida com requisições de pre-flight (CORS)
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders })
 
   try {
+    console.log("[create-stripe-session] Iniciando v2 (Sem PIX manual)");
+    
     const { amount, type, metadata = {} } = await req.json()
     
-    if (!amount || amount <= 0) {
-        throw new Error("Valor inválido para pagamento.");
-    }
-
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // Busca as configurações do Stripe no banco de dados
-    const { data: settings, error: settingsError } = await supabaseAdmin
+    const { data: settings } = await supabaseAdmin
       .from('configuracoes')
       .select('stripe_secret_key')
-      .eq('singleton', true)
       .single();
 
-    if (settingsError || !settings?.stripe_secret_key) {
-        console.error("[create-stripe-session] Erro: Chave secreta não encontrada no banco.");
-        return new Response(JSON.stringify({ error: "Configuração do Stripe incompleta no painel administrativo." }), {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 400
-        });
+    if (!settings?.stripe_secret_key) {
+        throw new Error("Chave do Stripe não configurada no Admin.");
     }
 
-    const secretKey = settings.stripe_secret_key.trim();
-
-    if (!secretKey.startsWith('sk_')) {
-        return new Response(JSON.stringify({ error: "A chave configurada no painel não é uma Secret Key válida do Stripe (deve começar com sk_)." }), {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 400
-        });
-    }
-
-    const stripe = new Stripe(secretKey, {
+    const stripe = new Stripe(settings.stripe_secret_key.trim(), {
       apiVersion: '2023-10-16',
-      httpClient: Stripe.createFetchHttpClient(),
     })
 
-    // Autenticação do usuário que chamou a função
     const authHeader = req.headers.get('Authorization')
-    if (!authHeader) throw new Error("Não autorizado: Token ausente.");
-
     const userSupabaseClient = createClient(
         Deno.env.get('SUPABASE_URL') ?? '',
         Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-        { global: { headers: { Authorization: authHeader } } }
+        { global: { headers: { Authorization: authHeader! } } }
     )
-    const { data: { user }, error: userError } = await userSupabaseClient.auth.getUser()
-    if (userError || !user) throw new Error("Usuário inválido ou sessão expirada.");
+    const { data: { user } } = await userSupabaseClient.auth.getUser()
+    
+    if (!user) throw new Error("Usuário não autenticado.");
 
-    console.log(`[create-stripe-session] Criando checkout para ${user.email} no valor de R$ ${amount}`);
-
-    // Cria a sessão de checkout no Stripe
+    // Criando a sessão. 
+    // Removi 'pix' e usei 'automatic_payment_methods'
     const session = await stripe.checkout.sessions.create({
-      payment_method_types: ['card', 'pix'],
       line_items: [
         {
           price_data: {
             currency: 'brl',
             product_data: {
               name: type === 'credits' ? 'Créditos Bingo Show' : 'Cartela Bingo Show',
-              description: type === 'credits' ? `Recarga de ${metadata.credits_requested || amount} créditos` : 'Participação em partida de Bingo',
             },
-            unit_amount: Math.round(amount * 100), // Converte para centavos
+            unit_amount: Math.round(amount * 100),
           },
           quantity: 1,
         },
       ],
       mode: 'payment',
+      // Isso permite que o Stripe mostre o que estiver ativo no seu painel
+      automatic_payment_methods: {
+        enabled: true,
+      },
       success_url: `${req.headers.get('origin')}/?payment=success`,
       cancel_url: `${req.headers.get('origin')}/?payment=cancel`,
       customer_email: user.email,
@@ -94,15 +74,7 @@ serve(async (req) => {
       },
     })
 
-    // Registra a tentativa de pagamento no banco de dados
-    await supabaseAdmin.from('stripe_payments').insert({
-      user_id: user.id,
-      stripe_session_id: session.id,
-      amount: amount,
-      payment_type: type,
-      metadata: metadata,
-      status: 'pending'
-    })
+    console.log(`[create-stripe-session] Sessão criada: ${session.id}`);
 
     return new Response(JSON.stringify({ url: session.url }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -113,7 +85,7 @@ serve(async (req) => {
     console.error("[create-stripe-session] Erro fatal:", error.message);
     return new Response(JSON.stringify({ error: error.message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 400, // Retornamos 400 para que o erro apareça no toast do frontend
+      status: 400,
     })
   }
 })
