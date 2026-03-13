@@ -15,7 +15,7 @@ export default function PagarCartela() {
   const codigo = searchParams.get('codigo');
 
   const [venda, setVenda] = useState<any | null>(null);
-  const [pixKey, setPixKey] = useState<string | null>(null);
+  const [gameSettings, setGameSettings] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -31,11 +31,11 @@ export default function PagarCartela() {
           .select('*, partidas(name), vendedores_rifa(nome)')
           .eq('codigo_validacao', codigo.toUpperCase().trim())
           .single(),
-        supabase.from('configuracoes').select('pix_key').single()
+        supabase.from('configuracoes').select('*').single()
       ]);
 
       if (resVenda.data) setVenda(resVenda.data);
-      if (resConfig.data) setPixKey(resConfig.data.pix_key);
+      if (resConfig.data) setGameSettings(resConfig.data);
 
       setLoading(false);
     }
@@ -48,21 +48,25 @@ export default function PagarCartela() {
   }, [venda]);
 
   const pixPayload = useMemo(() => {
-    if (!pixKey || !venda) return '';
+    if (!gameSettings?.pix_key || !venda) return '';
     try {
-      // Gerando o PIX mais simples possível para evitar erros em bancos rigorosos
+      // Remove espaços e acentos para evitar erros nos bancos
+      const cleanKey = gameSettings.pix_key.replace(/\s/g, '');
+      const cleanName = (gameSettings.pix_name || 'BINGOSHOW').normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s/g, '').toUpperCase();
+      const cleanCity = (gameSettings.pix_city || 'SAOPAULO').normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s/g, '').toUpperCase();
+
       return QrCodePix({
         version: '01',
-        key: pixKey.replace(/\s/g, ''), // Remove qualquer espaço da chave
-        name: 'BINGOSHOW', // Nome sem espaços
-        city: 'SAOPAULO', // Cidade sem espaços
+        key: cleanKey,
+        name: cleanName,
+        city: cleanCity,
         value: parseFloat(valorCheio.toFixed(2)),
       }).payload();
     } catch (e) {
       console.error("Erro ao gerar payload PIX:", e);
       return '';
     }
-  }, [pixKey, venda, valorCheio]);
+  }, [gameSettings, venda, valorCheio]);
 
   const handleCopiarPix = () => {
     if (pixPayload) {

@@ -35,6 +35,8 @@ const SettingsManager = () => {
     n8n_prod_url: '',
     n8n_env: 'test' as 'test' | 'production',
     pix_key: '',
+    pix_name: '',
+    pix_city: '',
     credit_request_text: '',
     auto_engine_enabled: false,
     auto_engine_interval_mins: 60,
@@ -67,6 +69,8 @@ const SettingsManager = () => {
         n8n_prod_url: gameSettings.n8n_prod_url || '',
         n8n_env: (gameSettings.n8n_env as 'test' | 'production') || 'test',
         pix_key: gameSettings.pix_key || '',
+        pix_name: gameSettings.pix_name || 'BINGO SHOW',
+        pix_city: gameSettings.pix_city || 'SAO PAULO',
         credit_request_text: gameSettings.credit_request_text || '',
         auto_engine_enabled: gameSettings.auto_engine_enabled || false,
         auto_engine_interval_mins: gameSettings.auto_engine_interval_mins || 60,
@@ -239,8 +243,14 @@ const SettingsManager = () => {
 
         <div className="space-y-6">
           <h3 className="font-heading font-bold text-primary border-b pb-2">PIX e Créditos</h3>
-          <div><Label>Chave PIX (Admin)</Label><Input name="pix_key" value={currentSettings.pix_key} onChange={handleSettingsChange} /></div>
-          <div><Label>Texto de Instrução</Label><Textarea name="credit_request_text" value={currentSettings.credit_request_text} onChange={handleSettingsChange} rows={3} /></div>
+          <div className="space-y-4">
+            <div><Label>Chave PIX (Admin)</Label><Input name="pix_key" value={currentSettings.pix_key} onChange={handleSettingsChange} /></div>
+            <div className="grid grid-cols-2 gap-4">
+              <div><Label>Nome Recebedor (Sem acentos)</Label><Input name="pix_name" value={currentSettings.pix_name} onChange={handleSettingsChange} placeholder="Ex: BINGO SHOW" /></div>
+              <div><Label>Cidade (Sem acentos)</Label><Input name="pix_city" value={currentSettings.pix_city} onChange={handleSettingsChange} placeholder="Ex: SAO PAULO" /></div>
+            </div>
+            <div><Label>Texto de Instrução</Label><Textarea name="credit_request_text" value={currentSettings.credit_request_text} onChange={handleSettingsChange} rows={3} /></div>
+          </div>
         </div>
 
         <div className="space-y-6">
@@ -282,7 +292,7 @@ const SettingsManager = () => {
             <div className="space-y-2">
               <Label>Tipo de Jogo Padrão</Label>
               <Select value={currentSettings.auto_engine_game_type} onValueChange={(v: GameType) => handleSelectChange('auto_engine_game_type', v)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger><SelectValue /></SelectValue /></SelectTrigger>
                 <SelectContent>{Object.entries(gameTypeLabels).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}</SelectContent>
               </Select>
             </div>

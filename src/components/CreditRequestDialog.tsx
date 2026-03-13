@@ -30,18 +30,22 @@ export const CreditRequestDialog = ({ gameSettings, children }: CreditRequestDia
     if (!gameSettings?.pix_key || !profile) return '';
 
     try {
+      const cleanKey = gameSettings.pix_key.replace(/\s/g, '');
+      const cleanName = (gameSettings.pix_name || 'BINGOSHOW').normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s/g, '').toUpperCase();
+      const cleanCity = (gameSettings.pix_city || 'SAOPAULO').normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s/g, '').toUpperCase();
+
       return QrCodePix({
         version: '01',
-        key: gameSettings.pix_key.replace(/\s/g, ''),
-        name: 'BINGOSHOW',
-        city: 'SAOPAULO',
+        key: cleanKey,
+        name: cleanName,
+        city: cleanCity,
         value: parseFloat(amount.toFixed(2)),
       }).payload();
     } catch (e) {
       console.error("Erro ao gerar PIX:", e);
       return '';
     }
-  }, [gameSettings?.pix_key, profile, amount]);
+  }, [gameSettings, profile, amount]);
 
   const handleCopyToClipboard = () => {
     if (pixPayload) {

@@ -86,6 +86,8 @@ export interface GameSettings {
   intervalo_sorteio_auto_seg: number;
   valor_por_credito: number;
   pix_key?: string;
+  pix_name?: string;
+  pix_city?: string;
   credit_request_text?: string;
   n8n_test_url?: string;
   n8n_prod_url?: string;
