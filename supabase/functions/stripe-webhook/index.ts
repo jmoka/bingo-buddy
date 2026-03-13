@@ -8,7 +8,6 @@ serve(async (req) => {
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
   )
 
-  // Busca as chaves no banco de dados
   const { data: settings, error: settingsError } = await supabaseAdmin
     .from('configuracoes')
     .select('stripe_secret_key, stripe_webhook_secret')
@@ -35,31 +34,47 @@ serve(async (req) => {
       settings.stripe_webhook_secret
     )
 
-    if (event.type === 'checkout.session.completed') {
+    // Processamos tanto o fechamento da sessão quanto a confirmação assíncrona (PIX)
+    if (event.type === 'checkout.session.completed' || event.type === 'checkout.session.async_payment_succeeded') {
       const session = event.data.object
+      
+      // Evita processar duas vezes se ambos os eventos dispararem
+      if (session.payment_status !== 'paid') {
+          console.log(`[webhook] Sessão ${session.id} ainda não está paga. Aguardando confirmação.`);
+          return new Response(JSON.stringify({ received: true }), { status: 200 });
+      }
+
       const userId = session.client_reference_id
       const paymentType = session.metadata?.payment_type
       const amount = session.amount_total / 100
 
-      console.log(`[webhook] Pagamento confirmado: ${session.id} para usuário ${userId}`);
+      // Verifica se já processamos este pagamento para evitar duplicidade
+      const { data: existingPayment } = await supabaseAdmin
+        .from('stripe_payments')
+        .select('status')
+        .eq('stripe_session_id', session.id)
+        .single();
 
-      // 1. Atualiza o status na tabela stripe_payments
+      if (existingPayment?.status === 'completed') {
+          console.log(`[webhook] Pagamento ${session.id} já foi processado anteriormente.`);
+          return new Response(JSON.stringify({ received: true }), { status: 200 });
+      }
+
+      console.log(`[webhook] Processando pagamento confirmado: ${session.id} para usuário ${userId}`);
+
       await supabaseAdmin
         .from('stripe_payments')
         .update({ status: 'completed', updated_at: new Date().toISOString() })
         .eq('stripe_session_id', session.id);
 
-      // 2. Se for compra de créditos, adiciona ao saldo
       if (paymentType === 'credits') {
         const creditsToGrant = Number(session.metadata?.credits_requested || amount);
         
-        // Incrementa créditos
         await supabaseAdmin.rpc('increment_player_credits', {
           p_player_id: userId,
           p_amount: creditsToGrant
         });
 
-        // Registra na tabela de solicitações como aprovado automaticamente
         await supabaseAdmin.from('solicitacoes_credito').insert({
           player_id: userId,
           status: 'approved',
