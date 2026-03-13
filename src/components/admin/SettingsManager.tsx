@@ -75,7 +75,7 @@ const SettingsManager = () => {
         pix_name: gameSettings.pix_name || 'BINGO SHOW',
         pix_city: gameSettings.pix_city || 'SAO PAULO',
         credit_request_text: gameSettings.credit_request_text || '',
-        auto_engine_enabled: gameSettings.auto_engine_enabled || false,
+        auto_engine_enabled: !!gameSettings.auto_engine_enabled,
         auto_engine_interval_mins: gameSettings.auto_engine_interval_mins || 60,
         auto_engine_matches_per_day: gameSettings.auto_engine_matches_per_day || 24,
         auto_engine_game_type: gameSettings.auto_engine_game_type || 'full',
@@ -113,23 +113,27 @@ const SettingsManager = () => {
   };
 
   const handleToggleChange = async (name: string, checked: boolean) => {
-    // Atualiza o estado local imediatamente para feedback visual
+    // 1. Atualiza o estado local IMEDIATAMENTE para a UI não "voltar"
     setCurrentSettings(prev => ({ ...prev, [name]: checked }));
     
-    setIsSaving(true);
-    // Enviamos apenas o campo alterado para evitar conflitos com estados não convertidos
-    const success = await updateGameSettings({ 
-        [name]: checked 
-    });
-    setIsSaving(false);
+    // 2. Tenta salvar no banco
+    try {
+        const success = await updateGameSettings({ 
+            [name]: checked 
+        });
 
-    if (success) {
-        toast.success(`${name === 'stripe_enabled' ? 'Stripe' : 'Motor'} ${checked ? 'ativado' : 'desativado'}!`);
-        if (name === 'auto_engine_enabled' && checked) {
-            try {
+        if (success) {
+            toast.success(`${name === 'stripe_enabled' ? 'Stripe' : 'Motor'} ${checked ? 'ativado' : 'desativado'}!`);
+            if (name === 'auto_engine_enabled' && checked) {
                 await supabase.functions.invoke('auto-match-engine', { body: { force: true } });
-            } catch (e) {}
+            }
+        } else {
+            // Se falhou no banco, volta o estado local para o que estava
+            setCurrentSettings(prev => ({ ...prev, [name]: !checked }));
         }
+    } catch (e) {
+        setCurrentSettings(prev => ({ ...prev, [name]: !checked }));
+        toast.error("Erro ao atualizar configuração.");
     }
   };
 
