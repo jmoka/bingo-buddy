@@ -17,7 +17,9 @@ export const useGameSettings = () => {
         intervalo_sorteio_auto_seg: 120, 
         valor_por_credito: 1, 
         admin_profit: 0,
-        cartelas_por_folha_bingo: 4
+        cartelas_por_folha_bingo: 4,
+        auto_engine_enabled: false,
+        stripe_enabled: false
       } as GameSettings;
       return data as GameSettings;
     }
