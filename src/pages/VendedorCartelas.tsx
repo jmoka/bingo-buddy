@@ -3,17 +3,21 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Printer, Loader2, Ticket, ShieldCheck } from 'lucide-react';
+import { ArrowLeft, Printer, Loader2, Ticket, ShieldCheck, Smartphone, Search } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
+import { cn } from '@/lib/utils';
 
 const BASE_URL = window.location.origin;
 
 interface BilheteData {
+  id: string;
   numero: number;
   codigoValidacao: string | null;
   nome_comprador: string | null;
   telefone_comprador: string | null;
   endereco_comprador: string | null;
+  status_compra: string;
+  valor_final: number;
   rifa: {
     nome: string;
     descricao: string | null;
@@ -24,12 +28,6 @@ interface BilheteData {
     nome: string;
     telefone: string | null;
     codigo_ref: string | null;
-  } | null;
-  compra: {
-    created_at: string;
-    valor_total: number;
-    numeros: number[];
-    id: string;
   } | null;
 }
 
@@ -66,24 +64,35 @@ export default function VendedorCartelas() {
       const numeroIds = numerosDb.map(n => n.id);
       const { data: cartelas } = await supabase
         .from('cartelas_rifa')
-        .select('numero_rifa_id, codigo_validacao')
+        .select('id, numero_rifa_id, codigo_validacao, compras_rifa(status, valor_total, numeros)')
         .in('numero_rifa_id', numeroIds);
 
-      const codigoMap: Record<string, string> = {};
+      const cartelaMap: Record<string, any> = {};
       for (const c of (cartelas ?? [])) {
-        codigoMap[c.numero_rifa_id] = c.codigo_validacao;
+        cartelaMap[c.numero_rifa_id] = c;
       }
 
-      const lista: BilheteData[] = numerosDb.map(nData => ({
-        numero: nData.numero,
-        codigoValidacao: codigoMap[nData.id] ?? null,
-        nome_comprador: nData.nome_comprador ?? null,
-        telefone_comprador: nData.telefone_comprador ?? null,
-        endereco_comprador: nData.endereco_comprador ?? null,
-        rifa: nData.rifas as any,
-        vendedor: { nome: v.nome, telefone: v.telefone, codigo_ref: v.codigo_ref },
-        compra: null,
-      }));
+      const lista: BilheteData[] = numerosDb.map(nData => {
+        const cartela = cartelaMap[nData.id];
+        const compra = cartela?.compras_rifa;
+        
+        // Calcula o valor individual deste número na compra (valor total / quantidade de números)
+        const qtdNums = compra?.numeros?.length || 1;
+        const valorUnitario = Number(compra?.valor_total || 0) / qtdNums;
+
+        return {
+            id: cartela?.id,
+            numero: nData.numero,
+            codigoValidacao: cartela?.codigo_validacao ?? null,
+            nome_comprador: nData.nome_comprador ?? null,
+            telefone_comprador: nData.telefone_comprador ?? null,
+            endereco_comprador: nData.endereco_comprador ?? null,
+            status_compra: compra?.status || 'pago',
+            valor_final: valorUnitario,
+            rifa: nData.rifas as any,
+            vendedor: { nome: v.nome, telefone: v.telefone, codigo_ref: v.codigo_ref },
+        };
+      });
 
       setBilhetes(lista);
       setLoading(false);
@@ -127,105 +136,130 @@ export default function VendedorCartelas() {
           </div>
         ) : (
           <div className="flex flex-col gap-4 max-w-4xl mx-auto print:max-w-none print:mx-0 print:gap-2">
-            {bilhetes.map((b, idx) => (
-              <div key={`${b.numero}-${idx}`} className="print:break-inside-avoid">
-                <div className="bg-white rounded-xl overflow-hidden shadow border border-gray-200 print:shadow-none print:border print:border-gray-400 print:rounded-none flex min-w-0 h-[200px]">
-                  
-                  {/* CANHOTO DO CLIENTE (MAIOR) */}
-                  <div className="flex-1 flex min-w-0">
-                    {/* Faixa Lateral */}
-                    <div className="bg-emerald-600 flex flex-col items-center justify-center px-3 shrink-0 text-white">
-                      <p className="text-[8px] uppercase font-bold rotate-180 [writing-mode:vertical-lr]">BILHETE OFICIAL</p>
-                      <p className="text-2xl font-black font-mono mt-2">{String(b.numero).padStart(3, '0')}</p>
-                    </div>
+            {bilhetes.map((b, idx) => {
+              const pagarUrl = `${BASE_URL}/pagar-cartela?codigo=${b.codigoValidacao}`;
+              const conferirUrl = `${BASE_URL}/validar-cartela?codigo=${b.codigoValidacao}`;
+              const isPendente = b.status_compra === 'pendente';
 
-                    {/* Conteúdo Cliente */}
-                    <div className="flex-1 p-4 flex flex-col justify-between min-w-0">
-                      <div className="flex justify-between items-start gap-2">
-                        <div className="min-w-0">
-                          <h2 className="text-lg font-black text-gray-800 uppercase truncate leading-tight">{b.rifa?.nome}</h2>
-                          <p className="text-[10px] text-gray-500 font-bold mt-0.5">CÓDIGO: <span className="text-gray-800 font-mono">{b.codigoValidacao}</span></p>
-                        </div>
-                        <div className="text-right shrink-0">
-                          <p className="text-[8px] text-gray-400 uppercase font-bold">Valor</p>
-                          <p className="text-sm font-black text-emerald-600">R$ {Number(b.rifa?.custo_por_numero).toFixed(2)}</p>
-                        </div>
+              return (
+                <div key={`${b.numero}-${idx}`} className="print:break-inside-avoid">
+                  <div className="bg-white rounded-xl overflow-hidden shadow border border-gray-200 print:shadow-none print:border print:border-gray-400 print:rounded-none flex min-w-0 h-[200px]">
+                    
+                    {/* CANHOTO DO CLIENTE (MAIOR) */}
+                    <div className="flex-1 flex min-w-0">
+                      {/* Faixa Lateral */}
+                      <div className="bg-emerald-600 flex flex-col items-center justify-center px-3 shrink-0 text-white">
+                        <p className="text-[8px] uppercase font-bold rotate-180 [writing-mode:vertical-lr]">BILHETE OFICIAL</p>
+                        <p className="text-2xl font-black font-mono mt-2">{String(b.numero).padStart(3, '0')}</p>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-4 border-y border-gray-100 py-2 my-1">
-                        <div>
-                          <p className="text-[7px] text-gray-400 uppercase font-bold">Data do Sorteio</p>
-                          <p className="text-[10px] font-bold text-gray-700">{formatDate(b.rifa?.data_encerramento ?? null)}</p>
-                        </div>
-                        <div>
-                          <p className="text-[7px] text-gray-400 uppercase font-bold">Cadastre-se e Jogue</p>
-                          <p className="text-[9px] font-mono text-emerald-600 font-bold truncate">{BASE_URL.replace('https://', '')}</p>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-3">
-                        <div className="shrink-0 flex flex-col items-center">
-                          {b.vendedor?.codigo_ref && (
-                            <QRCodeSVG value={`${BASE_URL}/vendedor/perfil/${b.vendedor.codigo_ref}`} size={45} />
-                          )}
-                          <p className="text-[6px] text-gray-400 font-bold mt-1 uppercase">Vendedor</p>
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-1 text-emerald-600">
-                            <ShieldCheck className="h-3 w-3" />
-                            <span className="text-[8px] font-black uppercase">Vendedor Autorizado</span>
+                      {/* Conteúdo Cliente */}
+                      <div className="flex-1 p-4 flex flex-col justify-between min-w-0">
+                        <div className="flex justify-between items-start gap-2">
+                          <div className="min-w-0">
+                            <h2 className="text-lg font-black text-gray-800 uppercase truncate leading-tight">{b.rifa?.nome}</h2>
+                            <p className="text-[10px] text-gray-500 font-bold mt-0.5">CÓDIGO: <span className="text-gray-800 font-mono">{b.codigoValidacao}</span></p>
                           </div>
-                          <p className="text-[10px] font-bold text-gray-700 truncate">{b.vendedor?.nome}</p>
-                          <p className="text-[8px] text-gray-500">Ref: {b.vendedor?.codigo_ref}</p>
+                          <div className="text-right shrink-0">
+                            <p className="text-[8px] text-gray-400 uppercase font-bold">Valor</p>
+                            <p className="text-sm font-black text-emerald-600">R$ {Number(b.rifa?.custo_por_numero).toFixed(2)}</p>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4 border-y border-gray-100 py-2 my-1">
+                          <div>
+                            <p className="text-[7px] text-gray-400 uppercase font-bold">Data do Sorteio</p>
+                            <p className="text-[10px] font-bold text-gray-700">{formatDate(b.rifa?.data_encerramento ?? null)}</p>
+                          </div>
+                          <div>
+                            <p className="text-[7px] text-gray-400 uppercase font-bold">Cadastre-se e Jogue</p>
+                            <p className="text-[9px] font-mono text-emerald-600 font-bold truncate">{BASE_URL.replace('https://', '')}</p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-3">
+                          <div className="shrink-0 flex flex-col items-center">
+                            {b.vendedor?.codigo_ref && (
+                              <QRCodeSVG value={`${BASE_URL}/vendedor/perfil/${b.vendedor.codigo_ref}`} size={45} />
+                            )}
+                            <p className="text-[6px] text-gray-400 font-bold mt-1 uppercase">Vendedor</p>
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-1 text-emerald-600">
+                              <ShieldCheck className="h-3 w-3" />
+                              <span className="text-[8px] font-black uppercase">Vendedor Autorizado</span>
+                            </div>
+                            <p className="text-[10px] font-bold text-gray-700 truncate">{b.vendedor?.nome}</p>
+                            <p className="text-[8px] text-gray-500">Ref: {b.vendedor?.codigo_ref}</p>
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
 
-                  {/* LINHA DE CORTE */}
-                  <div className="w-0 border-l-2 border-dashed border-gray-300 relative">
-                    <div className="absolute -top-2 -left-2 w-4 h-4 bg-gray-100 rounded-full border border-gray-300 print:bg-white" />
-                    <div className="absolute -bottom-2 -left-2 w-4 h-4 bg-gray-100 rounded-full border border-gray-300 print:bg-white" />
-                  </div>
+                    {/* LINHA DE CORTE */}
+                    <div className="w-0 border-l-2 border-dashed border-gray-300 relative">
+                      <div className="absolute -top-2 -left-2 w-4 h-4 bg-gray-100 rounded-full border border-gray-300 print:bg-white" />
+                      <div className="absolute -bottom-2 -left-2 w-4 h-4 bg-gray-100 rounded-full border border-gray-300 print:bg-white" />
+                    </div>
 
-                  {/* CANHOTO DO VENDEDOR (MENOR) */}
-                  <div className="w-[220px] bg-gray-50/50 p-4 flex flex-col shrink-0">
-                    <div className="flex justify-between items-start mb-2">
-                      <p className="text-[8px] font-black text-gray-400 uppercase pt-1">Canhoto Vendedor</p>
-                      <div className="text-right">
-                        <p className="text-sm font-black font-mono text-gray-800">Nº {String(b.numero).padStart(3, '0')}</p>
-                        {b.codigoValidacao && (
-                          <div className="mt-1 bg-white p-1 border border-gray-200 rounded shadow-sm inline-block">
-                            <QRCodeSVG value={`${BASE_URL}/validar-cartela?codigo=${b.codigoValidacao}`} size={42} />
+                    {/* CANHOTO DO VENDEDOR (MENOR) */}
+                    <div className="w-[240px] bg-gray-50/50 p-3 flex flex-col shrink-0">
+                      <div className="flex justify-between items-start mb-2">
+                        <p className="text-[8px] font-black text-gray-400 uppercase pt-1">Canhoto Vendedor</p>
+                        <div className="text-right">
+                          <p className="text-sm font-black font-mono text-gray-800">Nº {String(b.numero).padStart(3, '0')}</p>
+                        </div>
+                      </div>
+
+                      {/* QR CODES DE PAGAMENTO E CONFERÊNCIA */}
+                      <div className="flex gap-2 mb-3">
+                        {/* QR CODE 1: PAGAMENTO (Se pendente) */}
+                        <div className={cn(
+                            "text-center flex flex-col items-center border rounded p-1 flex-1 shadow-sm",
+                            !isPendente ? "border-gray-200 bg-gray-50 opacity-50" : "border-emerald-600 bg-emerald-50"
+                        )}>
+                          <p className="text-[6px] font-black text-emerald-700 flex items-center gap-0.5 mb-0.5 uppercase">
+                            <Smartphone className="w-2 h-2" /> {!isPendente ? 'PAGO' : 'PAGAR'}
+                          </p>
+                          <div className="p-0.5 bg-white rounded shadow-sm">
+                            <QRCodeSVG value={pagarUrl} size={42} />
                           </div>
-                        )}
+                          {isPendente && <p className="text-[7px] font-black text-emerald-900 mt-0.5">R$ {b.valor_final.toFixed(2)}</p>}
+                        </div>
+
+                        {/* QR CODE 2: CONFERÊNCIA */}
+                        <div className="text-center flex flex-col items-center border border-blue-200 bg-blue-50 rounded p-1 flex-1 shadow-sm">
+                          <p className="text-[6px] font-black text-blue-700 flex items-center gap-0.5 mb-0.5 uppercase">
+                            <Search className="w-2 h-2" /> CONFERIR
+                          </p>
+                          <div className="p-0.5 bg-white rounded shadow-sm border border-blue-100">
+                            <QRCodeSVG value={conferirUrl} size={42} />
+                          </div>
+                          <p className="text-[5px] font-bold text-blue-600 mt-0.5 uppercase">Ver Ganhador</p>
+                        </div>
+                      </div>
+
+                      {/* Campos para preencher */}
+                      <div className="space-y-1.5 flex-1">
+                        <div className="border-b border-gray-300 pb-0.5">
+                          <p className="text-[7px] text-gray-400 uppercase font-bold">Nome Comprador</p>
+                          <div className="h-2.5" />
+                        </div>
+                        <div className="border-b border-gray-300 pb-0.5">
+                          <p className="text-[7px] text-gray-400 uppercase font-bold">Telefone / WhatsApp</p>
+                          <div className="h-2.5" />
+                        </div>
+                      </div>
+
+                      <div className="mt-auto pt-1 border-t border-gray-200">
+                        <p className="text-[7px] text-gray-400 uppercase font-bold truncate">{b.rifa?.nome}</p>
                       </div>
                     </div>
 
-                    {/* Campos para preencher */}
-                    <div className="space-y-2 flex-1">
-                      <div className="border-b border-gray-300 pb-0.5">
-                        <p className="text-[7px] text-gray-400 uppercase font-bold">Nome Comprador</p>
-                        <div className="h-3" />
-                      </div>
-                      <div className="border-b border-gray-300 pb-0.5">
-                        <p className="text-[7px] text-gray-400 uppercase font-bold">Telefone / WhatsApp</p>
-                        <div className="h-3" />
-                      </div>
-                      <div className="border-b border-gray-300 pb-0.5">
-                        <p className="text-[7px] text-gray-400 uppercase font-bold">Endereço</p>
-                        <div className="h-3" />
-                      </div>
-                    </div>
-
-                    <div className="mt-auto pt-2 border-t border-gray-200">
-                      <p className="text-[7px] text-gray-400 uppercase font-bold truncate">{b.rifa?.nome}</p>
-                    </div>
                   </div>
-
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
@@ -237,6 +271,8 @@ export default function VendedorCartelas() {
           .bg-emerald-600 { background-color: #059669 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
           .text-white { color: white !important; }
           .bg-gray-50\/50 { background-color: #f9fafb !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+          .bg-emerald-50 { background-color: #ecfdf5 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+          .bg-blue-50 { background-color: #eff6ff !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         }
       `}</style>
     </div>

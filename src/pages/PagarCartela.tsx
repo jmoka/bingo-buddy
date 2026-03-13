@@ -4,7 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2, ArrowLeft, Copy, CheckCircle2, AlertTriangle, ShieldCheck, Camera, Smartphone, ArrowRight } from 'lucide-react';
+import { Loader2, ArrowLeft, Copy, CheckCircle2, AlertTriangle, ShieldCheck, Camera } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { QrCodePix } from 'qrcode-pix';
 import { toast } from 'sonner';
@@ -15,6 +15,7 @@ export default function PagarCartela() {
   const codigo = searchParams.get('codigo');
 
   const [venda, setVenda] = useState<any | null>(null);
+  const [tipoVenda, setTipoVenda] = useState<'bingo' | 'rifa' | null>(null);
   const [gameSettings, setGameSettings] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -25,17 +26,44 @@ export default function PagarCartela() {
         return;
       }
 
-      const [resVenda, resConfig] = await Promise.all([
-        supabase
-          .from('vendas_bingo_fisico')
-          .select('*, partidas(name), vendedores_rifa(nome)')
-          .eq('codigo_validacao', codigo.toUpperCase().trim())
-          .single(),
-        supabase.from('configuracoes').select('*').single()
-      ]);
+      // 1. Busca Configurações
+      const { data: resConfig } = await supabase.from('configuracoes').select('*').single();
+      if (resConfig) setGameSettings(resConfig);
 
-      if (resVenda.data) setVenda(resVenda.data);
-      if (resConfig.data) setGameSettings(resConfig.data);
+      // 2. Tenta buscar no Bingo
+      const { data: resBingo } = await supabase
+        .from('vendas_bingo_fisico')
+        .select('*, partidas(name), vendedores_rifa(nome)')
+        .eq('codigo_validacao', codigo.toUpperCase().trim())
+        .maybeSingle();
+
+      if (resBingo) {
+        setVenda(resBingo);
+        setTipoVenda('bingo');
+        setLoading(false);
+        return;
+      }
+
+      // 3. Se não achou no bingo, tenta buscar na Rifa
+      const { data: resRifa } = await supabase
+        .from('cartelas_rifa')
+        .select('*, compras_rifa(*, rifas(nome), vendedores_rifa(nome))')
+        .eq('codigo_validacao', codigo.toUpperCase().trim())
+        .maybeSingle();
+
+      if (resRifa) {
+        // Normaliza os dados da rifa para o formato esperado pelo componente
+        setVenda({
+            id: resRifa.id,
+            status: resRifa.compras_rifa?.status,
+            codigo_validacao: resRifa.codigo_validacao,
+            valor_pago: resRifa.compras_rifa?.valor_total,
+            desconto_aplicado: resRifa.compras_rifa?.desconto_aplicado,
+            partidas: { name: resRifa.compras_rifa?.rifas?.nome },
+            vendedores_rifa: resRifa.compras_rifa?.vendedores_rifa
+        });
+        setTipoVenda('rifa');
+      }
 
       setLoading(false);
     }
@@ -44,13 +72,15 @@ export default function PagarCartela() {
 
   const valorCheio = useMemo(() => {
     if (!venda) return 0;
-    return Number(venda.valor_pago) / (1 - (Number(venda.desconto_aplicado || 0) / 100));
+    // Se o desconto for 100% (improvável), evita divisão por zero
+    const desc = Number(venda.desconto_aplicado || 0);
+    if (desc >= 100) return Number(venda.valor_pago);
+    return Number(venda.valor_pago) / (1 - (desc / 100));
   }, [venda]);
 
   const pixPayload = useMemo(() => {
     if (!gameSettings?.pix_key || !venda) return '';
     try {
-      // Remove espaços e acentos para evitar erros nos bancos
       const cleanKey = gameSettings.pix_key.replace(/\s/g, '');
       const cleanName = (gameSettings.pix_name || 'BINGOSHOW').normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s/g, '').toUpperCase();
       const cleanCity = (gameSettings.pix_city || 'SAOPAULO').normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s/g, '').toUpperCase();
@@ -88,7 +118,7 @@ export default function PagarCartela() {
       <div className="card-container text-center py-20 max-w-md mx-auto mt-10">
         <AlertTriangle className="w-12 h-12 text-destructive mx-auto mb-4 opacity-50" />
         <h2 className="text-xl font-bold mb-2">Código não encontrado</h2>
-        <p className="text-muted-foreground mb-6">Não conseguimos localizar a cartela informada.</p>
+        <p className="text-muted-foreground mb-6">Não conseguimos localizar o bilhete informado.</p>
         <Button onClick={() => navigate('/')}>Voltar ao Início</Button>
       </div>
     );
@@ -98,8 +128,8 @@ export default function PagarCartela() {
     return (
       <div className="card-container text-center py-16 max-w-md mx-auto mt-10 border-success/30 bg-success/5">
         <CheckCircle2 className="w-16 h-16 text-success mx-auto mb-4" />
-        <h2 className="text-2xl font-bold text-success mb-2">Cartela Paga!</h2>
-        <p className="text-muted-foreground mb-6">Esta cartela já está validada e pronta para o sorteio.</p>
+        <h2 className="text-2xl font-bold text-success mb-2">Bilhete Pago!</h2>
+        <p className="text-muted-foreground mb-6">Este bilhete já está validado e pronto para o sorteio.</p>
         <Button className="w-full bg-success hover:bg-success/90" onClick={() => navigate('/')}>Ir para o Lobby</Button>
       </div>
     );
@@ -119,9 +149,9 @@ export default function PagarCartela() {
   return (
     <div className="max-w-md mx-auto space-y-6 pt-4 pb-20 px-2">
       <div className="text-center space-y-2">
-        <h1 className="font-heading text-2xl font-black text-foreground">Pagamento da Cartela</h1>
+        <h1 className="font-heading text-2xl font-black text-foreground">Pagamento do Bilhete</h1>
         <p className="text-muted-foreground text-sm">
-          Siga as instruções abaixo para validar sua participação no bingo.
+          Siga as instruções abaixo para validar sua participação.
         </p>
       </div>
 
@@ -135,7 +165,6 @@ export default function PagarCartela() {
         </div>
 
         <div className="space-y-6">
-          {/* PASSO 1 */}
           <div className="space-y-3">
             <h3 className="font-bold flex items-center gap-2 text-foreground">
               <span className="bg-primary text-white w-6 h-6 rounded-full flex items-center justify-center text-xs shrink-0">1</span>
@@ -171,11 +200,10 @@ export default function PagarCartela() {
             </div>
           </div>
 
-          {/* PASSO 2 */}
           <div className="space-y-3 pt-4 border-t">
             <h3 className="font-bold flex items-center gap-2 text-foreground">
               <span className="bg-primary text-white w-6 h-6 rounded-full flex items-center justify-center text-xs shrink-0">2</span>
-              Valide sua Cartela
+              Valide seu Bilhete
             </h3>
             <p className="text-sm text-muted-foreground leading-relaxed">
               Após realizar o PIX no app do seu banco, anexe o comprovante abaixo.
@@ -185,7 +213,7 @@ export default function PagarCartela() {
               <p className="text-sm font-bold text-foreground mb-2">Já pagou?</p>
               <Button 
                 className="w-full h-14 text-xl font-bold bg-green-600 hover:bg-green-700 text-white shadow-button animate-pulse"
-                onClick={() => navigate(`/validar-cartela?bingo=${venda.codigo_validacao}`)}
+                onClick={() => navigate(`/validar-cartela?codigo=${venda.codigo_validacao}`)}
               >
                 <Camera className="w-5 h-5 mr-2" />
                 Validar
@@ -197,7 +225,7 @@ export default function PagarCartela() {
 
       <div className="flex items-start gap-3 p-4 bg-amber-50 rounded-xl border border-amber-200 text-amber-800 text-sm">
         <AlertTriangle className="w-5 h-5 shrink-0 text-amber-600 mt-0.5" />
-        <p><strong>Atenção:</strong> Sua cartela só terá validade no sorteio após você enviar o comprovante de pagamento no botão acima!</p>
+        <p><strong>Atenção:</strong> Seu bilhete só terá validade no sorteio após você enviar o comprovante de pagamento no botão acima!</p>
       </div>
     </div>
   );
