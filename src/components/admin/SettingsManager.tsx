@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { Save, Settings, Check, Loader2, Bot, Link as LinkIcon, DollarSign, Banknote, Play, CalendarDays, Clock, Ticket } from 'lucide-react';
+import { Save, Settings, Check, Loader2, Bot, Link as LinkIcon, DollarSign, Banknote, Play, CalendarDays, Clock, Ticket, CreditCard } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { supabase } from '@/integrations/supabase/client';
@@ -49,6 +49,8 @@ const SettingsManager = () => {
     desconto_vendedor_global: 0,
     comissao_vendedor_global: 0,
     cartelas_por_folha_bingo: 4,
+    stripe_secret_key: '',
+    stripe_webhook_secret: '',
   });
   const [isSaving, setIsSaving] = useState(false);
   const [justSaved, setJustSaved] = useState(false);
@@ -83,6 +85,8 @@ const SettingsManager = () => {
         desconto_vendedor_global: gameSettings.desconto_vendedor_global || 0,
         comissao_vendedor_global: gameSettings.comissao_vendedor_global || 0,
         cartelas_por_folha_bingo: gameSettings.cartelas_por_folha_bingo || 4,
+        stripe_secret_key: gameSettings.stripe_secret_key || '',
+        stripe_webhook_secret: gameSettings.stripe_webhook_secret || '',
       });
     }
   }, [gameSettings]);
@@ -250,6 +254,24 @@ const SettingsManager = () => {
               <div><Label>Cidade (Sem acentos)</Label><Input name="pix_city" value={currentSettings.pix_city} onChange={handleSettingsChange} placeholder="Ex: SAO PAULO" /></div>
             </div>
             <div><Label>Texto de Instrução</Label><Textarea name="credit_request_text" value={currentSettings.credit_request_text} onChange={handleSettingsChange} rows={3} /></div>
+          </div>
+        </div>
+
+        <div className="space-y-6">
+          <h3 className="font-heading font-bold text-primary border-b pb-2 flex items-center gap-2"><CreditCard className="w-4 h-4" /> Pagamentos Automáticos (Stripe)</h3>
+          <div className="space-y-4">
+            <div>
+              <Label>Stripe Secret Key (sk_...)</Label>
+              <Input name="stripe_secret_key" type="password" value={currentSettings.stripe_secret_key} onChange={handleSettingsChange} placeholder="Cole sua chave secreta aqui" />
+            </div>
+            <div>
+              <Label>Stripe Webhook Secret (whsec_...)</Label>
+              <Input name="stripe_webhook_secret" type="password" value={currentSettings.stripe_webhook_secret} onChange={handleSettingsChange} placeholder="Cole o segredo do webhook aqui" />
+            </div>
+            <p className="text-[10px] text-muted-foreground bg-muted p-2 rounded border border-dashed">
+              <strong>Dica:</strong> Configure o Webhook no Stripe para enviar eventos para:<br/>
+              <code className="font-bold text-primary">https://vqvnodwojefubbbnbyar.supabase.co/functions/v1/stripe-webhook</code>
+            </p>
           </div>
         </div>
 

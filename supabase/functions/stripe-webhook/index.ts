@@ -3,7 +3,23 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
 import Stripe from 'https://esm.sh/stripe@14.16.0?target=deno'
 
 serve(async (req) => {
-  const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') || '', {
+  const supabaseAdmin = createClient(
+    Deno.env.get('SUPABASE_URL') ?? '',
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+  )
+
+  // Busca as chaves no banco de dados
+  const { data: settings, error: settingsError } = await supabaseAdmin
+    .from('configuracoes')
+    .select('stripe_secret_key, stripe_webhook_secret')
+    .single();
+
+  if (settingsError || !settings?.stripe_secret_key || !settings?.stripe_webhook_secret) {
+      console.error("[webhook] Erro: Chaves do Stripe não configuradas no banco.");
+      return new Response('Config Error', { status: 500 });
+  }
+
+  const stripe = new Stripe(settings.stripe_secret_key, {
     apiVersion: '2023-10-16',
     httpClient: Stripe.createFetchHttpClient(),
   })
@@ -16,12 +32,7 @@ serve(async (req) => {
     const event = stripe.webhooks.constructEvent(
       body,
       signature,
-      Deno.env.get('STRIPE_WEBHOOK_SECRET') || ''
-    )
-
-    const supabaseAdmin = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      settings.stripe_webhook_secret
     )
 
     if (event.type === 'checkout.session.completed') {

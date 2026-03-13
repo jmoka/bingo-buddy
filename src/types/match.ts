@@ -104,6 +104,8 @@ export interface GameSettings {
   desconto_vendedor_global: number;
   comissao_vendedor_global: number;
   cartelas_por_folha_bingo: number;
+  stripe_secret_key?: string;
+  stripe_webhook_secret?: string;
 }
 
 export interface FolhaBingoFisico {

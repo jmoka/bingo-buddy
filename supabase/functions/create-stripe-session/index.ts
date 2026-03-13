@@ -13,15 +13,25 @@ serve(async (req) => {
   try {
     const { amount, type, metadata = {} } = await req.json()
     
-    const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') || '', {
-      apiVersion: '2023-10-16',
-      httpClient: Stripe.createFetchHttpClient(),
-    })
-
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
+
+    // Busca a chave secreta no banco de dados
+    const { data: settings, error: settingsError } = await supabaseAdmin
+      .from('configuracoes')
+      .select('stripe_secret_key')
+      .single();
+
+    if (settingsError || !settings?.stripe_secret_key) {
+        throw new Error("Stripe Secret Key não configurada no painel administrativo.");
+    }
+
+    const stripe = new Stripe(settings.stripe_secret_key, {
+      apiVersion: '2023-10-16',
+      httpClient: Stripe.createFetchHttpClient(),
+    })
 
     const authHeader = req.headers.get('Authorization')
     const userSupabaseClient = createClient(
