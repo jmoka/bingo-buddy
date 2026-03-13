@@ -142,8 +142,17 @@ export default function VendedorCartelas() {
 
               return (
                 <div key={`${b.numero}-${idx}`} className="print:break-inside-avoid">
-                  <div className="bg-white rounded-xl overflow-hidden shadow border border-gray-200 print:shadow-none print:border print:border-gray-400 print:rounded-none flex min-w-0 h-[200px]">
+                  <div className="bg-white rounded-xl overflow-hidden shadow border border-gray-200 print:shadow-none print:border print:border-gray-400 print:rounded-none flex min-w-0 h-[200px] relative">
                     
+                    {/* CARIMBO JÁ FOI PAGO (CENTRALIZADO) */}
+                    {!isPendente && (
+                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20 overflow-hidden">
+                        <p className="text-6xl font-black text-green-600/15 border-8 border-green-600/15 p-4 rounded-xl rotate-[-25deg] uppercase tracking-tighter whitespace-nowrap">
+                          JÁ FOI PAGO
+                        </p>
+                      </div>
+                    )}
+
                     {/* CANHOTO DO CLIENTE (MAIOR) */}
                     <div className="flex-1 flex min-w-0">
                       {/* Faixa Lateral */}

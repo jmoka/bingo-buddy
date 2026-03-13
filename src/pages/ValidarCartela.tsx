@@ -94,7 +94,6 @@ export default function ValidarCartela() {
     setIsEnviandoComprovante(true);
     try {
       const ext = comprovanteFile.name.split('.').pop();
-      // Salva em uma pasta para anônimos
       const fileName = `anonimo_${Date.now()}_${Math.random().toString(36).substring(7)}.${ext}`;
       
       const { error: uploadError } = await supabase.storage
@@ -235,8 +234,13 @@ export default function ValidarCartela() {
                   </div>
                 ) : (
                   <>
-                    <div className="card-container p-5 border-purple-300">
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4 border-b pb-4">
+                    <div className="card-container p-5 border-purple-300 relative overflow-hidden">
+                      {/* Carimbo JÁ FOI PAGO */}
+                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
+                        <p className="text-6xl font-black text-green-600/10 border-8 border-green-600/10 p-4 rounded-xl rotate-[-15deg] uppercase tracking-tighter">JÁ FOI PAGO</p>
+                      </div>
+
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4 border-b pb-4 relative z-20">
                         <div className="flex items-center gap-3">
                           <CheckCircle className="h-8 w-8 text-green-500 shrink-0" />
                           <div><p className="font-bold text-lg text-green-700 leading-tight">Folha Autêntica e Válida</p><p className="text-sm text-muted-foreground">{resultadoBingo.partidas.name}</p></div>
@@ -300,10 +304,17 @@ export default function ValidarCartela() {
                <div className="space-y-4">
                  {resultadoRifa.map((num: any, idx: number) => {
                    const isGanhador = num.rifas?.status === 'finalizada' && num.rifas?.numero_ganhador === num.numero;
-                   const isPago = num.status === 'vendido';
+                   const isPago = num.status === 'vendido' || num.cartelas_rifa?.[0]?.compras_rifa?.status === 'pago';
                    return (
-                     <div key={idx} className={`card-container p-6 border-2 ${isGanhador ? 'border-success bg-success/10' : isPago ? 'border-primary/30 bg-primary/5' : 'border-amber-400 bg-amber-50'}`}>
-                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4 border-b pb-4">
+                     <div key={idx} className={`card-container p-6 border-2 relative overflow-hidden ${isGanhador ? 'border-success bg-success/10' : isPago ? 'border-primary/30 bg-primary/5' : 'border-amber-400 bg-amber-50'}`}>
+                       {/* Carimbo JÁ FOI PAGO */}
+                       {isPago && (
+                         <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
+                           <p className="text-6xl font-black text-green-600/10 border-8 border-green-600/10 p-4 rounded-xl rotate-[-15deg] uppercase tracking-tighter">JÁ FOI PAGO</p>
+                         </div>
+                       )}
+
+                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4 border-b pb-4 relative z-20">
                          <div className="flex items-center gap-3">
                            {isGanhador ? <Trophy className="h-8 w-8 text-success" /> : isPago ? <CheckCircle className="h-8 w-8 text-primary" /> : <AlertTriangle className="h-8 w-8 text-amber-500" />}
                            <div><p className={`font-bold text-lg leading-tight ${isGanhador ? 'text-success' : isPago ? 'text-primary' : 'text-amber-700'}`}>{isGanhador ? 'Cota Vencedora!' : isPago ? 'Cota Válida e Paga' : 'Cota Reservada (Fiado)'}</p><p className="text-sm font-medium opacity-80">{num.rifas?.nome}</p></div>
@@ -313,7 +324,7 @@ export default function ValidarCartela() {
                            <p className={`text-4xl font-black font-heading ${isGanhador ? 'text-success' : 'text-foreground'}`}>{String(num.numero).padStart(3, '0')}</p>
                          </div>
                        </div>
-                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm relative z-20">
                          <div className="space-y-1"><p className="text-xs text-muted-foreground font-bold uppercase">Comprador</p><p className="font-semibold text-base">{num.nome_comprador || 'Nome não registrado'}</p></div>
                          <div className="space-y-1"><p className="text-xs text-muted-foreground font-bold uppercase">Situação Financeira</p><p className="font-semibold flex items-center gap-1.5">{isPago ? <Badge className="bg-success text-white border-none">PAGO</Badge> : <Badge variant="outline" className="text-amber-600 border-amber-400 bg-amber-100">AGUARDANDO PAGAMENTO</Badge>}</p></div>
                        </div>
@@ -342,8 +353,15 @@ export default function ValidarCartela() {
                const isPago = c.compras_rifa?.status === 'pago';
                const isGanhador = c.compras_rifa?.rifas?.status === 'finalizada' && c.compras_rifa?.rifas?.numero_ganhador === c.numeros_rifa?.numero;
                return (
-                 <div className={`card-container p-6 border-2 ${isGanhador ? 'border-success bg-success/10' : isPago ? 'border-primary/30 bg-primary/5' : 'border-amber-400 bg-amber-50'}`}>
-                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4 border-b pb-4">
+                 <div className={`card-container p-6 border-2 relative overflow-hidden ${isGanhador ? 'border-success bg-success/10' : isPago ? 'border-primary/30 bg-primary/5' : 'border-amber-400 bg-amber-50'}`}>
+                   {/* Carimbo JÁ FOI PAGO */}
+                   {isPago && (
+                     <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
+                       <p className="text-6xl font-black text-green-600/10 border-8 border-green-600/10 p-4 rounded-xl rotate-[-15deg] uppercase tracking-tighter">JÁ FOI PAGO</p>
+                     </div>
+                   )}
+
+                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4 border-b pb-4 relative z-20">
                      <div className="flex items-center gap-3">
                        {isGanhador ? <Trophy className="h-8 w-8 text-success" /> : isPago ? <CheckCircle className="h-8 w-8 text-primary" /> : <AlertTriangle className="h-8 w-8 text-amber-500" />}
                        <div><p className={`font-bold text-lg leading-tight ${isGanhador ? 'text-success' : isPago ? 'text-primary' : 'text-amber-700'}`}>{isGanhador ? 'Cota Vencedora!' : isPago ? 'Cota Válida e Paga' : 'Cota Reservada (Fiado)'}</p><p className="text-sm font-medium opacity-80">{c.compras_rifa?.rifas?.nome}</p></div>
@@ -353,7 +371,7 @@ export default function ValidarCartela() {
                        <p className={`text-4xl font-black font-heading ${isGanhador ? 'text-success' : 'text-foreground'}`}>{String(c.numeros_rifa?.numero).padStart(3, '0')}</p>
                      </div>
                    </div>
-                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm relative z-20">
                      <div className="space-y-1"><p className="text-xs text-muted-foreground font-bold uppercase">Comprador</p><p className="font-semibold text-base">{c.numeros_rifa?.nome_comprador || 'Nome não registrado'}</p></div>
                      <div className="space-y-1"><p className="text-xs text-muted-foreground font-bold uppercase">Situação Financeira</p><p className="font-semibold flex items-center gap-1.5">{isPago ? <Badge className="bg-success text-white border-none">PAGO</Badge> : <Badge variant="outline" className="text-amber-600 border-amber-400 bg-amber-100">AGUARDANDO PAGAMENTO</Badge>}</p></div>
                    </div>

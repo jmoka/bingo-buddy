@@ -64,7 +64,6 @@ const VendedorPainel = () => {
   const [bingoFilterMatchId, setBingoFilterMatchId] = useState<string>('todas');
   const [rifaFilterId, setRifaFilterId] = useState<string>('todas');
   
-  // Filtros Acertos
   const [acertoTipoFilter, setAcertoTipoFilter] = useState<'todos' | 'bingo' | 'rifa'>('todos');
   const [acertoBingoFilterId, setAcertoBingoFilterId] = useState<string>('todas');
   const [acertoRifaFilterId, setAcertoRifaFilterId] = useState<string>('todas');
@@ -134,7 +133,7 @@ const VendedorPainel = () => {
   const reservasPorRifa = useMemo(() => {
     const map: Record<string, NumeroRifaVendedor[]> = {};
     const filtradas = minhasReservas.filter(r => {
-      if (r.rifas?.status !== 'ativa') return false; // Mostrar apenas reservas de rifas ativas
+      if (r.rifas?.status !== 'ativa') return false;
       if (rifaFilterId !== 'todas' && r.rifa_id !== rifaFilterId) return false;
       return true;
     });
@@ -393,7 +392,7 @@ const VendedorPainel = () => {
         </div>
         <div className="flex flex-col items-end">
            <Badge className="bg-green-500/15 text-green-700 dark:text-green-400 border-green-500/30">Ativo</Badge>
-           <span className="text-[10px] text-muted-foreground mt-1 font-semibold">{descontoAtivo}% Desconto | {gameSettings?.comissao_vendedor_global}% Comissão</span>
+           <span className="text-[10px] text-muted-foreground mt-1 font-semibold">{descontoAtivo}% Desconto | {gameSettings?.comissao_vendedor_global || 0}% Comissão</span>
         </div>
       </div>
 
@@ -412,7 +411,6 @@ const VendedorPainel = () => {
         </div>
       )}
 
-      {/* LINKS DE INDICAÇÃO */}
       <div className="card-container space-y-3">
         <h3 className="font-heading font-bold text-sm flex items-center gap-2"><Link2 className="w-4 h-4 text-primary" /> Seus Links de Indicação (Ganhe Comissão!)</h3>
         <p className="text-xs text-muted-foreground mb-2">Envie estes links para seus clientes. Se eles comprarem online, você ganha <strong>{gameSettings?.comissao_vendedor_global || 0}%</strong> de comissão no saldo!</p>
@@ -514,13 +512,20 @@ const VendedorPainel = () => {
                           const statusCompra = n.cartelas_rifa?.[0]?.compras_rifa?.status;
                           const codigoValidacao = n.cartelas_rifa?.[0]?.codigo_validacao;
                           
+                          const isPago = statusCompra === 'pago';
+                          const isPendente = statusCompra === 'pendente';
+                          const isEmAnalise = statusCompra === 'em_analise';
+                          
+                          // Lógica solicitada: Se está pago mas ainda é "reservado" (vendedor pagou mas não vinculou cliente)
+                          const isPagoSemNome = n.status === 'reservado' && isPago;
+
                           let badgeText = 'PAGO';
                           let badgeClass = 'bg-green-100 text-green-700 border-green-200';
 
-                          if (statusCompra === 'pendente') {
+                          if (isPendente) {
                             badgeText = 'FIADO';
                             badgeClass = 'bg-red-100 text-red-700 border-red-200';
-                          } else if (statusCompra === 'em_analise') {
+                          } else if (isEmAnalise) {
                             badgeText = 'ANÁLISE';
                             badgeClass = 'bg-amber-100 text-amber-700 border-amber-200';
                           }
@@ -538,26 +543,36 @@ const VendedorPainel = () => {
                                             setValidarOpen(true);
                                         }
                                     }}
-                                    className={`w-full rounded-lg p-2 flex flex-col items-center justify-center gap-0.5 transition-all min-h-[75px] border 
-                                        ${n.status === 'vendido' ? 'bg-green-50/50 text-green-700 border-green-200 cursor-default opacity-80' : 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100 cursor-pointer'}
+                                    className={`w-full rounded-lg p-2 flex flex-col items-center justify-center gap-0.5 transition-all min-h-[85px] border 
+                                        ${n.status === 'vendido' ? 'bg-green-50/50 text-green-700 border-green-200 cursor-default opacity-80' : 
+                                          isPagoSemNome ? 'bg-green-600 text-white border-green-700 shadow-inner' :
+                                          'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100 cursor-pointer'}
                                         ${modoSelecao && isSelected ? 'ring-2 ring-primary border-primary bg-primary/10 text-primary' : ''}
                                     `}
                                 >
-                                    <span className="text-2xl font-bold font-heading leading-none">{n.numero}</span>
+                                    <span className={`text-2xl font-black font-heading leading-none ${isPagoSemNome ? 'text-white' : ''}`}>{n.numero}</span>
                                     
-                                    {codigoValidacao && (
+                                    {isPagoSemNome && (
+                                        <p className="text-[6px] font-black leading-tight text-center px-1 mt-1 animate-pulse uppercase">
+                                            Informe o cliente ou fique com o número
+                                        </p>
+                                    )}
+
+                                    {codigoValidacao && !isPagoSemNome && (
                                         <span className="text-[9px] font-mono text-primary bg-primary/10 px-1.5 py-0.5 rounded mt-1 font-bold tracking-widest border border-primary/20">
                                             {codigoValidacao}
                                         </span>
                                     )}
 
-                                    <span className={`text-[8px] px-1.5 py-0.5 rounded border mt-1.5 uppercase font-black tracking-wider w-full text-center ${badgeClass}`}>
-                                      {badgeText}
-                                    </span>
+                                    {!isPagoSemNome && (
+                                        <span className={`text-[8px] px-1.5 py-0.5 rounded border mt-1.5 uppercase font-black tracking-wider w-full text-center ${badgeClass}`}>
+                                          {badgeText}
+                                        </span>
+                                    )}
                                     
                                     {n.status === 'vendido' && <CheckSquare className="w-4 h-4 absolute top-1.5 left-1.5 text-green-600 opacity-60" />}
                                 </button>
-                                {n.status === 'reservado' && !modoSelecao && (
+                                {n.status === 'reservado' && !isPago && !modoSelecao && (
                                     <button onClick={e => { e.stopPropagation(); setCancelarNumero(n); }} className="absolute -top-1 -right-1 opacity-0 group-hover:opacity-100 bg-red-500 text-white rounded-full p-1 shadow-md hover:bg-red-600 transition-colors">
                                         <Undo2 className="w-3 h-3" />
                                     </button>
@@ -724,7 +739,6 @@ const VendedorPainel = () => {
                   </div>
                 </div>
 
-                {/* Lista de Vendas Pendentes (Bingo) */}
                 {showBingoSection && (
                   <div className="space-y-2">
                     <p className="text-[10px] font-bold uppercase tracking-wider text-purple-700 dark:text-purple-400">Bingo Físico</p>
@@ -745,7 +759,6 @@ const VendedorPainel = () => {
                   </div>
                 )}
 
-                {/* Lista de Vendas Pendentes (Rifa) */}
                 {showRifaSection && (
                   <div className="space-y-2 mt-4">
                     <p className="text-[10px] font-bold uppercase tracking-wider text-blue-700 dark:text-blue-400">Rifas</p>
@@ -779,7 +792,6 @@ const VendedorPainel = () => {
                   </div>
                 )}
                 
-                {/* RESUMO TOTAL */}
                 <div className="flex flex-col sm:flex-row items-center justify-between p-4 bg-amber-100 dark:bg-amber-900/20 border-2 border-amber-400 rounded-xl mt-6 gap-4">
                     <div className="text-center sm:text-left">
                         <p className="text-sm font-bold text-amber-800 dark:text-amber-500 uppercase tracking-widest flex items-center justify-center sm:justify-start gap-2">
@@ -868,7 +880,6 @@ const VendedorPainel = () => {
         </TabsContent>
       </Tabs>
 
-      {/* MODAL DE COMPRA DE BINGO */}
       <Dialog open={comprarBingoOpen} onOpenChange={setComprarBingoOpen}>
         <DialogContent>
           <DialogHeader>
@@ -948,7 +959,6 @@ const VendedorPainel = () => {
         </DialogContent>
       </Dialog>
 
-      {/* MODAL DE RESERVA RIFA */}
       <Dialog open={reservarOpen} onOpenChange={setReservarOpen}>
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
@@ -1026,7 +1036,6 @@ const VendedorPainel = () => {
         </DialogContent>
       </Dialog>
 
-      {/* MODAL PAGAR ACERTOS (PIX) */}
       <Dialog open={pagarAcertoOpen} onOpenChange={setPagarAcertoOpen}>
         <DialogContent>
           <DialogHeader>
@@ -1065,7 +1074,6 @@ const VendedorPainel = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Modal Validação em Lote ou Única (COM PAGAMENTO DE SALDO EMBUTIDO) */}
       <Dialog open={validarOpen} onOpenChange={setValidarOpen}>
         <DialogContent>
           <DialogHeader>
@@ -1077,7 +1085,7 @@ const VendedorPainel = () => {
           <div className="space-y-4">
              
              {comprasPendentesRelacionadas.ids.length > 0 && (
-                <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg space-y-2">
+                <div className="p-3 bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-800 rounded-lg space-y-2">
                   <div className="flex gap-2 text-red-700 dark:text-red-400">
                      <AlertTriangle className="w-5 h-5 shrink-0" />
                      <div>
@@ -1142,7 +1150,6 @@ const VendedorPainel = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Modal Cancelar */}
       <Dialog open={!!cancelarNumero} onOpenChange={open => { if (!open) setCancelarNumero(null); }}>
         <DialogContent>
           <DialogHeader>
