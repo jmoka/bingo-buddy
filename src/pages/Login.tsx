@@ -18,7 +18,11 @@ const Login = () => {
   const [view, setView] = useState<'login' | 'signup'>('login');
 
   useEffect(() => {
-    if (session) {
+    // Verifica se estamos em um fluxo de recuperação de senha (pelo hash da URL)
+    const isRecovery = window.location.hash.includes('type=recovery') || 
+                       window.location.search.includes('type=recovery');
+
+    if (session && !isRecovery) {
       navigate('/');
     }
   }, [session, navigate]);

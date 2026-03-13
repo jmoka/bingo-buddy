@@ -2,10 +2,12 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useNavigate } from "react-router-dom";
 import { GameProvider } from "@/contexts/GameContext";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { Layout } from "@/components/Layout";
+import { useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import Lobby from "./pages/Lobby";
 import Admin from "./pages/Admin";
 import Login from "./pages/Login";
@@ -38,6 +40,24 @@ import { Loader2 } from "lucide-react";
 
 const queryClient = new QueryClient();
 
+// Componente para lidar com eventos globais do Supabase Auth (como recuperação de senha)
+const AuthEventsHandler = () => {
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        console.log("Evento de recuperação de senha detectado, redirecionando...");
+        navigate('/update-password');
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [navigate]);
+
+  return null;
+};
+
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { session, loading } = useAuth();
   if (loading) {
@@ -56,11 +76,12 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
-      <AuthProvider>
-        <GameProvider>
-          <Toaster />
-          <Sonner />
-          <BrowserRouter>
+      <BrowserRouter>
+        <AuthProvider>
+          <GameProvider>
+            <AuthEventsHandler />
+            <Toaster />
+            <Sonner />
             <Routes>
               <Route path="/login" element={<Login />} />
               <Route path="/update-password" element={<UpdatePassword />} />
@@ -96,9 +117,9 @@ const App = () => (
               <Route path="/vendedor/imprimir-bingo/:folhaId" element={<ProtectedRoute><VendedorImprimirBingo /></ProtectedRoute>} />
               <Route path="*" element={<NotFound />} />
             </Routes>
-          </BrowserRouter>
-        </GameProvider>
-      </AuthProvider>
+          </GameProvider>
+        </AuthProvider>
+      </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
 );
