@@ -40,17 +40,23 @@ import { Loader2 } from "lucide-react";
 
 const queryClient = new QueryClient();
 
-// Componente para lidar com eventos globais do Supabase Auth (como recuperação de senha)
+// Componente para lidar com eventos globais do Supabase Auth
 const AuthEventsHandler = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
+    // 1. Escuta mudanças de estado (evento disparado pelo link do e-mail)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
       if (event === 'PASSWORD_RECOVERY') {
-        console.log("Evento de recuperação de senha detectado, redirecionando...");
         navigate('/update-password');
       }
     });
+
+    // 2. Verificação imediata via URL (caso o evento demore ou falhe)
+    const hash = window.location.hash;
+    if (hash && hash.includes('type=recovery')) {
+      navigate('/update-password');
+    }
 
     return () => subscription.unsubscribe();
   }, [navigate]);
@@ -60,6 +66,7 @@ const AuthEventsHandler = () => {
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { session, loading } = useAuth();
+  
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -67,9 +74,14 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
       </div>
     );
   }
-  if (!session) {
+
+  // Se estiver no meio de uma recuperação de senha, não redireciona para o login
+  const isRecovery = window.location.hash.includes('type=recovery');
+  
+  if (!session && !isRecovery) {
     return <Navigate to="/login" replace />;
   }
+  
   return <Layout>{children}</Layout>;
 };
 
