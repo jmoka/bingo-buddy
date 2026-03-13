@@ -106,6 +106,7 @@ export interface GameSettings {
   cartelas_por_folha_bingo: number;
   stripe_secret_key?: string;
   stripe_webhook_secret?: string;
+  stripe_enabled: boolean;
 }
 
 export interface FolhaBingoFisico {

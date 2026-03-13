@@ -133,19 +133,21 @@ export const CreditRequestDialog = ({ gameSettings, children }: CreditRequestDia
               </div>
             </div>
 
-            <div className="space-y-3">
-              <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Pagar Agora (Liberação Automática)</p>
-              
-              <Button 
-                className="w-full h-14 bg-primary text-white shadow-button font-bold text-lg" 
-                onClick={handleStripePayment}
-                disabled={isStripeLoading}
-              >
-                {isStripeLoading ? <Loader2 className="w-6 h-6 mr-2 animate-spin" /> : <CreditCard className="w-6 h-6 mr-2" />}
-                PAGAR COM CARTÃO / PIX
-              </Button>
-              <p className="text-[10px] text-muted-foreground italic">Os créditos caem na hora após a confirmação.</p>
-            </div>
+            {gameSettings.stripe_enabled && (
+              <div className="space-y-3">
+                <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Pagar Agora (Liberação Automática)</p>
+                
+                <Button 
+                  className="w-full h-14 bg-primary text-white shadow-button font-bold text-lg" 
+                  onClick={handleStripePayment}
+                  disabled={isStripeLoading}
+                >
+                  {isStripeLoading ? <Loader2 className="w-6 h-6 mr-2 animate-spin" /> : <CreditCard className="w-6 h-6 mr-2" />}
+                  PAGAR COM CARTÃO / PIX
+                </Button>
+                <p className="text-[10px] text-muted-foreground italic">Os créditos caem na hora após a confirmação.</p>
+              </div>
+            )}
 
             <div className="relative py-4">
               <div className="absolute inset-0 flex items-center"><span className="w-full border-t" /></div>

@@ -51,6 +51,7 @@ const SettingsManager = () => {
     cartelas_por_folha_bingo: 4,
     stripe_secret_key: '',
     stripe_webhook_secret: '',
+    stripe_enabled: false,
   });
   const [isSaving, setIsSaving] = useState(false);
   const [justSaved, setJustSaved] = useState(false);
@@ -87,6 +88,7 @@ const SettingsManager = () => {
         cartelas_por_folha_bingo: gameSettings.cartelas_por_folha_bingo || 4,
         stripe_secret_key: gameSettings.stripe_secret_key || '',
         stripe_webhook_secret: gameSettings.stripe_webhook_secret || '',
+        stripe_enabled: gameSettings.stripe_enabled || false,
       });
     }
   }, [gameSettings]);
@@ -260,6 +262,16 @@ const SettingsManager = () => {
         <div className="space-y-6">
           <h3 className="font-heading font-bold text-primary border-b pb-2 flex items-center gap-2"><CreditCard className="w-4 h-4" /> Pagamentos Automáticos (Stripe)</h3>
           <div className="space-y-4">
+            <div className="flex items-center justify-between p-4 bg-primary/5 border border-primary/20 rounded-xl">
+              <div className="space-y-0.5">
+                <Label className="text-base font-bold">Ativar Stripe</Label>
+                <p className="text-xs text-muted-foreground">Habilita pagamentos automáticos via Cartão/PIX.</p>
+              </div>
+              <Switch 
+                checked={currentSettings.stripe_enabled} 
+                onCheckedChange={(checked) => handleToggleChange('stripe_enabled', checked)}
+              />
+            </div>
             <div>
               <Label>Stripe Secret Key (sk_...)</Label>
               <Input name="stripe_secret_key" type="password" value={currentSettings.stripe_secret_key} onChange={handleSettingsChange} placeholder="Cole sua chave secreta aqui" />
