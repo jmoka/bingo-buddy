@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { GameSettings } from '@/types/match';
 import { QRCodeSVG as QRCode } from 'qrcode.react';
 import { toast } from 'sonner';
-import { Copy, Upload, Loader2, Minus, Plus, Zap } from 'lucide-react';
+import { Copy, Upload, Loader2, Minus, Plus, Zap, CreditCard } from 'lucide-react';
 import { QrCodePix } from 'qrcode-pix';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -72,7 +72,7 @@ export const CreditRequestDialog = ({ gameSettings, children }: CreditRequestDia
         window.location.href = data.url;
       }
     } catch (e: any) {
-      toast.error("Erro ao iniciar pagamento automático: " + e.message);
+      toast.error("Erro ao iniciar pagamento: " + e.message);
     } finally {
       setIsStripeLoading(false);
     }
@@ -105,7 +105,7 @@ export const CreditRequestDialog = ({ gameSettings, children }: CreditRequestDia
         <DialogHeader>
           <DialogTitle className="font-heading">Solicitar Créditos</DialogTitle>
           <DialogDescription>
-            {gameSettings?.credit_request_text || 'Escolha a quantidade de créditos, faça o PIX e anexe o comprovante.'}
+            {gameSettings?.credit_request_text || 'Escolha a quantidade de créditos e a forma de pagamento.'}
           </DialogDescription>
         </DialogHeader>
         {gameSettings?.pix_key ? (
@@ -133,61 +133,64 @@ export const CreditRequestDialog = ({ gameSettings, children }: CreditRequestDia
               </div>
             </div>
 
-            {pixPayload && (
-              <div className="p-4 bg-white rounded-lg inline-block">
-                <QRCode value={pixPayload} size={160} />
-              </div>
-            )}
-            
-            <div className="relative">
-              <Input value={pixPayload ? "Clique para copiar o PIX" : "Erro ao gerar PIX"} readOnly className="pr-10 text-center cursor-pointer" onClick={handleCopyToClipboard} />
-              <Button
-                size="icon"
-                variant="ghost"
-                className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8"
-                onClick={handleCopyToClipboard}
-                disabled={!pixPayload}
-              >
-                <Copy className="w-4 h-4" />
-              </Button>
-            </div>
-
-            <div className="border-t pt-4 space-y-3">
-              <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Escolha como prosseguir</p>
+            <div className="space-y-3">
+              <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Pagar Agora (Liberação Automática)</p>
               
               <Button 
-                className="w-full h-12 bg-primary text-white shadow-button font-bold" 
+                className="w-full h-14 bg-primary text-white shadow-button font-bold text-lg" 
                 onClick={handleStripePayment}
                 disabled={isStripeLoading}
               >
-                {isStripeLoading ? <Loader2 className="w-5 h-5 mr-2 animate-spin" /> : <Zap className="w-5 h-5 mr-2" />}
-                PAGAMENTO AUTOMÁTICO (PIX/CARTÃO)
+                {isStripeLoading ? <Loader2 className="w-6 h-6 mr-2 animate-spin" /> : <CreditCard className="w-6 h-6 mr-2" />}
+                PAGAR COM CARTÃO / PIX
               </Button>
+              <p className="text-[10px] text-muted-foreground italic">Os créditos caem na hora após a confirmação.</p>
+            </div>
 
-              <div className="relative py-2">
-                <div className="absolute inset-0 flex items-center"><span className="w-full border-t" /></div>
-                <div className="relative flex justify-center text-xs uppercase"><span className="bg-background px-2 text-muted-foreground">Ou manual com comprovante</span></div>
-              </div>
+            <div className="relative py-4">
+              <div className="absolute inset-0 flex items-center"><span className="w-full border-t" /></div>
+              <div className="relative flex justify-center text-xs uppercase"><span className="bg-background px-2 text-muted-foreground">Ou PIX Manual (Anexar Comprovante)</span></div>
+            </div>
 
-              <div className="space-y-2 text-left">
-                <Label htmlFor="receipt" className="text-xs">Anexar Comprovante</Label>
-                <Input
-                  id="receipt"
-                  type="file"
-                  accept="image/*,application/pdf"
-                  onChange={(e) => setFile(e.target.files ? e.target.files[0] : null)}
-                  className="file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20"
-                />
-                <Button 
-                  variant="outline" 
-                  className="w-full h-10" 
-                  onClick={handleSubmit} 
-                  disabled={!file || isLoading}
+            <div className="space-y-4">
+                {pixPayload && (
+                <div className="p-4 bg-white rounded-lg inline-block border">
+                    <QRCode value={pixPayload} size={140} />
+                </div>
+                )}
+                
+                <div className="relative">
+                <Input value={pixPayload ? "Clique para copiar chave PIX" : "Erro ao gerar PIX"} readOnly className="pr-10 text-center cursor-pointer text-xs" onClick={handleCopyToClipboard} />
+                <Button
+                    size="icon"
+                    variant="ghost"
+                    className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8"
+                    onClick={handleCopyToClipboard}
+                    disabled={!pixPayload}
                 >
-                  {isLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Upload className="w-4 h-4 mr-2" />}
-                  Enviar para Revisão Admin
+                    <Copy className="w-4 h-4" />
                 </Button>
-              </div>
+                </div>
+
+                <div className="space-y-2 text-left pt-2">
+                    <Label htmlFor="receipt" className="text-xs font-bold">Já pagou o PIX manual? Anexe aqui:</Label>
+                    <Input
+                    id="receipt"
+                    type="file"
+                    accept="image/*,application/pdf"
+                    onChange={(e) => setFile(e.target.files ? e.target.files[0] : null)}
+                    className="file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20"
+                    />
+                    <Button 
+                    variant="outline" 
+                    className="w-full h-10" 
+                    onClick={handleSubmit} 
+                    disabled={!file || isLoading}
+                    >
+                    {isLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Upload className="w-4 h-4 mr-2" />}
+                    Enviar Comprovante p/ Admin
+                    </Button>
+                </div>
             </div>
           </div>
         ) : (
