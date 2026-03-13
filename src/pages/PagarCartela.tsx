@@ -50,14 +50,12 @@ export default function PagarCartela() {
   const pixPayload = useMemo(() => {
     if (!pixKey || !venda) return '';
     try {
-      // Para máxima compatibilidade, usamos o TXID padrão '***' para PIX estático
-      // e removemos o campo de mensagem que causa erro em alguns bancos.
+      // Gerando o PIX mais simples possível para evitar erros em bancos rigorosos
       return QrCodePix({
         version: '01',
-        key: pixKey.replace(/\s/g, ''), 
-        name: 'BINGO SHOW', 
-        city: 'SAO PAULO',
-        transactionId: '***', 
+        key: pixKey.replace(/\s/g, ''), // Remove qualquer espaço da chave
+        name: 'BINGOSHOW', // Nome sem espaços
+        city: 'SAOPAULO', // Cidade sem espaços
         value: parseFloat(valorCheio.toFixed(2)),
       }).payload();
     } catch (e) {

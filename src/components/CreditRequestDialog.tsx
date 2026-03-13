@@ -29,16 +29,12 @@ export const CreditRequestDialog = ({ gameSettings, children }: CreditRequestDia
   const pixPayload = useMemo(() => {
     if (!gameSettings?.pix_key || !profile) return '';
 
-    const stableId = `BINGO${profile.id.substring(0, 8)}`.slice(0, 25);
-
     try {
       return QrCodePix({
         version: '01',
-        key: gameSettings.pix_key,
-        name: 'Bingo App',
-        city: 'WEB',
-        transactionId: stableId,
-        message: `Créditos para o Bingo`,
+        key: gameSettings.pix_key.replace(/\s/g, ''),
+        name: 'BINGOSHOW',
+        city: 'SAOPAULO',
         value: parseFloat(amount.toFixed(2)),
       }).payload();
     } catch (e) {
