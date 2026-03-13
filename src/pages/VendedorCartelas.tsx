@@ -76,7 +76,6 @@ export default function VendedorCartelas() {
         const cartela = cartelaMap[nData.id];
         const compra = cartela?.compras_rifa;
         
-        // Calcula o valor individual deste número na compra (valor total / quantidade de números)
         const qtdNums = compra?.numeros?.length || 1;
         const valorUnitario = Number(compra?.valor_total || 0) / qtdNums;
 
@@ -160,9 +159,29 @@ export default function VendedorCartelas() {
                             <h2 className="text-lg font-black text-gray-800 uppercase truncate leading-tight">{b.rifa?.nome}</h2>
                             <p className="text-[10px] text-gray-500 font-bold mt-0.5">CÓDIGO: <span className="text-gray-800 font-mono">{b.codigoValidacao}</span></p>
                           </div>
-                          <div className="text-right shrink-0">
-                            <p className="text-[8px] text-gray-400 uppercase font-bold">Valor</p>
-                            <p className="text-sm font-black text-emerald-600">R$ {Number(b.rifa?.custo_por_numero).toFixed(2)}</p>
+                          
+                          {/* QR CODES NO CANHOTO MAIOR */}
+                          <div className="flex gap-2 shrink-0">
+                            <div className={cn(
+                                "text-center flex flex-col items-center border rounded p-1 min-w-[65px] shadow-sm",
+                                !isPendente ? "border-gray-200 bg-gray-50 opacity-50" : "border-emerald-600 bg-emerald-50"
+                            )}>
+                              <p className="text-[5px] font-black text-emerald-700 flex items-center gap-0.5 mb-0.5 uppercase">
+                                <Smartphone className="w-2 h-2" /> {!isPendente ? 'PAGO' : 'PAGAR'}
+                              </p>
+                              <div className="p-0.5 bg-white rounded shadow-sm">
+                                <QRCodeSVG value={pagarUrl} size={35} />
+                              </div>
+                            </div>
+
+                            <div className="text-center flex flex-col items-center border border-blue-200 bg-blue-50 rounded p-1 min-w-[65px] shadow-sm">
+                              <p className="text-[5px] font-black text-blue-700 flex items-center gap-0.5 mb-0.5 uppercase">
+                                <Search className="w-2 h-2" /> CONFERIR
+                              </p>
+                              <div className="p-0.5 bg-white rounded shadow-sm border border-blue-100">
+                                <QRCodeSVG value={conferirUrl} size={35} />
+                              </div>
+                            </div>
                           </div>
                         </div>
 
@@ -171,9 +190,9 @@ export default function VendedorCartelas() {
                             <p className="text-[7px] text-gray-400 uppercase font-bold">Data do Sorteio</p>
                             <p className="text-[10px] font-bold text-gray-700">{formatDate(b.rifa?.data_encerramento ?? null)}</p>
                           </div>
-                          <div>
-                            <p className="text-[7px] text-gray-400 uppercase font-bold">Cadastre-se e Jogue</p>
-                            <p className="text-[9px] font-mono text-emerald-600 font-bold truncate">{BASE_URL.replace('https://', '')}</p>
+                          <div className="text-right">
+                            <p className="text-[8px] text-gray-400 uppercase font-bold">Valor</p>
+                            <p className="text-sm font-black text-emerald-600">R$ {Number(b.rifa?.custo_por_numero).toFixed(2)}</p>
                           </div>
                         </div>
 
@@ -191,6 +210,10 @@ export default function VendedorCartelas() {
                             </div>
                             <p className="text-[10px] font-bold text-gray-700 truncate">{b.vendedor?.nome}</p>
                             <p className="text-[8px] text-gray-500">Ref: {b.vendedor?.codigo_ref}</p>
+                          </div>
+                          <div className="text-right">
+                             <p className="text-[7px] text-gray-400 uppercase font-bold">Cadastre-se e Jogue</p>
+                             <p className="text-[9px] font-mono text-emerald-600 font-bold truncate">{BASE_URL.replace('https://', '')}</p>
                           </div>
                         </div>
                       </div>
@@ -213,7 +236,6 @@ export default function VendedorCartelas() {
 
                       {/* QR CODES DE PAGAMENTO E CONFERÊNCIA */}
                       <div className="flex gap-2 mb-3">
-                        {/* QR CODE 1: PAGAMENTO (Se pendente) */}
                         <div className={cn(
                             "text-center flex flex-col items-center border rounded p-1 flex-1 shadow-sm",
                             !isPendente ? "border-gray-200 bg-gray-50 opacity-50" : "border-emerald-600 bg-emerald-50"
@@ -227,7 +249,6 @@ export default function VendedorCartelas() {
                           {isPendente && <p className="text-[7px] font-black text-emerald-900 mt-0.5">R$ {b.valor_final.toFixed(2)}</p>}
                         </div>
 
-                        {/* QR CODE 2: CONFERÊNCIA */}
                         <div className="text-center flex flex-col items-center border border-blue-200 bg-blue-50 rounded p-1 flex-1 shadow-sm">
                           <p className="text-[6px] font-black text-blue-700 flex items-center gap-0.5 mb-0.5 uppercase">
                             <Search className="w-2 h-2" /> CONFERIR
