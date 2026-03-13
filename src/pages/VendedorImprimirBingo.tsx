@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Printer, Loader2, ShieldCheck, Smartphone } from 'lucide-react';
+import { ArrowLeft, Printer, Loader2, ShieldCheck, Smartphone, Search } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { FolhaBingoFisico } from '@/types/match';
 import { format } from 'date-fns';
@@ -42,7 +42,7 @@ export default function VendedorImprimirBingo() {
       <div className="print:hidden bg-white border-b px-4 py-3 flex items-center justify-between sticky top-0 z-10 shadow-sm">
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="icon" onClick={() => navigate(-1)}><ArrowLeft className="h-5 w-5" /></Button>
-          <div><h1 className="font-bold">Impressão em Lote</h1><p className="text-xs text-muted-foreground">{folhas.length} folha(s) carregada(s)</p></div>
+          <div><h1 className="font-bold">Impressão de Bilhetes</h1><p className="text-xs text-muted-foreground">{folhas.length} folha(s) carregada(s)</p></div>
         </div>
         <Button onClick={() => window.print()} className="bg-purple-600 hover:bg-purple-700 text-white shadow-sm"><Printer className="h-4 w-4 mr-2" /> Imprimir</Button>
       </div>
@@ -52,6 +52,7 @@ export default function VendedorImprimirBingo() {
           const grids = folha.grids;
           const valorCheio = Number(folha.valor_pago) / (1 - (Number(folha.desconto_aplicado || 0) / 100));
           const pagarUrl = `${BASE_URL}/pagar-cartela?codigo=${folha.codigo_validacao}`;
+          const conferirUrl = `${BASE_URL}/validar-cartela?bingo=${folha.codigo_validacao}`;
           
           return (
             <div key={folha.id} className={cn("max-w-4xl mx-auto p-4 sm:p-8 print:p-0 w-full", index < folhas.length - 1 && "print:break-after-page")}>
@@ -83,17 +84,28 @@ export default function VendedorImprimirBingo() {
                   </div>
                   
                   <div className="flex flex-row gap-2 sm:gap-4 shrink-0 items-start ml-auto sm:ml-0">
-                    {folha.status === 'pendente' && (
-                      <div className="text-center flex flex-col items-center border border-green-600 bg-green-50 rounded p-1.5 min-w-[85px] shadow-sm">
-                        <p className="text-[7px] font-black text-green-700 flex items-center gap-1 mb-0.5 uppercase"><Smartphone className="w-2.5 h-2.5" /> PAGAR & VALIDAR</p>
-                        <div className="p-1 bg-white rounded shadow-sm"><QRCodeSVG value={pagarUrl} size={50} /></div>
-                        <p className="text-[6px] font-bold text-green-800 mt-0.5 uppercase">Use a CÂMERA</p>
-                        <p className="text-[8px] font-black text-green-900">R$ {valorCheio.toFixed(2)}</p>
+                    {/* QR CODE 1: PAGAMENTO (Sempre visível para instrução) */}
+                    <div className={cn(
+                        "text-center flex flex-col items-center border rounded p-1.5 min-w-[90px] shadow-sm",
+                        folha.status === 'pago' ? "border-gray-200 bg-gray-50 opacity-50" : "border-green-600 bg-green-50"
+                    )}>
+                      <p className="text-[7px] font-black text-green-700 flex items-center gap-1 mb-0.5 uppercase">
+                        <Smartphone className="w-2.5 h-2.5" /> {folha.status === 'pago' ? 'PAGAMENTO OK' : 'PAGAR & VALIDAR'}
+                      </p>
+                      <div className="p-1 bg-white rounded shadow-sm"><QRCodeSVG value={pagarUrl} size={50} /></div>
+                      <p className="text-[5px] font-black text-red-600 mt-0.5 uppercase leading-tight">Use a CÂMERA<br/>Não use App Banco</p>
+                      {folha.status !== 'pago' && <p className="text-[8px] font-black text-green-900 mt-0.5">R$ {valorCheio.toFixed(2)}</p>}
+                    </div>
+
+                    {/* QR CODE 2: CONFERÊNCIA (O que você perguntou) */}
+                    <div className="text-center flex flex-col items-center border border-blue-200 bg-blue-50 rounded p-1.5 min-w-[90px] shadow-sm">
+                      <p className="text-[7px] font-black text-blue-700 flex items-center gap-1 mb-0.5 uppercase">
+                        <Search className="w-2.5 h-2.5" /> CONFERIR BINGO
+                      </p>
+                      <div className="p-1 bg-white rounded shadow-sm border border-blue-100">
+                        <QRCodeSVG value={conferirUrl} size={50} />
                       </div>
-                    )}
-                    <div className="text-center flex flex-col items-center min-w-[75px]">
-                      <p className="text-[7px] font-black text-gray-600 mb-1 pt-1 uppercase">CONFERIR BINGO</p>
-                      <div className="p-1 border border-gray-300 rounded bg-white shadow-sm"><QRCodeSVG value={`${BASE_URL}/validar-cartela?bingo=${folha.codigo_validacao}`} size={45} /></div>
+                      <p className="text-[5px] font-bold text-blue-600 mt-0.5 uppercase">Veja se você ganhou</p>
                     </div>
                   </div>
                 </div>
