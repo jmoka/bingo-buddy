@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Printer, Loader2, ShieldCheck, Banknote } from 'lucide-react';
+import { ArrowLeft, Printer, Loader2, ShieldCheck, Smartphone } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { FolhaBingoFisico } from '@/types/match';
 import { format } from 'date-fns';
@@ -84,14 +84,15 @@ export default function VendedorImprimirBingo() {
                   
                   <div className="flex flex-row gap-2 sm:gap-4 shrink-0 items-start ml-auto sm:ml-0">
                     {folha.status === 'pendente' && (
-                      <div className="text-center flex flex-col items-center border border-green-500 bg-green-50 rounded p-1.5 min-w-[75px]">
-                        <p className="text-[7px] font-black text-green-700 flex items-center gap-1 mb-0.5 uppercase"><Banknote className="w-2.5 h-2.5" /> PAGAR PIX</p>
-                        <div className="p-1 bg-white rounded shadow-sm"><QRCodeSVG value={pagarUrl} size={45} /></div>
-                        <p className="text-[8px] font-bold text-green-800 mt-0.5">R$ {valorCheio.toFixed(2)}</p>
+                      <div className="text-center flex flex-col items-center border border-green-600 bg-green-50 rounded p-1.5 min-w-[85px] shadow-sm">
+                        <p className="text-[7px] font-black text-green-700 flex items-center gap-1 mb-0.5 uppercase"><Smartphone className="w-2.5 h-2.5" /> PAGAR & VALIDAR</p>
+                        <div className="p-1 bg-white rounded shadow-sm"><QRCodeSVG value={pagarUrl} size={50} /></div>
+                        <p className="text-[6px] font-bold text-green-800 mt-0.5 uppercase">Use a CÂMERA</p>
+                        <p className="text-[8px] font-black text-green-900">R$ {valorCheio.toFixed(2)}</p>
                       </div>
                     )}
                     <div className="text-center flex flex-col items-center min-w-[75px]">
-                      <p className="text-[7px] font-black text-gray-600 mb-1 pt-1 uppercase">VALIDAR BINGO</p>
+                      <p className="text-[7px] font-black text-gray-600 mb-1 pt-1 uppercase">CONFERIR BINGO</p>
                       <div className="p-1 border border-gray-300 rounded bg-white shadow-sm"><QRCodeSVG value={`${BASE_URL}/validar-cartela?bingo=${folha.codigo_validacao}`} size={45} /></div>
                     </div>
                   </div>

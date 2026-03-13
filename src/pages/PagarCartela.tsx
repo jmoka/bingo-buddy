@@ -29,7 +29,7 @@ export default function PagarCartela() {
         supabase
           .from('vendas_bingo_fisico')
           .select('*, partidas(name), vendedores_rifa(nome)')
-          .eq('codigo_validacao', codigo.toUpperCase())
+          .eq('codigo_validacao', codigo.toUpperCase().trim())
           .single(),
         supabase.from('configuracoes').select('pix_key').single()
       ]);
@@ -50,16 +50,20 @@ export default function PagarCartela() {
   const pixPayload = useMemo(() => {
     if (!pixKey || !venda) return '';
     try {
+      // TXID deve ser alfanumérico e sem espaços para máxima compatibilidade
+      const txid = `BINGO${venda.codigo_validacao}`.substring(0, 25);
+      
       return QrCodePix({
         version: '01',
-        key: pixKey,
-        name: 'Bingo App',
-        city: 'WEB',
-        transactionId: venda.codigo_validacao,
+        key: pixKey.replace(/\s/g, ''), // Remove espaços da chave
+        name: 'Bingo Show',
+        city: 'SAO PAULO', // Cidade padrão para evitar erros em alguns bancos
+        transactionId: txid,
         message: `Bingo ${venda.codigo_validacao}`,
         value: parseFloat(valorCheio.toFixed(2)),
       }).payload();
-    } catch {
+    } catch (e) {
+      console.error("Erro ao gerar payload PIX:", e);
       return '';
     }
   }, [pixKey, venda, valorCheio]);
@@ -139,9 +143,16 @@ export default function PagarCartela() {
             </h3>
             
             <div className="bg-muted/40 p-4 rounded-xl border border-border/50 text-center">
-              <div className="bg-white p-3 rounded-lg inline-block shadow-sm border border-gray-200 mb-4">
-                <QRCodeSVG value={pixPayload} size={150} />
-              </div>
+              {pixPayload ? (
+                <div className="bg-white p-3 rounded-lg inline-block shadow-sm border border-gray-200 mb-4">
+                  <QRCodeSVG value={pixPayload} size={180} />
+                </div>
+              ) : (
+                <div className="p-8 text-destructive flex flex-col items-center gap-2">
+                  <AlertTriangle className="w-8 h-8" />
+                  <p className="text-xs font-bold">Erro ao gerar QR Code PIX. Tente novamente ou contate o suporte.</p>
+                </div>
+              )}
               
               <div className="space-y-2">
                 <Label className="text-xs text-muted-foreground uppercase font-bold">PIX Copia e Cola</Label>
@@ -151,6 +162,7 @@ export default function PagarCartela() {
                     size="sm" 
                     className="absolute right-1 top-1 h-8"
                     onClick={handleCopiarPix}
+                    disabled={!pixPayload}
                   >
                     <Copy className="w-3 h-3 mr-1" /> Copiar
                   </Button>
