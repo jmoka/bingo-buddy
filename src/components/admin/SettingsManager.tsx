@@ -88,7 +88,7 @@ const SettingsManager = () => {
         cartelas_por_folha_bingo: gameSettings.cartelas_por_folha_bingo || 4,
         stripe_secret_key: gameSettings.stripe_secret_key || '',
         stripe_webhook_secret: gameSettings.stripe_webhook_secret || '',
-        stripe_enabled: gameSettings.stripe_enabled || false,
+        stripe_enabled: !!gameSettings.stripe_enabled,
       });
     }
   }, [gameSettings]);
@@ -113,26 +113,23 @@ const SettingsManager = () => {
   };
 
   const handleToggleChange = async (name: string, checked: boolean) => {
+    // Atualiza o estado local imediatamente para feedback visual
     setCurrentSettings(prev => ({ ...prev, [name]: checked }));
     
     setIsSaving(true);
+    // Enviamos apenas o campo alterado para evitar conflitos com estados não convertidos
     const success = await updateGameSettings({ 
-        ...currentSettings, 
-        [name]: checked,
-        auto_engine_interval_mins: Math.max(1, Number(currentSettings.auto_engine_interval_mins)),
-        auto_engine_matches_per_day: Number(currentSettings.auto_engine_matches_per_day),
-        auto_engine_card_price: Number(currentSettings.auto_engine_card_price),
-        auto_engine_prize_value: Number(currentSettings.auto_engine_prize_value),
-        auto_engine_start_hour: Number(currentSettings.auto_engine_start_hour),
-        cartelas_por_folha_bingo: Number(currentSettings.cartelas_por_folha_bingo),
+        [name]: checked 
     });
     setIsSaving(false);
 
-    if (success && name === 'auto_engine_enabled' && checked) {
-        toast.info("Motor ativado! Tentando criar a primeira partida...");
-        try {
-            await supabase.functions.invoke('auto-match-engine', { body: { force: true } });
-        } catch (e) {}
+    if (success) {
+        toast.success(`${name === 'stripe_enabled' ? 'Stripe' : 'Motor'} ${checked ? 'ativado' : 'desativado'}!`);
+        if (name === 'auto_engine_enabled' && checked) {
+            try {
+                await supabase.functions.invoke('auto-match-engine', { body: { force: true } });
+            } catch (e) {}
+        }
     }
   };
 
@@ -141,11 +138,6 @@ const SettingsManager = () => {
   };
 
   const handleSaveSettings = async () => {
-    if (Number(currentSettings.auto_engine_interval_mins) < 1) {
-        toast.error("O intervalo do motor deve ser de pelo menos 1 minuto.");
-        return;
-    }
-
     setIsSaving(true);
     const success = await updateGameSettings({
       ...currentSettings,
