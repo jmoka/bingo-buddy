@@ -292,7 +292,7 @@ const SettingsManager = () => {
             <div className="space-y-2">
               <Label>Tipo de Jogo Padrão</Label>
               <Select value={currentSettings.auto_engine_game_type} onValueChange={(v: GameType) => handleSelectChange('auto_engine_game_type', v)}>
-                <SelectTrigger><SelectValue /></SelectValue /></SelectTrigger>
+                <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>{Object.entries(gameTypeLabels).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}</SelectContent>
               </Select>
             </div>
