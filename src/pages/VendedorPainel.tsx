@@ -358,6 +358,16 @@ const VendedorPainel = () => {
     navigate(`/vendedor/imprimir-bingo/${idsString}`);
   };
 
+  const scrollToAcertos = () => {
+    setActiveTab('acertos');
+    setTimeout(() => {
+      const element = document.getElementById('secao-acertos');
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }, 100);
+  };
+
   const gerarLinkBase = (path: string) => {
     const base = window.location.origin;
     const ref = meuVendedor?.codigo_ref ?? '';
@@ -405,7 +415,7 @@ const VendedorPainel = () => {
               <p className="text-xs font-medium">As cartelas ou números de rifa gerados no fiado só terão validade no sorteio após você registrar o pagamento.</p>
             </div>
           </div>
-          <Button variant="destructive" className="shrink-0 w-full sm:w-auto font-bold" onClick={() => setActiveTab('acertos')}>
+          <Button variant="destructive" className="shrink-0 w-full sm:w-auto font-bold" onClick={scrollToAcertos}>
             Fazer Acerto
           </Button>
         </div>
@@ -672,7 +682,7 @@ const VendedorPainel = () => {
         <TabsContent value="acertos" className="space-y-4 mt-0">
           <div className="card-container space-y-4">
             <div className="flex items-center justify-between mb-2 border-b pb-4">
-                <h2 className="font-heading text-lg font-bold flex items-center gap-2">
+                <h2 id="secao-acertos" className="font-heading text-lg font-bold flex items-center gap-2">
                 <Wallet className="w-5 h-5 text-primary" /> Acertos Financeiros
                 </h2>
                 {selectedFaturas.geral.liquido > 0 && (
