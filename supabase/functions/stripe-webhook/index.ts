@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
-import Stripe from 'https://esm.sh/stripe@14.16.0?target=deno'
+import Stripe from 'https://esm.sh/stripe@14.16.0'
 
 serve(async (req) => {
   const supabaseAdmin = createClient(
@@ -11,10 +11,11 @@ serve(async (req) => {
   const { data: settings, error: settingsError } = await supabaseAdmin
     .from('configuracoes')
     .select('stripe_secret_key, stripe_webhook_secret')
+    .eq('singleton', true)
     .single();
 
   if (settingsError || !settings?.stripe_secret_key || !settings?.stripe_webhook_secret) {
-      console.error("[stripe-webhook] Erro: Chaves do Stripe não configuradas no banco.");
+      console.error("[stripe-webhook] Erro: Configurações ausentes.");
       return new Response('Config Error', { status: 500 });
   }
 
@@ -24,10 +25,7 @@ serve(async (req) => {
   })
 
   const signature = req.headers.get('stripe-signature')
-  if (!signature) {
-      console.error("[stripe-webhook] Assinatura ausente");
-      return new Response('No signature', { status: 400 });
-  }
+  if (!signature) return new Response('No signature', { status: 400 });
 
   try {
     const body = await req.text()
@@ -37,62 +35,52 @@ serve(async (req) => {
       settings.stripe_webhook_secret
     )
 
-    console.log(`[stripe-webhook] Evento recebido: ${event.type}`);
-
     if (event.type === 'checkout.session.completed' || event.type === 'checkout.session.async_payment_succeeded') {
       const session = event.data.object
       
-      if (session.payment_status !== 'paid') {
-          console.log(`[stripe-webhook] Sessão ${session.id} ainda não está paga.`);
-          return new Response(JSON.stringify({ received: true }), { status: 200 });
-      }
+      if (session.payment_status === 'paid') {
+        const userId = session.client_reference_id
+        const paymentType = session.metadata?.payment_type
+        const amount = session.amount_total / 100
 
-      const userId = session.client_reference_id
-      const paymentType = session.metadata?.payment_type
-      const amount = session.amount_total / 100
+        const { data: existing } = await supabaseAdmin
+          .from('stripe_payments')
+          .select('status')
+          .eq('stripe_session_id', session.id)
+          .maybeSingle();
 
-      const { data: existingPayment } = await supabaseAdmin
-        .from('stripe_payments')
-        .select('status')
-        .eq('stripe_session_id', session.id)
-        .single();
+        if (existing?.status !== 'completed') {
+          await supabaseAdmin
+            .from('stripe_payments')
+            .update({ status: 'completed', updated_at: new Date().toISOString() })
+            .eq('stripe_session_id', session.id);
 
-      if (existingPayment?.status === 'completed') {
-          console.log(`[stripe-webhook] Pagamento ${session.id} já processado.`);
-          return new Response(JSON.stringify({ received: true }), { status: 200 });
-      }
+          if (paymentType === 'credits') {
+            const creditsToGrant = Number(session.metadata?.credits_requested || amount);
+            
+            await supabaseAdmin.rpc('increment_player_credits', {
+              p_player_id: userId,
+              p_amount: creditsToGrant
+            });
 
-      console.log(`[stripe-webhook] Confirmando pagamento: ${session.id} para usuário ${userId}`);
-
-      await supabaseAdmin
-        .from('stripe_payments')
-        .update({ status: 'completed', updated_at: new Date().toISOString() })
-        .eq('stripe_session_id', session.id);
-
-      if (paymentType === 'credits') {
-        const creditsToGrant = Number(session.metadata?.credits_requested || amount);
-        
-        await supabaseAdmin.rpc('increment_player_credits', {
-          p_player_id: userId,
-          p_amount: creditsToGrant
-        });
-
-        await supabaseAdmin.from('solicitacoes_credito').insert({
-          player_id: userId,
-          status: 'approved',
-          credits_requested: creditsToGrant,
-          credits_granted: creditsToGrant,
-          amount_paid: amount,
-          receipt_url: `STRIPE_${session.id}`,
-          notes: 'Pagamento automático via Stripe.',
-          resolved_at: new Date().toISOString()
-        });
+            await supabaseAdmin.from('solicitacoes_credito').insert({
+              player_id: userId,
+              status: 'approved',
+              credits_requested: creditsToGrant,
+              credits_granted: creditsToGrant,
+              amount_paid: amount,
+              receipt_url: `STRIPE_${session.id}`,
+              notes: 'Pagamento automático via Stripe.',
+              resolved_at: new Date().toISOString()
+            });
+          }
+        }
       }
     }
 
     return new Response(JSON.stringify({ received: true }), { status: 200 })
   } catch (err) {
-    console.error(`[stripe-webhook] Erro no processamento: ${err.message}`);
+    console.error(`[stripe-webhook] Erro: ${err.message}`);
     return new Response(`Webhook Error: ${err.message}`, { status: 400 })
   }
 })

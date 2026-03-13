@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
-import Stripe from 'https://esm.sh/stripe@14.16.0?target=deno'
+import Stripe from 'https://esm.sh/stripe@14.16.0'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -13,22 +13,24 @@ serve(async (req) => {
   try {
     const { amount, type, metadata = {} } = await req.json()
     
-    console.log("[create-stripe-session] Iniciando criação de sessão", { amount, type });
-
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // Busca a chave secreta no banco de dados
+    // Busca a chave secreta garantindo que pega a linha correta (singleton)
     const { data: settings, error: settingsError } = await supabaseAdmin
       .from('configuracoes')
       .select('stripe_secret_key')
+      .eq('singleton', true)
       .single();
 
     if (settingsError || !settings?.stripe_secret_key) {
-        console.error("[create-stripe-session] Erro: Stripe Secret Key não encontrada no banco.");
         throw new Error("Stripe Secret Key não configurada no painel administrativo.");
+    }
+
+    if (!settings.stripe_secret_key.startsWith('sk_')) {
+        throw new Error("A chave configurada não parece ser uma Secret Key válida do Stripe (deve começar com sk_).");
     }
 
     const stripe = new Stripe(settings.stripe_secret_key, {
@@ -37,7 +39,7 @@ serve(async (req) => {
     })
 
     const authHeader = req.headers.get('Authorization')
-    if (!authHeader) throw new Error("Token de autorização ausente");
+    if (!authHeader) throw new Error("Não autorizado");
 
     const userSupabaseClient = createClient(
         Deno.env.get('SUPABASE_URL') ?? '',
@@ -45,12 +47,9 @@ serve(async (req) => {
         { global: { headers: { Authorization: authHeader } } }
     )
     const { data: { user }, error: userError } = await userSupabaseClient.auth.getUser()
-    if (userError || !user) {
-        console.error("[create-stripe-session] Erro de autenticação", userError);
-        throw new Error("Usuário não autenticado ou token inválido");
-    }
+    if (userError || !user) throw new Error("Usuário inválido");
 
-    console.log(`[create-stripe-session] Criando checkout para ${user.email}`);
+    console.log(`[create-stripe-session] Criando checkout para ${user.email} no valor de R$ ${amount}`);
 
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card', 'pix'],
@@ -61,7 +60,7 @@ serve(async (req) => {
             product_data: {
               name: type === 'credits' ? 'Créditos Bingo Show' : 'Cartela Bingo Show',
             },
-            unit_amount: Math.round(amount * 100), // Stripe usa centavos
+            unit_amount: Math.round(amount * 100),
           },
           quantity: 1,
         },
@@ -78,8 +77,7 @@ serve(async (req) => {
       },
     })
 
-    // Registra a sessão no banco para controle
-    const { error: dbError } = await supabaseAdmin.from('stripe_payments').insert({
+    await supabaseAdmin.from('stripe_payments').insert({
       user_id: user.id,
       stripe_session_id: session.id,
       amount: amount,
@@ -87,20 +85,16 @@ serve(async (req) => {
       metadata: metadata
     })
 
-    if (dbError) {
-        console.warn("[create-stripe-session] Aviso: Falha ao registrar sessão no banco, mas o checkout foi criado.", dbError);
-    }
-
     return new Response(JSON.stringify({ url: session.url }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
     })
 
   } catch (error) {
-    console.error("[create-stripe-session] Erro fatal:", error.message);
+    console.error("[create-stripe-session] Erro:", error.message);
     return new Response(JSON.stringify({ error: error.message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 500,
+      status: 400,
     })
   }
 })
