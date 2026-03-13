@@ -31,7 +31,7 @@ export const AppHeader = () => {
 
   if (!profile) {
     return (
-      <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 print:hidden">
         <div className="container max-w-6xl mx-auto flex h-16 items-center justify-between">
           <a href="/" className="font-heading text-2xl font-bold text-foreground">
             🎱 Bingo
@@ -115,7 +115,7 @@ export const AppHeader = () => {
   ];
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 print:hidden">
       <div className="container max-w-6xl mx-auto flex h-16 items-center justify-between">
         <a href="/" className="font-heading text-2xl font-bold text-foreground">
           🎱 Bingo
