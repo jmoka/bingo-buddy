@@ -10,6 +10,7 @@ import { toast } from 'sonner';
 import { Copy, Upload, Loader2, Minus, Plus, Zap } from 'lucide-react';
 import { QrCodePix } from 'qrcode-pix';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 
 interface CreditRequestDialogProps {
   gameSettings: GameSettings | undefined;
@@ -21,6 +22,7 @@ export const CreditRequestDialog = ({ gameSettings, children }: CreditRequestDia
   const { profile } = useAuth();
   const [file, setFile] = useState<File | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isStripeLoading, setIsStripeLoading] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   const [credits, setCredits] = useState<number>(10);
 
@@ -51,6 +53,28 @@ export const CreditRequestDialog = ({ gameSettings, children }: CreditRequestDia
     if (pixPayload) {
       navigator.clipboard.writeText(pixPayload);
       toast.success('PIX Copia e Cola copiado!');
+    }
+  };
+
+  const handleStripePayment = async () => {
+    setIsStripeLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('create-stripe-session', {
+        body: { 
+          amount, 
+          type: 'credits',
+          metadata: { credits_requested: credits }
+        }
+      });
+
+      if (error) throw error;
+      if (data?.url) {
+        window.location.href = data.url;
+      }
+    } catch (e: any) {
+      toast.error("Erro ao iniciar pagamento automático: " + e.message);
+    } finally {
+      setIsStripeLoading(false);
     }
   };
 
@@ -132,12 +156,12 @@ export const CreditRequestDialog = ({ gameSettings, children }: CreditRequestDia
               <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Escolha como prosseguir</p>
               
               <Button 
-                className="w-full h-12 bg-primary/20 text-primary/70 shadow-none font-bold" 
-                disabled={true}
-                title="Integração bancária em desenvolvimento"
+                className="w-full h-12 bg-primary text-white shadow-button font-bold" 
+                onClick={handleStripePayment}
+                disabled={isStripeLoading}
               >
-                <Zap className="w-5 h-5 mr-2 opacity-50" />
-                PAGAMENTO AUTOMÁTICO (EM BREVE)
+                {isStripeLoading ? <Loader2 className="w-5 h-5 mr-2 animate-spin" /> : <Zap className="w-5 h-5 mr-2" />}
+                PAGAMENTO AUTOMÁTICO (PIX/CARTÃO)
               </Button>
 
               <div className="relative py-2">
