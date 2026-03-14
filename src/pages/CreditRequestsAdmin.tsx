@@ -12,7 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose, DialogDescription } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Check, X, Eye, ExternalLink, MessageSquare, Trash2, Coins, RefreshCw, Undo2, User, ShieldCheck, Loader2 } from 'lucide-react';
+import { ArrowLeft, Check, X, Eye, ExternalLink, MessageSquare, Trash2, Coins, RefreshCw, Undo2, User, ShieldCheck, Loader2, CreditCard } from 'lucide-react';
 import PlayerAvatar from '@/components/PlayerAvatar';
 import { CreditRequest, CreditRequestMessage } from '@/types/match';
 import { format, formatDistanceToNow } from 'date-fns';
@@ -25,7 +25,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 const statusConfig = {
   pending: { label: 'Pendente', color: 'bg-amber-500/10 text-amber-600' },
   approved: { label: 'Aprovada', color: 'bg-success/10 text-success' },
-  rejected: { label: 'Rejeitada/Bloqueada', color: 'bg-destructive/10 text-destructive' },
+  rejected: { label: 'Rejeitada', color: 'bg-destructive/10 text-destructive' },
 };
 
 const CreditRequestsAdmin = () => {
@@ -100,8 +100,10 @@ const CreditRequestsAdmin = () => {
       toast.error('Nenhum comprovante anexado.');
       return;
     }
-    if (path === 'AUTOMATIC_PAYMENT') {
-        toast.info('Este pagamento foi aprovado automaticamente via sistema (não possui comprovante de imagem).');
+    
+    // Tratamento de segurança: se for Stripe, nem tenta buscar no Storage
+    if (path === 'AUTOMATIC_PAYMENT' || path.startsWith('STRIPE_')) {
+        toast.info('Pagamento processado automaticamente via Cartão (Stripe). Não existe arquivo de imagem.', { duration: 5000 });
         return;
     }
 
@@ -110,7 +112,7 @@ const CreditRequestsAdmin = () => {
       if (error) throw error;
       setComprovanteUrl(data.signedUrl);
     } catch (e) {
-      toast.error('Erro ao carregar o comprovante.');
+      toast.error('Erro ao carregar o arquivo do comprovante.');
     }
   };
 
@@ -214,38 +216,66 @@ const CreditRequestsAdmin = () => {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead>Data</TableHead>
                   <TableHead>Jogador</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Créditos</TableHead>
-                  <TableHead>Mensagem</TableHead>
-                  <TableHead className="text-right">Ação</TableHead>
+                  <TableHead>Pedido (R$)</TableHead>
+                  <TableHead>Status / Forma</TableHead>
+                  <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {resolvedRequests.map(req => (
-                  <TableRow key={req.id} className="opacity-80">
+                {resolvedRequests.map(req => {
+                  const isStripe = req.receipt_url?.startsWith('STRIPE_') || req.receipt_url === 'AUTOMATIC_PAYMENT';
+                  
+                  return (
+                  <TableRow key={req.id} className="opacity-90">
+                    <TableCell className="text-sm min-w-[120px]">
+                      <div className="font-medium">{format(new Date(req.resolved_at || req.requested_at), "dd/MM/yy", { locale: ptBR })}</div>
+                      <div className="text-[10px] text-muted-foreground">{format(new Date(req.resolved_at || req.requested_at), "HH:mm", { locale: ptBR })}</div>
+                    </TableCell>
                     <TableCell className="min-w-[200px]">
-                      <div className="flex items-center gap-2 text-sm">
+                      <div className="flex items-center gap-3">
                         <PlayerAvatar url={req.perfis?.avatar_url || null} />
-                        <span>{req.perfis?.full_name || 'Removido'}</span>
+                        <div className="flex flex-col">
+                          <span className="font-medium">{req.perfis?.full_name || 'Removido'}</span>
+                          <span className="text-[10px] text-muted-foreground font-mono">ID: ...{req.player_id.slice(-6)}</span>
+                        </div>
                       </div>
                     </TableCell>
-                    <TableCell><Badge className={`${statusConfig[req.status]?.color || 'bg-muted'} border-none`}>{statusConfig[req.status]?.label}</Badge></TableCell>
-                    <TableCell><div className="text-sm font-bold">{req.credits_granted || 0} de {req.credits_requested}</div></TableCell>
-                    <TableCell className="max-w-[200px] truncate">
-                      <button onClick={() => setConversationRequest(req)} className="text-[10px] text-primary/70 hover:text-primary transition-colors text-left font-bold flex items-center gap-1">
-                        <MessageSquare className="w-3 h-3" /> Ver conversa...
-                      </button>
+                    <TableCell>
+                      <div className="font-bold text-primary">{(req.credits_granted || 0)} cr.</div>
+                      <div className="text-xs text-muted-foreground">R$ {Number(req.amount_paid || 0).toFixed(2).replace('.', ',')}</div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex flex-col items-start gap-1.5">
+                         <Badge className={`${statusConfig[req.status]?.color || 'bg-muted'} border-none`}>{statusConfig[req.status]?.label}</Badge>
+                         {isStripe ? (
+                           <Badge variant="outline" className="text-[9px] bg-primary/5 text-primary border-primary/20"><CreditCard className="w-3 h-3 mr-1"/> Cartão (Stripe)</Badge>
+                         ) : (
+                           <Badge variant="outline" className="text-[9px] bg-amber-500/5 text-amber-600 border-amber-500/20">PIX / Manual</Badge>
+                         )}
+                      </div>
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1.5">
-                        <Button size="icon" variant="ghost" className="h-8 w-8" title="Ver Comprovante" onClick={() => handleViewReceipt(req.receipt_url)}><Eye className="w-4 h-4" /></Button>
-                        {req.status === 'rejected' && <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground" onClick={() => unblockCreditRequest(req.id)}><Undo2 className="w-4 h-4" /></Button>}
-                        <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground" onClick={() => handleOpenDialog(req, 'delete')}><Trash2 className="w-4 h-4" /></Button>
+                        {isStripe ? (
+                           <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground opacity-40 cursor-not-allowed" title="Pagamento Automático (Não possui imagem anexada)">
+                             <CreditCard className="w-4 h-4" />
+                           </Button>
+                        ) : (
+                           <Button size="icon" variant="ghost" className="h-8 w-8 text-primary" title="Ver Comprovante PIX" onClick={() => handleViewReceipt(req.receipt_url)}>
+                             <Eye className="w-4 h-4" />
+                           </Button>
+                        )}
+                        <Button size="icon" variant="ghost" className="h-8 w-8 text-primary" title="Ver Mensagens / Avisos" onClick={() => setConversationRequest(req)}>
+                          <MessageSquare className="w-4 h-4" />
+                        </Button>
+                        {req.status === 'rejected' && <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground" title="Reabrir Solicitação" onClick={() => unblockCreditRequest(req.id)}><Undo2 className="w-4 h-4" /></Button>}
+                        <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive opacity-70 hover:opacity-100" title="Apagar Registro" onClick={() => handleOpenDialog(req, 'delete')}><Trash2 className="w-4 h-4" /></Button>
                       </div>
                     </TableCell>
                   </TableRow>
-                ))}
+                )})}
               </TableBody>
             </Table>
           </div>
