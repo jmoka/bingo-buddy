@@ -22,6 +22,7 @@ import {
 import { GameType, PrizeType } from '@/types/match';
 import { gameTypeLabels } from '@/utils/bingoUtils';
 import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
+import { cn } from '@/lib/utils';
 
 const SettingsManager = () => {
   const { gameSettings, updateGameSettings, withdrawAdminProfit } = useGame();
@@ -113,22 +114,15 @@ const SettingsManager = () => {
   };
 
   const handleToggleChange = async (name: string, checked: boolean) => {
-    // 1. Atualiza o estado local IMEDIATAMENTE para a UI não "voltar"
     setCurrentSettings(prev => ({ ...prev, [name]: checked }));
-    
-    // 2. Tenta salvar no banco
     try {
-        const success = await updateGameSettings({ 
-            [name]: checked 
-        });
-
+        const success = await updateGameSettings({ [name]: checked });
         if (success) {
             toast.success(`${name === 'stripe_enabled' ? 'Stripe' : 'Motor'} ${checked ? 'ativado' : 'desativado'}!`);
             if (name === 'auto_engine_enabled' && checked) {
                 await supabase.functions.invoke('auto-match-engine', { body: { force: true } });
             }
         } else {
-            // Se falhou no banco, volta o estado local para o que estava
             setCurrentSettings(prev => ({ ...prev, [name]: !checked }));
         }
     } catch (e) {
@@ -196,248 +190,170 @@ const SettingsManager = () => {
   };
 
   return (
-    <div className="card-container">
-      <h2 className="font-heading text-xl font-bold text-foreground mb-6 flex items-center gap-2"><Settings className="w-5 h-5" /> Ajustes do Sistema</h2>
+    <div className="card-container pb-10">
+      <div className="flex items-center justify-between mb-8 border-b pb-4">
+        <h2 className="font-heading text-xl font-bold text-foreground flex items-center gap-2">
+          <Settings className="w-5 h-5 text-primary" /> Ajustes do Sistema
+        </h2>
+        <Button onClick={handleSaveSettings} className="gradient-primary shadow-button" disabled={isSaving || justSaved}>
+          {isSaving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : justSaved ? <Check className="w-4 h-4 mr-2" /> : <Save className="w-4 h-4 mr-2" />}
+          {isSaving ? 'Salvando...' : justSaved ? 'Salvo!' : 'Salvar Alterações'}
+        </Button>
+      </div>
       
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-10">
-        <div className="space-y-6">
-          <h3 className="font-heading font-bold text-primary border-b pb-2">Economia</h3>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        {/* ECONOMIA */}
+        <div className="space-y-6 p-4 bg-muted/20 rounded-2xl border border-border/50">
+          <h3 className="font-heading font-bold text-primary flex items-center gap-2"><DollarSign className="w-4 h-4" /> Economia</h3>
           <div className="grid grid-cols-2 gap-4">
-            <div><Label>Nova Cartela (cr)</Label><Input name="custo_nova_cartela" type="number" step="0.01" value={currentSettings.custo_nova_cartela} onChange={handleSettingsChange} /></div>
-            <div><Label>Recarga (cr)</Label><Input name="custo_recarga_cartela" type="number" step="0.01" value={currentSettings.custo_recarga_cartela} onChange={handleSettingsChange} /></div>
-            <div><Label>Usos por Recarga</Label><Input name="usos_por_recarga" type="number" value={currentSettings.usos_por_recarga} onChange={handleSettingsChange} /></div>
-            <div><Label>R$ por Crédito</Label><Input name="valor_por_credito" type="number" step="0.01" value={currentSettings.valor_por_credito} onChange={handleSettingsChange} /></div>
+            <div className="space-y-1.5"><Label className="text-xs">Nova Cartela (cr)</Label><Input name="custo_nova_cartela" type="number" step="0.01" value={currentSettings.custo_nova_cartela} onChange={handleSettingsChange} /></div>
+            <div className="space-y-1.5"><Label className="text-xs">Recarga (cr)</Label><Input name="custo_recarga_cartela" type="number" step="0.01" value={currentSettings.custo_recarga_cartela} onChange={handleSettingsChange} /></div>
+            <div className="space-y-1.5"><Label className="text-xs">Usos por Recarga</Label><Input name="usos_por_recarga" type="number" value={currentSettings.usos_por_recarga} onChange={handleSettingsChange} /></div>
+            <div className="space-y-1.5"><Label className="text-xs">R$ por Crédito</Label><Input name="valor_por_credito" type="number" step="0.01" value={currentSettings.valor_por_credito} onChange={handleSettingsChange} /></div>
           </div>
         </div>
 
-        <div className="space-y-6">
-          <h3 className="font-heading font-bold text-primary border-b pb-2 flex items-center gap-2"><Clock className="w-4 h-4" /> Regras de Partida</h3>
-          <div>
-            <Label>Intervalo entre Números (segundos)</Label>
-            <Input 
-              name="intervalo_sorteio_auto_seg" 
-              type="number" 
-              value={currentSettings.intervalo_sorteio_auto_seg} 
-              onChange={handleSettingsChange} 
-            />
-            <p className="text-[10px] text-muted-foreground mt-1">Tempo de espera entre cada bola sorteada no modo automático.</p>
+        {/* REGRAS DE PARTIDA */}
+        <div className="space-y-6 p-4 bg-muted/20 rounded-2xl border border-border/50">
+          <h3 className="font-heading font-bold text-primary flex items-center gap-2"><Clock className="w-4 h-4" /> Regras de Partida</h3>
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <Label className="text-xs">Intervalo entre Números (segundos)</Label>
+              <Input name="intervalo_sorteio_auto_seg" type="number" value={currentSettings.intervalo_sorteio_auto_seg} onChange={handleSettingsChange} />
+              <p className="text-[10px] text-muted-foreground">Tempo de espera entre cada bola sorteada no modo automático.</p>
+            </div>
           </div>
         </div>
 
-        <div className="space-y-6">
-          <h3 className="font-heading font-bold text-primary border-b pb-2 flex items-center gap-2"><Ticket className="w-4 h-4" /> Sistema de Vendedores</h3>
+        {/* VENDEDORES */}
+        <div className="space-y-6 p-4 bg-muted/20 rounded-2xl border border-border/50">
+          <h3 className="font-heading font-bold text-primary flex items-center gap-2"><Ticket className="w-4 h-4" /> Sistema de Vendedores</h3>
           <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label>Desconto Global (%)</Label>
-              <Input name="desconto_vendedor_global" type="number" step="0.1" min="0" max="100" value={currentSettings.desconto_vendedor_global} onChange={handleSettingsChange} />
-            </div>
-            <div>
-              <Label>Comissão Global (%)</Label>
-              <Input name="comissao_vendedor_global" type="number" step="0.1" min="0" max="100" value={currentSettings.comissao_vendedor_global} onChange={handleSettingsChange} />
-            </div>
-            <div className="col-span-2">
-              <Label>Grids por Folha de Bingo Impressa</Label>
+            <div className="space-y-1.5"><Label className="text-xs">Desconto Global (%)</Label><Input name="desconto_vendedor_global" type="number" step="0.1" value={currentSettings.desconto_vendedor_global} onChange={handleSettingsChange} /></div>
+            <div className="space-y-1.5"><Label className="text-xs">Comissão Global (%)</Label><Input name="comissao_vendedor_global" type="number" step="0.1" value={currentSettings.comissao_vendedor_global} onChange={handleSettingsChange} /></div>
+            <div className="col-span-2 space-y-1.5">
+              <Label className="text-xs">Grids por Folha de Bingo Impressa</Label>
               <Input name="cartelas_por_folha_bingo" type="number" min="1" max="10" value={currentSettings.cartelas_por_folha_bingo} onChange={handleSettingsChange} />
-              <p className="text-[10px] text-muted-foreground mt-1">Quando o vendedor emite 1 bilhete físico para o bingo, quantas cartelas (chances) o jogador terá na folha.</p>
+              <p className="text-[10px] text-muted-foreground">Quantidade de cartelas por bilhete físico emitido.</p>
             </div>
           </div>
         </div>
 
-        <div className="space-y-6">
-          <h3 className="font-heading font-bold text-primary border-b pb-2">PIX e Créditos</h3>
+        {/* PIX E CRÉDITOS */}
+        <div className="space-y-6 p-4 bg-muted/20 rounded-2xl border border-border/50">
+          <h3 className="font-heading font-bold text-primary flex items-center gap-2"><Banknote className="w-4 h-4" /> PIX e Créditos</h3>
           <div className="space-y-4">
-            <div><Label>Chave PIX (Admin)</Label><Input name="pix_key" value={currentSettings.pix_key} onChange={handleSettingsChange} /></div>
+            <div className="space-y-1.5"><Label className="text-xs">Chave PIX (Admin)</Label><Input name="pix_key" value={currentSettings.pix_key} onChange={handleSettingsChange} /></div>
             <div className="grid grid-cols-2 gap-4">
-              <div><Label>Nome Recebedor (Sem acentos)</Label><Input name="pix_name" value={currentSettings.pix_name} onChange={handleSettingsChange} placeholder="Ex: BINGO SHOW" /></div>
-              <div><Label>Cidade (Sem acentos)</Label><Input name="pix_city" value={currentSettings.pix_city} onChange={handleSettingsChange} placeholder="Ex: SAO PAULO" /></div>
+              <div className="space-y-1.5"><Label className="text-xs">Nome Recebedor</Label><Input name="pix_name" value={currentSettings.pix_name} onChange={handleSettingsChange} /></div>
+              <div className="space-y-1.5"><Label className="text-xs">Cidade</Label><Input name="pix_city" value={currentSettings.pix_city} onChange={handleSettingsChange} /></div>
             </div>
-            <div><Label>Texto de Instrução</Label><Textarea name="credit_request_text" value={currentSettings.credit_request_text} onChange={handleSettingsChange} rows={3} /></div>
+            <div className="space-y-1.5"><Label className="text-xs">Texto de Instrução</Label><Textarea name="credit_request_text" value={currentSettings.credit_request_text} onChange={handleSettingsChange} rows={2} className="text-xs" /></div>
           </div>
         </div>
 
-        <div className="space-y-6">
-          <h3 className="font-heading font-bold text-primary border-b pb-2 flex items-center gap-2"><CreditCard className="w-4 h-4" /> Pagamentos Automáticos (Stripe)</h3>
+        {/* STRIPE */}
+        <div className="space-y-6 p-4 bg-muted/20 rounded-2xl border border-border/50">
+          <h3 className="font-heading font-bold text-primary flex items-center gap-2"><CreditCard className="w-4 h-4" /> Pagamentos Automáticos (Stripe)</h3>
           <div className="space-y-4">
-            <div className="flex items-center justify-between p-4 bg-primary/5 border border-primary/20 rounded-xl">
+            <div className="flex items-center justify-between p-3 bg-background rounded-xl border border-border/50">
               <div className="space-y-0.5">
-                <Label className="text-base font-bold">Ativar Stripe</Label>
-                <p className="text-xs text-muted-foreground">Habilita pagamentos automáticos via Cartão/PIX.</p>
+                <Label className="text-sm font-bold">Ativar Stripe</Label>
+                <p className="text-[10px] text-muted-foreground">Habilita pagamentos automáticos.</p>
               </div>
-              <Switch 
-                checked={currentSettings.stripe_enabled} 
-                onCheckedChange={(checked) => handleToggleChange('stripe_enabled', checked)}
-              />
+              <Switch checked={currentSettings.stripe_enabled} onCheckedChange={(checked) => handleToggleChange('stripe_enabled', checked)} />
             </div>
-            <div>
-              <Label>Stripe Secret Key (sk_...)</Label>
-              <Input name="stripe_secret_key" type="password" value={currentSettings.stripe_secret_key} onChange={handleSettingsChange} placeholder="Cole sua chave secreta aqui" />
-            </div>
-            <div>
-              <Label>Stripe Webhook Secret (whsec_...)</Label>
-              <Input name="stripe_webhook_secret" type="password" value={currentSettings.stripe_webhook_secret} onChange={handleSettingsChange} placeholder="Cole o segredo do webhook aqui" />
-            </div>
-            <p className="text-[10px] text-muted-foreground bg-muted p-2 rounded border border-dashed">
-              <strong>Dica:</strong> Configure o Webhook no Stripe para enviar eventos para:<br/>
-              <code className="font-bold text-primary">https://vqvnodwojefubbbnbyar.supabase.co/functions/v1/stripe-webhook</code>
+            <div className="space-y-1.5"><Label className="text-xs">Stripe Secret Key</Label><Input name="stripe_secret_key" type="password" value={currentSettings.stripe_secret_key} onChange={handleSettingsChange} className="text-xs" /></div>
+            <div className="space-y-1.5"><Label className="text-xs">Stripe Webhook Secret</Label><Input name="stripe_webhook_secret" type="password" value={currentSettings.stripe_webhook_secret} onChange={handleSettingsChange} className="text-xs" /></div>
+            <p className="text-[9px] text-muted-foreground bg-background p-2 rounded border border-dashed overflow-hidden">
+              <strong>Webhook URL:</strong><br/>
+              <code className="font-bold text-primary break-all">https://vqvnodwojefubbbnbyar.supabase.co/functions/v1/stripe-webhook</code>
             </p>
           </div>
         </div>
 
-        <div className="space-y-6">
-          <h3 className="font-heading font-bold text-primary border-b pb-2 flex items-center gap-2"><Bot className="w-4 h-4" /> Automação (Motor)</h3>
+        {/* MOTOR AUTOMÁTICO */}
+        <div className="space-y-6 p-4 bg-muted/20 rounded-2xl border border-border/50">
+          <h3 className="font-heading font-bold text-primary flex items-center gap-2"><Bot className="w-4 h-4" /> Automação (Motor)</h3>
           <div className="space-y-4">
-            <div className="flex items-center justify-between p-4 bg-primary/5 border border-primary/20 rounded-xl">
+            <div className="flex items-center justify-between p-3 bg-background rounded-xl border border-border/50">
               <div className="space-y-0.5">
-                <Label className="text-base font-bold">Status do Motor</Label>
-                <p className="text-xs text-muted-foreground">Ligue para criar partidas automaticamente.</p>
+                <Label className="text-sm font-bold">Status do Motor</Label>
+                <p className="text-[10px] text-muted-foreground">Cria partidas automaticamente.</p>
               </div>
-              <Switch 
-                checked={currentSettings.auto_engine_enabled} 
-                onCheckedChange={(checked) => handleToggleChange('auto_engine_enabled', checked)}
-              />
+              <Switch checked={currentSettings.auto_engine_enabled} onCheckedChange={(checked) => handleToggleChange('auto_engine_enabled', checked)} />
             </div>
 
             <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label>Hora de Início (0-23h)</Label>
-                <Input name="auto_engine_start_hour" type="number" min="0" max="23" value={currentSettings.auto_engine_start_hour} onChange={handleSettingsChange} />
-              </div>
-              <div>
-                <Label>Intervalo (min)</Label>
-                <Input name="auto_engine_interval_mins" type="number" min="1" value={currentSettings.auto_engine_interval_mins} onChange={handleSettingsChange} />
-              </div>
+              <div className="space-y-1.5"><Label className="text-xs">Hora Início (0-23h)</Label><Input name="auto_engine_start_hour" type="number" value={currentSettings.auto_engine_start_hour} onChange={handleSettingsChange} /></div>
+              <div className="space-y-1.5"><Label className="text-xs">Intervalo (min)</Label><Input name="auto_engine_interval_mins" type="number" value={currentSettings.auto_engine_interval_mins} onChange={handleSettingsChange} /></div>
+              <div className="space-y-1.5"><Label className="text-xs">Partidas/Dia</Label><Input name="auto_engine_matches_per_day" type="number" value={currentSettings.auto_engine_matches_per_day} onChange={handleSettingsChange} /></div>
+              <div className="space-y-1.5"><Label className="text-xs">Preço Cartela (cr)</Label><Input name="auto_engine_card_price" type="number" step="0.01" value={currentSettings.auto_engine_card_price} onChange={handleSettingsChange} /></div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label>Partidas por Dia (Máx)</Label>
-                <Input name="auto_engine_matches_per_day" type="number" value={currentSettings.auto_engine_matches_per_day} onChange={handleSettingsChange} />
-              </div>
-              <div>
-                <Label>Preço da Cartela (cr)</Label>
-                <Input name="auto_engine_card_price" type="number" step="0.01" value={currentSettings.auto_engine_card_price} onChange={handleSettingsChange} />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Tipo de Jogo Padrão</Label>
-              <Select value={currentSettings.auto_engine_game_type} onValueChange={(v: GameType) => handleSelectChange('auto_engine_game_type', v)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>{Object.entries(gameTypeLabels).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}</SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Prêmio Padrão</Label>
-              <div className="flex gap-2">
-                <RadioGroup
-                  value={currentSettings.auto_engine_prize_type}
-                  onValueChange={(v: PrizeType) => handleSelectChange('auto_engine_prize_type', v)}
-                  className="grid grid-cols-2 gap-2 flex-grow"
-                >
-                  <div>
-                    <RadioGroupItem value="percentage" id="auto_percentage" className="peer sr-only" />
-                    <Label htmlFor="auto_percentage" className="flex text-xs items-center justify-center rounded-md border-2 border-muted bg-popover p-3 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary">
-                      % do Pote
-                    </Label>
-                  </div>
-                  <div>
-                    <RadioGroupItem value="fixed" id="auto_fixed" className="peer sr-only" />
-                    <Label htmlFor="auto_fixed" className="flex text-xs items-center justify-center rounded-md border-2 border-muted bg-popover p-3 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary">
-                      Valor Fixo
-                    </Label>
-                  </div>
-                </RadioGroup>
-                <Input 
-                  name="auto_engine_prize_value" 
-                  type="number" 
-                  step="0.01"
-                  value={currentSettings.auto_engine_prize_value} 
-                  onChange={handleSettingsChange} 
-                  className="w-24"
-                />
-              </div>
-            </div>
-
-            <div className="p-4 bg-muted/30 rounded-xl border border-border/50">
-                <Label className="flex items-center gap-2 mb-3"><CalendarDays className="w-4 h-4" /> Agenda Programada (Slots)</Label>
-                <div className="grid grid-cols-4 gap-2">
+            <div className="space-y-3">
+                <Label className="text-xs flex items-center gap-2"><CalendarDays className="w-3 h-3" /> Agenda Programada (Slots)</Label>
+                <div className="grid grid-cols-4 gap-1.5 max-h-32 overflow-y-auto p-2 bg-background rounded-lg border border-border/50 custom-scrollbar">
                     {schedulePreview.map((time, i) => (
-                        <div key={i} className="text-[10px] font-bold font-mono bg-background border rounded p-1 text-center">
+                        <div key={i} className="text-[9px] font-bold font-mono bg-muted/50 border rounded py-1 text-center">
                             {format(time, 'HH:mm')}
                         </div>
                     ))}
                 </div>
             </div>
 
-            {currentSettings.auto_engine_enabled && (
-              <Button 
-                variant="outline" 
-                className="w-full border-primary/30 text-primary hover:bg-primary/5"
-                onClick={handleTestEngine}
-                disabled={isTestingEngine}
-              >
-                {isTestingEngine ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Play className="w-4 h-4 mr-2" />}
-                Testar Motor Agora
-              </Button>
-            )}
+            <Button variant="outline" size="sm" className="w-full text-xs h-9" onClick={handleTestEngine} disabled={isTestingEngine || !currentSettings.auto_engine_enabled}>
+              {isTestingEngine ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Play className="w-4 h-4 mr-2" />}
+              Testar Motor Agora
+            </Button>
           </div>
         </div>
 
-        <div className="space-y-6">
-          <h3 className="font-heading font-bold text-primary border-b pb-2 flex items-center gap-2"><LinkIcon className="w-4 h-4" /> Integrações (n8n)</h3>
-          <div><Label>URL de Teste</Label><Input name="n8n_test_url" value={currentSettings.n8n_test_url} onChange={handleSettingsChange} /></div>
-          <div><Label>URL de Produção</Label><Input name="n8n_prod_url" value={currentSettings.n8n_prod_url} onChange={handleSettingsChange} /></div>
-          <div>
-            <Label>Ambiente Ativo</Label>
-            <Select value={currentSettings.n8n_env} onValueChange={(v) => handleSelectChange('n8n_env', v)}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="test">Teste</SelectItem>
-                <SelectItem value="production">Produção</SelectItem>
-              </SelectContent>
-            </Select>
+        {/* N8N */}
+        <div className="space-y-6 p-4 bg-muted/20 rounded-2xl border border-border/50">
+          <h3 className="font-heading font-bold text-primary flex items-center gap-2"><LinkIcon className="w-4 h-4" /> Integrações (n8n)</h3>
+          <div className="space-y-4">
+            <div className="space-y-1.5"><Label className="text-xs">URL de Teste</Label><Input name="n8n_test_url" value={currentSettings.n8n_test_url} onChange={handleSettingsChange} className="text-xs" /></div>
+            <div className="space-y-1.5"><Label className="text-xs">URL de Produção</Label><Input name="n8n_prod_url" value={currentSettings.n8n_prod_url} onChange={handleSettingsChange} className="text-xs" /></div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Ambiente Ativo</Label>
+              <Select value={currentSettings.n8n_env} onValueChange={(v) => handleSelectChange('n8n_env', v)}>
+                <SelectTrigger className="h-9 text-xs"><SelectValue /></SelectTrigger>
+                <SelectContent><SelectItem value="test">Teste</SelectItem><SelectItem value="production">Produção</SelectItem></SelectContent>
+              </Select>
+            </div>
           </div>
         </div>
 
-        <div className="space-y-6 md:col-span-2">
-          <h3 className="font-heading font-bold text-primary border-b pb-2 flex items-center gap-2"><DollarSign className="w-4 h-4" /> Caixa do Admin</h3>
-          <div className="p-4 bg-muted rounded-lg flex items-center justify-between">
+        {/* CAIXA ADMIN */}
+        <div className="space-y-6 p-4 bg-primary/5 rounded-2xl border-2 border-primary/20 md:col-span-2">
+          <h3 className="font-heading font-bold text-primary flex items-center gap-2"><DollarSign className="w-4 h-4" /> Caixa do Admin</h3>
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
             <div>
-              <Label>Lucro Total Acumulado</Label>
-              <p className="text-2xl font-bold font-heading text-success">
-                {Number(gameSettings?.admin_profit || 0).toFixed(2)} créditos
+              <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Lucro Total Acumulado</p>
+              <p className="text-3xl font-black font-heading text-success">
+                {Number(gameSettings?.admin_profit || 0).toFixed(2)} <span className="text-sm font-bold">cr.</span>
               </p>
             </div>
             <Dialog open={isWithdrawDialogOpen} onOpenChange={setIsWithdrawDialogOpen}>
               <DialogTrigger asChild>
-                <Button variant="outline">
-                  <Banknote className="w-4 h-4 mr-2" />
-                  Retirar Lucro
+                <Button className="w-full sm:w-auto bg-success hover:bg-success/90 text-white font-bold h-12 px-8">
+                  <Banknote className="w-5 h-5 mr-2" /> Retirar Lucro
                 </Button>
               </DialogTrigger>
               <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Retirar Lucro do Caixa</DialogTitle>
-                </DialogHeader>
+                <DialogHeader><DialogTitle>Retirar Lucro do Caixa</DialogTitle></DialogHeader>
                 <div className="py-4 space-y-4">
-                  <div>
+                  <div className="space-y-2">
                     <Label htmlFor="withdraw-amount">Créditos a Retirar</Label>
-                    <Input
-                      id="withdraw-amount"
-                      type="number"
-                      step="0.01"
-                      value={withdrawAmount || ''}
-                      onChange={(e) => setWithdrawAmount(Number(e.target.value) || 0)}
-                      max={gameSettings?.admin_profit || 0}
-                    />
+                    <Input id="withdraw-amount" type="number" step="0.01" value={withdrawAmount || ''} onChange={(e) => setWithdrawAmount(Number(e.target.value) || 0)} max={gameSettings?.admin_profit || 0} className="text-lg font-bold" />
+                    <p className="text-xs text-muted-foreground">O valor será subtraído do saldo do caixa administrativo.</p>
                   </div>
                 </div>
                 <DialogFooter>
                   <DialogClose asChild><Button variant="ghost">Cancelar</Button></DialogClose>
-                  <Button onClick={handleWithdraw} disabled={isWithdrawing || !withdrawAmount || withdrawAmount <= 0}>
-                    {isWithdrawing && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                    Confirmar Retirada
+                  <Button onClick={handleWithdraw} disabled={isWithdrawing || !withdrawAmount || withdrawAmount <= 0} className="bg-success hover:bg-success/90 text-white">
+                    {isWithdrawing && <Loader2 className="w-4 h-4 mr-2 animate-spin" />} Confirmar Retirada
                   </Button>
                 </DialogFooter>
               </DialogContent>
@@ -446,10 +362,10 @@ const SettingsManager = () => {
         </div>
       </div>
 
-      <div className="mt-10 flex justify-end">
-        <Button onClick={handleSaveSettings} className="gradient-primary" disabled={isSaving || justSaved}>
-          {isSaving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : justSaved ? <Check className="w-4 h-4 mr-2" /> : <Save className="w-4 h-4 mr-2" />}
-          {isSaving ? 'Salvando...' : justSaved ? 'Salvo!' : 'Salvar Alterações'}
+      <div className="mt-10 flex justify-center sm:justify-end">
+        <Button onClick={handleSaveSettings} size="lg" className="w-full sm:w-auto gradient-primary h-14 px-10 text-lg font-bold shadow-button" disabled={isSaving || justSaved}>
+          {isSaving ? <Loader2 className="w-5 h-5 mr-2 animate-spin" /> : justSaved ? <Check className="w-5 h-5 mr-2" /> : <Save className="w-5 h-5 mr-2" />}
+          {isSaving ? 'Salvando...' : justSaved ? 'Salvo!' : 'Salvar Todas as Alterações'}
         </Button>
       </div>
     </div>
