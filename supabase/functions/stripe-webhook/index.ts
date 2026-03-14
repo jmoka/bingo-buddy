@@ -124,11 +124,28 @@ serve(async (req) => {
                     console.log("[stripe-webhook] Venda Bingo ativada com sucesso!");
                 }
             } else if (vendaId && paymentType === 'venda_rifa') {
-                // Mesma lógica se no futuro você usar pra Rifa física
                 const { data: compra } = await supabaseAdmin.from('compras_rifa').select('*').eq('id', vendaId).single();
                 if (compra && compra.status !== 'pago') {
+                    // Ativa a cartela da rifa
                     await supabaseAdmin.from('compras_rifa').update({ status: 'pago' }).eq('id', vendaId);
+                    
+                    const { data: vendedor } = await supabaseAdmin.from('vendedores_rifa').select('*').eq('id', compra.vendedor_id).single();
+                    const { data: cfg } = await supabaseAdmin.from('configuracoes').select('*').limit(1).single();
+
+                    let precoTotal = Number(compra.valor_total);
+                    const desconto = Number(compra.desconto_aplicado || 0);
+                    if (desconto < 100 && desconto > 0) precoTotal = precoTotal / (1 - (desconto / 100.0));
+
                     await supabaseAdmin.rpc('increment_admin_profit', { amount: amount });
+
+                    // Paga a comissão do vendedor da Rifa (se tiver)
+                    const comissaoPerc = Number(vendedor?.comissao_percentual || cfg?.comissao_vendedor_global || 0);
+                    if (comissaoPerc > 0 && vendedor?.user_id) {
+                        const comissaoValor = precoTotal * (comissaoPerc / 100.0);
+                        await supabaseAdmin.rpc('increment_player_credits', { p_player_id: vendedor.user_id, p_amount: comissaoValor });
+                        await supabaseAdmin.rpc('increment_admin_profit', { amount: -comissaoValor });
+                    }
+                    console.log("[stripe-webhook] Venda Rifa ativada com sucesso!");
                 }
             }
         }

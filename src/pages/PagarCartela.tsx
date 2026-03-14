@@ -61,16 +61,18 @@ export default function PagarCartela() {
         .eq('codigo_validacao', codigo.toUpperCase().trim())
         .maybeSingle();
 
-      if (resRifa) {
+      if (resRifa && resRifa.compras_rifa) {
         // Normaliza os dados da rifa para o formato esperado pelo componente
+        // O ID TEM que ser o da COMPRA para o Webhook achar no banco e dar baixa
         setVenda({
-            id: resRifa.id,
-            status: resRifa.compras_rifa?.status,
+            id: resRifa.compras_rifa.id, 
+            cartela_id: resRifa.id,
+            status: resRifa.compras_rifa.status,
             codigo_validacao: resRifa.codigo_validacao,
-            valor_pago: resRifa.compras_rifa?.valor_total,
-            desconto_aplicado: resRifa.compras_rifa?.desconto_aplicado,
-            partidas: { name: resRifa.compras_rifa?.rifas?.nome },
-            vendedores_rifa: resRifa.compras_rifa?.vendedores_rifa
+            valor_pago: resRifa.compras_rifa.valor_total,
+            desconto_aplicado: resRifa.compras_rifa.desconto_aplicado,
+            partidas: { name: resRifa.compras_rifa.rifas?.nome },
+            vendedores_rifa: resRifa.compras_rifa.vendedores_rifa
         });
         setTipoVenda('rifa');
       }
