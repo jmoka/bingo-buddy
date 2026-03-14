@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { GameSettings } from '@/types/match';
 import { QRCodeSVG as QRCode } from 'qrcode.react';
 import { toast } from 'sonner';
-import { Copy, Upload, Loader2, Minus, Plus, Zap, CreditCard } from 'lucide-react';
+import { Copy, Upload, Loader2, Minus, Plus, CreditCard } from 'lucide-react';
 import { QrCodePix } from 'qrcode-pix';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -143,7 +143,7 @@ export const CreditRequestDialog = ({ gameSettings, children }: CreditRequestDia
                   disabled={isStripeLoading}
                 >
                   {isStripeLoading ? <Loader2 className="w-6 h-6 mr-2 animate-spin" /> : <CreditCard className="w-6 h-6 mr-2" />}
-                  PAGAR COM CARTÃO / PIX
+                  PAGAR COM CARTÃO
                 </Button>
                 <p className="text-[10px] text-muted-foreground italic">Os créditos caem na hora após a confirmação.</p>
               </div>
