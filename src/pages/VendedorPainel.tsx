@@ -1172,7 +1172,7 @@ const VendedorPainel = () => {
                      <AlertTriangle className="w-5 h-5 shrink-0" />
                      <div>
                        <p className="font-bold text-sm leading-tight">Atenção: Você tem cartelas no Fiado aqui!</p>
-                       <p className="text-xs mt-1">Alguns destes números fazem parte de pacotes gerados no fiado (Total a pagar: <strong>R$ {comprasPendentesRelacionadas.total.toFixed(2)}</strong>). Mesmo preenchendo os dados do cliente, <strong>as cartelas não valerão no sorteio</strong> até serem pagas ao sistema.</p>
+                       <p className="text-xs mt-1">Alguns destes números foram gerados no fiado (Total pendente: <strong>R$ {comprasPendentesRelacionadas.total.toFixed(2)}</strong>). Para validá-los e incluí-los no sorteio agora, é necessário debitar o valor do seu saldo.</p>
                      </div>
                   </div>
                 </div>
@@ -1204,23 +1204,17 @@ const VendedorPainel = () => {
              
              <div className="flex flex-col gap-2 pt-2">
                 {comprasPendentesRelacionadas.ids.length > 0 ? (
-                    <>
-                        <Button 
-                            className="bg-green-600 hover:bg-green-700 text-white w-full shadow-button h-12" 
-                            onClick={handleValidarEPagar} 
-                            disabled={isPagando || !validarForm.nome.trim()}
-                        >
-                            {isPagando ? <Loader2 className="w-5 h-5 mr-2 animate-spin" /> : <WalletCards className="w-5 h-5 mr-2" />} 
-                            <div className="text-left">
-                                <span className="block font-bold">Validar & Pagar com Meu Saldo</span>
-                                <span className="block text-[10px] opacity-80">Debitar R$ {comprasPendentesRelacionadas.total.toFixed(2)} dos meus créditos</span>
-                            </div>
-                        </Button>
-                        <Button variant="outline" className="w-full text-muted-foreground text-xs h-10" onClick={handleValidarMultiplos} disabled={isValidando || isPagando || !validarForm.nome.trim()}>
-                            {isValidando ? <Loader2 className="h-3 w-3 mr-2 animate-spin" /> : null} 
-                            Apenas Validar Dados (Continuar no Fiado)
-                        </Button>
-                    </>
+                    <Button 
+                        className="bg-green-600 hover:bg-green-700 text-white w-full shadow-button h-12" 
+                        onClick={handleValidarEPagar} 
+                        disabled={isPagando || !validarForm.nome.trim()}
+                    >
+                        {isPagando ? <Loader2 className="w-5 h-5 mr-2 animate-spin" /> : <WalletCards className="w-5 h-5 mr-2" />} 
+                        <div className="text-left">
+                            <span className="block font-bold">Validar & Pagar com Meu Saldo</span>
+                            <span className="block text-[10px] opacity-80">Debitar R$ {comprasPendentesRelacionadas.total.toFixed(2)} dos meus créditos</span>
+                        </div>
+                    </Button>
                 ) : (
                     <Button className="w-full gradient-primary" onClick={handleValidarMultiplos} disabled={isValidando || !validarForm.nome.trim()}>
                         {isValidando ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <CheckSquare className="h-4 w-4 mr-2" />} 
