@@ -101,7 +101,6 @@ const CreditRequestsAdmin = () => {
       return;
     }
     
-    // Tratamento de segurança: se for Stripe, nem tenta buscar no Storage
     if (path === 'AUTOMATIC_PAYMENT' || path.startsWith('STRIPE_')) {
         toast.info('Pagamento processado automaticamente via Cartão (Stripe). Não existe arquivo de imagem.', { duration: 5000 });
         return;
@@ -322,10 +321,26 @@ const CreditRequestsAdmin = () => {
           <ScrollArea className="flex-grow p-4">
             {isLoadingMessages ? (
                 <div className="flex justify-center py-10"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>
-            ) : messages.length === 0 ? (
-                <div className="text-center py-10 text-muted-foreground">Nenhuma mensagem no histórico.</div>
             ) : (
                 <div className="space-y-4">
+                    {/* Caso não tenha mensagens, mas tenha nota do sistema (Ex: Compra automática antiga via Stripe) */}
+                    {messages.length === 0 && conversationRequest?.notes && (
+                        <div className="flex flex-col items-start space-y-1">
+                            <div className="flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-widest text-primary ml-2">
+                                <ShieldCheck className="w-3 h-3" /> 
+                                Sistema • {format(new Date(conversationRequest.resolved_at || conversationRequest.requested_at), "HH:mm", { locale: ptBR })}
+                            </div>
+                            <div className="p-3 rounded-2xl shadow-sm max-w-[85%] text-sm leading-relaxed border bg-primary/10 border-primary/20 rounded-tl-none text-foreground font-medium">
+                                {conversationRequest.notes}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Caso realmente não tenha NADA */}
+                    {messages.length === 0 && !conversationRequest?.notes && (
+                        <div className="text-center py-10 text-muted-foreground">Nenhuma mensagem no histórico.</div>
+                    )}
+
                     {messages.map(msg => {
                         const isMe = msg.sender_id === profile?.id;
                         return (
