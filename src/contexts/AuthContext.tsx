@@ -14,12 +14,15 @@ export interface Profile {
   whatsapp: string | null;
   address: string | null;
   bloqueado: boolean;
+  admins_id?: string | null;
+  vendedor_id?: string | null;
 }
 
 interface AuthContextType {
   session: Session | null;
   user: User | null;
   profile: Profile | null;
+  isAdmin: boolean;
   loading: boolean;
   signOut: () => Promise<void>;
 }
@@ -35,12 +38,36 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     queryKey: ['profile', user?.id],
     queryFn: async () => {
       if (!user) return null;
-      const { data, error } = await supabase.from('perfis').select('*').eq('id', user.id).single();
+
+      // 1. PRIMEIRO: Verifica se o usuário logado é um Admin (tabela admins)
+      const { data: adminData } = await supabase
+        .from('admins')
+        .select('*')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      if (adminData) {
+        // Se achou na tabela admins, retorna o perfil forçando a role 'admin'
+        return {
+          ...adminData,
+          role: 'admin',
+          admins_id: adminData.id // O admin é dono de si mesmo
+        } as Profile;
+      }
+
+      // 2. SE NÃO FOR ADMIN: Busca na tabela normal de perfis (Jogadores e Vendedores)
+      const { data: profileData, error } = await supabase
+        .from('perfis')
+        .select('*')
+        .eq('id', user.id)
+        .single();
+
       if (error) {
         console.error('Error fetching profile:', error);
         return null;
       }
-      return data as Profile;
+      
+      return profileData as Profile;
     },
     enabled: !!user,
   });
@@ -67,14 +94,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const signOut = async () => {
     await supabase.auth.signOut();
-    // Força o redirecionamento imediato e limpa os estados da memória
     window.location.href = '/login';
   };
+
+  const isAdmin = profile?.role === 'admin';
 
   const value = {
     session,
     user,
     profile: profile ?? null,
+    isAdmin,
     loading: loadingInitial || (!!user && isLoadingProfile),
     signOut,
   };
