@@ -12,7 +12,7 @@ import { Match, MatchStatus, PlayerCard } from '@/types/match';
 import { gameTypeLabels } from '@/utils/bingoUtils';
 import { 
   Coins, Plus, Trophy, Users, Settings, 
-  Timer, DoorOpen, Ticket, Zap, ZapOff, Tv, Archive, Trash2, RotateCcw, Star, Loader2, CalendarDays, Clock, Crown, ChevronDown, ChevronUp, Gift, BellRing
+  Timer, DoorOpen, Ticket, Zap, ZapOff, Tv, Archive, Trash2, RotateCcw, Star, Loader2, CalendarDays, Clock, Crown, ChevronDown, ChevronUp, Gift, BellRing, Search
 } from 'lucide-react';
 import PlayerAvatar from '@/components/PlayerAvatar';
 import { 
@@ -331,7 +331,7 @@ const Lobby = () => {
                       {countdownMatch && <Badge variant="outline" className="text-[10px] font-mono"><Timer className="w-3 h-3 mr-1" />{countdownMatch}</Badge>}
                     </div>
                     <div className="flex flex-wrap gap-3 text-[11px] text-muted-foreground font-medium">
-                      <span className="flex items-center gap-1"><Trophy className="w-3 h-3" />{gameTypeLabels[match.game_type]}</span>
+                      <span className="flex items-center gap-1"><Trophy className="w-3.5 h-3.5" />{gameTypeLabels[match.game_type]}</span>
                       <span className="flex items-center gap-1"><Users className="w-3 h-3" />{playersInMatchCount} Jogadores</span>
                       <span className="flex items-center gap-1" title={`${realCardsCount} Reais / ${fakeCardsCount} Brincar`}>
                         <Ticket className="w-3 h-3" /> 
@@ -475,6 +475,11 @@ const Lobby = () => {
     );
   };
 
+  const inProgressMatches = matches.filter(m => m.status === 'in_progress');
+  const openMatches = matches.filter(m => m.status === 'open');
+  const waitingMatches = matches.filter(m => m.status === 'waiting');
+  const finishedMatches = matches.filter(m => m.status === 'finished');
+
   return (
     <div className="space-y-6">
       {/* Banner Admin */}
@@ -527,32 +532,34 @@ const Lobby = () => {
       )}
 
       {/* DASHBOARD PRINCIPAL */}
-      <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 sm:gap-4">
+      <div className="grid grid-cols-3 md:grid-cols-6 gap-2 sm:gap-4">
         <div className="card-container p-2 sm:p-4 bg-primary text-white border-none flex flex-col items-center text-center justify-center">
           <Coins className="w-4 h-4 sm:w-6 sm:h-6 mb-1 opacity-80" />
           <p className="text-[9px] sm:text-xs font-bold uppercase opacity-70 leading-tight">Pote</p>
           <p className="text-xs sm:text-xl font-bold font-heading truncate w-full">{Number(totalPot).toFixed(0)}</p>
         </div>
+        
         <div className="card-container p-2 sm:p-4 bg-accent text-white border-none flex flex-col items-center text-center justify-center cursor-pointer hover:opacity-90 transition-opacity" onClick={() => navigate('/active-players')}>
           <Users className="w-4 h-4 sm:w-6 sm:h-6 mb-1 opacity-80" />
           <p className="text-[9px] sm:text-xs font-bold uppercase opacity-70 leading-tight">Ativos</p>
           <p className="text-xs sm:text-xl font-bold font-heading truncate w-full">{totalPlayers}</p>
         </div>
+        
         <div className="card-container p-2 sm:p-4 bg-amber-500 text-white border-none flex flex-col items-center text-center justify-center cursor-pointer hover:opacity-90 transition-opacity" onClick={() => navigate('/trophies')}>
           <Trophy className="w-4 h-4 sm:w-6 sm:h-6 mb-1 opacity-80" />
           <p className="text-[9px] sm:text-xs font-bold uppercase opacity-70 leading-tight">Troféus</p>
           <p className="text-xs sm:text-xl font-bold font-heading truncate w-full">{wins.length}</p>
         </div>
+        
         <div className="card-container p-2 sm:p-4 bg-yellow-500 text-white border-none flex flex-col items-center text-center justify-center cursor-pointer hover:opacity-90 transition-opacity" onClick={() => navigate('/ranking')}>
           <Crown className="w-4 h-4 sm:w-6 sm:h-6 mb-1 opacity-80" />
           <p className="text-[9px] sm:text-xs font-bold uppercase opacity-70 leading-tight">Ranking</p>
           <p className="text-xs sm:text-xl font-bold font-heading truncate w-full">Top</p>
         </div>
         
-        {/* NOVO CARD: RIFAS */}
         <div 
           className={cn(
-            "card-container p-2 sm:p-4 border-none flex flex-col items-center text-center justify-center cursor-pointer transition-all col-span-3 sm:col-span-1",
+            "card-container p-2 sm:p-4 border-none flex flex-col items-center text-center justify-center cursor-pointer transition-all",
             hasWonRifa ? "bg-green-500 text-white animate-pulse shadow-lg shadow-green-500/40 border-2 border-white" : "bg-purple-500 hover:bg-purple-600 text-white"
           )}
           onClick={() => navigate('/rifas')}
@@ -562,6 +569,15 @@ const Lobby = () => {
           <p className="text-xs sm:text-xl font-bold font-heading truncate w-full">
             {hasWonRifa ? 'GANHOU!' : activeRifasCount}
           </p>
+        </div>
+
+        <div 
+          className="card-container p-2 sm:p-4 bg-slate-700 hover:bg-slate-800 text-white border-none flex flex-col items-center text-center justify-center cursor-pointer transition-opacity shadow-sm"
+          onClick={() => navigate('/validar-cartela')}
+        >
+          <Search className="w-4 h-4 sm:w-6 sm:h-6 mb-1 opacity-80" />
+          <p className="text-[9px] sm:text-xs font-bold uppercase opacity-70 leading-tight">Validar</p>
+          <p className="text-xs sm:text-xl font-bold font-heading truncate w-full">Bilhete</p>
         </div>
       </div>
 
