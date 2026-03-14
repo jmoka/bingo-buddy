@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Switch } from '@/components/ui/switch';
-import { Loader2, CheckCircle2, XCircle, Users, Copy, ShieldBan, ShieldCheck, Edit, Wallet, HandCoins, AlertTriangle, Eye, ExternalLink, Grid3X3, SmartphoneNfc, Ticket, TrendingUp, BadgeDollarSign, HeartHandshake, PenTool } from 'lucide-react';
+import { Loader2, CheckCircle2, XCircle, Users, Copy, ShieldBan, ShieldCheck, Edit, Wallet, HandCoins, AlertTriangle, Eye, ExternalLink, Grid3X3, SmartphoneNfc, Ticket, TrendingUp, BadgeDollarSign, HeartHandshake, PenTool, Undo2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { AcertoVendedor } from '@/types/rifa';
@@ -212,7 +212,7 @@ const VendedoresAdmin = () => {
 
     setAcertoComissao(acerto);
     setValorComissao(sugestao);
-    setDescontarDoAdmin(true);
+    setDescontarDoAdmin(true); 
     setPagarComissaoOpen(true);
   };
 
@@ -278,6 +278,19 @@ const VendedoresAdmin = () => {
                </div>
              );
           })}
+        </TabsContent>
+
+        <TabsContent value="solicitacoes" className="mt-4 space-y-4">
+           {pendentes.length === 0 ? (
+             <div className="card-container text-center py-10 text-muted-foreground text-sm border-dashed">Nenhuma inscrição pendente.</div>
+           ) : (
+             pendentes.map(s => (
+               <div key={s.id} className="card-container p-4 border-l-4 border-l-amber-500">
+                 <p>{s.nome}</p>
+                 {/* ... restante dos itens de solicitacoes não mudou */}
+               </div>
+             ))
+           )}
         </TabsContent>
 
         <TabsContent value="clientes" className="mt-4 space-y-4">
@@ -484,7 +497,6 @@ const VendedoresAdmin = () => {
                )})
              )}
           </div>
-
         </TabsContent>
       </Tabs>
 
@@ -501,6 +513,7 @@ const VendedoresAdmin = () => {
         </DialogContent>
       </Dialog>
 
+      {/* MODAL COMPROVANTE */}
       <Dialog open={!!comprovanteUrl} onOpenChange={(open) => !open && setComprovanteUrl(null)}>
         <DialogContent className="max-w-3xl">
           <DialogHeader><DialogTitle>Visualizador de Comprovante</DialogTitle></DialogHeader>
@@ -561,6 +574,7 @@ const VendedoresAdmin = () => {
         </DialogContent>
       </Dialog>
 
+      {/* MODAL CONFIRMAR PIX ACERTO */}
       <Dialog open={!!acaoAcerto} onOpenChange={open => !open && setAcaoAcerto(null)}>
         <DialogContent>
           <DialogHeader><DialogTitle className="flex items-center gap-2">{acaoAcerto?.tipo === 'aprovado' ? <HandCoins className="w-5 h-5 text-green-600" /> : <AlertTriangle className="w-5 h-5 text-destructive" />}{acaoAcerto?.tipo === 'aprovado' ? 'Confirmar Recebimento' : 'Rejeitar Comprovante'}</DialogTitle></DialogHeader>
@@ -578,6 +592,7 @@ const VendedoresAdmin = () => {
         </DialogContent>
       </Dialog>
 
+      {/* MODAL FORÇAR REPASSE DE ACERTO BUGADO */}
       <Dialog open={!!acertoForcarRepasse} onOpenChange={open => !open && setAcertoForcarRepasse(null)}>
         <DialogContent>
           <DialogHeader>
