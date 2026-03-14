@@ -32,7 +32,9 @@ serve(async (req) => {
 
   try {
     const body = await req.text()
-    const event = stripe.webhooks.constructEvent(
+    
+    // CORREÇÃO AQUI: Usando constructEventAsync com await, obrigatório no Supabase Edge Functions
+    const event = await stripe.webhooks.constructEventAsync(
       body,
       signature,
       settings.stripe_webhook_secret.trim()
@@ -56,6 +58,7 @@ serve(async (req) => {
           .maybeSingle();
 
         if (existing?.status !== 'completed' && userId) {
+          // Registra na tabela específica de transações do Stripe
           await supabaseAdmin
             .from('stripe_payments')
             .upsert({ 
@@ -72,11 +75,18 @@ serve(async (req) => {
             
             console.log(`[stripe-webhook] Liberando ${creditsToGrant} créditos para ${userId}`);
 
+            // 1. Libera os créditos pro jogador
             await supabaseAdmin.rpc('increment_player_credits', {
               p_player_id: userId,
               p_amount: creditsToGrant
             });
 
+            // 2. Adiciona o valor pago no Caixa do Admin!
+            await supabaseAdmin.rpc('increment_admin_profit', {
+              amount: amount
+            });
+
+            // 3. Registra no histórico normal de créditos do jogador
             await supabaseAdmin.from('solicitacoes_credito').insert({
               player_id: userId,
               status: 'approved',
@@ -84,7 +94,7 @@ serve(async (req) => {
               credits_granted: creditsToGrant,
               amount_paid: amount,
               receipt_url: `STRIPE_${session.id}`,
-              notes: 'Pagamento automático via Stripe.',
+              notes: 'Pagamento automático via Cartão de Crédito (Stripe).',
               resolved_at: new Date().toISOString()
             });
           }
