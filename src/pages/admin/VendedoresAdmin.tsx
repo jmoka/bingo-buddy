@@ -59,7 +59,7 @@ const VendedoresAdmin = () => {
     comprovante_url: f.comprovante_url
   }));
 
-  const pagamentosClientesRifa = todasCompras.filter(c => c.status === 'em_analise').map(c => {
+  const pagamentosClientesRifa = todasCompras.filter(c => c.compra_status === 'em_analise').map(c => {
     const cartela = c.cartelas_rifa?.[0];
     return {
       id: c.id,

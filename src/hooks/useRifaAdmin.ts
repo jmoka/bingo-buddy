@@ -10,6 +10,31 @@ export const useRifaAdmin = () => {
   const queryClient = useQueryClient();
   const isAdmin = profile?.role === 'admin';
 
+  // Efeito para escutar mudanças em tempo real nas tabelas de admin
+  useEffect(() => {
+    if (!isAdmin) return;
+
+    const channel = supabase
+      .channel('admin-rifa-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'compras_rifa' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['todasComprasRifa'] });
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'vendas_bingo_fisico' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['todasFolhasBingoAdmin'] });
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'solicitacoes_vendedor' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['solicitacoesVendedor'] });
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'acertos_vendedor' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['acertosAdmin'] });
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [isAdmin, queryClient]);
+
   const { data: todasRifas = [], isLoading: isLoadingRifas } = useQuery({
     queryKey: ['rifasAdmin'],
     queryFn: async () => {
@@ -55,7 +80,7 @@ export const useRifaAdmin = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('compras_rifa')
-        .select('*, rifas(nome), cartelas_rifa(codigo_validacao, numeros_rifa(nome_comprador, telefone_comprador, endereco_comprador)), vendedores_rifa(nome)')
+        .select('*, compra_status:status, rifas(nome), cartelas_rifa(codigo_validacao, numeros_rifa(nome_comprador, telefone_comprador, endereco_comprador)), vendedores_rifa(nome)')
         .order('created_at', { ascending: false });
       if (error) throw error;
       return data as any[];
