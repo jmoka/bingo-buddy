@@ -475,11 +475,6 @@ const Lobby = () => {
     );
   };
 
-  const inProgressMatches = matches.filter(m => m.status === 'in_progress');
-  const openMatches = matches.filter(m => m.status === 'open');
-  const waitingMatches = matches.filter(m => m.status === 'waiting');
-  const finishedMatches = matches.filter(m => m.status === 'finished');
-
   return (
     <div className="space-y-6">
       {/* Banner Admin */}
