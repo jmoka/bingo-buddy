@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
-import { Rifa, NumeroRifa, CompraRifa, VendedorRifa, ClienteRifa, CartelaRifa, SolicitacaoVendedor, CadastroVendedor, AcertoVendedor } from '@/types/rifa';
+import { Rifa, NumeroRifa, VendedorRifa, ClienteRifa, CartelaRifa, SolicitacaoVendedor, CadastroVendedor, AcertoVendedor } from '@/types/rifa';
 
 export const useRifaAdmin = () => {
   const { profile } = useAuth();
@@ -77,8 +77,6 @@ export const useRifaAdmin = () => {
   const { data: todasCompras = [], isLoading: isLoadingCompras } = useQuery({
     queryKey: ['todasComprasRifa'],
     queryFn: async () => {
-      // CORREÇÃO AQUI: Retirado o `vendedores_rifa(nome)` para evitar o erro de ambiguidade do Supabase
-      // devido as colunas vendedor_id e ref_vendedor_id existirem simultaneamente.
       const { data, error } = await supabase
         .from('compras_rifa')
         .select('*, rifas(nome), cartelas_rifa(codigo_validacao, numeros_rifa(nome_comprador, telefone_comprador, endereco_comprador))')
@@ -396,20 +394,7 @@ export const useRifaAdmin = () => {
   };
 
   const resolverAcerto = async (acertoId: string, status: 'aprovado' | 'rejeitado'): Promise<boolean> => {
-    let valorRepasse = 0;
-
-    if (status === 'aprovado') {
-      const { data: acerto } = await supabase
-          .from('acertos_vendedor')
-          .select('valor')
-          .eq('id', acertoId)
-          .single();
-      
-      if (acerto) {
-        valorRepasse = Number(acerto.valor);
-      }
-    }
-
+    // Agora o banco de dados calcula a comissão, paga o vendedor e dá o lucro líquido para o Admin sozinho!
     const { data, error } = await supabase.rpc('resolver_acerto_vendedor', {
       p_acerto_id: acertoId,
       p_status: status
@@ -420,21 +405,11 @@ export const useRifaAdmin = () => {
       return false;
     }
 
-    if (status === 'aprovado' && valorRepasse > 0) {
-      await supabase.rpc('increment_admin_profit', { amount: valorRepasse });
-      const { error: updateErr } = await supabase.from('acertos_vendedor').update({ repasse_concluido: true }).eq('id', acertoId);
-      if (updateErr) {
-        console.error("Falta de permissão (RLS):", updateErr);
-        toast.error("O dinheiro entrou no caixa, mas faltam permissões no banco. Execute o comando SQL no painel!");
-      }
-      queryClient.invalidateQueries({ queryKey: ['gameSettings'] }); 
-    } else if (status === 'rejeitado') {
-      await supabase.from('acertos_vendedor').update({ repasse_concluido: false }).eq('id', acertoId);
-    }
-
-    toast.success(`Acerto ${status} com sucesso!`);
+    toast.success(`Acerto ${status} com sucesso! A divisão do dinheiro foi feita.`);
     queryClient.invalidateQueries({ queryKey: ['acertosAdmin'] });
     queryClient.invalidateQueries({ queryKey: ['todasComprasRifa'] });
+    queryClient.invalidateQueries({ queryKey: ['gameSettings'] }); 
+    queryClient.invalidateQueries({ queryKey: ['perfis'] });
     return true;
   };
 
