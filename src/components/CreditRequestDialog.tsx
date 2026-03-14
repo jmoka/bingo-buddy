@@ -145,13 +145,13 @@ export const CreditRequestDialog = ({ gameSettings, children }: CreditRequestDia
 
             {gameSettings.stripe_enabled && (
               <div className="space-y-2">
-                <Button 
-                  className="w-full h-14 bg-primary text-white shadow-button font-bold text-lg" 
+                <Button
+                  className="w-full min-h-14 h-auto py-3 px-2 bg-primary text-white shadow-button font-bold text-sm sm:text-lg whitespace-normal leading-tight"
                   onClick={handleStripePayment}
                   disabled={isStripeLoading}
                 >
-                  {isStripeLoading ? <Loader2 className="w-6 h-6 mr-2 animate-spin" /> : <CreditCard className="w-6 h-6 mr-2" />}
-                  PAGAR R$ {finalStripeAmount.toFixed(2).replace('.', ',')} NO CARTÃO
+                  {isStripeLoading ? <Loader2 className="w-5 h-5 sm:w-6 sm:h-6 mr-2 animate-spin shrink-0" /> : <CreditCard className="w-5 h-5 sm:w-6 sm:h-6 mr-2 shrink-0" />}
+                  <span>PAGAR R$ {finalStripeAmount.toFixed(2).replace('.', ',')} NO CARTÃO</span>
                 </Button>
                 {stripeFeeDetails && (
                   <div className="text-[10px] text-muted-foreground bg-muted/30 p-2 rounded border border-border/50 flex justify-between items-center px-4">
