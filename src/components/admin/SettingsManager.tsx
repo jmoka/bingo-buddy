@@ -311,6 +311,32 @@ const SettingsManager = () => {
               <div className="space-y-1.5"><Label className="text-xs">Intervalo (min)</Label><Input name="auto_engine_interval_mins" type="number" value={currentSettings.auto_engine_interval_mins} onChange={handleSettingsChange} /></div>
               <div className="space-y-1.5"><Label className="text-xs">Partidas/Dia</Label><Input name="auto_engine_matches_per_day" type="number" value={currentSettings.auto_engine_matches_per_day} onChange={handleSettingsChange} /></div>
               <div className="space-y-1.5"><Label className="text-xs">Preço Cartela (cr)</Label><Input name="auto_engine_card_price" type="number" step="0.01" value={currentSettings.auto_engine_card_price} onChange={handleSettingsChange} /></div>
+              
+              <div className="space-y-1.5">
+                <Label className="text-xs">Tipo de Jogo</Label>
+                <Select value={currentSettings.auto_engine_game_type} onValueChange={(v: any) => handleSelectChange('auto_engine_game_type', v)}>
+                  <SelectTrigger className="h-9 text-xs bg-background"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(gameTypeLabels).map(([k, v]) => (
+                      <SelectItem key={k} value={k}>{v}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Tipo de Prêmio</Label>
+                <Select value={currentSettings.auto_engine_prize_type} onValueChange={(v: any) => handleSelectChange('auto_engine_prize_type', v)}>
+                  <SelectTrigger className="h-9 text-xs bg-background"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="percentage">% do Pote</SelectItem>
+                    <SelectItem value="fixed">Valor Fixo</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Valor do Prêmio {currentSettings.auto_engine_prize_type === 'percentage' ? '(%)' : '(cr)'}</Label>
+                <Input name="auto_engine_prize_value" type="number" step="0.01" value={currentSettings.auto_engine_prize_value} onChange={handleSettingsChange} />
+              </div>
             </div>
 
             <div className="space-y-3">
