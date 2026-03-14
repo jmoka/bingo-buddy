@@ -497,6 +497,50 @@ export const useRifaAdmin = () => {
     return true;
   };
 
+  const getNumerosRifaAdmin = async (rifaId: string): Promise<NumeroRifa[]> => {
+    const { data, error } = await supabase
+      .from('numeros_rifa')
+      .select('*')
+      .eq('rifa_id', rifaId)
+      .order('numero');
+    if (error) {
+      toast.error('Erro ao buscar números da rifa.');
+      return [];
+    }
+    return data as NumeroRifa[];
+  };
+
+  const getCartelasCompra = async (compraId: string): Promise<CartelaRifa[]> => {
+    const { data, error } = await supabase
+      .from('cartelas_rifa')
+      .select('*')
+      .eq('compra_id', compraId);
+    if (error) {
+      toast.error('Erro ao buscar cartelas da compra.');
+      return [];
+    }
+    return data as CartelaRifa[];
+  };
+
+  const registrarVendaVendedor = async (rifaId: string, vendedorId: string, numeros: number[], clienteId?: string): Promise<boolean> => {
+    console.warn("Using deprecated function registrarVendaVendedor");
+    const { data, error } = await supabase.rpc('reservar_numeros_vendedor', {
+      p_rifa_id: rifaId,
+      p_numeros: numeros,
+      p_pagar_depois: false,
+    });
+    if (error || !data?.success) {
+      toast.error('Erro ao registrar venda: ' + (data?.error || error?.message));
+      return false;
+    }
+    toast.success('Venda registrada com sucesso!');
+    queryClient.invalidateQueries({ queryKey: ['minhasReservasVendedor'] });
+    queryClient.invalidateQueries({ queryKey: ['minhasVendasVendedor'] });
+    queryClient.invalidateQueries({ queryKey: ['numerosRifa'] });
+    queryClient.invalidateQueries({ queryKey: ['profile'] });
+    return true;
+  };
+
   return {
     todasRifas,
     vendedores,
