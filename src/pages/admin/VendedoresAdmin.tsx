@@ -43,7 +43,7 @@ const VendedoresAdmin = () => {
   const pendentes = solicitacoesVendedor.filter(s => s.status === 'pendente');
   const acertosParaAnalisar = acertosPendentes.filter(a => a.status === 'pendente' || a.status === 'em_analise');
 
-  // Vendas de Clientes (PIX Direto) - Removido o filtro && f.comprovante_url para mostrar os itens mesmo que a imagem falhe
+  // Vendas de Clientes (PIX Direto)
   const pagamentosClientesBingo = todasFolhasBingo.filter(f => f.status === 'em_analise').map(f => ({
     id: f.id,
     created_at: f.created_at,
@@ -59,7 +59,8 @@ const VendedoresAdmin = () => {
     comprovante_url: f.comprovante_url
   }));
 
-  const pagamentosClientesRifa = todasCompras.filter(c => c.compra_status === 'em_analise').map(c => {
+  // Corrigido aqui: mudado de c.compra_status para c.status
+  const pagamentosClientesRifa = todasCompras.filter(c => c.status === 'em_analise').map(c => {
     const cartela = c.cartelas_rifa?.[0];
     return {
       id: c.id,

@@ -10,7 +10,6 @@ export const useRifaAdmin = () => {
   const queryClient = useQueryClient();
   const isAdmin = profile?.role === 'admin';
 
-  // Efeito para escutar mudanças em tempo real nas tabelas de admin
   useEffect(() => {
     if (!isAdmin) return;
 
@@ -80,7 +79,7 @@ export const useRifaAdmin = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('compras_rifa')
-        .select('*, compra_status:status, rifas(nome), cartelas_rifa(codigo_validacao, numeros_rifa(nome_comprador, telefone_comprador, endereco_comprador)), vendedores_rifa(nome)')
+        .select('*, rifas(nome), cartelas_rifa(codigo_validacao, numeros_rifa(nome_comprador, telefone_comprador, endereco_comprador)), vendedores_rifa(nome)')
         .order('created_at', { ascending: false });
       if (error) throw error;
       return data as any[];
@@ -420,10 +419,7 @@ export const useRifaAdmin = () => {
     }
 
     if (status === 'aprovado' && valorRepasse > 0) {
-      // Tenta incrementar o admin_profit
       await supabase.rpc('increment_admin_profit', { amount: valorRepasse });
-      
-      // Validação rigorosa do UPDATE de repasse_concluido
       const { error: updateErr } = await supabase.from('acertos_vendedor').update({ repasse_concluido: true }).eq('id', acertoId);
       if (updateErr) {
         console.error("Falta de permissão (RLS):", updateErr);
@@ -455,10 +451,7 @@ export const useRifaAdmin = () => {
     const valorRepasse = Number(acerto.valor);
 
     if (valorRepasse > 0) {
-      // Incrementa o lucro
       await supabase.rpc('increment_admin_profit', { amount: valorRepasse });
-      
-      // Tenta atualizar. Se der erro, avisa e retorna falso para não fechar modal.
       const { error: updErr } = await supabase.from('acertos_vendedor').update({ repasse_concluido: true }).eq('id', acertoId);
       if (updErr) {
         toast.error("Você precisa executar o comando SQL no Supabase para liberar o acesso a essa tabela!");
