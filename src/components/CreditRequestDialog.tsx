@@ -28,6 +28,17 @@ export const CreditRequestDialog = ({ gameSettings, children }: CreditRequestDia
 
   const amount = credits * (gameSettings?.valor_por_credito || 1);
 
+  // Calcula o valor final se as taxas da Stripe estiverem ativas
+  const finalStripeAmount = useMemo(() => {
+    if (gameSettings?.stripe_pass_fees_to_customer) {
+        const perc = gameSettings.stripe_fee_percentage || 0;
+        const fix = gameSettings.stripe_fee_fixed || 0;
+        const final = (amount + fix) / (1 - (perc / 100));
+        return Math.ceil(final * 100) / 100;
+    }
+    return amount;
+  }, [amount, gameSettings]);
+
   const pixPayload = useMemo(() => {
     if (!gameSettings?.pix_key || !profile) return '';
 
@@ -128,33 +139,32 @@ export const CreditRequestDialog = ({ gameSettings, children }: CreditRequestDia
                   <Plus className="w-4 h-4" />
                 </Button>
               </div>
-              <div className="font-heading text-2xl font-bold text-primary">
-                Total: R$ {amount.toFixed(2).replace('.', ',')}
-              </div>
             </div>
 
             {gameSettings.stripe_enabled && (
-              <div className="space-y-3">
-                <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Pagar Agora (Liberação Automática)</p>
-                
+              <div className="space-y-2">
                 <Button 
                   className="w-full h-14 bg-primary text-white shadow-button font-bold text-lg" 
                   onClick={handleStripePayment}
                   disabled={isStripeLoading}
                 >
                   {isStripeLoading ? <Loader2 className="w-6 h-6 mr-2 animate-spin" /> : <CreditCard className="w-6 h-6 mr-2" />}
-                  PAGAR COM CARTÃO
+                  PAGAR R$ {finalStripeAmount.toFixed(2).replace('.', ',')} NO CARTÃO
                 </Button>
-                <p className="text-[10px] text-muted-foreground italic">Os créditos caem na hora após a confirmação.</p>
+                {gameSettings.stripe_pass_fees_to_customer && (
+                  <p className="text-[10px] text-muted-foreground italic">* O valor no cartão inclui as taxas operacionais da Stripe.</p>
+                )}
               </div>
             )}
 
             <div className="relative py-4">
               <div className="absolute inset-0 flex items-center"><span className="w-full border-t" /></div>
-              <div className="relative flex justify-center text-xs uppercase"><span className="bg-background px-2 text-muted-foreground">Ou PIX Manual (Anexar Comprovante)</span></div>
+              <div className="relative flex justify-center text-xs uppercase"><span className="bg-background px-2 text-muted-foreground">Ou PIX Manual (Sem taxas extras)</span></div>
             </div>
 
             <div className="space-y-4">
+                <p className="text-xl font-heading font-black text-primary">Total: R$ {amount.toFixed(2).replace('.', ',')}</p>
+                
                 {pixPayload && (
                 <div className="p-4 bg-white rounded-lg inline-block border">
                     <QRCode value={pixPayload} size={140} />

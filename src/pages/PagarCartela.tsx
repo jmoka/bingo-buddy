@@ -57,7 +57,6 @@ export default function PagarCartela() {
       }
 
       // 3. Se não achou no bingo, tenta buscar na Rifa
-      // Removido vendedores_rifa(nome) para evitar ambiguidade de Foreign Keys
       const { data: resRifa, error: errRifa } = await supabase
         .from('cartelas_rifa')
         .select('*, compras_rifa(*, rifas(nome))')
@@ -86,11 +85,21 @@ export default function PagarCartela() {
 
   const valorCheio = useMemo(() => {
     if (!venda) return 0;
-    // Se o desconto for 100% (improvável), evita divisão por zero
     const desc = Number(venda.desconto_aplicado || 0);
     if (desc >= 100) return Number(venda.valor_pago);
     return Number(venda.valor_pago) / (1 - (desc / 100));
   }, [venda]);
+
+  // Calcula o valor final se as taxas da Stripe estiverem ativas
+  const finalStripeAmount = useMemo(() => {
+    if (gameSettings?.stripe_pass_fees_to_customer) {
+        const perc = gameSettings.stripe_fee_percentage || 0;
+        const fix = gameSettings.stripe_fee_fixed || 0;
+        const final = (valorCheio + fix) / (1 - (perc / 100));
+        return Math.ceil(final * 100) / 100;
+    }
+    return valorCheio;
+  }, [valorCheio, gameSettings]);
 
   const pixPayload = useMemo(() => {
     if (!gameSettings?.pix_key || !venda) return '';
@@ -124,7 +133,7 @@ export default function PagarCartela() {
     try {
       const { data, error } = await supabase.functions.invoke('create-stripe-session', {
         body: { 
-          amount: valorCheio, 
+          amount: valorCheio, // Enviamos o valor original. O backend calcula a taxa final e aplica lá.
           type: tipoVenda === 'bingo' ? 'venda_bingo' : 'venda_rifa',
           metadata: { venda_id: venda.id, codigo: venda.codigo_validacao }
         }
@@ -196,8 +205,7 @@ export default function PagarCartela() {
         
         <div className="p-2 mb-4 text-center">
            <p className="text-sm font-bold text-muted-foreground uppercase tracking-wider mb-1">{venda.partidas?.name}</p>
-           <p className="text-3xl font-black font-heading text-primary">R$ {valorCheio.toFixed(2).replace('.', ',')}</p>
-           <p className="text-xs font-mono bg-muted inline-block px-3 py-1 rounded-full mt-2 font-bold">Cód: {venda.codigo_validacao}</p>
+           <p className="text-xs font-mono bg-muted inline-block px-3 py-1 rounded-full font-bold">Cód: {venda.codigo_validacao}</p>
         </div>
 
         <div className="space-y-6">
@@ -208,29 +216,34 @@ export default function PagarCartela() {
             </h3>
             
             {gameSettings?.stripe_enabled && (
-              <div className="bg-primary/5 p-4 rounded-xl border border-primary/20 space-y-3 text-center">
-                <p className="text-xs text-primary font-bold uppercase tracking-wider">Pagamento Imediato via Cartão</p>
+              <div className="bg-primary/5 p-4 rounded-xl border border-primary/20 space-y-2 text-center">
                 <Button 
                   className="w-full h-14 bg-primary hover:bg-primary/90 text-white shadow-button font-bold text-lg" 
                   onClick={handleStripePayment}
                   disabled={isStripeLoading}
                 >
                   {isStripeLoading ? <Loader2 className="w-6 h-6 mr-2 animate-spin" /> : <CreditCard className="w-6 h-6 mr-2" />}
-                  PAGAR COM CARTÃO
+                  PAGAR R$ {finalStripeAmount.toFixed(2).replace('.', ',')} NO CARTÃO
                 </Button>
-                <p className="text-[10px] text-muted-foreground italic">A cartela é validada na mesma hora. Não precisa enviar comprovante.</p>
+                {gameSettings.stripe_pass_fees_to_customer ? (
+                  <p className="text-[10px] text-muted-foreground italic">* O valor no cartão inclui as taxas operacionais da Stripe.</p>
+                ) : (
+                  <p className="text-[10px] text-muted-foreground italic">A cartela é validada na mesma hora.</p>
+                )}
               </div>
             )}
 
             <div className="relative py-4">
               <div className="absolute inset-0 flex items-center"><span className="w-full border-t" /></div>
-              <div className="relative flex justify-center text-xs uppercase"><span className="bg-background px-2 text-muted-foreground">Ou Pague com PIX Copia e Cola</span></div>
+              <div className="relative flex justify-center text-xs uppercase"><span className="bg-background px-2 text-muted-foreground">Ou PIX Manual (Sem taxas extras)</span></div>
             </div>
 
-            <div className="bg-muted/40 p-4 rounded-xl border border-border/50 text-center">
+            <div className="bg-muted/40 p-4 rounded-xl border border-border/50 text-center space-y-4">
+              <p className="text-2xl font-black font-heading text-primary">R$ {valorCheio.toFixed(2).replace('.', ',')}</p>
+              
               {pixPayload ? (
-                <div className="bg-white p-3 rounded-lg inline-block shadow-sm border border-gray-200 mb-4">
-                  <QRCodeSVG value={pixPayload} size={180} />
+                <div className="bg-white p-3 rounded-lg inline-block shadow-sm border border-gray-200">
+                  <QRCodeSVG value={pixPayload} size={160} />
                 </div>
               ) : (
                 <div className="p-8 text-destructive flex flex-col items-center gap-2">

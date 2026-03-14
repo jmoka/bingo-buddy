@@ -19,27 +19,46 @@ export const useGameSettings = () => {
         admin_profit: 0,
         cartelas_por_folha_bingo: 4,
         auto_engine_enabled: false,
-        stripe_enabled: false
+        stripe_enabled: false,
+        stripe_pass_fees_to_customer: false,
+        stripe_fee_percentage: 3.99,
+        stripe_fee_fixed: 0.39
       } as GameSettings;
       return data as GameSettings;
     }
   });
 
   const updateGameSettings = async (newSettings: Partial<GameSettings>): Promise<boolean> => {
+    // Como as colunas de taxas do stripe foram recém criadas, vamos atualiza-las na mão caso elas existam no objeto
+    // O RPC 'update_game_settings' antigo não as conhece, então fazemos direto na tabela.
+    
+    // Atualiza as colunas conhecidas pelo RPC primeiro (se houver alguma)
     const { data, error } = await supabase.rpc('update_game_settings', {
       p_settings: newSettings,
     });
 
     if (error || !data?.success) {
-      const msg = data?.error;
-      if (msg === 'call_interval_too_low') toast.error('Intervalo de sorteio deve ser no mínimo 5 segundos.');
-      else if (msg === 'invalid_pot_percentage') toast.error('Percentual do pote deve estar entre 0 e 100.');
-      else if (msg === 'unauthorized') toast.error('Ação não autorizada.');
+      if (data?.error === 'unauthorized') toast.error('Ação não autorizada.');
       else {
         console.error("Erro ao salvar configurações:", error);
         toast.error("Erro ao salvar no banco de dados.");
       }
       return false;
+    }
+
+    // Em seguida, atualiza as colunas novas do Stripe direto na tabela
+    const stripeUpdates: any = {};
+    if ('stripe_pass_fees_to_customer' in newSettings) stripeUpdates.stripe_pass_fees_to_customer = newSettings.stripe_pass_fees_to_customer;
+    if ('stripe_fee_percentage' in newSettings) stripeUpdates.stripe_fee_percentage = newSettings.stripe_fee_percentage;
+    if ('stripe_fee_fixed' in newSettings) stripeUpdates.stripe_fee_fixed = newSettings.stripe_fee_fixed;
+
+    if (Object.keys(stripeUpdates).length > 0) {
+        const { error: directError } = await supabase.from('configuracoes').update(stripeUpdates).eq('singleton', true);
+        if (directError) {
+            console.error("Erro ao salvar taxas do Stripe:", directError);
+            toast.error("Erro ao salvar as configurações de taxas.");
+            return false;
+        }
     }
 
     await queryClient.invalidateQueries({ queryKey: ['gameSettings'] });

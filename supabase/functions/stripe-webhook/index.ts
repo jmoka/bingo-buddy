@@ -48,9 +48,12 @@ serve(async (req) => {
       if (session.payment_status === 'paid') {
         const userId = session.client_reference_id || session.metadata?.user_id || 'anonymous';
         const paymentType = session.metadata?.payment_type;
-        const amount = session.amount_total ? session.amount_total / 100 : 0;
+        const amountPaidByCustomer = session.amount_total ? session.amount_total / 100 : 0;
+        
+        // RECUPERA O VALOR ORIGINAL (ANTES DAS TAXAS), PARA CALCULAR O LUCRO LIMPO DO ADMIN
+        const originalAmount = session.metadata?.original_amount ? Number(session.metadata.original_amount) : amountPaidByCustomer;
 
-        console.log(`[stripe-webhook] Processando - Usuário: ${userId} | Valor: R$ ${amount} | Tipo: ${paymentType}`);
+        console.log(`[stripe-webhook] Pagamento recebido: Usuário: ${userId} | Valor Pago (Cliente): R$ ${amountPaidByCustomer} | Valor Original (Líquido Esperado): R$ ${originalAmount} | Tipo: ${paymentType}`);
 
         // 1. Evita processar a mesma compra 2 vezes
         const { data: existing } = await supabaseAdmin
@@ -68,25 +71,28 @@ serve(async (req) => {
         await supabaseAdmin.from('stripe_payments').insert({ 
             stripe_session_id: session.id,
             user_id: userId === 'anonymous' ? null : userId,
-            amount: amount,
+            amount: amountPaidByCustomer, // Salva o que foi efetivamente cobrado do cliente no banco
             status: 'completed',
             payment_type: paymentType || 'unknown'
         });
 
         // 3. SE FOR COMPRA DE CRÉDITOS NA CONTA
         if (paymentType === 'credits' && userId !== 'anonymous') {
-          const creditsToGrant = Number(session.metadata?.credits_requested || amount);
+          const creditsToGrant = Number(session.metadata?.credits_requested || originalAmount);
+          
           await supabaseAdmin.rpc('increment_player_credits', { p_player_id: userId, p_amount: creditsToGrant });
-          await supabaseAdmin.rpc('increment_admin_profit', { amount: amount });
+          
+          // O Admin só ganha de lucro o valor limpo (as taxas ficaram na Stripe)
+          await supabaseAdmin.rpc('increment_admin_profit', { amount: originalAmount });
 
           const { data: historyData } = await supabaseAdmin.from('solicitacoes_credito').insert({
             player_id: userId, status: 'approved', credits_requested: creditsToGrant, credits_granted: creditsToGrant,
-            amount_paid: amount, receipt_url: `STRIPE_${session.id}`, notes: 'Pagamento automático via Cartão de Crédito (Stripe).', resolved_at: new Date().toISOString()
+            amount_paid: amountPaidByCustomer, receipt_url: `STRIPE_${session.id}`, notes: 'Pagamento automático via Cartão de Crédito (Stripe).', resolved_at: new Date().toISOString()
           }).select('id').single();
 
           if (historyData) {
             await supabaseAdmin.from('mensagens_solicitacao').insert({
-              credit_request_id: historyData.id, sender_id: userId, message: `✅ Pagamento automático de R$ ${amount.toFixed(2)} aprovado via Cartão de Crédito.`
+              credit_request_id: historyData.id, sender_id: userId, message: `✅ Pagamento automático aprovado via Cartão de Crédito.`
             });
           }
         } 
@@ -113,12 +119,15 @@ serve(async (req) => {
                     const { data: match } = await supabaseAdmin.from('partidas').select('pot').eq('id', venda.match_id).single();
                     if (match) await supabaseAdmin.from('partidas').update({ pot: Number(match.pot || 0) + precoTotal }).eq('id', venda.match_id);
 
-                    // Paga comissão do vendedor (e repassa o resto do dinheiro para o caixa do admin)
-                    await supabaseAdmin.rpc('increment_admin_profit', { amount: amount });
+                    // O Caixa do Admin recebe o valor Original (já deduzindo as taxas do stripe)
+                    await supabaseAdmin.rpc('increment_admin_profit', { amount: originalAmount });
+                    
+                    // Paga a comissão do vendedor do Bingo
                     const comissaoPerc = Number(vendedor?.comissao_percentual || cfg?.comissao_vendedor_global || 0);
                     if (comissaoPerc > 0 && vendedor?.user_id) {
                         const comissaoValor = precoTotal * (comissaoPerc / 100.0);
                         await supabaseAdmin.rpc('increment_player_credits', { p_player_id: vendedor.user_id, p_amount: comissaoValor });
+                        // Deduz a comissão do Vendedor do Caixa do Admin
                         await supabaseAdmin.rpc('increment_admin_profit', { amount: -comissaoValor });
                     }
                     console.log("[stripe-webhook] Venda Bingo ativada com sucesso!");
@@ -136,13 +145,15 @@ serve(async (req) => {
                     const desconto = Number(compra.desconto_aplicado || 0);
                     if (desconto < 100 && desconto > 0) precoTotal = precoTotal / (1 - (desconto / 100.0));
 
-                    await supabaseAdmin.rpc('increment_admin_profit', { amount: amount });
+                    // Admin recebe o valor líquido (já sem taxas da Stripe)
+                    await supabaseAdmin.rpc('increment_admin_profit', { amount: originalAmount });
 
-                    // Paga a comissão do vendedor da Rifa (se tiver)
+                    // Paga a comissão do vendedor da Rifa
                     const comissaoPerc = Number(vendedor?.comissao_percentual || cfg?.comissao_vendedor_global || 0);
                     if (comissaoPerc > 0 && vendedor?.user_id) {
                         const comissaoValor = precoTotal * (comissaoPerc / 100.0);
                         await supabaseAdmin.rpc('increment_player_credits', { p_player_id: vendedor.user_id, p_amount: comissaoValor });
+                        // Deduz a comissão do lucro do admin
                         await supabaseAdmin.rpc('increment_admin_profit', { amount: -comissaoValor });
                     }
                     console.log("[stripe-webhook] Venda Rifa ativada com sucesso!");

@@ -53,6 +53,9 @@ const SettingsManager = () => {
     stripe_secret_key: '',
     stripe_webhook_secret: '',
     stripe_enabled: false,
+    stripe_pass_fees_to_customer: false,
+    stripe_fee_percentage: 3.99,
+    stripe_fee_fixed: 0.39,
   });
   const [isSaving, setIsSaving] = useState(false);
   const [justSaved, setJustSaved] = useState(false);
@@ -90,6 +93,9 @@ const SettingsManager = () => {
         stripe_secret_key: gameSettings.stripe_secret_key || '',
         stripe_webhook_secret: gameSettings.stripe_webhook_secret || '',
         stripe_enabled: gameSettings.stripe_enabled === true,
+        stripe_pass_fees_to_customer: gameSettings.stripe_pass_fees_to_customer === true,
+        stripe_fee_percentage: gameSettings.stripe_fee_percentage ?? 3.99,
+        stripe_fee_fixed: gameSettings.stripe_fee_fixed ?? 0.39,
       });
     }
   }, [gameSettings]);
@@ -120,7 +126,7 @@ const SettingsManager = () => {
     try {
         const success = await updateGameSettings({ [name]: checked });
         if (success) {
-            toast.success(`${name === 'stripe_enabled' ? 'Stripe' : 'Motor'} ${checked ? 'ativado' : 'desativado'}!`);
+            toast.success(`${name.includes('stripe') ? 'Stripe' : 'Motor'} ${checked ? 'ativado' : 'desativado'}!`);
             // Se ativou o motor, força uma execução imediata
             if (name === 'auto_engine_enabled' && checked) {
                 await supabase.functions.invoke('auto-match-engine', { body: { force: true } });
@@ -156,6 +162,8 @@ const SettingsManager = () => {
       desconto_vendedor_global: Number(currentSettings.desconto_vendedor_global),
       comissao_vendedor_global: Number(currentSettings.comissao_vendedor_global),
       cartelas_por_folha_bingo: parseInt(currentSettings.cartelas_por_folha_bingo as any, 10),
+      stripe_fee_percentage: Number(currentSettings.stripe_fee_percentage),
+      stripe_fee_fixed: Number(currentSettings.stripe_fee_fixed),
     });
     
     setIsSaving(false);
@@ -243,19 +251,6 @@ const SettingsManager = () => {
           </div>
         </div>
 
-        {/* PIX E CRÉDITOS */}
-        <div className="space-y-6 p-4 bg-muted/20 rounded-2xl border border-border/50">
-          <h3 className="font-heading font-bold text-primary flex items-center gap-2"><Banknote className="w-4 h-4" /> PIX e Créditos</h3>
-          <div className="space-y-4">
-            <div className="space-y-1.5"><Label className="text-xs">Chave PIX (Admin)</Label><Input name="pix_key" value={currentSettings.pix_key} onChange={handleSettingsChange} /></div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1.5"><Label className="text-xs">Nome Recebedor</Label><Input name="pix_name" value={currentSettings.pix_name} onChange={handleSettingsChange} /></div>
-              <div className="space-y-1.5"><Label className="text-xs">Cidade</Label><Input name="pix_city" value={currentSettings.pix_city} onChange={handleSettingsChange} /></div>
-            </div>
-            <div className="space-y-1.5"><Label className="text-xs">Texto de Instrução</Label><Textarea name="credit_request_text" value={currentSettings.credit_request_text} onChange={handleSettingsChange} rows={2} className="text-xs" /></div>
-          </div>
-        </div>
-
         {/* STRIPE */}
         <div className="space-y-6 p-4 bg-muted/20 rounded-2xl border border-border/50">
           <h3 className="font-heading font-bold text-primary flex items-center gap-2"><CreditCard className="w-4 h-4" /> Pagamentos Automáticos (Stripe)</h3>
@@ -263,10 +258,33 @@ const SettingsManager = () => {
             <div className="flex items-center justify-between p-3 bg-background rounded-xl border border-border/50">
               <div className="space-y-0.5">
                 <Label className="text-sm font-bold">Ativar Stripe</Label>
-                <p className="text-[10px] text-muted-foreground">Habilita pagamentos automáticos.</p>
+                <p className="text-[10px] text-muted-foreground">Habilita pagamentos via cartão.</p>
               </div>
               <Switch checked={currentSettings.stripe_enabled} onCheckedChange={(checked) => handleToggleChange('stripe_enabled', checked)} />
             </div>
+
+            <div className="space-y-3 p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl">
+               <div className="flex items-center justify-between mb-2">
+                 <div className="space-y-0.5">
+                   <Label className="text-sm font-bold text-amber-900 dark:text-amber-500">Repassar Taxas ao Cliente?</Label>
+                   <p className="text-[10px] text-amber-700/80">Calcula e embute a taxa no valor final.</p>
+                 </div>
+                 <Switch checked={currentSettings.stripe_pass_fees_to_customer} onCheckedChange={(checked) => handleToggleChange('stripe_pass_fees_to_customer', checked)} />
+               </div>
+               {currentSettings.stripe_pass_fees_to_customer && (
+                 <div className="grid grid-cols-2 gap-4 border-t border-amber-500/20 pt-3">
+                   <div className="space-y-1.5">
+                     <Label className="text-[10px] text-amber-800">Taxa Percentual (%)</Label>
+                     <Input name="stripe_fee_percentage" type="number" step="0.01" value={currentSettings.stripe_fee_percentage} onChange={handleSettingsChange} className="text-xs h-8 border-amber-300" />
+                   </div>
+                   <div className="space-y-1.5">
+                     <Label className="text-[10px] text-amber-800">Taxa Fixa (R$)</Label>
+                     <Input name="stripe_fee_fixed" type="number" step="0.01" value={currentSettings.stripe_fee_fixed} onChange={handleSettingsChange} className="text-xs h-8 border-amber-300" />
+                   </div>
+                 </div>
+               )}
+            </div>
+
             <div className="space-y-1.5"><Label className="text-xs">Stripe Secret Key</Label><Input name="stripe_secret_key" type="password" value={currentSettings.stripe_secret_key} onChange={handleSettingsChange} className="text-xs" /></div>
             <div className="space-y-1.5"><Label className="text-xs">Stripe Webhook Secret</Label><Input name="stripe_webhook_secret" type="password" value={currentSettings.stripe_webhook_secret} onChange={handleSettingsChange} className="text-xs" /></div>
             <p className="text-[9px] text-muted-foreground bg-background p-2 rounded border border-dashed overflow-hidden">
@@ -310,6 +328,19 @@ const SettingsManager = () => {
               {isTestingEngine ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Play className="w-4 h-4 mr-2" />}
               Testar Motor Agora
             </Button>
+          </div>
+        </div>
+        
+        {/* PIX E CRÉDITOS */}
+        <div className="space-y-6 p-4 bg-muted/20 rounded-2xl border border-border/50">
+          <h3 className="font-heading font-bold text-primary flex items-center gap-2"><Banknote className="w-4 h-4" /> PIX e Créditos</h3>
+          <div className="space-y-4">
+            <div className="space-y-1.5"><Label className="text-xs">Chave PIX (Admin)</Label><Input name="pix_key" value={currentSettings.pix_key} onChange={handleSettingsChange} /></div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5"><Label className="text-xs">Nome Recebedor</Label><Input name="pix_name" value={currentSettings.pix_name} onChange={handleSettingsChange} /></div>
+              <div className="space-y-1.5"><Label className="text-xs">Cidade</Label><Input name="pix_city" value={currentSettings.pix_city} onChange={handleSettingsChange} /></div>
+            </div>
+            <div className="space-y-1.5"><Label className="text-xs">Texto de Instrução</Label><Textarea name="credit_request_text" value={currentSettings.credit_request_text} onChange={handleSettingsChange} rows={2} className="text-xs" /></div>
           </div>
         </div>
 

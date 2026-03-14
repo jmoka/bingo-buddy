@@ -21,7 +21,7 @@ serve(async (req) => {
 
     const { data: settings, error: settingsError } = await supabaseAdmin
       .from('configuracoes')
-      .select('stripe_secret_key')
+      .select('stripe_secret_key, stripe_pass_fees_to_customer, stripe_fee_percentage, stripe_fee_fixed')
       .eq('singleton', true)
       .single();
 
@@ -36,7 +36,6 @@ serve(async (req) => {
     const authHeader = req.headers.get('Authorization')
     let user = null;
 
-    // Tenta pegar o usuário se ele estiver logado, mas não bloqueia se for anônimo (para compras de cartela física)
     if (authHeader && authHeader !== 'Bearer null' && authHeader !== 'null') {
       try {
         const userSupabaseClient = createClient(
@@ -55,13 +54,27 @@ serve(async (req) => {
         throw new Error("Usuário não autenticado para compra de créditos.");
     }
 
-    console.log(`[create-stripe-session] Criando checkout - Tipo: ${type} | R$ ${amount}`);
+    // Calcula o valor final com as taxas do Stripe embutidas (se o Admin ativou a função)
+    let finalAmount = Number(amount);
+    if (settings.stripe_pass_fees_to_customer) {
+      const percentage = Number(settings.stripe_fee_percentage || 0);
+      const fixed = Number(settings.stripe_fee_fixed || 0);
+      // Fórmula para descobrir quanto cobrar para receber exatamente o "amount":
+      // Final = (Amount + Fixed) / (1 - Percentage/100)
+      finalAmount = (amount + fixed) / (1 - (percentage / 100));
+      
+      // Arredonda pra cima nos centavos para garantir que a taxa não coma 1 centavo
+      finalAmount = Math.ceil(finalAmount * 100) / 100;
+      
+      console.log(`[create-stripe-session] Valor original: R$${amount}. Repassando taxas. Novo valor: R$${finalAmount}`);
+    }
+
+    console.log(`[create-stripe-session] Criando checkout - Tipo: ${type} | R$ ${finalAmount}`);
 
     const origin = req.headers.get('origin') || 'http://localhost:5173';
     let success_url = `${origin}/?payment=success`;
     let cancel_url = `${origin}/?payment=cancel`;
     
-    // Se for validação de cartela, volta pra mesma tela mostrando que deu certo
     if ((type === 'venda_bingo' || type === 'venda_rifa') && metadata.codigo) {
         success_url = `${origin}/pagar-cartela?codigo=${metadata.codigo}&payment=success`;
         cancel_url = `${origin}/pagar-cartela?codigo=${metadata.codigo}`;
@@ -76,7 +89,7 @@ serve(async (req) => {
             product_data: {
               name: type === 'credits' ? 'Créditos Bingo Show' : 'Validação de Cartela (Bingo Show)',
             },
-            unit_amount: Math.round(amount * 100),
+            unit_amount: Math.round(finalAmount * 100),
           },
           quantity: 1,
         },
@@ -89,7 +102,8 @@ serve(async (req) => {
       metadata: {
         ...metadata,
         user_id: user?.id || 'anonymous',
-        payment_type: type
+        payment_type: type,
+        original_amount: amount // Guarda o valor original para o webhook usar!
       },
     })
 

@@ -107,6 +107,9 @@ export interface GameSettings {
   stripe_secret_key?: string;
   stripe_webhook_secret?: string;
   stripe_enabled: boolean;
+  stripe_pass_fees_to_customer: boolean;
+  stripe_fee_percentage: number;
+  stripe_fee_fixed: number;
 }
 
 export interface FolhaBingoFisico {
