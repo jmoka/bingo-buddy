@@ -138,16 +138,27 @@ export default function VendedorCartelas() {
             {bilhetes.map((b, idx) => {
               const pagarUrl = `${BASE_URL}/pagar-cartela?codigo=${b.codigoValidacao}`;
               const conferirUrl = `${BASE_URL}/validar-cartela?codigo=${b.codigoValidacao}`;
+              
               const isPendente = b.status_compra === 'pendente';
+              const isPago = b.status_compra === 'pago';
+              const isEmAnalise = b.status_compra === 'em_analise';
 
               return (
                 <div key={`${b.numero}-${idx}`} className="print:break-inside-avoid">
                   <div className="bg-white rounded-xl overflow-hidden shadow border border-gray-200 print:shadow-none print:border print:border-gray-400 print:rounded-none flex min-w-0 h-[200px] relative">
                     
-                    {!isPendente && (
+                    {isPago && (
                       <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20 overflow-hidden">
                         <p className="text-6xl font-black text-green-600/15 border-8 border-green-600/15 p-4 rounded-xl rotate-[-25deg] uppercase tracking-tighter whitespace-nowrap">
                           JÁ FOI PAGO
+                        </p>
+                      </div>
+                    )}
+                    
+                    {isEmAnalise && (
+                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20 overflow-hidden">
+                        <p className="text-5xl font-black text-blue-600/20 border-8 border-blue-600/20 p-4 rounded-xl rotate-[-25deg] uppercase tracking-tighter whitespace-nowrap">
+                          EM ANÁLISE
                         </p>
                       </div>
                     )}
@@ -168,10 +179,10 @@ export default function VendedorCartelas() {
                           <div className="flex gap-2 shrink-0">
                             <div className={cn(
                                 "text-center flex flex-col items-center border rounded p-1 min-w-[65px] shadow-sm",
-                                !isPendente ? "border-gray-200 bg-gray-50 opacity-50" : "border-emerald-600 bg-emerald-50"
+                                isPago ? "border-gray-200 bg-gray-50 opacity-50" : isEmAnalise ? "border-blue-200 bg-blue-50" : "border-emerald-600 bg-emerald-50"
                             )}>
-                              <p className="text-[5px] font-black text-emerald-700 flex items-center gap-0.5 mb-0.5 uppercase">
-                                <Smartphone className="w-2 h-2" /> {!isPendente ? 'PAGO' : 'PAGAR'}
+                              <p className={cn("text-[5px] font-black flex items-center gap-0.5 mb-0.5 uppercase", isPago ? "text-gray-500" : isEmAnalise ? "text-blue-700" : "text-emerald-700")}>
+                                <Smartphone className="w-2 h-2" /> {isPago ? 'PAGO' : isEmAnalise ? 'ANÁLISE' : 'PAGAR'}
                               </p>
                               <div className="p-0.5 bg-white rounded shadow-sm">
                                 <QRCodeSVG value={pagarUrl} size={35} />
@@ -235,10 +246,10 @@ export default function VendedorCartelas() {
                       <div className="flex gap-2 mb-3">
                         <div className={cn(
                             "text-center flex flex-col items-center border rounded p-1 flex-1 shadow-sm",
-                            !isPendente ? "border-gray-200 bg-gray-50 opacity-50" : "border-emerald-600 bg-emerald-50"
+                            isPago ? "border-gray-200 bg-gray-50 opacity-50" : isEmAnalise ? "border-blue-200 bg-blue-50" : "border-emerald-600 bg-emerald-50"
                         )}>
-                          <p className="text-[6px] font-black text-emerald-700 flex items-center gap-0.5 mb-0.5 uppercase">
-                            <Smartphone className="w-2 h-2" /> {!isPendente ? 'PAGO' : 'PAGAR'}
+                          <p className={cn("text-[6px] font-black flex items-center gap-0.5 mb-0.5 uppercase", isPago ? "text-gray-500" : isEmAnalise ? "text-blue-700" : "text-emerald-700")}>
+                            <Smartphone className="w-2 h-2" /> {isPago ? 'PAGO' : isEmAnalise ? 'ANÁLISE' : 'PAGAR'}
                           </p>
                           <div className="p-0.5 bg-white rounded shadow-sm">
                             <QRCodeSVG value={pagarUrl} size={42} />

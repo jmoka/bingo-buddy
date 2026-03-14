@@ -43,8 +43,8 @@ const VendedoresAdmin = () => {
   const pendentes = solicitacoesVendedor.filter(s => s.status === 'pendente');
   const acertosParaAnalisar = acertosPendentes.filter(a => a.status === 'pendente' || a.status === 'em_analise');
 
-  // Vendas de Clientes (PIX Direto)
-  const pagamentosClientesBingo = todasFolhasBingo.filter(f => f.status === 'em_analise' && f.comprovante_url).map(f => ({
+  // Vendas de Clientes (PIX Direto) - Removido o filtro && f.comprovante_url para mostrar os itens mesmo que a imagem falhe
+  const pagamentosClientesBingo = todasFolhasBingo.filter(f => f.status === 'em_analise').map(f => ({
     id: f.id,
     created_at: f.created_at,
     isBingo: true,
@@ -59,7 +59,7 @@ const VendedoresAdmin = () => {
     comprovante_url: f.comprovante_url
   }));
 
-  const pagamentosClientesRifa = todasCompras.filter(c => c.status === 'em_analise' && c.comprovante_url).map(c => {
+  const pagamentosClientesRifa = todasCompras.filter(c => c.status === 'em_analise').map(c => {
     const cartela = c.cartelas_rifa?.[0];
     return {
       id: c.id,
@@ -148,7 +148,11 @@ const VendedoresAdmin = () => {
     if (ok) setEditandoVendedor(null);
   };
 
-  const handleViewComprovante = async (path: string, isPublic: boolean = false) => {
+  const handleViewComprovante = async (path: string | null, isPublic: boolean = false) => {
+    if (!path) {
+        toast.error('Nenhum comprovante de imagem foi anexado a esta transação.');
+        return;
+    }
     if (isPublic) {
         setComprovanteUrl(path);
         return;
@@ -191,7 +195,7 @@ const VendedoresAdmin = () => {
         </div>
       </div>
 
-      <Tabs defaultValue="vendedores">
+      <Tabs defaultValue="clientes">
         <TabsList className="grid w-full grid-cols-4 h-auto p-1">
           <TabsTrigger value="vendedores" className="py-3">Vendedores</TabsTrigger>
           <TabsTrigger value="solicitacoes" className="relative py-3">Inscrições {pendentes.length > 0 && <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-amber-500 text-[9px] font-bold text-white">{pendentes.length}</span>}</TabsTrigger>

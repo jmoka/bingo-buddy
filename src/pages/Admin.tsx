@@ -15,7 +15,7 @@ const Admin = () => {
   const navigate = useNavigate();
   const { profile } = useAuth();
   const { allCreditRequests, allRedeemRequests, players, gameSettings } = useGame();
-  const { solicitacoesVendedor, todasFolhasBingo, acertosPendentes } = useRifaAdmin();
+  const { solicitacoesVendedor, todasFolhasBingo, todasCompras, acertosPendentes } = useRifaAdmin();
 
   useEffect(() => {
     if (profile && profile.role !== 'admin') {
@@ -43,7 +43,7 @@ const Admin = () => {
   
   // Vendedores
   const pendingVendedoresCount = solicitacoesVendedor.filter(s => s.status === 'pendente').length;
-  const pendingPixClientesCount = todasFolhasBingo.filter(f => f.status === 'em_analise').length;
+  const pendingPixClientesCount = todasFolhasBingo.filter(f => f.status === 'em_analise').length + todasCompras.filter(c => c.status === 'em_analise').length;
   const totalVendedoresPendencies = pendingVendedoresCount + pendingPixClientesCount;
 
   return (
@@ -59,7 +59,7 @@ const Admin = () => {
             <SmartphoneNfc className="w-8 h-8" />
             <div>
               <p className="font-bold">Atenção: Pagamento de Cliente via PIX</p>
-              <p className="text-xs">Existem {pendingPixClientesCount} comprovante(s) enviado(s) por clientes de bingo físico para você conferir.</p>
+              <p className="text-xs">Existem {pendingPixClientesCount} comprovante(s) enviado(s) por clientes para você conferir.</p>
             </div>
           </div>
           <p className="text-[10px] font-black uppercase bg-blue-600 text-white px-2 py-1 rounded">Confira na aba Vendas</p>
