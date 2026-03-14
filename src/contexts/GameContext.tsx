@@ -71,9 +71,16 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'solicitacoes_credito' }, () => {
         queryClient.invalidateQueries({ queryKey: ['creditRequests'] });
+        queryClient.invalidateQueries({ queryKey: ['rawCreditRequests'] });
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'configuracoes' }, () => {
         queryClient.invalidateQueries({ queryKey: ['gameSettings'] });
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'vendas_bingo_fisico' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['todasFolhasBingoAdmin'] });
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'compras_rifa' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['todasComprasRifa'] });
       })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
