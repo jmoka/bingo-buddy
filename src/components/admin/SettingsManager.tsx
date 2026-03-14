@@ -76,7 +76,7 @@ const SettingsManager = () => {
         pix_name: gameSettings.pix_name || 'BINGO SHOW',
         pix_city: gameSettings.pix_city || 'SAO PAULO',
         credit_request_text: gameSettings.credit_request_text || '',
-        auto_engine_enabled: !!gameSettings.auto_engine_enabled,
+        auto_engine_enabled: gameSettings.auto_engine_enabled === true,
         auto_engine_interval_mins: gameSettings.auto_engine_interval_mins || 60,
         auto_engine_matches_per_day: gameSettings.auto_engine_matches_per_day || 24,
         auto_engine_game_type: gameSettings.auto_engine_game_type || 'full',
@@ -89,7 +89,7 @@ const SettingsManager = () => {
         cartelas_por_folha_bingo: gameSettings.cartelas_por_folha_bingo || 4,
         stripe_secret_key: gameSettings.stripe_secret_key || '',
         stripe_webhook_secret: gameSettings.stripe_webhook_secret || '',
-        stripe_enabled: !!gameSettings.stripe_enabled,
+        stripe_enabled: gameSettings.stripe_enabled === true,
       });
     }
   }, [gameSettings]);
@@ -114,15 +114,19 @@ const SettingsManager = () => {
   };
 
   const handleToggleChange = async (name: string, checked: boolean) => {
+    // Atualiza o estado local imediatamente para feedback visual
     setCurrentSettings(prev => ({ ...prev, [name]: checked }));
+    
     try {
         const success = await updateGameSettings({ [name]: checked });
         if (success) {
             toast.success(`${name === 'stripe_enabled' ? 'Stripe' : 'Motor'} ${checked ? 'ativado' : 'desativado'}!`);
+            // Se ativou o motor, força uma execução imediata
             if (name === 'auto_engine_enabled' && checked) {
                 await supabase.functions.invoke('auto-match-engine', { body: { force: true } });
             }
         } else {
+            // Reverte se falhar
             setCurrentSettings(prev => ({ ...prev, [name]: !checked }));
         }
     } catch (e) {
@@ -364,7 +368,7 @@ const SettingsManager = () => {
 
       <div className="mt-10 flex justify-center sm:justify-end">
         <Button onClick={handleSaveSettings} size="lg" className="w-full sm:w-auto gradient-primary h-14 px-10 text-lg font-bold shadow-button" disabled={isSaving || justSaved}>
-          {isSaving ? <Loader2 className="w-5 h-5 mr-2 animate-spin" /> : justSaved ? <Check className="w-5 h-5 mr-2" /> : <Save className="w-5 h-5 mr-2" />}
+          {isSaving ? <Loader2 className="w-5 h-5 mr-2 animate-spin" /> : justSaved ? <Check className="w-5 h-5 mr-2" /> : <Save className="w-4 h-4 mr-2" />}
           {isSaving ? 'Salvando...' : justSaved ? 'Salvo!' : 'Salvar Todas as Alterações'}
         </Button>
       </div>
