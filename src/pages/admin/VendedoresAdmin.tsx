@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
-import { Loader2, CheckCircle2, XCircle, Users, Copy, ShieldBan, ShieldCheck, Edit, Wallet, HandCoins, AlertTriangle, Eye, ExternalLink, Grid3X3, SmartphoneNfc } from 'lucide-react';
+import { Loader2, CheckCircle2, XCircle, Users, Copy, ShieldBan, ShieldCheck, Edit, Wallet, HandCoins, AlertTriangle, Eye, ExternalLink, Grid3X3, SmartphoneNfc, Ticket } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { AcertoVendedor } from '@/types/rifa';
@@ -21,6 +21,7 @@ const VendedoresAdmin = () => {
     vendedoresComStats,
     acertosPendentes,
     todasFolhasBingo,
+    todasCompras,
     isLoadingSolicitacoes,
     atualizarVendedor,
     salvarEdicaoCompletaVendedor,
@@ -42,23 +43,64 @@ const VendedoresAdmin = () => {
   const pendentes = solicitacoesVendedor.filter(s => s.status === 'pendente');
   const acertosParaAnalisar = acertosPendentes.filter(a => a.status === 'pendente' || a.status === 'em_analise');
 
-  // Novas Vendas (PIX Direto do Cliente)
-  const pagamentosClientes = todasFolhasBingo.filter(f => f.status === 'em_analise' && f.comprovante_url);
+  // Vendas de Clientes (PIX Direto)
+  const pagamentosClientesBingo = todasFolhasBingo.filter(f => f.status === 'em_analise' && f.comprovante_url).map(f => ({
+    id: f.id,
+    created_at: f.created_at,
+    isBingo: true,
+    displayNome: f.nome_comprador,
+    displayTelefone: f.telefone_comprador,
+    displayEndereco: f.endereco_comprador,
+    displayJogo: f.partidas?.name,
+    displayCodigo: f.codigo_validacao,
+    displayVendedor: f.vendedores_rifa?.nome,
+    displayValor: f.valor_pago,
+    displayDesconto: f.desconto_aplicado,
+    comprovante_url: f.comprovante_url
+  }));
+
+  const pagamentosClientesRifa = todasCompras.filter(c => c.status === 'em_analise' && c.comprovante_url).map(c => {
+    const cartela = c.cartelas_rifa?.[0];
+    return {
+      id: c.id,
+      created_at: c.created_at,
+      isBingo: false,
+      displayNome: cartela?.numeros_rifa?.nome_comprador || 'Comprador',
+      displayTelefone: cartela?.numeros_rifa?.telefone_comprador,
+      displayEndereco: cartela?.numeros_rifa?.endereco_comprador,
+      displayJogo: c.rifas?.nome,
+      displayCodigo: cartela?.codigo_validacao,
+      displayVendedor: c.vendedores_rifa?.nome,
+      displayValor: c.valor_total,
+      displayDesconto: c.desconto_aplicado,
+      comprovante_url: c.comprovante_url
+    };
+  });
+
+  const pagamentosClientes = [...pagamentosClientesBingo, ...pagamentosClientesRifa].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  
   const [isProcessandoPagCliente, setIsProcessandoPagCliente] = useState(false);
 
-  const handleResolverPagamentoCliente = async (vendaId: string, aprovar: boolean) => {
+  const handleResolverPagamentoCliente = async (vendaId: string, aprovar: boolean, isBingo: boolean) => {
     setIsProcessandoPagCliente(true);
-    const fnName = aprovar ? 'aprovar_pagamento_cliente_bingo' : 'rejeitar_pagamento_cliente_bingo';
+    let fnName = '';
+    if (isBingo) {
+      fnName = aprovar ? 'aprovar_pagamento_cliente_bingo' : 'rejeitar_pagamento_cliente_bingo';
+    } else {
+      fnName = aprovar ? 'aprovar_pagamento_cliente_rifa' : 'rejeitar_pagamento_cliente_rifa';
+    }
+    
     const { data, error } = await supabase.rpc(fnName, { p_venda_id: vendaId });
     setIsProcessandoPagCliente(false);
 
     if (error || !data?.success) {
-      toast.error('Erro ao processar o pagamento direto do cliente.');
+      toast.error(`Erro ao processar o pagamento direto do cliente: ${data?.error || error?.message}`);
       return;
     }
     
     toast.success(aprovar ? 'Comprovante do cliente aprovado! Comissão do vendedor gerada.' : 'Comprovante rejeitado.');
     queryClient.invalidateQueries({ queryKey: ['todasFolhasBingoAdmin'] });
+    queryClient.invalidateQueries({ queryKey: ['todasComprasRifa'] });
     queryClient.invalidateQueries({ queryKey: ['vendedoresComStats'] });
   };
 
@@ -200,16 +242,23 @@ const VendedoresAdmin = () => {
              {pagamentosClientes.length === 0 ? (
                 <div className="card-container text-center py-10 text-muted-foreground text-sm border-dashed">Nenhum pagamento direto pendente.</div>
              ) : (
-               pagamentosClientes.map(venda => {
-                 const valorCheio = Number(venda.valor_pago) / (1 - (Number(venda.desconto_aplicado || 0) / 100));
+               pagamentosClientes.map((venda: any) => {
+                 const valorCheio = Number(venda.displayValor) / (1 - (Number(venda.displayDesconto || 0) / 100));
                  return (
                    <div key={venda.id} className="card-container p-4 border-l-4 border-l-blue-500 flex flex-col gap-3">
                      <div className="flex items-start justify-between">
                        <div>
-                         <p className="font-bold text-sm text-foreground">{venda.nome_comprador}</p>
+                         <p className="font-bold text-sm text-foreground flex items-center gap-2">
+                           {venda.displayNome}
+                           {venda.isBingo ? (
+                             <Badge variant="outline" className="text-[9px] text-purple-600 border-purple-300 bg-purple-50"><Grid3X3 className="w-3 h-3 mr-1"/> Bingo</Badge>
+                           ) : (
+                             <Badge variant="outline" className="text-[9px] text-blue-600 border-blue-300 bg-blue-50"><Ticket className="w-3 h-3 mr-1"/> Rifa</Badge>
+                           )}
+                         </p>
                          <p className="text-xs text-muted-foreground">
-                           {venda.telefone_comprador || 'Sem telefone'} 
-                           {venda.endereco_comprador ? ` • ${venda.endereco_comprador}` : ''}
+                           {venda.displayTelefone || 'Sem telefone'} 
+                           {venda.displayEndereco ? ` • ${venda.displayEndereco}` : ''}
                          </p>
                        </div>
                        <div className="text-right shrink-0">
@@ -219,10 +268,13 @@ const VendedoresAdmin = () => {
                      </div>
                      
                      <div className="bg-muted/50 p-2.5 rounded-lg border border-border/50 text-xs">
-                        <p className="font-bold flex items-center gap-1.5 mb-1"><Grid3X3 className="w-3.5 h-3.5" /> {venda.partidas?.name}</p>
+                        <p className="font-bold flex items-center gap-1.5 mb-1 text-muted-foreground">
+                          {venda.isBingo ? <Grid3X3 className="w-3.5 h-3.5" /> : <Ticket className="w-3.5 h-3.5" />} 
+                          {venda.displayJogo}
+                        </p>
                         <div className="flex justify-between">
-                           <span className="font-mono text-primary font-bold">Cód: {venda.codigo_validacao}</span>
-                           <span className="text-muted-foreground">Vendedor: {venda.vendedores_rifa?.nome}</span>
+                           <span className="font-mono text-primary font-bold">Cód: {venda.displayCodigo}</span>
+                           <span className="text-muted-foreground">Vendedor: {venda.displayVendedor || 'Desconhecido'}</span>
                         </div>
                      </div>
 
@@ -231,8 +283,8 @@ const VendedoresAdmin = () => {
                           <Eye className="w-4 h-4 mr-2" /> Comprovante
                         </Button>
                         <div className="flex gap-2">
-                          <Button size="icon" variant="destructive" className="h-9 w-9" onClick={() => handleResolverPagamentoCliente(venda.id, false)} disabled={isProcessandoPagCliente}><XCircle className="w-4 h-4" /></Button>
-                          <Button size="icon" className="h-9 w-9 bg-green-600 hover:bg-green-700" onClick={() => handleResolverPagamentoCliente(venda.id, true)} disabled={isProcessandoPagCliente}><CheckCircle2 className="w-4 h-4" /></Button>
+                          <Button size="icon" variant="destructive" className="h-9 w-9" onClick={() => handleResolverPagamentoCliente(venda.id, false, venda.isBingo)} disabled={isProcessandoPagCliente}><XCircle className="w-4 h-4" /></Button>
+                          <Button size="icon" className="h-9 w-9 bg-green-600 hover:bg-green-700" onClick={() => handleResolverPagamentoCliente(venda.id, true, venda.isBingo)} disabled={isProcessandoPagCliente}><CheckCircle2 className="w-4 h-4" /></Button>
                         </div>
                      </div>
                    </div>

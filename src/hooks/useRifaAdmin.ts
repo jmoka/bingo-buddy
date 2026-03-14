@@ -54,7 +54,7 @@ export const useRifaAdmin = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('compras_rifa')
-        .select('*, rifas(nome), cartelas_rifa(codigo_validacao)')
+        .select('*, rifas(nome), cartelas_rifa(codigo_validacao, numeros_rifa(nome_comprador, telefone_comprador, endereco_comprador)), vendedores_rifa(nome)')
         .order('created_at', { ascending: false });
       if (error) throw error;
       return data as any[];
