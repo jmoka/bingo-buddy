@@ -9,7 +9,7 @@ export type NumeroRifaVendedor = NumeroRifa & {
   cartelas_rifa: { 
     codigo_validacao: string; 
     compra_id: string;
-    compras_rifa: { status: string; valor_total: number };
+    compras_rifa: { status: string; valor_total: number; tipo_pagamento: string };
   }[]; 
 };
 
@@ -40,7 +40,7 @@ export const useVendedor = () => {
       if (!meuVendedor) return [];
       const { data, error } = await supabase
         .from('numeros_rifa')
-        .select('*, rifas(id, nome, custo_por_numero, status), cartelas_rifa(codigo_validacao, compra_id, compras_rifa(status, valor_total))')
+        .select('*, rifas(id, nome, custo_por_numero, status), cartelas_rifa(codigo_validacao, compra_id, compras_rifa(status, valor_total, tipo_pagamento))')
         .eq('vendedor_id', meuVendedor.id)
         .in('status', ['reservado', 'vendido'])
         .order('rifa_id');

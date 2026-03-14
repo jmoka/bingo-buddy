@@ -17,7 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import {
   ArrowLeft, Loader2, Copy, Link2, CheckSquare, ShoppingBag, UserCheck, Ticket,
   Printer, Plus, Undo2, Grid3X3, DollarSign, Wallet, Upload, CheckCircle2, XCircle,
-  BadgePercent, ListChecks, AlertTriangle, WalletCards, Filter
+  BadgePercent, ListChecks, AlertTriangle, WalletCards, Filter, User
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -52,7 +52,9 @@ const VendedorPainel = () => {
 
   const [cancelarNumero, setCancelarNumero] = useState<NumeroRifaVendedor | null>(null);
   const [isCancelando, setIsCancelando] = useState(false);
-  const [filtroStatus, setFiltroStatus] = useState<'todas' | 'ativa' | 'finalizada'>('todas');
+
+  // Novo Estado do Modal de Detalhes
+  const [detalhesNumero, setDetalhesNumero] = useState<NumeroRifaVendedor | null>(null);
 
   const [comprarBingoOpen, setComprarBingoOpen] = useState(false);
   const [selectedBingoMatch, setSelectedBingoMatch] = useState('');
@@ -520,7 +522,6 @@ const VendedorPainel = () => {
                         {numeros.map(n => {
                           const isSelected = selectedToValidate.has(n.id);
                           const statusCompra = n.cartelas_rifa?.[0]?.compras_rifa?.status;
-                          const codigoValidacao = n.cartelas_rifa?.[0]?.codigo_validacao;
                           
                           const isPago = statusCompra === 'pago';
                           const isPendente = statusCompra === 'pendente';
@@ -528,26 +529,28 @@ const VendedorPainel = () => {
                           
                           const temNome = !!n.nome_comprador?.trim();
                           
-                          // Lógica visual corrigida
                           const isPagoSemNome = (n.status === 'reservado' || n.status === 'vendido') && isPago && !temNome;
                           const isTotalmenteFinalizado = n.status === 'vendido' || (n.status === 'reservado' && isPago && temNome);
 
                           let badgeText = 'PAGO';
-                          let badgeClass = 'bg-green-100 text-green-700 border-green-200';
+                          let badgeClass = 'text-green-700 bg-green-100';
 
                           if (isPendente) {
                             badgeText = 'FIADO';
-                            badgeClass = 'bg-red-100 text-red-700 border-red-200';
+                            badgeClass = 'text-red-700 bg-red-100';
                           } else if (isEmAnalise) {
                             badgeText = 'ANÁLISE';
-                            badgeClass = 'bg-amber-100 text-amber-700 border-amber-200';
+                            badgeClass = 'text-amber-700 bg-amber-100';
                           }
 
                           return (
                             <div key={n.id} className="relative group">
                                 <button
                                     onClick={() => {
-                                        if (isTotalmenteFinalizado) return; // Bloqueia clique se já está totalmente pronto
+                                        if (isTotalmenteFinalizado) {
+                                            if (!modoSelecao) setDetalhesNumero(n);
+                                            return;
+                                        }
                                         if (modoSelecao) {
                                             toggleValidar(n.id);
                                         } else {
@@ -557,12 +560,18 @@ const VendedorPainel = () => {
                                         }
                                     }}
                                     className={`w-full rounded-lg p-2 flex flex-col items-center justify-center gap-0.5 transition-all min-h-[85px] border 
-                                        ${isTotalmenteFinalizado ? 'bg-green-50/50 text-green-700 border-green-200 cursor-default opacity-80' : 
+                                        ${isTotalmenteFinalizado ? 'bg-green-50/50 text-green-700 border-green-200 opacity-90' : 
                                           isPagoSemNome ? 'bg-green-600 text-white border-green-700 shadow-inner hover:bg-green-700' :
                                           'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100 cursor-pointer'}
                                         ${modoSelecao && isSelected ? 'ring-2 ring-primary border-primary bg-primary/10 text-primary' : ''}
                                     `}
                                 >
+                                    {isTotalmenteFinalizado && (
+                                        <div className="absolute top-1 left-1.5 flex flex-col items-center">
+                                            <CheckCircle2 className="w-3.5 h-3.5 text-green-600" />
+                                        </div>
+                                    )}
+
                                     <span className={`text-2xl font-black font-heading leading-none ${isPagoSemNome ? 'text-white' : ''}`}>{n.numero}</span>
                                     
                                     {isPagoSemNome && (
@@ -571,22 +580,18 @@ const VendedorPainel = () => {
                                         </p>
                                     )}
 
-                                    {codigoValidacao && !isPagoSemNome && !isTotalmenteFinalizado && (
-                                        <span className="text-[9px] font-mono text-primary bg-primary/10 px-1.5 py-0.5 rounded mt-1 font-bold tracking-widest border border-primary/20">
-                                            {codigoValidacao}
+                                    {isTotalmenteFinalizado ? (
+                                        <span className="text-[7px] text-green-700/70 font-bold uppercase mt-1">
+                                            {n.cartelas_rifa?.[0]?.compras_rifa?.tipo_pagamento === 'creditos' ? 'Online' : 'Físico'}
                                         </span>
-                                    )}
-
-                                    {!isPagoSemNome && !isTotalmenteFinalizado && (
-                                        <span className={`text-[8px] px-1.5 py-0.5 rounded border mt-1.5 uppercase font-black tracking-wider w-full text-center ${badgeClass}`}>
+                                    ) : !isPagoSemNome ? (
+                                        <span className={`text-[8px] px-1.5 py-0.5 rounded border mt-1.5 uppercase font-black tracking-wider w-full text-center border-transparent ${badgeClass}`}>
                                           {badgeText}
                                         </span>
-                                    )}
-                                    
-                                    {isTotalmenteFinalizado && <CheckSquare className="w-4 h-4 absolute top-1.5 left-1.5 text-green-600 opacity-60" />}
+                                    ) : null}
                                 </button>
                                 {n.status === 'reservado' && !isPago && !modoSelecao && (
-                                    <button onClick={e => { e.stopPropagation(); setCancelarNumero(n); }} className="absolute -top-1 -right-1 opacity-0 group-hover:opacity-100 bg-red-500 text-white rounded-full p-1 shadow-md hover:bg-red-600 transition-colors">
+                                    <button onClick={e => { e.stopPropagation(); setCancelarNumero(n); }} className="absolute -top-1 -right-1 opacity-0 group-hover:opacity-100 bg-red-500 text-white rounded-full p-1 shadow-md hover:bg-red-600 transition-colors z-10">
                                         <Undo2 className="w-3 h-3" />
                                     </button>
                                 )}
@@ -893,6 +898,70 @@ const VendedorPainel = () => {
         </TabsContent>
       </Tabs>
 
+      {/* NOVO MODAL DE DETALHES DE NÚMERO FINALIZADO */}
+      <Dialog open={!!detalhesNumero} onOpenChange={(open) => !open && setDetalhesNumero(null)}>
+        <DialogContent>
+          <DialogHeader>
+             <DialogTitle className="flex items-center gap-2">
+               <Ticket className="w-5 h-5 text-primary" />
+               Detalhes da Cota {detalhesNumero?.numero}
+             </DialogTitle>
+          </DialogHeader>
+          {detalhesNumero && (
+             <div className="space-y-4">
+                <div className="p-3 bg-muted rounded-lg flex justify-between items-center">
+                    <div>
+                        <p className="text-[10px] uppercase font-bold text-muted-foreground">Status</p>
+                        <Badge className="bg-success text-white border-none mt-0.5">PAGO E HABILITADO</Badge>
+                    </div>
+                    <div className="text-right">
+                        <p className="text-[10px] uppercase font-bold text-muted-foreground">Código</p>
+                        <p className="font-mono font-bold text-primary">{detalhesNumero.cartelas_rifa?.[0]?.codigo_validacao}</p>
+                    </div>
+                </div>
+
+                <div className="space-y-3 border-t pt-3">
+                    <h3 className="text-sm font-bold flex items-center gap-2 text-foreground"><User className="w-4 h-4 text-muted-foreground" /> Dados do Comprador</h3>
+                    <div className="grid grid-cols-2 gap-3 text-sm">
+                        <div className="col-span-2">
+                            <p className="text-xs text-muted-foreground font-semibold">Nome</p>
+                            <p className="font-medium">{detalhesNumero.nome_comprador}</p>
+                        </div>
+                        <div>
+                            <p className="text-xs text-muted-foreground font-semibold">WhatsApp</p>
+                            <p className="font-medium">{detalhesNumero.telefone_comprador || 'Não informado'}</p>
+                        </div>
+                        <div>
+                            <p className="text-xs text-muted-foreground font-semibold">Endereço</p>
+                            <p className="font-medium">{detalhesNumero.endereco_comprador || 'Não informado'}</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="space-y-3 border-t pt-3">
+                    <h3 className="text-sm font-bold flex items-center gap-2 text-foreground"><WalletCards className="w-4 h-4 text-muted-foreground" /> Dados do Pagamento</h3>
+                    <div className="grid grid-cols-2 gap-3 text-sm">
+                        <div>
+                            <p className="text-xs text-muted-foreground font-semibold">Origem do Pagamento</p>
+                            <p className="font-medium capitalize">
+                                {detalhesNumero.cartelas_rifa?.[0]?.compras_rifa?.tipo_pagamento === 'creditos' ? 'App Online' : 'Vendedor Físico'}
+                            </p>
+                        </div>
+                        <div>
+                            <p className="text-xs text-muted-foreground font-semibold">Valor da Cota</p>
+                            <p className="font-medium">R$ {Number(detalhesNumero.rifas?.custo_por_numero || 0).toFixed(2)}</p>
+                        </div>
+                    </div>
+                </div>
+             </div>
+          )}
+          <DialogFooter>
+             <Button onClick={() => setDetalhesNumero(null)}>Fechar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* RESTANTE DOS MODAIS */}
       <Dialog open={comprarBingoOpen} onOpenChange={setComprarBingoOpen}>
         <DialogContent>
           <DialogHeader>
