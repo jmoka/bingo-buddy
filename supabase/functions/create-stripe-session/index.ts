@@ -48,7 +48,8 @@ serve(async (req) => {
     console.log(`[create-stripe-session] Criando checkout para ${user.email} - R$ ${amount}`);
 
     const session = await stripe.checkout.sessions.create({
-      payment_method_types: ['card'],
+      // Adicionamos 'pix' aqui na lista de métodos de pagamento!
+      payment_method_types: ['card', 'pix'],
       line_items: [
         {
           price_data: {
