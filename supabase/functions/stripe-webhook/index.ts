@@ -71,7 +71,7 @@ serve(async (req) => {
         await supabaseAdmin.from('stripe_payments').insert({ 
             stripe_session_id: session.id,
             user_id: userId === 'anonymous' ? null : userId,
-            amount: amountPaidByCustomer, // Salva o que foi efetivamente cobrado do cliente no banco
+            amount: amountPaidByCustomer,
             status: 'completed',
             payment_type: paymentType || 'unknown'
         });
@@ -81,8 +81,6 @@ serve(async (req) => {
           const creditsToGrant = Number(session.metadata?.credits_requested || originalAmount);
           
           await supabaseAdmin.rpc('increment_player_credits', { p_player_id: userId, p_amount: creditsToGrant });
-          
-          // O Admin só ganha de lucro o valor limpo (as taxas ficaram na Stripe)
           await supabaseAdmin.rpc('increment_admin_profit', { amount: originalAmount });
 
           const { data: historyData } = await supabaseAdmin.from('solicitacoes_credito').insert({
@@ -100,63 +98,35 @@ serve(async (req) => {
         // 4. SE FOR PAGAMENTO DE UMA CARTELA FÍSICA (PagarCartela)
         else if (paymentType === 'venda_bingo' || paymentType === 'venda_rifa') {
             const vendaId = session.metadata?.venda_id;
-            console.log(`[stripe-webhook] Aprovando venda/cartela ID: ${vendaId}`);
+            console.log(`[stripe-webhook] Aprovando financeiramente venda/cartela ID: ${vendaId}`);
             
             if (vendaId && paymentType === 'venda_bingo') {
                 const { data: venda } = await supabaseAdmin.from('vendas_bingo_fisico').select('*').eq('id', vendaId).single();
                 if (venda && venda.status !== 'pago') {
-                    const { data: vendedor } = await supabaseAdmin.from('vendedores_rifa').select('*').eq('id', venda.vendedor_id).single();
-                    const { data: cfg } = await supabaseAdmin.from('configuracoes').select('*').limit(1).single();
-                    
                     let precoTotal = Number(venda.valor_pago);
                     const desconto = Number(venda.desconto_aplicado || 0);
                     if (desconto < 100 && desconto > 0) precoTotal = precoTotal / (1 - (desconto / 100.0));
 
-                    // Ativa a cartela
+                    // Ativa a cartela apenas financeiramente
                     await supabaseAdmin.from('vendas_bingo_fisico').update({ status: 'pago' }).eq('id', vendaId);
                     
-                    // Alimenta o pote da partida
+                    // Alimenta o pote da partida e o caixa do admin
                     const { data: match } = await supabaseAdmin.from('partidas').select('pot').eq('id', venda.match_id).single();
                     if (match) await supabaseAdmin.from('partidas').update({ pot: Number(match.pot || 0) + precoTotal }).eq('id', venda.match_id);
-
-                    // O Caixa do Admin recebe o valor Original (já deduzindo as taxas do stripe)
                     await supabaseAdmin.rpc('increment_admin_profit', { amount: originalAmount });
                     
-                    // Paga a comissão do vendedor do Bingo
-                    const comissaoPerc = Number(vendedor?.comissao_percentual || cfg?.comissao_vendedor_global || 0);
-                    if (comissaoPerc > 0 && vendedor?.user_id) {
-                        const comissaoValor = precoTotal * (comissaoPerc / 100.0);
-                        await supabaseAdmin.rpc('increment_player_credits', { p_player_id: vendedor.user_id, p_amount: comissaoValor });
-                        // Deduz a comissão do Vendedor do Caixa do Admin
-                        await supabaseAdmin.rpc('increment_admin_profit', { amount: -comissaoValor });
-                    }
-                    console.log("[stripe-webhook] Venda Bingo ativada com sucesso!");
+                    console.log("[stripe-webhook] Venda Bingo ativada (Financeiro Ok). A comissão será paga apenas na validação dos dados.");
                 }
             } else if (vendaId && paymentType === 'venda_rifa') {
                 const { data: compra } = await supabaseAdmin.from('compras_rifa').select('*').eq('id', vendaId).single();
                 if (compra && compra.status !== 'pago') {
-                    // Ativa a cartela da rifa
+                    // Ativa a cartela da rifa apenas financeiramente
                     await supabaseAdmin.from('compras_rifa').update({ status: 'pago' }).eq('id', vendaId);
                     
-                    const { data: vendedor } = await supabaseAdmin.from('vendedores_rifa').select('*').eq('id', compra.vendedor_id).single();
-                    const { data: cfg } = await supabaseAdmin.from('configuracoes').select('*').limit(1).single();
-
-                    let precoTotal = Number(compra.valor_total);
-                    const desconto = Number(compra.desconto_aplicado || 0);
-                    if (desconto < 100 && desconto > 0) precoTotal = precoTotal / (1 - (desconto / 100.0));
-
-                    // Admin recebe o valor líquido (já sem taxas da Stripe)
+                    // Admin recebe o valor líquido
                     await supabaseAdmin.rpc('increment_admin_profit', { amount: originalAmount });
 
-                    // Paga a comissão do vendedor da Rifa
-                    const comissaoPerc = Number(vendedor?.comissao_percentual || cfg?.comissao_vendedor_global || 0);
-                    if (comissaoPerc > 0 && vendedor?.user_id) {
-                        const comissaoValor = precoTotal * (comissaoPerc / 100.0);
-                        await supabaseAdmin.rpc('increment_player_credits', { p_player_id: vendedor.user_id, p_amount: comissaoValor });
-                        // Deduz a comissão do lucro do admin
-                        await supabaseAdmin.rpc('increment_admin_profit', { amount: -comissaoValor });
-                    }
-                    console.log("[stripe-webhook] Venda Rifa ativada com sucesso!");
+                    console.log("[stripe-webhook] Venda Rifa ativada (Financeiro Ok). A comissão será paga apenas na validação dos dados.");
                 }
             }
         }

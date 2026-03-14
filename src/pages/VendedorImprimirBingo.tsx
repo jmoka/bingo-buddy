@@ -84,7 +84,6 @@ export default function VendedorImprimirBingo() {
                   </div>
                   
                   <div className="flex flex-row gap-2 sm:gap-4 shrink-0 items-start ml-auto sm:ml-0">
-                    {/* QR CODE 1: PAGAMENTO (Sempre visível para instrução) */}
                     <div className={cn(
                         "text-center flex flex-col items-center border rounded p-1.5 min-w-[90px] shadow-sm",
                         folha.status === 'pago' ? "border-gray-200 bg-gray-50 opacity-50" : "border-green-600 bg-green-50"
@@ -97,15 +96,14 @@ export default function VendedorImprimirBingo() {
                       {folha.status !== 'pago' && <p className="text-[8px] font-black text-green-900 mt-0.5">R$ {valorCheio.toFixed(2)}</p>}
                     </div>
 
-                    {/* QR CODE 2: CONFERÊNCIA (O que você perguntou) */}
                     <div className="text-center flex flex-col items-center border border-blue-200 bg-blue-50 rounded p-1.5 min-w-[90px] shadow-sm">
                       <p className="text-[7px] font-black text-blue-700 flex items-center gap-1 mb-0.5 uppercase">
-                        <Search className="w-2.5 h-2.5" /> CONFERIR BINGO
+                        <Search className="w-2.5 h-2.5" /> CONFERIR / VALIDAR
                       </p>
                       <div className="p-1 bg-white rounded shadow-sm border border-blue-100">
                         <QRCodeSVG value={conferirUrl} size={50} />
                       </div>
-                      <p className="text-[5px] font-bold text-blue-600 mt-0.5 uppercase">Veja se você ganhou</p>
+                      <p className="text-[5px] font-bold text-blue-600 mt-0.5 uppercase">Cadastre-se / Ganhe</p>
                     </div>
                   </div>
                 </div>

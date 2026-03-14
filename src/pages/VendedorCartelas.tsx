@@ -144,7 +144,6 @@ export default function VendedorCartelas() {
                 <div key={`${b.numero}-${idx}`} className="print:break-inside-avoid">
                   <div className="bg-white rounded-xl overflow-hidden shadow border border-gray-200 print:shadow-none print:border print:border-gray-400 print:rounded-none flex min-w-0 h-[200px] relative">
                     
-                    {/* CARIMBO JÁ FOI PAGO (CENTRALIZADO) */}
                     {!isPendente && (
                       <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20 overflow-hidden">
                         <p className="text-6xl font-black text-green-600/15 border-8 border-green-600/15 p-4 rounded-xl rotate-[-25deg] uppercase tracking-tighter whitespace-nowrap">
@@ -153,15 +152,12 @@ export default function VendedorCartelas() {
                       </div>
                     )}
 
-                    {/* CANHOTO DO CLIENTE (MAIOR) */}
                     <div className="flex-1 flex min-w-0">
-                      {/* Faixa Lateral */}
                       <div className="bg-emerald-600 flex flex-col items-center justify-center px-3 shrink-0 text-white">
                         <p className="text-[8px] uppercase font-bold rotate-180 [writing-mode:vertical-lr]">BILHETE OFICIAL</p>
                         <p className="text-2xl font-black font-mono mt-2">{String(b.numero).padStart(3, '0')}</p>
                       </div>
 
-                      {/* Conteúdo Cliente */}
                       <div className="flex-1 p-4 flex flex-col justify-between min-w-0">
                         <div className="flex justify-between items-start gap-2">
                           <div className="min-w-0">
@@ -169,7 +165,6 @@ export default function VendedorCartelas() {
                             <p className="text-[10px] text-gray-500 font-bold mt-0.5">CÓDIGO: <span className="text-gray-800 font-mono">{b.codigoValidacao}</span></p>
                           </div>
                           
-                          {/* QR CODES NO CANHOTO MAIOR */}
                           <div className="flex gap-2 shrink-0">
                             <div className={cn(
                                 "text-center flex flex-col items-center border rounded p-1 min-w-[65px] shadow-sm",
@@ -185,7 +180,7 @@ export default function VendedorCartelas() {
 
                             <div className="text-center flex flex-col items-center border border-blue-200 bg-blue-50 rounded p-1 min-w-[65px] shadow-sm">
                               <p className="text-[5px] font-black text-blue-700 flex items-center gap-0.5 mb-0.5 uppercase">
-                                <Search className="w-2 h-2" /> CONFERIR
+                                <Search className="w-2 h-2" /> CONFERIR / VALIDAR
                               </p>
                               <div className="p-0.5 bg-white rounded shadow-sm border border-blue-100">
                                 <QRCodeSVG value={conferirUrl} size={35} />
@@ -220,21 +215,15 @@ export default function VendedorCartelas() {
                             <p className="text-[10px] font-bold text-gray-700 truncate">{b.vendedor?.nome}</p>
                             <p className="text-[8px] text-gray-500">Ref: {b.vendedor?.codigo_ref}</p>
                           </div>
-                          <div className="text-right">
-                             <p className="text-[7px] text-gray-400 uppercase font-bold">Cadastre-se e Jogue</p>
-                             <p className="text-[9px] font-mono text-emerald-600 font-bold truncate">{BASE_URL.replace('https://', '')}</p>
-                          </div>
                         </div>
                       </div>
                     </div>
 
-                    {/* LINHA DE CORTE */}
                     <div className="w-0 border-l-2 border-dashed border-gray-300 relative">
                       <div className="absolute -top-2 -left-2 w-4 h-4 bg-gray-100 rounded-full border border-gray-300 print:bg-white" />
                       <div className="absolute -bottom-2 -left-2 w-4 h-4 bg-gray-100 rounded-full border border-gray-300 print:bg-white" />
                     </div>
 
-                    {/* CANHOTO DO VENDEDOR (MENOR) */}
                     <div className="w-[240px] bg-gray-50/50 p-3 flex flex-col shrink-0">
                       <div className="flex justify-between items-start mb-2">
                         <p className="text-[8px] font-black text-gray-400 uppercase pt-1">Canhoto Vendedor</p>
@@ -243,7 +232,6 @@ export default function VendedorCartelas() {
                         </div>
                       </div>
 
-                      {/* QR CODES DE PAGAMENTO E CONFERÊNCIA */}
                       <div className="flex gap-2 mb-3">
                         <div className={cn(
                             "text-center flex flex-col items-center border rounded p-1 flex-1 shadow-sm",
@@ -260,16 +248,14 @@ export default function VendedorCartelas() {
 
                         <div className="text-center flex flex-col items-center border border-blue-200 bg-blue-50 rounded p-1 flex-1 shadow-sm">
                           <p className="text-[6px] font-black text-blue-700 flex items-center gap-0.5 mb-0.5 uppercase">
-                            <Search className="w-2 h-2" /> CONFERIR
+                            <Search className="w-2 h-2" /> CONFERIR / VALIDAR
                           </p>
                           <div className="p-0.5 bg-white rounded shadow-sm border border-blue-100">
                             <QRCodeSVG value={conferirUrl} size={42} />
                           </div>
-                          <p className="text-[5px] font-bold text-blue-600 mt-0.5 uppercase">Ver Ganhador</p>
                         </div>
                       </div>
 
-                      {/* Campos para preencher */}
                       <div className="space-y-1.5 flex-1">
                         <div className="border-b border-gray-300 pb-0.5">
                           <p className="text-[7px] text-gray-400 uppercase font-bold">Nome Comprador</p>
@@ -280,10 +266,6 @@ export default function VendedorCartelas() {
                           <div className="h-2.5" />
                         </div>
                       </div>
-
-                      <div className="mt-auto pt-1 border-t border-gray-200">
-                        <p className="text-[7px] text-gray-400 uppercase font-bold truncate">{b.rifa?.nome}</p>
-                      </div>
                     </div>
 
                   </div>
@@ -293,7 +275,6 @@ export default function VendedorCartelas() {
           </div>
         )}
       </div>
-
       <style>{`
         @media print {
           @page { size: A4; margin: 10mm; }

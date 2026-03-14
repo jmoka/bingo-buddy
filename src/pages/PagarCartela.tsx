@@ -21,14 +21,6 @@ export default function PagarCartela() {
   const [loading, setLoading] = useState(true);
   const [isStripeLoading, setIsStripeLoading] = useState(false);
 
-  // Alerta de sucesso se voltar do Stripe
-  useEffect(() => {
-    if (paymentStatus === 'success') {
-      toast.success("Pagamento aprovado com sucesso! Sua cartela está válida.");
-      window.history.replaceState({}, document.title, window.location.pathname + "?codigo=" + codigo);
-    }
-  }, [paymentStatus, codigo]);
-
   useEffect(() => {
     async function loadData() {
       if (!codigo) {
@@ -47,8 +39,6 @@ export default function PagarCartela() {
         .eq('codigo_validacao', codigo.toUpperCase().trim())
         .maybeSingle();
 
-      if (errBingo) console.error("Erro na busca do bingo:", errBingo);
-
       if (resBingo) {
         setVenda(resBingo);
         setTipoVenda('bingo');
@@ -62,8 +52,6 @@ export default function PagarCartela() {
         .select('*, compras_rifa(*, rifas(nome))')
         .eq('codigo_validacao', codigo.toUpperCase().trim())
         .maybeSingle();
-
-      if (errRifa) console.error("Erro na busca da rifa:", errRifa);
 
       if (resRifa && resRifa.compras_rifa) {
         setVenda({
@@ -83,6 +71,15 @@ export default function PagarCartela() {
     loadData();
   }, [codigo]);
 
+  // Alerta e redirecionamento de sucesso se voltar do Stripe
+  useEffect(() => {
+    if (paymentStatus === 'success' && codigo && tipoVenda) {
+      toast.success("Pagamento confirmado via Cartão! Agora só falta preencher seus dados.");
+      navigate(`/validar-cartela?${tipoVenda === 'rifa' ? 'codigo' : 'bingo'}=${codigo}`, { replace: true });
+    }
+  }, [paymentStatus, codigo, tipoVenda, navigate]);
+
+
   const valorCheio = useMemo(() => {
     if (!venda) return 0;
     const desc = Number(venda.desconto_aplicado || 0);
@@ -90,7 +87,6 @@ export default function PagarCartela() {
     return Number(venda.valor_pago) / (1 - (desc / 100));
   }, [venda]);
 
-  // Calcula o valor final e o detalhamento se as taxas da Stripe estiverem ativas
   const stripeFeeDetails = useMemo(() => {
     if (!gameSettings?.stripe_pass_fees_to_customer) return null;
     const perc = gameSettings.stripe_fee_percentage || 0;
@@ -135,7 +131,7 @@ export default function PagarCartela() {
     try {
       const { data, error } = await supabase.functions.invoke('create-stripe-session', {
         body: { 
-          amount: valorCheio, // Enviamos o valor original. O backend calcula a taxa final e aplica lá.
+          amount: valorCheio,
           type: tipoVenda === 'bingo' ? 'venda_bingo' : 'venda_rifa',
           metadata: { venda_id: venda.id, codigo: venda.codigo_validacao }
         }
@@ -175,9 +171,9 @@ export default function PagarCartela() {
     return (
       <div className="card-container text-center py-16 max-w-md mx-auto mt-10 border-success/30 bg-success/5">
         <CheckCircle2 className="w-16 h-16 text-success mx-auto mb-4" />
-        <h2 className="text-2xl font-bold text-success mb-2">Bilhete Pago!</h2>
-        <p className="text-muted-foreground mb-6">Este bilhete já está validado e pronto para o sorteio.</p>
-        <Button className="w-full bg-success hover:bg-success/90" onClick={() => navigate('/')}>Ir para o Lobby</Button>
+        <h2 className="text-2xl font-bold text-success mb-2">Pagamento Confirmado!</h2>
+        <p className="text-muted-foreground mb-6">Verifique se você precisa validar seus dados para concorrer ao sorteio.</p>
+        <Button className="w-full bg-success hover:bg-success/90" onClick={() => navigate(`/validar-cartela?${tipoVenda === 'rifa' ? 'codigo' : 'bingo'}=${venda.codigo_validacao}`)}>Validar / Conferir Cartela</Button>
       </div>
     );
   }
@@ -198,7 +194,7 @@ export default function PagarCartela() {
       <div className="text-center space-y-2">
         <h1 className="font-heading text-2xl font-black text-foreground">Pagamento do Bilhete</h1>
         <p className="text-muted-foreground text-sm">
-          Siga as instruções abaixo para validar sua participação.
+          Siga as instruções abaixo para pagar e liberar sua cartela.
         </p>
       </div>
 
@@ -233,7 +229,7 @@ export default function PagarCartela() {
                     <span>+ Taxa Cartão: <strong>R$ {stripeFeeDetails.fee.toFixed(2).replace('.', ',')}</strong></span>
                   </div>
                 ) : (
-                  <p className="text-[10px] text-muted-foreground italic">A cartela é validada na mesma hora.</p>
+                  <p className="text-[10px] text-muted-foreground italic">A cartela é validada instantaneamente.</p>
                 )}
               </div>
             )}
@@ -253,7 +249,7 @@ export default function PagarCartela() {
               ) : (
                 <div className="p-8 text-destructive flex flex-col items-center gap-2">
                   <AlertTriangle className="w-8 h-8" />
-                  <p className="text-xs font-bold">Erro ao gerar QR Code PIX. Tente novamente ou contate o suporte.</p>
+                  <p className="text-xs font-bold">Erro ao gerar QR Code PIX.</p>
                 </div>
               )}
               
@@ -277,28 +273,23 @@ export default function PagarCartela() {
           <div className="space-y-3 pt-4 border-t">
             <h3 className="font-bold flex items-center gap-2 text-foreground">
               <span className="bg-primary text-white w-6 h-6 rounded-full flex items-center justify-center text-xs shrink-0">2</span>
-              Valide seu Bilhete (Apenas PIX Manual)
+              Envio de Comprovante e Validação
             </h3>
             <p className="text-sm text-muted-foreground leading-relaxed">
-              Se você realizou o PIX no app do seu banco, anexe o comprovante abaixo.
+              Você já fez o pagamento do PIX Manual no seu banco? Avance para enviar o comprovante e se identificar!
             </p>
 
             <div className="text-center pt-2">
               <Button 
                 className="w-full h-14 text-xl font-bold bg-green-600 hover:bg-green-700 text-white shadow-button animate-pulse"
-                onClick={() => navigate(`/validar-cartela?codigo=${venda.codigo_validacao}`)}
+                onClick={() => navigate(`/validar-cartela?${tipoVenda === 'rifa' ? 'codigo' : 'bingo'}=${venda.codigo_validacao}`)}
               >
                 <Camera className="w-5 h-5 mr-2" />
-                Validar Comprovante PIX
+                Continuar p/ Validar
               </Button>
             </div>
           </div>
         </div>
-      </div>
-
-      <div className="flex items-start gap-3 p-4 bg-amber-50 rounded-xl border border-amber-200 text-amber-800 text-sm">
-        <AlertTriangle className="w-5 h-5 shrink-0 text-amber-600 mt-0.5" />
-        <p><strong>Atenção:</strong> Seu bilhete só terá validade no sorteio após o pagamento ser confirmado!</p>
       </div>
     </div>
   );
