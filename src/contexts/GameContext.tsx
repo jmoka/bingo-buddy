@@ -68,10 +68,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'vitorias' }, () => {
         queryClient.invalidateQueries({ queryKey: ['wins'] });
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'solicitacoes_credito' }, () => {
-        queryClient.invalidateQueries({ queryKey: ['creditRequests'] });
-        queryClient.invalidateQueries({ queryKey: ['rawCreditRequests'] });
+        queryClient.invalidateQueries({ queryKey: ['allWins'] });
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'configuracoes' }, () => {
         queryClient.invalidateQueries({ queryKey: ['gameSettings'] });

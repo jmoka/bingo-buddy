@@ -11,23 +11,20 @@ export const useAdminData = () => {
   const queryClient = useQueryClient();
   const isAdmin = profile?.role === 'admin';
 
-  // Centralized real-time listeners for all admin data
+  // Listeners for admin-specific, non-rifa data
   useEffect(() => {
     if (!isAdmin) return;
 
     const channel = supabase
-      .channel('admin-data-changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'compras_rifa' }, () => {
-        queryClient.invalidateQueries({ queryKey: ['todasComprasRifa'] });
+      .channel('admin-specific-data-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'solicitacoes_credito' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['rawCreditRequests'] });
       })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'vendas_bingo_fisico' }, () => {
-        queryClient.invalidateQueries({ queryKey: ['todasFolhasBingoAdmin'] });
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'solicitacoes_resgate' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['rawRedeemRequests'] });
       })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'solicitacoes_vendedor' }, () => {
-        queryClient.invalidateQueries({ queryKey: ['solicitacoesVendedor'] });
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'acertos_vendedor' }, () => {
-        queryClient.invalidateQueries({ queryKey: ['acertosAdmin'] });
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'cartelas_jogador' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['allPlayerCards'] });
       })
       .subscribe();
 
