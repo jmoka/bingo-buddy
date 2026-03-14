@@ -114,13 +114,30 @@ export const useAdminData = () => {
     if (!profile || profile.role !== 'admin' || !user) return false;
     const request = allCreditRequests.find(r => r.id === requestId);
     if (!request) return false;
-    if (status === 'approved' && creditsGranted !== undefined) {
-      await updatePlayerCredits(request.player_id, creditsGranted);
+    
+    let repasseConcluido = false;
+    const amountPaid = Number(request.amount_paid || 0);
+
+    if (status === 'approved') {
+      if (creditsGranted !== undefined) {
+        await updatePlayerCredits(request.player_id, creditsGranted);
+      }
+      if (amountPaid > 0) {
+         await supabase.rpc('increment_admin_profit', { amount: amountPaid });
+         repasseConcluido = true;
+         queryClient.invalidateQueries({ queryKey: ['gameSettings'] });
+      }
     }
+
     await supabase.from('solicitacoes_credito').update({
-      status, credits_granted: status === 'approved' ? creditsGranted : null,
-      resolved_at: new Date().toISOString(), resolved_by: user.id, notes: notes || null,
+      status, 
+      credits_granted: status === 'approved' ? creditsGranted : null,
+      repasse_concluido: repasseConcluido,
+      resolved_at: new Date().toISOString(), 
+      resolved_by: user.id, 
+      notes: notes || null,
     }).eq('id', requestId);
+
     if (notes) {
         await supabase.from('mensagens_solicitacao').insert({
             credit_request_id: requestId,
@@ -128,13 +145,39 @@ export const useAdminData = () => {
             message: notes
         });
     }
+
     await queryClient.refetchQueries({ queryKey: ['rawCreditRequests'] });
+    return true;
+  };
+
+  const forcarRepasseCredito = async (requestId: string): Promise<boolean> => {
+    const { data: request } = await supabase
+        .from('solicitacoes_credito')
+        .select('amount_paid')
+        .eq('id', requestId)
+        .single();
+    
+    if (!request) {
+      toast.error("Solicitação não encontrada.");
+      return false;
+    }
+
+    const amount = Number(request.amount_paid || 0);
+
+    if (amount > 0) {
+      await supabase.rpc('increment_admin_profit', { amount });
+      await supabase.from('solicitacoes_credito').update({ repasse_concluido: true }).eq('id', requestId);
+      queryClient.invalidateQueries({ queryKey: ['gameSettings'] });
+    }
+    
+    toast.success("Saldo adicionado ao Caixa Admin com sucesso!");
+    queryClient.invalidateQueries({ queryKey: ['rawCreditRequests'] });
     return true;
   };
 
   const unblockCreditRequest = async (requestId: string) => {
     await supabase.from('solicitacoes_credito').update({
-      status: 'pending', notes: 'Solicitação reaberta pelo administrador.', resolved_at: null, resolved_by: null, credits_granted: null,
+      status: 'pending', notes: 'Solicitação reaberta pelo administrador.', resolved_at: null, resolved_by: null, credits_granted: null, repasse_concluido: false
     }).eq('id', requestId);
     toast.success('Solicitação reaberta');
     await queryClient.refetchQueries({ queryKey: ['rawCreditRequests'] });
@@ -238,6 +281,7 @@ export const useAdminData = () => {
     updatePlayerCredits,
     updatePlayerFakeCredits,
     resolveCreditRequest,
+    forcarRepasseCredito,
     unblockCreditRequest,
     deleteCreditRequest,
     resolveRedeemRequest,

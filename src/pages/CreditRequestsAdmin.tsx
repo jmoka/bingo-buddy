@@ -36,7 +36,7 @@ const CreditRequestsAdmin = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { profile } = useAuth();
-  const { allCreditRequests, resolveCreditRequest, deleteCreditRequest, unblockCreditRequest, fetchRequestMessages, isLoading: isGameLoading } = useGame();
+  const { allCreditRequests, resolveCreditRequest, forcarRepasseCredito, deleteCreditRequest, unblockCreditRequest, fetchRequestMessages, isLoading: isGameLoading } = useGame();
   const { acertosPendentes, resolverAcerto, forcarRepasseAcerto, isLoading: isRifaLoading } = useRifaAdmin();
   
   // States - Credit Requests
@@ -48,12 +48,13 @@ const CreditRequestsAdmin = () => {
   const [rejectionNotes, setRejectionNotes] = useState('');
   const [isResolveDialogOpen, setIsResolveDialogOpen] = useState(false);
   const [actionType, setActionType] = useState<'approve' | 'reject' | 'delete' | null>(null);
+  const [requestForcarRepasse, setRequestForcarRepasse] = useState<CreditRequest | null>(null);
   
   // States - Acertos
   const [acaoAcerto, setAcaoAcerto] = useState<{tipo: 'aprovado' | 'rejeitado', acerto: AcertoVendedor} | null>(null);
   const [isProcessandoAcerto, setIsProcessandoAcerto] = useState(false);
 
-  // States - Forçar Repasse
+  // States - Forçar Repasse (Geral)
   const [acertoForcarRepasse, setAcertoForcarRepasse] = useState<AcertoVendedor | null>(null);
   const [isForcandoRepasse, setIsForcandoRepasse] = useState(false);
 
@@ -119,7 +120,7 @@ const CreditRequestsAdmin = () => {
     if (ok) setAcaoAcerto(null);
   };
 
-  const handleForcarRepasse = async () => {
+  const handleForcarRepasseAcerto = async () => {
     if (!acertoForcarRepasse) return;
     setIsForcandoRepasse(true);
     await forcarRepasseAcerto(acertoForcarRepasse.id);
@@ -127,7 +128,15 @@ const CreditRequestsAdmin = () => {
     setAcertoForcarRepasse(null);
   };
 
-  const handleViewReceipt = async (path: string) => {
+  const handleForcarRepasseCredito = async () => {
+    if (!requestForcarRepasse) return;
+    setIsForcandoRepasse(true);
+    await forcarRepasseCredito(requestForcarRepasse.id);
+    setIsForcandoRepasse(false);
+    setRequestForcarRepasse(null);
+  };
+
+  const handleViewReceipt = async (path: string | null) => {
     if (!path) {
       toast.error('Nenhum comprovante anexado.');
       return;
@@ -296,7 +305,7 @@ const CreditRequestsAdmin = () => {
                   <TableHead>Data</TableHead>
                   <TableHead>Origem / Jogador</TableHead>
                   <TableHead>Valor</TableHead>
-                  <TableHead>Status</TableHead>
+                  <TableHead>Status / Forma</TableHead>
                   <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
@@ -391,10 +400,27 @@ const CreditRequestsAdmin = () => {
                          ) : (
                            <Badge variant="outline" className="text-[9px] bg-blue-500/5 text-blue-600 border-blue-500/20">Recarga PIX</Badge>
                          )}
+
+                         {req.status === 'approved' && (
+                           req.repasse_concluido ? (
+                             <Badge variant="outline" className="text-[9px] bg-green-500/10 text-green-700 border-green-500/30 font-bold">
+                               <CheckCircle2 className="w-2.5 h-2.5 mr-1" /> Lucro Creditado
+                             </Badge>
+                           ) : (
+                             <Badge variant="outline" className="text-[9px] bg-red-500/10 text-red-700 border-red-500/30 font-bold animate-pulse">
+                               <AlertTriangle className="w-2.5 h-2.5 mr-1" /> Erro no Repasse
+                             </Badge>
+                           )
+                         )}
                       </div>
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1.5">
+                        {req.status === 'approved' && !req.repasse_concluido && (
+                          <Button size="icon" variant="ghost" className="h-8 w-8 text-amber-600 hover:bg-amber-100" title="Saldo não entrou no Caixa? Forçar Repasse" onClick={() => setRequestForcarRepasse(req)}>
+                            <AlertTriangle className="w-4 h-4" />
+                          </Button>
+                        )}
                         {isStripe ? (
                            <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground opacity-40 cursor-not-allowed" title="Pagamento Automático (Não possui imagem anexada)">
                              <CreditCard className="w-4 h-4" />
@@ -460,7 +486,7 @@ const CreditRequestsAdmin = () => {
           </DialogHeader>
           <div className="py-4 space-y-3">
             {acaoAcerto?.tipo === 'aprovado' ? (
-              <p className="text-sm text-muted-foreground">Você conferiu o PIX e o valor de <strong className="text-success text-lg">R$ {Number(acaoAcerto.acerto.valor).toFixed(2)}</strong> realmente caiu na sua conta?</p>
+              <p className="text-sm text-muted-foreground">Você conferiu o PIX e o valor de <strong className="text-success text-lg">R$ {Number(acaoAcerto.acerto.valor).toFixed(2)}</strong> realmente caiu na conta?</p>
             ) : (
               <p className="text-sm text-muted-foreground">O comprovante é inválido ou o dinheiro não caiu?</p>
             )}
@@ -475,7 +501,7 @@ const CreditRequestsAdmin = () => {
         </DialogContent>
       </Dialog>
 
-      {/* DIALOG DE FORÇAR REPASSE DE ACERTO */}
+      {/* DIALOG DE FORÇAR REPASSE DE ACERTO VENDEDOR */}
       <Dialog open={!!acertoForcarRepasse} onOpenChange={open => !open && setAcertoForcarRepasse(null)}>
         <DialogContent>
           <DialogHeader>
@@ -496,7 +522,7 @@ const CreditRequestsAdmin = () => {
           </div>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setAcertoForcarRepasse(null)}>Cancelar</Button>
-            <Button onClick={handleForcarRepasse} disabled={isForcandoRepasse} className="bg-amber-600 hover:bg-amber-700 text-white">
+            <Button onClick={handleForcarRepasseAcerto} disabled={isForcandoRepasse} className="bg-amber-600 hover:bg-amber-700 text-white">
               {isForcandoRepasse && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
               Confirmar e Enviar p/ Caixa
             </Button>
@@ -504,94 +530,31 @@ const CreditRequestsAdmin = () => {
         </DialogContent>
       </Dialog>
 
-      {/* DIALOG DE CHAT COM O JOGADOR (SOLICITACOES DE CREDITO) */}
-      <Dialog open={!!conversationRequest} onOpenChange={(open) => !open && setConversationRequest(null)}>
-        <DialogContent className="max-w-md h-[70vh] flex flex-col p-0">
-          <DialogHeader className="p-6 pb-2 border-b">
-            <DialogTitle className="flex items-center gap-2 font-heading">
-              <MessageSquare className="w-5 h-5 text-primary" /> Histórico da Conversa
-            </DialogTitle>
-            <DialogDescription>Solicitação de {conversationRequest?.perfis?.full_name}</DialogDescription>
-          </DialogHeader>
-
-          <ScrollArea className="flex-grow p-4">
-            {isLoadingMessages ? (
-                <div className="flex justify-center py-10"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>
-            ) : (
-                <div className="space-y-4">
-                    {messages.length === 0 && conversationRequest?.notes && (
-                        <div className="flex flex-col items-start space-y-1">
-                            <div className="flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-widest text-primary ml-2">
-                                <ShieldCheck className="w-3 h-3" /> 
-                                Sistema • {format(new Date(conversationRequest.resolved_at || conversationRequest.requested_at), "HH:mm", { locale: ptBR })}
-                            </div>
-                            <div className="p-3 rounded-2xl shadow-sm max-w-[85%] text-sm leading-relaxed border bg-primary/10 border-primary/20 rounded-tl-none text-foreground font-medium">
-                                {conversationRequest.notes}
-                            </div>
-                        </div>
-                    )}
-
-                    {messages.length === 0 && !conversationRequest?.notes && (
-                        <div className="text-center py-10 text-muted-foreground">Nenhuma mensagem no histórico.</div>
-                    )}
-
-                    {messages.map(msg => {
-                        const isMe = msg.sender_id === profile?.id;
-                        return (
-                            <div key={msg.id} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'} space-y-1`}>
-                                <div className={`flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-widest ${isMe ? 'text-muted-foreground mr-2' : 'text-primary ml-2'}`}>
-                                    {isMe ? <ShieldCheck className="w-3 h-3" /> : <User className="w-3 h-3" />}
-                                    {isMe ? 'Admin (Você)' : 'Jogador'} • {format(new Date(msg.created_at), "HH:mm", { locale: ptBR })}
-                                </div>
-                                <div className={`p-3 rounded-2xl shadow-sm max-w-[85%] text-sm leading-relaxed border ${
-                                    isMe 
-                                    ? 'bg-muted border-border rounded-tr-none' 
-                                    : 'bg-primary/10 border-primary/20 rounded-tl-none text-foreground'
-                                }`}>
-                                    {msg.message}
-                                </div>
-                            </div>
-                        );
-                    })}
-                </div>
-            )}
-          </ScrollArea>
-
-          <DialogFooter className="p-4 border-t bg-muted/20">
-            <DialogClose asChild><Button variant="outline" className="w-full">Fechar</Button></DialogClose>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* DIALOG DE APROVAR/REJEITAR SOLICITACAO DE CREDITO JOGADOR */}
-      <Dialog open={isResolveDialogOpen} onOpenChange={setIsResolveDialogOpen}>
+      {/* DIALOG DE FORÇAR REPASSE COMPRA DE CREDITOS JOGADOR */}
+      <Dialog open={!!requestForcarRepasse} onOpenChange={open => !open && setRequestForcarRepasse(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              {actionType === 'delete' && <Trash2 className="w-5 h-5 text-destructive" />}
-              {actionType === 'approve' && <Check className="w-5 h-5 text-success" />}
-              {actionType === 'reject' && <X className="w-5 h-5 text-destructive" />}
-              {actionType === 'delete' ? 'Excluir Solicitação' : 'Resolver Solicitação'}
+            <DialogTitle className="flex items-center gap-2 text-amber-600">
+              <AlertTriangle className="w-6 h-6" /> Forçar Repasse pro Caixa Admin
             </DialogTitle>
           </DialogHeader>
-          {selectedRequest && actionType !== 'delete' && (
-            <div className="space-y-4 py-2">
-              <div className="p-3 bg-muted rounded-lg flex items-center justify-between">
-                <div><p className="text-[10px] uppercase font-bold text-muted-foreground">O Jogador Pagou (PIX)</p><p className="text-xl font-black text-primary">R$ {Number(selectedRequest.amount_paid || 0).toFixed(2).replace('.', ',')}</p></div>
-                <div className="text-right"><p className="text-[10px] uppercase font-bold text-muted-foreground">Créditos Solicitados</p><p className="text-xl font-bold">{selectedRequest.credits_requested} cr.</p></div>
-              </div>
-              {actionType === 'approve' && (
-                <div className="space-y-2"><Label>Créditos a Liberar no Saldo dele</Label><Input type="number" value={creditsToGrant} onChange={e => setCreditsToGrant(+e.target.value || 0)} className="text-lg font-bold" /></div>
-              )}
-              <div className="space-y-2">
-                <Label className="flex items-center gap-2"><MessageSquare className="w-4 h-4" /> Mensagem para o Jogador</Label>
-                <Textarea placeholder="Explique o motivo do bloqueio ou confirme a liberação..." value={rejectionNotes} onChange={e => setRejectionNotes(e.target.value)} />
-              </div>
-            </div>
-          )}
+          <div className="py-4 space-y-4">
+             <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
+               <strong>Atenção:</strong> Utilize esta opção apenas se o sistema não tiver creditado o valor de <strong>R$ {Number(requestForcarRepasse?.amount_paid || 0).toFixed(2)}</strong> no Caixa do Admin ao aprovar.
+             </div>
+             <p className="text-sm text-muted-foreground">
+               Ao confirmar, o sistema adicionará esse valor diretamente ao seu Caixa.
+             </p>
+             <p className="text-xs font-bold text-destructive">
+               Importante: Se você clicar aqui e o saldo já tiver sido pago antes, o valor será duplicado indevidamente no Caixa.
+             </p>
+          </div>
           <DialogFooter>
-            <DialogClose asChild><Button variant="ghost">Cancelar</Button></DialogClose>
-            <Button variant={actionType === 'approve' ? 'default' : 'destructive'} onClick={handleResolve}>Confirmar</Button>
+            <Button variant="ghost" onClick={() => setRequestForcarRepasse(null)}>Cancelar</Button>
+            <Button onClick={handleForcarRepasseCredito} disabled={isForcandoRepasse} className="bg-amber-600 hover:bg-amber-700 text-white">
+              {isForcandoRepasse && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Confirmar e Enviar p/ Caixa
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

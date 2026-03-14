@@ -149,6 +149,7 @@ export interface CreditRequest {
   resolved_by: string | null;
   notes: string | null;
   resubmission_notes: string | null;
+  repasse_concluido?: boolean;
   perfis?: {
     full_name: string;
     avatar_url: string;

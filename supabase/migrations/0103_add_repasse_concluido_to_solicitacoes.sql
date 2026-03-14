@@ -1,0 +1,1 @@
+ALTER TABLE public.solicitacoes_credito ADD COLUMN IF NOT EXISTS repasse_concluido BOOLEAN DEFAULT false;
