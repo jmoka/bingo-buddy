@@ -67,6 +67,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const signOut = async () => {
     await supabase.auth.signOut();
+    // Força o redirecionamento imediato e limpa os estados da memória
+    window.location.href = '/login';
   };
 
   const value = {
