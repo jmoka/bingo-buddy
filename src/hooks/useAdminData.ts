@@ -183,6 +183,42 @@ export const useAdminData = () => {
     return true;
   };
 
+  const estornarRepasseCredito = async (requestId: string): Promise<boolean> => {
+    const request = allCreditRequests.find(r => r.id === requestId);
+    if (!request) return false;
+
+    // 1. Desconta o Caixa do Admin se o repasse havia sido concluído
+    if (request.repasse_concluido && Number(request.amount_paid) > 0) {
+      await supabase.rpc('increment_admin_profit', { amount: -Number(request.amount_paid) });
+    }
+
+    // 2. Retira os créditos que tinham sido liberados para o jogador
+    if (Number(request.credits_granted) > 0) {
+      await supabase.rpc('admin_adjust_credits', { p_player_id: request.player_id, p_delta: -Number(request.credits_granted) });
+    }
+
+    // 3. Volta o status para pending
+    const { error } = await supabase.from('solicitacoes_credito').update({
+      status: 'pending',
+      repasse_concluido: false,
+      credits_granted: null,
+      resolved_at: null,
+      notes: 'Estornado pelo administrador.'
+    }).eq('id', requestId);
+
+    if (error) {
+       toast.error("Erro ao atualizar a solicitação no banco.");
+       return false;
+    }
+
+    toast.success("Recarga estornada com sucesso!");
+    queryClient.invalidateQueries({ queryKey: ['rawCreditRequests'] });
+    queryClient.invalidateQueries({ queryKey: ['gameSettings'] });
+    queryClient.invalidateQueries({ queryKey: ['players'] });
+    queryClient.invalidateQueries({ queryKey: ['profile'] });
+    return true;
+  };
+
   const unblockCreditRequest = async (requestId: string) => {
     await supabase.from('solicitacoes_credito').update({
       status: 'pending', notes: 'Solicitação reaberta pelo administrador.', resolved_at: null, resolved_by: null, credits_granted: null, repasse_concluido: false
@@ -290,6 +326,7 @@ export const useAdminData = () => {
     updatePlayerFakeCredits,
     resolveCreditRequest,
     forcarRepasseCredito,
+    estornarRepasseCredito,
     unblockCreditRequest,
     deleteCreditRequest,
     resolveRedeemRequest,

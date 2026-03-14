@@ -36,8 +36,24 @@ const CreditRequestsAdmin = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { profile } = useAuth();
-  const { allCreditRequests, resolveCreditRequest, forcarRepasseCredito, deleteCreditRequest, unblockCreditRequest, fetchRequestMessages, isLoading: isGameLoading } = useGame();
-  const { acertosPendentes, resolverAcerto, forcarRepasseAcerto, isLoading: isRifaLoading } = useRifaAdmin();
+  const { 
+    allCreditRequests, 
+    resolveCreditRequest, 
+    forcarRepasseCredito, 
+    estornarRepasseCredito,
+    deleteCreditRequest, 
+    unblockCreditRequest, 
+    fetchRequestMessages, 
+    isLoading: isGameLoading 
+  } = useGame();
+  
+  const { 
+    acertosPendentes, 
+    resolverAcerto, 
+    forcarRepasseAcerto, 
+    estornarRepasseAcerto,
+    isLoading: isRifaLoading 
+  } = useRifaAdmin();
   
   // States - Credit Requests
   const [selectedRequest, setSelectedRequest] = useState<CreditRequest | null>(null);
@@ -48,15 +64,20 @@ const CreditRequestsAdmin = () => {
   const [rejectionNotes, setRejectionNotes] = useState('');
   const [isResolveDialogOpen, setIsResolveDialogOpen] = useState(false);
   const [actionType, setActionType] = useState<'approve' | 'reject' | 'delete' | null>(null);
-  const [requestForcarRepasse, setRequestForcarRepasse] = useState<CreditRequest | null>(null);
   
+  // States - Forçar Repasse
+  const [requestForcarRepasse, setRequestForcarRepasse] = useState<CreditRequest | null>(null);
+  const [acertoForcarRepasse, setAcertoForcarRepasse] = useState<AcertoVendedor | null>(null);
+  const [isForcandoRepasse, setIsForcandoRepasse] = useState(false);
+  
+  // States - Estornos
+  const [acertoEstorno, setAcertoEstorno] = useState<AcertoVendedor | null>(null);
+  const [requestEstorno, setRequestEstorno] = useState<CreditRequest | null>(null);
+  const [isEstornando, setIsEstornando] = useState(false);
+
   // States - Acertos
   const [acaoAcerto, setAcaoAcerto] = useState<{tipo: 'aprovado' | 'rejeitado', acerto: AcertoVendedor} | null>(null);
   const [isProcessandoAcerto, setIsProcessandoAcerto] = useState(false);
-
-  // States - Forçar Repasse (Geral)
-  const [acertoForcarRepasse, setAcertoForcarRepasse] = useState<AcertoVendedor | null>(null);
-  const [isForcandoRepasse, setIsForcandoRepasse] = useState(false);
 
   // Generics
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -134,6 +155,22 @@ const CreditRequestsAdmin = () => {
     await forcarRepasseCredito(requestForcarRepasse.id);
     setIsForcandoRepasse(false);
     setRequestForcarRepasse(null);
+  };
+
+  const handleEstornarAcerto = async () => {
+    if (!acertoEstorno) return;
+    setIsEstornando(true);
+    await estornarRepasseAcerto(acertoEstorno.id);
+    setIsEstornando(false);
+    setAcertoEstorno(null);
+  };
+
+  const handleEstornarCredito = async () => {
+    if (!requestEstorno) return;
+    setIsEstornando(true);
+    await estornarRepasseCredito(requestEstorno.id);
+    setIsEstornando(false);
+    setRequestEstorno(null);
   };
 
   const handleViewReceipt = async (path: string | null) => {
@@ -360,6 +397,11 @@ const CreditRequestsAdmin = () => {
                             <AlertTriangle className="w-4 h-4" />
                           </Button>
                         )}
+                        {finalStatus === 'aprovado' && (
+                          <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive hover:bg-destructive/10" title="Estornar (Remover do Caixa e Voltar para Pendente)" onClick={() => setAcertoEstorno(acerto)}>
+                            <Undo2 className="w-4 h-4" />
+                          </Button>
+                        )}
                         <Button size="icon" variant="ghost" className="h-8 w-8 text-primary" title="Ver Comprovante PIX" onClick={() => handleViewReceipt(acerto.comprovante_url)}>
                           <Eye className="w-4 h-4" />
                         </Button>
@@ -419,6 +461,11 @@ const CreditRequestsAdmin = () => {
                         {req.status === 'approved' && !req.repasse_concluido && (
                           <Button size="icon" variant="ghost" className="h-8 w-8 text-amber-600 hover:bg-amber-100" title="Saldo não entrou no Caixa? Forçar Repasse" onClick={() => setRequestForcarRepasse(req)}>
                             <AlertTriangle className="w-4 h-4" />
+                          </Button>
+                        )}
+                        {req.status === 'approved' && (
+                          <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive hover:bg-destructive/10" title="Estornar Créditos do Jogador e do Caixa" onClick={() => setRequestEstorno(req)}>
+                            <Undo2 className="w-4 h-4" />
                           </Button>
                         )}
                         {isStripe ? (
@@ -554,6 +601,66 @@ const CreditRequestsAdmin = () => {
             <Button onClick={handleForcarRepasseCredito} disabled={isForcandoRepasse} className="bg-amber-600 hover:bg-amber-700 text-white">
               {isForcandoRepasse && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
               Confirmar e Enviar p/ Caixa
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* DIALOG DE ESTORNO DE ACERTO */}
+      <Dialog open={!!acertoEstorno} onOpenChange={open => !open && setAcertoEstorno(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <Undo2 className="w-6 h-6" /> Estornar Acerto
+            </DialogTitle>
+          </DialogHeader>
+          <div className="py-4 space-y-4">
+             <p className="text-sm text-muted-foreground">
+               Deseja realmente estornar este acerto de <strong className="text-foreground">R$ {Number(acertoEstorno?.valor || 0).toFixed(2)}</strong>?
+             </p>
+             <ul className="text-sm text-muted-foreground list-disc pl-5 space-y-1">
+                <li>O valor será <strong>descontado</strong> do seu Caixa Administrativo.</li>
+                <li>A solicitação de acerto voltará para a aba "Pendentes" para ser revisada.</li>
+             </ul>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setAcertoEstorno(null)}>Cancelar</Button>
+            <Button variant="destructive" onClick={handleEstornarAcerto} disabled={isEstornando}>
+              {isEstornando && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Confirmar Estorno
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* DIALOG DE ESTORNO DE CRÉDITO */}
+      <Dialog open={!!requestEstorno} onOpenChange={open => !open && setRequestEstorno(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <Undo2 className="w-6 h-6" /> Estornar Recarga de Créditos
+            </DialogTitle>
+          </DialogHeader>
+          <div className="py-4 space-y-4">
+             <p className="text-sm text-muted-foreground">
+               Deseja estornar esta recarga?
+             </p>
+             <ul className="text-sm text-muted-foreground list-disc pl-5 space-y-2">
+                <li><strong className="text-foreground">R$ {Number(requestEstorno?.amount_paid || 0).toFixed(2)}</strong> serão removidos do seu Caixa Administrativo.</li>
+                <li><strong className="text-foreground">{requestEstorno?.credits_granted} créditos</strong> serão removidos do saldo do jogador.</li>
+                <li>A solicitação voltará para a aba "Pendentes".</li>
+             </ul>
+             {requestEstorno?.receipt_url?.startsWith('STRIPE') && (
+                <div className="p-3 bg-amber-50 border border-amber-200 text-amber-800 text-xs rounded">
+                  <strong>Nota:</strong> Como este pagamento foi feito via Stripe, os valores serão removidos do sistema Bingo, mas o <strong>estorno no cartão de crédito do cliente</strong> precisa ser feito manualmente por você no painel da Stripe.
+                </div>
+             )}
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setRequestEstorno(null)}>Cancelar</Button>
+            <Button variant="destructive" onClick={handleEstornarCredito} disabled={isEstornando}>
+              {isEstornando && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Confirmar Estorno
             </Button>
           </DialogFooter>
         </DialogContent>

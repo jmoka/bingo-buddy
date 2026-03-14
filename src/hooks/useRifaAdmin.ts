@@ -537,6 +537,31 @@ export const useRifaAdmin = () => {
     return true;
   };
 
+  const estornarRepasseAcerto = async (acertoId: string): Promise<boolean> => {
+    const { data: acerto } = await supabase.from('acertos_vendedor').select('*').eq('id', acertoId).single();
+    if (!acerto) return false;
+
+    if (acerto.repasse_concluido && Number(acerto.valor) > 0) {
+      await supabase.rpc('increment_admin_profit', { amount: -Number(acerto.valor) });
+    }
+
+    const { error } = await supabase.from('acertos_vendedor').update({
+      status: 'pendente',
+      repasse_concluido: false,
+      resolved_at: null,
+    }).eq('id', acertoId);
+
+    if (error) {
+      toast.error("Erro ao atualizar status no banco.");
+      return false;
+    }
+
+    toast.success("Acerto estornado! O valor foi removido do caixa e voltou para análise.");
+    queryClient.invalidateQueries({ queryKey: ['acertosAdmin'] });
+    queryClient.invalidateQueries({ queryKey: ['gameSettings'] });
+    return true;
+  };
+
   return {
     todasRifas,
     vendedores,
@@ -564,5 +589,6 @@ export const useRifaAdmin = () => {
     registrarVendaVendedor,
     resolverAcerto,
     forcarRepasseAcerto,
+    estornarRepasseAcerto,
   };
 };
