@@ -41,11 +41,13 @@ export default function PagarCartela() {
       if (resConfig) setGameSettings(resConfig);
 
       // 2. Tenta buscar no Bingo
-      const { data: resBingo } = await supabase
+      const { data: resBingo, error: errBingo } = await supabase
         .from('vendas_bingo_fisico')
-        .select('*, partidas(name), vendedores_rifa(nome)')
+        .select('*, partidas(name)')
         .eq('codigo_validacao', codigo.toUpperCase().trim())
         .maybeSingle();
+
+      if (errBingo) console.error("Erro na busca do bingo:", errBingo);
 
       if (resBingo) {
         setVenda(resBingo);
@@ -55,15 +57,16 @@ export default function PagarCartela() {
       }
 
       // 3. Se não achou no bingo, tenta buscar na Rifa
-      const { data: resRifa } = await supabase
+      // Removido vendedores_rifa(nome) para evitar ambiguidade de Foreign Keys
+      const { data: resRifa, error: errRifa } = await supabase
         .from('cartelas_rifa')
-        .select('*, compras_rifa(*, rifas(nome), vendedores_rifa(nome))')
+        .select('*, compras_rifa(*, rifas(nome))')
         .eq('codigo_validacao', codigo.toUpperCase().trim())
         .maybeSingle();
 
+      if (errRifa) console.error("Erro na busca da rifa:", errRifa);
+
       if (resRifa && resRifa.compras_rifa) {
-        // Normaliza os dados da rifa para o formato esperado pelo componente
-        // O ID TEM que ser o da COMPRA para o Webhook achar no banco e dar baixa
         setVenda({
             id: resRifa.compras_rifa.id, 
             cartela_id: resRifa.id,
@@ -71,8 +74,7 @@ export default function PagarCartela() {
             codigo_validacao: resRifa.codigo_validacao,
             valor_pago: resRifa.compras_rifa.valor_total,
             desconto_aplicado: resRifa.compras_rifa.desconto_aplicado,
-            partidas: { name: resRifa.compras_rifa.rifas?.nome },
-            vendedores_rifa: resRifa.compras_rifa.vendedores_rifa
+            partidas: { name: resRifa.compras_rifa.rifas?.nome }
         });
         setTipoVenda('rifa');
       }
