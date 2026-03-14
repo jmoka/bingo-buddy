@@ -419,7 +419,7 @@ export const useRifaAdmin = () => {
     });
 
     if (error || !data?.success) {
-      toast.error('Erro ao pagar comissão manualmente.');
+      toast.error('Erro ao pagar comissão: ' + (error?.message || data?.error || 'Erro Desconhecido'));
       return false;
     }
 
@@ -509,6 +509,25 @@ export const useRifaAdmin = () => {
     return data as CartelaRifa[];
   };
 
+  const registrarVendaVendedor = async (rifaId: string, vendedorId: string, numeros: number[], clienteId?: string): Promise<boolean> => {
+    console.warn("Using deprecated function registrarVendaVendedor");
+    const { data, error } = await supabase.rpc('reservar_numeros_vendedor', {
+      p_rifa_id: rifaId,
+      p_numeros: numeros,
+      p_pagar_depois: false,
+    });
+    if (error || !data?.success) {
+      toast.error('Erro ao registrar venda: ' + (data?.error || error?.message));
+      return false;
+    }
+    toast.success('Venda registrada com sucesso!');
+    queryClient.invalidateQueries({ queryKey: ['minhasReservasVendedor'] });
+    queryClient.invalidateQueries({ queryKey: ['minhasVendasVendedor'] });
+    queryClient.invalidateQueries({ queryKey: ['numerosRifa'] });
+    queryClient.invalidateQueries({ queryKey: ['profile'] });
+    return true;
+  };
+
   return {
     todasRifas,
     vendedores,
@@ -533,9 +552,10 @@ export const useRifaAdmin = () => {
     rejeitarVendedor,
     getNumerosRifaAdmin,
     getCartelasCompra,
+    registrarVendaVendedor,
     resolverAcerto,
-    pagarComissaoManual,
     forcarRepasseAcerto,
     estornarRepasseAcerto,
+    pagarComissaoManual,
   };
 };
