@@ -74,17 +74,20 @@ serve(async (req) => {
     // --- LÓGICA DE COMISSÃO DO BINGO VIA LINK DE INDICAÇÃO ---
     let commissionAmount = 0;
     let sellerUserId = null;
+    let vendedorDaTabelaId = null;
 
     if (refCode && totalCost > 0) {
       const { data: seller } = await supabaseAdmin
         .from('vendedores_rifa')
-        .select('user_id, comissao_percentual')
+        .select('id, user_id, comissao_percentual')
         .eq('codigo_ref', refCode)
         .eq('ativo', true)
         .single();
 
       if (seller && seller.user_id) {
         let comissao = seller.comissao_percentual;
+        vendedorDaTabelaId = seller.id;
+
         if (!comissao || comissao === 0) {
           const { data: cfg } = await supabaseAdmin.from('configuracoes').select('comissao_vendedor_global').single();
           comissao = cfg?.comissao_vendedor_global || 0;
@@ -119,6 +122,7 @@ serve(async (req) => {
             .eq('id', card.id);
     }
 
+    // INSERE O VENDEDOR ID NA CARTELA DA PARTIDA!
     const newMatchCards = playerCards.map(card => ({
       player_id: user.id,
       match_id: matchId,
@@ -127,6 +131,7 @@ serve(async (req) => {
       numbers: card.numbers, 
       marked_numbers: [0], 
       credit_type: card.credit_type,
+      vendedor_id: vendedorDaTabelaId
     }));
 
     const { data: insertedMatchCards, error: insertError } = await supabaseAdmin
