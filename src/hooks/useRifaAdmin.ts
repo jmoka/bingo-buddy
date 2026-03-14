@@ -460,53 +460,18 @@ export const useRifaAdmin = () => {
   };
 
   const resolverAcerto = async (acertoId: string, status: 'aprovado' | 'rejeitado'): Promise<boolean> => {
-    let amountToDirectProfit = 0;
-    let sellerCommissionToPay = 0;
-    let sellerUserId = null;
+    let valorRepasse = 0;
 
+    // Pega o valor exato que o vendedor repassou, pois a comissão já foi descontada antes do PIX.
     if (status === 'aprovado') {
       const { data: acerto } = await supabase
           .from('acertos_vendedor')
-          .select('*, vendedores_rifa(user_id, comissao_percentual)')
+          .select('valor')
           .eq('id', acertoId)
           .single();
       
       if (acerto) {
-        sellerUserId = acerto.vendedores_rifa?.user_id;
-        
-        const { data: cfg } = await supabase.from('configuracoes').select('comissao_vendedor_global').single();
-        const comissaoPerc = Number(acerto.vendedores_rifa?.comissao_percentual || cfg?.comissao_vendedor_global || 0);
-
-        let bingoProfit = 0;
-        let rifaProfit = 0;
-
-        if (acerto.bingo_ids && acerto.bingo_ids.length > 0) {
-          const { data: bingos } = await supabase.from('vendas_bingo_fisico')
-            .select('valor_pago, partidas(status)')
-            .in('id', acerto.bingo_ids);
-            
-          bingos?.forEach(b => {
-            const val = Number(b.valor_pago);
-            if (b.partidas?.status === 'finished') {
-              bingoProfit += val; 
-            }
-            sellerCommissionToPay += val * (comissaoPerc / 100.0); 
-          });
-        }
-
-        if (acerto.rifa_ids && acerto.rifa_ids.length > 0) {
-           const { data: rifas } = await supabase.from('compras_rifa')
-            .select('valor_total')
-            .in('id', acerto.rifa_ids);
-            
-           rifas?.forEach(r => {
-              const val = Number(r.valor_total);
-              rifaProfit += val; 
-              sellerCommissionToPay += val * (comissaoPerc / 100.0); 
-           });
-        }
-
-        amountToDirectProfit = bingoProfit + rifaProfit - sellerCommissionToPay;
+        valorRepasse = Number(acerto.valor);
       }
     }
 
@@ -520,15 +485,10 @@ export const useRifaAdmin = () => {
       return false;
     }
 
-    if (status === 'aprovado') {
-      if (amountToDirectProfit !== 0) {
-        await supabase.rpc('increment_admin_profit', { amount: amountToDirectProfit });
-      }
-      if (sellerCommissionToPay > 0 && sellerUserId) {
-        await supabase.rpc('increment_player_credits', { p_player_id: sellerUserId, p_amount: sellerCommissionToPay });
-      }
+    if (status === 'aprovado' && valorRepasse > 0) {
+      // O valor líquido cai diretamente no Caixa Admin
+      await supabase.rpc('increment_admin_profit', { amount: valorRepasse });
       queryClient.invalidateQueries({ queryKey: ['gameSettings'] }); 
-      queryClient.invalidateQueries({ queryKey: ['players'] });
     }
 
     toast.success(`Acerto ${status} com sucesso!`);
@@ -537,15 +497,11 @@ export const useRifaAdmin = () => {
     return true;
   };
 
-  // Nova função para forçar o repasse caso o sistema tenha falhado anteriormente
+  // Função para forçar o repasse caso o sistema tenha falhado anteriormente
   const forcarRepasseAcerto = async (acertoId: string): Promise<boolean> => {
-    let amountToDirectProfit = 0;
-    let sellerCommissionToPay = 0;
-    let sellerUserId = null;
-
     const { data: acerto } = await supabase
         .from('acertos_vendedor')
-        .select('*, vendedores_rifa(user_id, comissao_percentual)')
+        .select('valor')
         .eq('id', acertoId)
         .single();
     
@@ -554,44 +510,14 @@ export const useRifaAdmin = () => {
       return false;
     }
 
-    sellerUserId = acerto.vendedores_rifa?.user_id;
-    
-    const { data: cfg } = await supabase.from('configuracoes').select('comissao_vendedor_global').single();
-    const comissaoPerc = Number(acerto.vendedores_rifa?.comissao_percentual || cfg?.comissao_vendedor_global || 0);
+    const valorRepasse = Number(acerto.valor);
 
-    let bingoProfit = 0;
-    let rifaProfit = 0;
-
-    if (acerto.bingo_ids && acerto.bingo_ids.length > 0) {
-      const { data: bingos } = await supabase.from('vendas_bingo_fisico').select('valor_pago, partidas(status)').in('id', acerto.bingo_ids);
-      bingos?.forEach(b => {
-        const val = Number(b.valor_pago);
-        if (b.partidas?.status === 'finished') bingoProfit += val;
-        sellerCommissionToPay += val * (comissaoPerc / 100.0);
-      });
-    }
-
-    if (acerto.rifa_ids && acerto.rifa_ids.length > 0) {
-       const { data: rifas } = await supabase.from('compras_rifa').select('valor_total').in('id', acerto.rifa_ids);
-       rifas?.forEach(r => {
-          const val = Number(r.valor_total);
-          rifaProfit += val;
-          sellerCommissionToPay += val * (comissaoPerc / 100.0);
-       });
-    }
-
-    amountToDirectProfit = bingoProfit + rifaProfit - sellerCommissionToPay;
-
-    if (amountToDirectProfit !== 0) {
-      await supabase.rpc('increment_admin_profit', { amount: amountToDirectProfit });
-    }
-    if (sellerCommissionToPay > 0 && sellerUserId) {
-      await supabase.rpc('increment_player_credits', { p_player_id: sellerUserId, p_amount: sellerCommissionToPay });
+    if (valorRepasse > 0) {
+      await supabase.rpc('increment_admin_profit', { amount: valorRepasse });
+      queryClient.invalidateQueries({ queryKey: ['gameSettings'] });
     }
     
-    queryClient.invalidateQueries({ queryKey: ['gameSettings'] });
-    queryClient.invalidateQueries({ queryKey: ['players'] });
-    toast.success("Saldos e comissões repassados forçadamente com sucesso!");
+    toast.success("Saldo repassado ao Caixa Admin com sucesso!");
     return true;
   };
 
