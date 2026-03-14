@@ -34,28 +34,47 @@ serve(async (req) => {
     })
 
     const authHeader = req.headers.get('Authorization')
-    if (!authHeader) throw new Error("Não autorizado.");
+    let user = null;
 
-    const userSupabaseClient = createClient(
-        Deno.env.get('SUPABASE_URL') ?? '',
-        Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-        { global: { headers: { Authorization: authHeader } } }
-    )
-    const { data: { user }, error: userError } = await userSupabaseClient.auth.getUser()
+    // Tenta pegar o usuário se ele estiver logado, mas não bloqueia se for anônimo (para compras de cartela física)
+    if (authHeader && authHeader !== 'Bearer null' && authHeader !== 'null') {
+      try {
+        const userSupabaseClient = createClient(
+            Deno.env.get('SUPABASE_URL') ?? '',
+            Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+            { global: { headers: { Authorization: authHeader } } }
+        )
+        const { data } = await userSupabaseClient.auth.getUser()
+        if (data?.user) user = data.user;
+      } catch(e) {
+          console.error("Auth pass-through falhou", e);
+      }
+    }
     
-    if (userError || !user) throw new Error("Usuário não autenticado.");
+    if (!user && type === 'credits') {
+        throw new Error("Usuário não autenticado para compra de créditos.");
+    }
 
-    console.log(`[create-stripe-session] Criando checkout para ${user.email} - R$ ${amount}`);
+    console.log(`[create-stripe-session] Criando checkout - Tipo: ${type} | R$ ${amount}`);
+
+    const origin = req.headers.get('origin') || 'http://localhost:5173';
+    let success_url = `${origin}/?payment=success`;
+    let cancel_url = `${origin}/?payment=cancel`;
+    
+    // Se for validação de cartela, volta pra mesma tela mostrando que deu certo
+    if ((type === 'venda_bingo' || type === 'venda_rifa') && metadata.codigo) {
+        success_url = `${origin}/pagar-cartela?codigo=${metadata.codigo}&payment=success`;
+        cancel_url = `${origin}/pagar-cartela?codigo=${metadata.codigo}`;
+    }
 
     const session = await stripe.checkout.sessions.create({
-      // Voltamos apenas para cartão para não dar conflito com a sua conta Stripe
       payment_method_types: ['card'],
       line_items: [
         {
           price_data: {
             currency: 'brl',
             product_data: {
-              name: type === 'credits' ? 'Créditos Bingo Show' : 'Cartela Bingo Show',
+              name: type === 'credits' ? 'Créditos Bingo Show' : 'Validação de Cartela (Bingo Show)',
             },
             unit_amount: Math.round(amount * 100),
           },
@@ -63,13 +82,13 @@ serve(async (req) => {
         },
       ],
       mode: 'payment',
-      success_url: `${req.headers.get('origin')}/?payment=success`,
-      cancel_url: `${req.headers.get('origin')}/?payment=cancel`,
-      customer_email: user.email,
-      client_reference_id: user.id,
+      success_url,
+      cancel_url,
+      customer_email: user?.email || undefined,
+      client_reference_id: user?.id || 'anonymous',
       metadata: {
         ...metadata,
-        user_id: user.id,
+        user_id: user?.id || 'anonymous',
         payment_type: type
       },
     })

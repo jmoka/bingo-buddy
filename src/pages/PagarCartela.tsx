@@ -4,7 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2, ArrowLeft, Copy, CheckCircle2, AlertTriangle, ShieldCheck, Camera } from 'lucide-react';
+import { Loader2, ArrowLeft, Copy, CheckCircle2, AlertTriangle, ShieldCheck, Camera, CreditCard } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { QrCodePix } from 'qrcode-pix';
 import { toast } from 'sonner';
@@ -13,11 +13,21 @@ export default function PagarCartela() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const codigo = searchParams.get('codigo');
+  const paymentStatus = searchParams.get('payment');
 
   const [venda, setVenda] = useState<any | null>(null);
   const [tipoVenda, setTipoVenda] = useState<'bingo' | 'rifa' | null>(null);
   const [gameSettings, setGameSettings] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isStripeLoading, setIsStripeLoading] = useState(false);
+
+  // Alerta de sucesso se voltar do Stripe
+  useEffect(() => {
+    if (paymentStatus === 'success') {
+      toast.success("Pagamento aprovado com sucesso! Sua cartela está válida.");
+      window.history.replaceState({}, document.title, window.location.pathname + "?codigo=" + codigo);
+    }
+  }, [paymentStatus, codigo]);
 
   useEffect(() => {
     async function loadData() {
@@ -105,6 +115,28 @@ export default function PagarCartela() {
     }
   };
 
+  const handleStripePayment = async () => {
+    setIsStripeLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('create-stripe-session', {
+        body: { 
+          amount: valorCheio, 
+          type: tipoVenda === 'bingo' ? 'venda_bingo' : 'venda_rifa',
+          metadata: { venda_id: venda.id, codigo: venda.codigo_validacao }
+        }
+      });
+
+      if (error) throw error;
+      if (data?.url) {
+        window.location.href = data.url;
+      }
+    } catch (e: any) {
+      toast.error("Erro ao iniciar pagamento: " + e.message);
+    } finally {
+      setIsStripeLoading(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-[70vh] flex items-center justify-center">
@@ -168,9 +200,29 @@ export default function PagarCartela() {
           <div className="space-y-3">
             <h3 className="font-bold flex items-center gap-2 text-foreground">
               <span className="bg-primary text-white w-6 h-6 rounded-full flex items-center justify-center text-xs shrink-0">1</span>
-              Realize o Pagamento via PIX
+              Escolha a forma de pagamento
             </h3>
             
+            {gameSettings?.stripe_enabled && (
+              <div className="bg-primary/5 p-4 rounded-xl border border-primary/20 space-y-3 text-center">
+                <p className="text-xs text-primary font-bold uppercase tracking-wider">Pagamento Imediato via Cartão</p>
+                <Button 
+                  className="w-full h-14 bg-primary hover:bg-primary/90 text-white shadow-button font-bold text-lg" 
+                  onClick={handleStripePayment}
+                  disabled={isStripeLoading}
+                >
+                  {isStripeLoading ? <Loader2 className="w-6 h-6 mr-2 animate-spin" /> : <CreditCard className="w-6 h-6 mr-2" />}
+                  PAGAR COM CARTÃO
+                </Button>
+                <p className="text-[10px] text-muted-foreground italic">A cartela é validada na mesma hora. Não precisa enviar comprovante.</p>
+              </div>
+            )}
+
+            <div className="relative py-4">
+              <div className="absolute inset-0 flex items-center"><span className="w-full border-t" /></div>
+              <div className="relative flex justify-center text-xs uppercase"><span className="bg-background px-2 text-muted-foreground">Ou Pague com PIX Copia e Cola</span></div>
+            </div>
+
             <div className="bg-muted/40 p-4 rounded-xl border border-border/50 text-center">
               {pixPayload ? (
                 <div className="bg-white p-3 rounded-lg inline-block shadow-sm border border-gray-200 mb-4">
@@ -203,20 +255,19 @@ export default function PagarCartela() {
           <div className="space-y-3 pt-4 border-t">
             <h3 className="font-bold flex items-center gap-2 text-foreground">
               <span className="bg-primary text-white w-6 h-6 rounded-full flex items-center justify-center text-xs shrink-0">2</span>
-              Valide seu Bilhete
+              Valide seu Bilhete (Apenas PIX Manual)
             </h3>
             <p className="text-sm text-muted-foreground leading-relaxed">
-              Após realizar o PIX no app do seu banco, anexe o comprovante abaixo.
+              Se você realizou o PIX no app do seu banco, anexe o comprovante abaixo.
             </p>
 
             <div className="text-center pt-2">
-              <p className="text-sm font-bold text-foreground mb-2">Já pagou?</p>
               <Button 
                 className="w-full h-14 text-xl font-bold bg-green-600 hover:bg-green-700 text-white shadow-button animate-pulse"
                 onClick={() => navigate(`/validar-cartela?codigo=${venda.codigo_validacao}`)}
               >
                 <Camera className="w-5 h-5 mr-2" />
-                Validar
+                Validar Comprovante PIX
               </Button>
             </div>
           </div>
@@ -225,7 +276,7 @@ export default function PagarCartela() {
 
       <div className="flex items-start gap-3 p-4 bg-amber-50 rounded-xl border border-amber-200 text-amber-800 text-sm">
         <AlertTriangle className="w-5 h-5 shrink-0 text-amber-600 mt-0.5" />
-        <p><strong>Atenção:</strong> Seu bilhete só terá validade no sorteio após você enviar o comprovante de pagamento no botão acima!</p>
+        <p><strong>Atenção:</strong> Seu bilhete só terá validade no sorteio após o pagamento ser confirmado!</p>
       </div>
     </div>
   );
