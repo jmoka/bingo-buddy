@@ -28,16 +28,18 @@ export const CreditRequestDialog = ({ gameSettings, children }: CreditRequestDia
 
   const amount = credits * (gameSettings?.valor_por_credito || 1);
 
-  // Calcula o valor final se as taxas da Stripe estiverem ativas
-  const finalStripeAmount = useMemo(() => {
-    if (gameSettings?.stripe_pass_fees_to_customer) {
-        const perc = gameSettings.stripe_fee_percentage || 0;
-        const fix = gameSettings.stripe_fee_fixed || 0;
-        const final = (amount + fix) / (1 - (perc / 100));
-        return Math.ceil(final * 100) / 100;
-    }
-    return amount;
+  // Calcula o valor final e o detalhamento da taxa se a cobrança estiver ativa
+  const stripeFeeDetails = useMemo(() => {
+    if (!gameSettings?.stripe_pass_fees_to_customer) return null;
+    const perc = gameSettings.stripe_fee_percentage || 0;
+    const fix = gameSettings.stripe_fee_fixed || 0;
+    const final = (amount + fix) / (1 - (perc / 100));
+    const finalRounded = Math.ceil(final * 100) / 100;
+    const fee = finalRounded - amount;
+    return { final: finalRounded, fee };
   }, [amount, gameSettings]);
+
+  const finalStripeAmount = stripeFeeDetails ? stripeFeeDetails.final : amount;
 
   const pixPayload = useMemo(() => {
     if (!gameSettings?.pix_key || !profile) return '';
@@ -151,8 +153,11 @@ export const CreditRequestDialog = ({ gameSettings, children }: CreditRequestDia
                   {isStripeLoading ? <Loader2 className="w-6 h-6 mr-2 animate-spin" /> : <CreditCard className="w-6 h-6 mr-2" />}
                   PAGAR R$ {finalStripeAmount.toFixed(2).replace('.', ',')} NO CARTÃO
                 </Button>
-                {gameSettings.stripe_pass_fees_to_customer && (
-                  <p className="text-[10px] text-muted-foreground italic">* O valor no cartão inclui as taxas operacionais da Stripe.</p>
+                {stripeFeeDetails && (
+                  <div className="text-[10px] text-muted-foreground bg-muted/30 p-2 rounded border border-border/50 flex justify-between items-center px-4">
+                    <span>Créditos: <strong>R$ {amount.toFixed(2).replace('.', ',')}</strong></span>
+                    <span>+ Taxa Cartão: <strong>R$ {stripeFeeDetails.fee.toFixed(2).replace('.', ',')}</strong></span>
+                  </div>
                 )}
               </div>
             )}

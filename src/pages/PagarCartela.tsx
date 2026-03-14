@@ -90,16 +90,18 @@ export default function PagarCartela() {
     return Number(venda.valor_pago) / (1 - (desc / 100));
   }, [venda]);
 
-  // Calcula o valor final se as taxas da Stripe estiverem ativas
-  const finalStripeAmount = useMemo(() => {
-    if (gameSettings?.stripe_pass_fees_to_customer) {
-        const perc = gameSettings.stripe_fee_percentage || 0;
-        const fix = gameSettings.stripe_fee_fixed || 0;
-        const final = (valorCheio + fix) / (1 - (perc / 100));
-        return Math.ceil(final * 100) / 100;
-    }
-    return valorCheio;
+  // Calcula o valor final e o detalhamento se as taxas da Stripe estiverem ativas
+  const stripeFeeDetails = useMemo(() => {
+    if (!gameSettings?.stripe_pass_fees_to_customer) return null;
+    const perc = gameSettings.stripe_fee_percentage || 0;
+    const fix = gameSettings.stripe_fee_fixed || 0;
+    const final = (valorCheio + fix) / (1 - (perc / 100));
+    const finalRounded = Math.ceil(final * 100) / 100;
+    const fee = finalRounded - valorCheio;
+    return { final: finalRounded, fee };
   }, [valorCheio, gameSettings]);
+
+  const finalStripeAmount = stripeFeeDetails ? stripeFeeDetails.final : valorCheio;
 
   const pixPayload = useMemo(() => {
     if (!gameSettings?.pix_key || !venda) return '';
@@ -225,8 +227,11 @@ export default function PagarCartela() {
                   {isStripeLoading ? <Loader2 className="w-6 h-6 mr-2 animate-spin" /> : <CreditCard className="w-6 h-6 mr-2" />}
                   PAGAR R$ {finalStripeAmount.toFixed(2).replace('.', ',')} NO CARTÃO
                 </Button>
-                {gameSettings.stripe_pass_fees_to_customer ? (
-                  <p className="text-[10px] text-muted-foreground italic">* O valor no cartão inclui as taxas operacionais da Stripe.</p>
+                {stripeFeeDetails ? (
+                  <div className="text-[10px] text-muted-foreground bg-white/60 p-2 rounded border border-primary/10 flex justify-between items-center px-4">
+                    <span>Valor Bilhete: <strong>R$ {valorCheio.toFixed(2).replace('.', ',')}</strong></span>
+                    <span>+ Taxa Cartão: <strong>R$ {stripeFeeDetails.fee.toFixed(2).replace('.', ',')}</strong></span>
+                  </div>
                 ) : (
                   <p className="text-[10px] text-muted-foreground italic">A cartela é validada na mesma hora.</p>
                 )}
