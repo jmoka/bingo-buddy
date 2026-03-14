@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useGame } from '@/contexts/GameContext';
@@ -6,17 +6,18 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
-import { Menu, Wallet, Plus, Banknote, History, Printer, LogOut, Star, Crown, Ticket, Search, UserCheck, ShieldCheck, User } from 'lucide-react';
+import { Menu, Wallet, Plus, Banknote, History, Printer, LogOut, Star, Crown, Ticket, Search, UserCheck, ShieldCheck, User, AlertTriangle } from 'lucide-react';
 import { CreditRequestDialog } from './CreditRequestDialog';
 import { MyCreditRequestsDialog } from './MyCreditRequestsDialog';
 import { RedeemRequestDialog } from './RedeemRequestDialog';
 import { MyRedeemRequestsDialog } from './MyRedeemRequestsDialog';
 import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
 
 export const AppHeader = () => {
   const navigate = useNavigate();
   const { profile, signOut } = useAuth();
-  const { gameSettings, playerCards, rechargeFakeCredits } = useGame();
+  const { gameSettings, playerCards, rechargeFakeCredits, players } = useGame();
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [isRecharging, setIsRecharging] = useState(false);
   const [avatarSrc, setAvatarSrc] = useState<string | null>(null);
@@ -62,6 +63,15 @@ export const AppHeader = () => {
   };
 
   const isAdmin = profile.role === 'admin';
+
+  // Lógica de Segurança do Caixa do Admin
+  const totalUserCredits = useMemo(() => {
+    if (!isAdmin || !players) return 0;
+    return players.reduce((acc, player) => acc + Number(player.credits || 0), 0);
+  }, [players, isAdmin]);
+
+  const adminCaixa = Number(gameSettings?.admin_profit || 0);
+  const isCaixaBaixo = adminCaixa < totalUserCredits;
 
   const menuItems = [
     ...(!isAdmin ? [{
@@ -121,7 +131,29 @@ export const AppHeader = () => {
           🎱 Bingo
         </a>
         <div className="flex items-center gap-1 sm:gap-2">
-          {/* Saldo Real */}
+          
+          {/* Visão do Admin: Caixa vs Saldo Jogadores */}
+          {isAdmin && (
+            <div 
+              className={cn(
+                "flex items-center gap-1.5 rounded-full px-2 py-1 sm:px-3 border cursor-help transition-colors",
+                isCaixaBaixo 
+                  ? "bg-destructive/10 border-destructive text-destructive" 
+                  : "bg-success/10 border-success/30 text-success"
+              )}
+              title={`Caixa Admin: ${adminCaixa.toFixed(2)} cr.\nSaldo Total dos Jogadores: ${totalUserCredits.toFixed(2)} cr.\n\n${isCaixaBaixo ? 'Atenção: Os jogadores possuem mais saldo do que o caixa acumulado do sistema!' : 'Caixa Saudável.'}`}
+            >
+              <ShieldCheck className="w-3.5 h-3.5" />
+              <span className="font-heading font-bold text-sm sm:text-base">
+                {adminCaixa.toFixed(2)}
+              </span>
+              {isCaixaBaixo && (
+                <AlertTriangle className="w-4 h-4 ml-1 animate-pulse" />
+              )}
+            </div>
+          )}
+
+          {/* Saldo Real (Apenas para Usuários/Vendedores) */}
           {!isAdmin && (
             <div className="flex items-center gap-1 bg-muted rounded-full px-2 py-1.5 sm:px-3" title="Créditos Reais">
               <Wallet className="w-3.5 h-3.5 text-foreground" />
@@ -129,7 +161,7 @@ export const AppHeader = () => {
             </div>
           )}
           
-          {/* Saldo de Brincar com Botão de Recarga */}
+          {/* Saldo de Brincar com Botão de Recarga (Apenas para Usuários/Vendedores) */}
           {!isAdmin && (
             <div className="flex items-center gap-1 bg-amber-400/10 rounded-full pl-2 pr-1 py-1 sm:pl-3 border border-amber-400/20" title="Créditos de Brincar">
               <Star className="w-3.5 h-3.5 text-amber-600" />
@@ -148,7 +180,7 @@ export const AppHeader = () => {
 
           <button
             onClick={() => navigate('/account')}
-            className="flex flex-col items-center gap-0.5 hover:opacity-80 transition-opacity"
+            className="flex flex-col items-center gap-0.5 hover:opacity-80 transition-opacity ml-2"
             title="Meu perfil"
           >
             {avatarSrc ? (
