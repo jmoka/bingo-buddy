@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -8,6 +9,31 @@ export const useRifaAdmin = () => {
   const { profile } = useAuth();
   const queryClient = useQueryClient();
   const isAdmin = profile?.role === 'admin';
+
+  // Efeito para escutar mudanças em tempo real nas tabelas de admin
+  useEffect(() => {
+    if (!isAdmin) return;
+
+    const channel = supabase
+      .channel('admin-rifa-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'compras_rifa' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['todasComprasRifa'] });
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'vendas_bingo_fisico' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['todasFolhasBingoAdmin'] });
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'solicitacoes_vendedor' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['solicitacoesVendedor'] });
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'acertos_vendedor' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['acertosAdmin'] });
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [isAdmin, queryClient]);
 
   const { data: todasRifas = [], isLoading: isLoadingRifas } = useQuery({
     queryKey: ['rifasAdmin'],
@@ -318,97 +344,6 @@ export const useRifaAdmin = () => {
 
     toast.success('Dados do vendedor atualizados com sucesso!');
     queryClient.invalidateQueries({ queryKey: ['vendedoresComStats'] });
-    return true;
-  };
-
-  const getNumerosRifaAdmin = async (rifaId: string): Promise<NumeroRifa[]> => {
-    const { data, error } = await supabase
-      .from('numeros_rifa')
-      .select('*')
-      .eq('rifa_id', rifaId)
-      .order('numero');
-    if (error) return [];
-    return data as NumeroRifa[];
-  };
-
-  const getCartelasCompra = async (compraId: string): Promise<CartelaRifa[]> => {
-    const { data, error } = await supabase
-      .from('cartelas_rifa')
-      .select('*')
-      .eq('compra_id', compraId);
-    if (error) return [];
-    return data as CartelaRifa[];
-  };
-
-  const registrarVendaVendedor = async (
-    rifaId: string,
-    vendedorId: string,
-    numeros: number[],
-    clienteId?: string,
-  ): Promise<boolean> => {
-    const { data: rifaData } = await supabase
-      .from('rifas')
-      .select('custo_por_numero')
-      .eq('id', rifaId)
-      .single();
-    if (!rifaData) { toast.error('Rifa não encontrada.'); return false; }
-
-    const { data: vendedorData } = await supabase
-      .from('vendedores_rifa')
-      .select('percentual_desconto')
-      .eq('id', vendedorId)
-      .single();
-
-    const desconto = vendedorData?.percentual_desconto ?? 0;
-    const valorBruto = numeros.length * rifaData.custo_por_numero;
-    const valorFinal = valorBruto * (1 - desconto / 100);
-
-    for (const num of numeros) {
-      const { error } = await supabase
-        .from('numeros_rifa')
-        .update({ status: 'vendido', vendedor_id: vendedorId, cliente_rifa_id: clienteId ?? null })
-        .eq('rifa_id', rifaId)
-        .eq('numero', num)
-        .eq('status', 'disponivel');
-      if (error) {
-        toast.error(`Erro ao reservar número ${num}.`);
-        return false;
-      }
-    }
-
-    const { data: compraData, error: compraErr } = await supabase
-      .from('compras_rifa')
-      .insert([{
-        rifa_id: rifaId,
-        vendedor_id: vendedorId,
-        cliente_rifa_id: clienteId ?? null,
-        numeros,
-        valor_total: valorFinal,
-        desconto_aplicado: desconto,
-        tipo_pagamento: 'vendedor',
-      }])
-      .select('id')
-      .single();
-
-    if (compraErr || !compraData) { toast.error('Erro ao registrar compra.'); return false; }
-
-    const numerosIds = await supabase
-      .from('numeros_rifa')
-      .select('id, numero')
-      .eq('rifa_id', rifaId)
-      .in('numero', numeros);
-
-    if (numerosIds.data && numerosIds.data.length > 0) {
-      const cartelas = numerosIds.data.map(n => ({
-        numero_rifa_id: n.id,
-        compra_id: compraData.id,
-      }));
-      await supabase.from('cartelas_rifa').insert(cartelas);
-    }
-
-    toast.success(`Venda de ${numeros.length} número(s) registrada!`);
-    queryClient.invalidateQueries({ queryKey: ['numerosRifa'] });
-    queryClient.invalidateQueries({ queryKey: ['todasComprasRifa'] });
     return true;
   };
 
