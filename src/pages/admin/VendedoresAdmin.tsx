@@ -573,7 +573,10 @@ const VendedoresAdmin = () => {
           </div>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setAcaoAcerto(null)}>Cancelar</Button>
-            <Button className={acaoAcerto?.tipo === 'aprovado' ? 'bg-green-600 hover:bg-green-700 text-white' : ''} variant={acaoAcerto?.tipo === 'rejeitado' ? 'destructive' : 'default'} onClick={handleResolverAcerto} disabled={isProcessandoAcerto}>{isProcessandoAcerto && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}{acaoAcerto?.tipo === 'aprovado' ? 'Sim, o dinheiro caiu!' : 'Rejeitar Acerto'}</Button>
+            <Button className={acaoAcerto?.tipo === 'aprovado' ? 'bg-green-600 hover:bg-green-700 text-white' : ''} variant={acaoAcerto?.tipo === 'rejeitado' ? 'destructive' : 'default'} onClick={handleResolverAcerto} disabled={isProcessandoAcerto}>
+              {isProcessandoAcerto && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              {acaoAcerto?.tipo === 'aprovado' ? 'Sim, o dinheiro caiu!' : 'Rejeitar Acerto'}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
