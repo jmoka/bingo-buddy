@@ -125,6 +125,7 @@ export interface AcertoVendedor {
   id: string;
   vendedor_id: string;
   valor: number;
+  comissao_paga?: number;
   comprovante_url: string;
   status: 'pendente' | 'aprovado' | 'rejeitado' | 'aprovar' | 'rejeitar';
   bingo_ids: string[];

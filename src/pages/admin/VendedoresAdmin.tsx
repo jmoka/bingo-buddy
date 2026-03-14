@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
-import { Loader2, CheckCircle2, XCircle, Users, Copy, ShieldBan, ShieldCheck, Edit, Wallet, HandCoins, AlertTriangle, Eye, ExternalLink, Grid3X3, SmartphoneNfc, Ticket } from 'lucide-react';
+import { Loader2, CheckCircle2, XCircle, Users, Copy, ShieldBan, ShieldCheck, Edit, Wallet, HandCoins, AlertTriangle, Eye, ExternalLink, Grid3X3, SmartphoneNfc, Ticket, TrendingUp, BadgeDollarSign, HeartHandshake } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { AcertoVendedor } from '@/types/rifa';
@@ -42,6 +42,15 @@ const VendedoresAdmin = () => {
 
   const pendentes = solicitacoesVendedor.filter(s => s.status === 'pendente');
   const acertosParaAnalisar = acertosPendentes.filter(a => a.status === 'pendente' || a.status === 'em_analise');
+  const resolvedAcertos = acertosPendentes.filter(a => a.status === 'aprovado' || a.status === 'rejeitado' || a.status === 'aprovar' || a.status === 'rejeitar');
+
+  // Cálculos do Dashboard Financeiro de Vendedores
+  const totalRecebido = resolvedAcertos.filter(a => a.status === 'aprovado' || a.status === 'aprovar').reduce((acc, a) => acc + Number(a.valor), 0);
+  const totalComissoesPagas = resolvedAcertos.filter(a => a.status === 'aprovado' || a.status === 'aprovar').reduce((acc, a) => acc + Number(a.comissao_paga || 0), 0);
+  
+  const fiadosBingo = todasFolhasBingo.filter(f => f.status === 'pendente').reduce((acc, f) => acc + Number(f.valor_pago), 0);
+  const fiadosRifa = todasCompras.filter(c => c.status === 'pendente' && c.tipo_pagamento === 'vendedor').reduce((acc, c) => acc + Number(c.valor_total), 0);
+  const totalFiadoNaRua = fiadosBingo + fiadosRifa;
 
   // Vendas de Clientes (PIX Direto)
   const pagamentosClientesBingo = todasFolhasBingo.filter(f => f.status === 'em_analise').map(f => ({
@@ -61,8 +70,6 @@ const VendedoresAdmin = () => {
 
   const pagamentosClientesRifa = todasCompras.filter(c => c.status === 'em_analise').map(c => {
     const cartela = c.cartelas_rifa?.[0];
-    
-    // CORREÇÃO: Buscando o nome do vendedor cruzando localmente para evitar erro do banco
     const vendedorDaRifa = c.vendedor_id 
       ? vendedoresComStats.find((v: any) => v.id === c.vendedor_id)
       : vendedoresComStats.find((v: any) => v.id === c.ref_vendedor_id);
@@ -190,8 +197,6 @@ const VendedoresAdmin = () => {
     return <div className="flex items-center justify-center min-h-[40vh]"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
   }
 
-  const resolvedAcertos = acertosPendentes.filter(a => a.status === 'aprovado' || a.status === 'rejeitado' || a.status === 'aprovar' || a.status === 'rejeitar');
-
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -201,7 +206,7 @@ const VendedoresAdmin = () => {
         </div>
       </div>
 
-      <Tabs defaultValue="clientes">
+      <Tabs defaultValue="acertos">
         <TabsList className="grid w-full grid-cols-4 h-auto p-1">
           <TabsTrigger value="vendedores" className="py-3">Vendedores</TabsTrigger>
           <TabsTrigger value="solicitacoes" className="relative py-3">Inscrições {pendentes.length > 0 && <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-amber-500 text-[9px] font-bold text-white">{pendentes.length}</span>}</TabsTrigger>
@@ -305,9 +310,34 @@ const VendedoresAdmin = () => {
         </TabsContent>
 
         <TabsContent value="acertos" className="mt-4 space-y-6">
-          
+          {/* DASHBOARD FINANCEIRO DOS VENDEDORES */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-6">
+            <div className="card-container p-4 bg-green-50 dark:bg-green-900/10 border-green-200 dark:border-green-800">
+               <div className="flex items-center gap-2 text-green-700 dark:text-green-400 mb-1">
+                  <TrendingUp className="w-4 h-4" />
+                  <p className="text-[10px] font-bold uppercase tracking-wider">Total Recebido (Caixa)</p>
+               </div>
+               <p className="text-2xl font-black font-heading text-green-800 dark:text-green-300">R$ {totalRecebido.toFixed(2).replace('.', ',')}</p>
+            </div>
+            <div className="card-container p-4 bg-amber-50 dark:bg-amber-900/10 border-amber-200 dark:border-amber-800">
+               <div className="flex items-center gap-2 text-amber-700 dark:text-amber-400 mb-1">
+                  <HeartHandshake className="w-4 h-4" />
+                  <p className="text-[10px] font-bold uppercase tracking-wider">Comissões Pagas</p>
+               </div>
+               <p className="text-2xl font-black font-heading text-amber-800 dark:text-amber-300">R$ {totalComissoesPagas.toFixed(2).replace('.', ',')}</p>
+               <p className="text-[9px] text-amber-700/70 leading-tight mt-1">Créditos depositados na conta dos vendedores.</p>
+            </div>
+            <div className="card-container p-4 bg-destructive/5 border-destructive/20">
+               <div className="flex items-center gap-2 text-destructive mb-1">
+                  <BadgeDollarSign className="w-4 h-4" />
+                  <p className="text-[10px] font-bold uppercase tracking-wider">Fiado na Rua (A Receber)</p>
+               </div>
+               <p className="text-2xl font-black font-heading text-destructive">R$ {totalFiadoNaRua.toFixed(2).replace('.', ',')}</p>
+            </div>
+          </div>
+
           <div className="space-y-3">
-             <h3 className="text-sm font-semibold text-foreground flex items-center gap-2"><Wallet className="w-4 h-4 text-green-600" /> Acertos em Lote de Vendedores ({acertosParaAnalisar.length})</h3>
+             <h3 className="text-sm font-semibold text-foreground flex items-center gap-2"><Wallet className="w-4 h-4 text-green-600" /> Acertos em Lote para Aprovar ({acertosParaAnalisar.length})</h3>
              {acertosParaAnalisar.length === 0 ? (
                 <div className="card-container text-center py-10 text-muted-foreground text-sm border-dashed">Nenhum acerto em lote pendente.</div>
              ) : (
@@ -319,12 +349,12 @@ const VendedoresAdmin = () => {
                        <p className="text-xs text-muted-foreground mt-0.5">{format(new Date(a.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}</p>
                      </div>
                      <div className="text-right">
-                        <p className="text-[10px] uppercase font-bold text-muted-foreground">Repasse Declarado</p>
+                        <p className="text-[10px] uppercase font-bold text-muted-foreground">Valor do PIX (Bruto)</p>
                         <p className="text-xl font-black text-green-600">R$ {Number(a.valor).toFixed(2)}</p>
                      </div>
                    </div>
                    <div className="flex items-center gap-3 pt-3 mt-3 border-t">
-                      <Button variant="outline" size="sm" className="flex-1" onClick={() => handleViewComprovante(a.comprovante_url, false)}><Eye className="w-4 h-4 mr-2" /> Comprovante</Button>
+                      <Button variant="outline" size="sm" className="flex-1" onClick={() => handleViewComprovante(a.comprovante_url, false)}><Eye className="w-4 h-4 mr-2" /> Comprovante PIX</Button>
                       <div className="flex gap-2">
                         <Button size="icon" variant="destructive" className="h-9 w-9" onClick={() => setAcaoAcerto({ tipo: 'rejeitado', acerto: a })}><XCircle className="w-4 h-4" /></Button>
                         <Button size="icon" className="h-9 w-9 bg-green-600 hover:bg-green-700" onClick={() => setAcaoAcerto({ tipo: 'aprovado', acerto: a })}><CheckCircle2 className="w-4 h-4" /></Button>
@@ -342,6 +372,9 @@ const VendedoresAdmin = () => {
              ) : (
                resolvedAcertos.map(a => {
                   const finalStatus = a.status === 'aprovar' ? 'aprovado' : a.status === 'rejeitar' ? 'rejeitado' : a.status;
+                  const valorBruto = Number(a.valor);
+                  const comissao = Number(a.comissao_paga || 0);
+                  const liquido = valorBruto - comissao;
                   
                  return (
                  <div key={a.id} className="card-container p-4 flex flex-col bg-muted/20">
@@ -351,11 +384,25 @@ const VendedoresAdmin = () => {
                        <p className="text-xs text-muted-foreground mt-0.5">{format(new Date(a.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}</p>
                      </div>
                      <div className="text-right">
-                        <p className="text-[10px] uppercase font-bold text-muted-foreground">Valor Acertado</p>
-                        <p className="text-xl font-black text-foreground">R$ {Number(a.valor).toFixed(2)}</p>
+                        <p className="text-[10px] uppercase font-bold text-muted-foreground">Valor Bruto</p>
+                        <p className="text-xl font-black text-foreground">R$ {valorBruto.toFixed(2)}</p>
                      </div>
                    </div>
-                   <div className="flex items-center justify-between pt-3 mt-3 border-t">
+                   
+                   {finalStatus === 'aprovado' && (
+                       <div className="flex items-center justify-between my-3 p-2.5 bg-background rounded-lg border border-border/50">
+                           <div className="text-center">
+                               <p className="text-[9px] uppercase font-bold text-amber-600">Comissão Paga</p>
+                               <p className="font-mono font-bold text-sm text-amber-700">R$ {comissao.toFixed(2)}</p>
+                           </div>
+                           <div className="text-center border-l pl-4">
+                               <p className="text-[9px] uppercase font-bold text-success">Líquido no Caixa</p>
+                               <p className="font-mono font-bold text-sm text-success">R$ {liquido.toFixed(2)}</p>
+                           </div>
+                       </div>
+                   )}
+
+                   <div className="flex items-center justify-between pt-3 mt-1 border-t">
                       <div className="flex items-center gap-2">
                          <Badge className={finalStatus === 'aprovado' ? 'bg-success text-white' : 'bg-destructive text-white'}>
                              {finalStatus.toUpperCase()}
@@ -363,7 +410,7 @@ const VendedoresAdmin = () => {
                          {finalStatus === 'aprovado' && (
                              a.repasse_concluido ? (
                                <Badge variant="outline" className="text-[9px] bg-green-500/10 text-green-700 border-green-500/30 font-bold">
-                                 <CheckCircle2 className="w-2.5 h-2.5 mr-1" /> Lucro Creditado
+                                 <CheckCircle2 className="w-2.5 h-2.5 mr-1" /> Dinheiro Dividido
                                </Badge>
                              ) : (
                                <Badge variant="outline" className="text-[9px] bg-red-500/10 text-red-700 border-red-500/30 font-bold animate-pulse">

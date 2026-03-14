@@ -17,7 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import {
   ArrowLeft, Loader2, Copy, Link2, CheckSquare, ShoppingBag, UserCheck, Ticket,
   Printer, Plus, Undo2, Grid3X3, DollarSign, Wallet, Upload, CheckCircle2, XCircle,
-  BadgePercent, ListChecks, AlertTriangle, WalletCards, Filter, User
+  BadgePercent, ListChecks, AlertTriangle, WalletCards, Filter, User, HeartHandshake, BadgeDollarSign
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -90,6 +90,10 @@ const VendedorPainel = () => {
   const pendingFolhas = useMemo(() => folhasEmitidas.filter(f => f.status === 'pendente'), [folhasEmitidas]);
   const pendingVendas = useMemo(() => minhasVendas.filter(v => v.status === 'pendente'), [minhasVendas]);
   const pendentesTotais = pendingFolhas.length + pendingVendas.length;
+  
+  // Dashboard Vendedor
+  const dividaAtual = pendingFolhas.reduce((a, f) => a + Number(f.valor_pago), 0) + pendingVendas.reduce((a, v) => a + Number(v.valor_total), 0);
+  const comissoesGanhas = meusAcertos.filter(a => a.status === 'aprovado').reduce((a, b) => a + Number((b as any).comissao_paga || 0), 0);
 
   const uniqueBingoMatches = useMemo(() => {
     const map = new Map<string, string>();
@@ -676,10 +680,28 @@ const VendedorPainel = () => {
         </TabsContent>
 
         <TabsContent value="acertos" className="space-y-4 mt-0">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-6">
+            <div className="card-container p-4 bg-amber-50 dark:bg-amber-900/10 border-amber-200 dark:border-amber-800">
+               <div className="flex items-center gap-2 text-amber-700 dark:text-amber-400 mb-1">
+                  <HeartHandshake className="w-4 h-4" />
+                  <p className="text-[10px] font-bold uppercase tracking-wider">Comissões Recebidas</p>
+               </div>
+               <p className="text-2xl font-black font-heading text-amber-800 dark:text-amber-300">R$ {comissoesGanhas.toFixed(2).replace('.', ',')}</p>
+               <p className="text-[9px] text-amber-700/70 leading-tight mt-1">Acertos fechados e validados pelo Admin.</p>
+            </div>
+            <div className="card-container p-4 bg-destructive/5 border-destructive/20">
+               <div className="flex items-center gap-2 text-destructive mb-1">
+                  <BadgeDollarSign className="w-4 h-4" />
+                  <p className="text-[10px] font-bold uppercase tracking-wider">Fiado na Rua (A Pagar)</p>
+               </div>
+               <p className="text-2xl font-black font-heading text-destructive">R$ {dividaAtual.toFixed(2).replace('.', ',')}</p>
+            </div>
+          </div>
+
           <div className="card-container space-y-4">
             <div className="flex items-center justify-between mb-2 border-b pb-4">
                 <h2 id="secao-acertos" className="font-heading text-lg font-bold flex items-center gap-2">
-                <Wallet className="w-5 h-5 text-primary" /> Acertos Financeiros
+                <Wallet className="w-5 h-5 text-primary" /> Fazer Novo Acerto
                 </h2>
                 {selectedFaturas.geral.bruto > 0 && (
                     <Button className="bg-amber-600 hover:bg-amber-700 text-white shadow-sm font-bold animate-pulse hidden sm:flex" onClick={() => setPagarAcertoOpen(true)}>
@@ -803,7 +825,7 @@ const VendedorPainel = () => {
                         <p className="text-sm font-bold text-amber-800 dark:text-amber-500 uppercase tracking-widest flex items-center justify-center sm:justify-start gap-2">
                             <BadgePercent className="w-5 h-5" /> REPASSE SELECIONADO
                         </p>
-                        <p className="text-xs text-amber-700/80 mt-1">Ao quitar este valor, você receberá <strong>{comissaoAtiva}%</strong> de comissão no saldo do App.</p>
+                        <p className="text-xs text-amber-700/80 mt-1">Ao quitar este valor (bruto), você receberá <strong>{comissaoAtiva}%</strong> de comissão no saldo do App.</p>
                     </div>
                     <div className="flex flex-col items-center sm:items-end gap-2 w-full sm:w-auto">
                         <p className="text-3xl font-black font-heading text-amber-700 dark:text-amber-400">R$ {selectedFaturas.geral.bruto.toFixed(2).replace('.', ',')}</p>
@@ -818,7 +840,7 @@ const VendedorPainel = () => {
             )}
 
             <div className="mt-8 border-t pt-6">
-              <h3 className="font-heading font-bold text-sm mb-3">Histórico de Acertos (PIX)</h3>
+              <h3 className="font-heading font-bold text-sm mb-3">Seu Histórico de Acertos (PIX)</h3>
               <div className="space-y-4">
                 {meusAcertos.length === 0 ? (
                   <p className="text-xs text-muted-foreground">Nenhum acerto enviado ainda.</p>
@@ -826,17 +848,26 @@ const VendedorPainel = () => {
                   meusAcertos.map((acerto: any) => {
                     const isBugged = acerto.status === 'aprovar' || acerto.status === 'rejeitar';
                     const finalStatus = isBugged ? (acerto.status === 'aprovar' ? 'aprovado' : 'rejeitado') : acerto.status;
+                    const comissao = Number(acerto.comissao_paga || 0);
 
                     return (
                       <div key={acerto.id} className="p-4 border rounded-xl flex flex-col text-sm bg-muted/20 gap-3 shadow-sm hover:shadow-md transition-shadow">
                         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/50 pb-2">
                           <div>
+                            <p className="text-[10px] uppercase font-bold text-muted-foreground">Valor Transferido (Bruto)</p>
                             <p className="font-black text-lg text-primary">R$ {Number(acerto.valor).toFixed(2).replace('.', ',')}</p>
-                            <p className="text-xs text-muted-foreground">{format(new Date(acerto.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}</p>
+                            <p className="text-xs text-muted-foreground mt-0.5">{format(new Date(acerto.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}</p>
                           </div>
-                          <Badge variant={finalStatus === 'aprovado' ? 'default' : finalStatus === 'rejeitado' ? 'destructive' : 'secondary'} className={finalStatus === 'aprovado' ? 'bg-success text-white' : ''}>
-                            {finalStatus.toUpperCase()}
-                          </Badge>
+                          <div className="text-right">
+                              <Badge variant={finalStatus === 'aprovado' ? 'default' : finalStatus === 'rejeitado' ? 'destructive' : 'secondary'} className={finalStatus === 'aprovado' ? 'bg-success text-white' : ''}>
+                                {finalStatus.toUpperCase()}
+                              </Badge>
+                              {finalStatus === 'aprovado' && comissao > 0 && (
+                                <p className="text-[10px] font-bold text-amber-600 mt-1">
+                                    + R$ {comissao.toFixed(2)} de comissão.
+                                </p>
+                              )}
+                          </div>
                         </div>
 
                         {isBugged && (
