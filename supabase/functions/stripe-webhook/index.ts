@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
-import Stripe from 'https://esm.sh/stripe@16.5.0?target=deno'
+import Stripe from 'npm:stripe@16.10.0'
 
 serve(async (req) => {
   const supabaseAdmin = createClient(
@@ -46,7 +46,7 @@ serve(async (req) => {
       if (session.payment_status === 'paid') {
         const userId = session.client_reference_id
         const paymentType = session.metadata?.payment_type
-        const amount = session.amount_total / 100
+        const amount = session.amount_total ? session.amount_total / 100 : 0
 
         // Evita duplicidade
         const { data: existing } = await supabaseAdmin
@@ -55,7 +55,7 @@ serve(async (req) => {
           .eq('stripe_session_id', session.id)
           .maybeSingle();
 
-        if (existing?.status !== 'completed') {
+        if (existing?.status !== 'completed' && userId) {
           await supabaseAdmin
             .from('stripe_payments')
             .upsert({ 
@@ -93,7 +93,7 @@ serve(async (req) => {
     }
 
     return new Response(JSON.stringify({ received: true }), { status: 200 })
-  } catch (err) {
+  } catch (err: any) {
     console.error(`💥 FATAL ERROR in stripe-webhook: ${err.message}`);
     return new Response(`Webhook Error: ${err.message}`, { status: 400 })
   }

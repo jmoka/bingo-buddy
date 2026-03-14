@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
-import Stripe from 'https://esm.sh/stripe@16.5.0?target=deno'
+import Stripe from 'npm:stripe@16.10.0'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -48,6 +48,7 @@ serve(async (req) => {
     console.log(`[create-stripe-session] Criando checkout para ${user.email} - R$ ${amount}`);
 
     const session = await stripe.checkout.sessions.create({
+      payment_method_types: ['card'],
       line_items: [
         {
           price_data: {
@@ -61,9 +62,6 @@ serve(async (req) => {
         },
       ],
       mode: 'payment',
-      automatic_payment_methods: {
-        enabled: true,
-      },
       success_url: `${req.headers.get('origin')}/?payment=success`,
       cancel_url: `${req.headers.get('origin')}/?payment=cancel`,
       customer_email: user.email,
@@ -80,7 +78,7 @@ serve(async (req) => {
       status: 200,
     })
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('💥 FATAL ERROR in create-stripe-session:', error);
     return new Response(JSON.stringify({ error: error.message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
