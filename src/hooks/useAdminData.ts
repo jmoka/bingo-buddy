@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -10,6 +10,31 @@ export const useAdminData = () => {
   const { profile, user } = useAuth();
   const queryClient = useQueryClient();
   const isAdmin = profile?.role === 'admin';
+
+  // Centralized real-time listeners for all admin data
+  useEffect(() => {
+    if (!isAdmin) return;
+
+    const channel = supabase
+      .channel('admin-data-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'compras_rifa' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['todasComprasRifa'] });
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'vendas_bingo_fisico' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['todasFolhasBingoAdmin'] });
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'solicitacoes_vendedor' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['solicitacoesVendedor'] });
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'acertos_vendedor' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['acertosAdmin'] });
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [isAdmin, queryClient]);
 
   const { data: players = [], isLoading: isLoadingPlayers } = useQuery({
     queryKey: ['players'],
