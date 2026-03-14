@@ -526,8 +526,11 @@ const VendedorPainel = () => {
                           const isPendente = statusCompra === 'pendente';
                           const isEmAnalise = statusCompra === 'em_analise';
                           
-                          // Lógica solicitada: Se está pago mas ainda é "reservado" (vendedor pagou mas não vinculou cliente)
-                          const isPagoSemNome = n.status === 'reservado' && isPago;
+                          const temNome = !!n.nome_comprador?.trim();
+                          
+                          // Lógica visual corrigida
+                          const isPagoSemNome = (n.status === 'reservado' || n.status === 'vendido') && isPago && !temNome;
+                          const isTotalmenteFinalizado = n.status === 'vendido' || (n.status === 'reservado' && isPago && temNome);
 
                           let badgeText = 'PAGO';
                           let badgeClass = 'bg-green-100 text-green-700 border-green-200';
@@ -544,7 +547,7 @@ const VendedorPainel = () => {
                             <div key={n.id} className="relative group">
                                 <button
                                     onClick={() => {
-                                        if (n.status === 'vendido') return;
+                                        if (isTotalmenteFinalizado) return; // Bloqueia clique se já está totalmente pronto
                                         if (modoSelecao) {
                                             toggleValidar(n.id);
                                         } else {
@@ -554,8 +557,8 @@ const VendedorPainel = () => {
                                         }
                                     }}
                                     className={`w-full rounded-lg p-2 flex flex-col items-center justify-center gap-0.5 transition-all min-h-[85px] border 
-                                        ${n.status === 'vendido' ? 'bg-green-50/50 text-green-700 border-green-200 cursor-default opacity-80' : 
-                                          isPagoSemNome ? 'bg-green-600 text-white border-green-700 shadow-inner' :
+                                        ${isTotalmenteFinalizado ? 'bg-green-50/50 text-green-700 border-green-200 cursor-default opacity-80' : 
+                                          isPagoSemNome ? 'bg-green-600 text-white border-green-700 shadow-inner hover:bg-green-700' :
                                           'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100 cursor-pointer'}
                                         ${modoSelecao && isSelected ? 'ring-2 ring-primary border-primary bg-primary/10 text-primary' : ''}
                                     `}
@@ -568,19 +571,19 @@ const VendedorPainel = () => {
                                         </p>
                                     )}
 
-                                    {codigoValidacao && !isPagoSemNome && (
+                                    {codigoValidacao && !isPagoSemNome && !isTotalmenteFinalizado && (
                                         <span className="text-[9px] font-mono text-primary bg-primary/10 px-1.5 py-0.5 rounded mt-1 font-bold tracking-widest border border-primary/20">
                                             {codigoValidacao}
                                         </span>
                                     )}
 
-                                    {!isPagoSemNome && (
+                                    {!isPagoSemNome && !isTotalmenteFinalizado && (
                                         <span className={`text-[8px] px-1.5 py-0.5 rounded border mt-1.5 uppercase font-black tracking-wider w-full text-center ${badgeClass}`}>
                                           {badgeText}
                                         </span>
                                     )}
                                     
-                                    {n.status === 'vendido' && <CheckSquare className="w-4 h-4 absolute top-1.5 left-1.5 text-green-600 opacity-60" />}
+                                    {isTotalmenteFinalizado && <CheckSquare className="w-4 h-4 absolute top-1.5 left-1.5 text-green-600 opacity-60" />}
                                 </button>
                                 {n.status === 'reservado' && !isPago && !modoSelecao && (
                                     <button onClick={e => { e.stopPropagation(); setCancelarNumero(n); }} className="absolute -top-1 -right-1 opacity-0 group-hover:opacity-100 bg-red-500 text-white rounded-full p-1 shadow-md hover:bg-red-600 transition-colors">
