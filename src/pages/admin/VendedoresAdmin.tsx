@@ -59,9 +59,14 @@ const VendedoresAdmin = () => {
     comprovante_url: f.comprovante_url
   }));
 
-  // Corrigido aqui: mudado de c.compra_status para c.status
   const pagamentosClientesRifa = todasCompras.filter(c => c.status === 'em_analise').map(c => {
     const cartela = c.cartelas_rifa?.[0];
+    
+    // CORREÇÃO: Buscando o nome do vendedor cruzando localmente para evitar erro do banco
+    const vendedorDaRifa = c.vendedor_id 
+      ? vendedoresComStats.find((v: any) => v.id === c.vendedor_id)
+      : vendedoresComStats.find((v: any) => v.id === c.ref_vendedor_id);
+      
     return {
       id: c.id,
       created_at: c.created_at,
@@ -71,7 +76,7 @@ const VendedoresAdmin = () => {
       displayEndereco: cartela?.numeros_rifa?.endereco_comprador,
       displayJogo: c.rifas?.nome,
       displayCodigo: cartela?.codigo_validacao,
-      displayVendedor: c.vendedores_rifa?.nome,
+      displayVendedor: vendedorDaRifa?.nome || 'Desconhecido',
       displayValor: c.valor_total,
       displayDesconto: c.desconto_aplicado,
       comprovante_url: c.comprovante_url
@@ -279,7 +284,7 @@ const VendedoresAdmin = () => {
                         </p>
                         <div className="flex justify-between">
                            <span className="font-mono text-primary font-bold">Cód: {venda.displayCodigo}</span>
-                           <span className="text-muted-foreground">Vendedor: {venda.displayVendedor || 'Desconhecido'}</span>
+                           <span className="text-muted-foreground">Vendedor: {venda.displayVendedor}</span>
                         </div>
                      </div>
 

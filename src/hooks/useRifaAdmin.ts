@@ -77,11 +77,17 @@ export const useRifaAdmin = () => {
   const { data: todasCompras = [], isLoading: isLoadingCompras } = useQuery({
     queryKey: ['todasComprasRifa'],
     queryFn: async () => {
+      // CORREÇÃO AQUI: Retirado o `vendedores_rifa(nome)` para evitar o erro de ambiguidade do Supabase
+      // devido as colunas vendedor_id e ref_vendedor_id existirem simultaneamente.
       const { data, error } = await supabase
         .from('compras_rifa')
-        .select('*, rifas(nome), cartelas_rifa(codigo_validacao, numeros_rifa(nome_comprador, telefone_comprador, endereco_comprador)), vendedores_rifa(nome)')
+        .select('*, rifas(nome), cartelas_rifa(codigo_validacao, numeros_rifa(nome_comprador, telefone_comprador, endereco_comprador))')
         .order('created_at', { ascending: false });
-      if (error) throw error;
+        
+      if (error) {
+        console.error('[useRifaAdmin] Erro ao buscar compras_rifa:', error);
+        throw error;
+      }
       return data as any[];
     },
     enabled: isAdmin,
@@ -109,11 +115,7 @@ export const useRifaAdmin = () => {
         .select('*')
         .order('created_at', { ascending: false });
         
-      if (error) {
-        console.error('[useRifaAdmin] Erro ao buscar solicitações:', error);
-        throw error;
-      }
-
+      if (error) throw error;
       if (!data || data.length === 0) return [];
 
       const userIds = [...new Set(data.map(s => s.user_id))];
