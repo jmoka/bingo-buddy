@@ -126,9 +126,10 @@ export interface AcertoVendedor {
   vendedor_id: string;
   valor: number;
   comprovante_url: string;
-  status: 'pendente' | 'aprovado' | 'rejeitado';
+  status: 'pendente' | 'aprovado' | 'rejeitado' | 'aprovar' | 'rejeitar';
   bingo_ids: string[];
   rifa_ids: string[];
   created_at: string;
+  repasse_concluido?: boolean;
   vendedores_rifa?: { nome: string };
 }

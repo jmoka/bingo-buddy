@@ -1,0 +1,1 @@
+ALTER TABLE public.acertos_vendedor ADD COLUMN IF NOT EXISTS repasse_concluido BOOLEAN DEFAULT false;

@@ -138,6 +138,8 @@ const VendedoresAdmin = () => {
     return <div className="flex items-center justify-center min-h-[40vh]"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
   }
 
+  const resolvedAcertos = acertosPendentes.filter(a => a.status === 'aprovado' || a.status === 'rejeitado' || a.status === 'aprovar' || a.status === 'rejeitar');
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -241,6 +243,7 @@ const VendedoresAdmin = () => {
         </TabsContent>
 
         <TabsContent value="acertos" className="mt-4 space-y-6">
+          
           <div className="space-y-3">
              <h3 className="text-sm font-semibold text-foreground flex items-center gap-2"><Wallet className="w-4 h-4 text-green-600" /> Acertos em Lote de Vendedores ({acertosParaAnalisar.length})</h3>
              {acertosParaAnalisar.length === 0 ? (
@@ -269,6 +272,58 @@ const VendedoresAdmin = () => {
                ))
              )}
           </div>
+
+          <div className="space-y-3 pt-6 border-t">
+             <h3 className="text-sm font-semibold text-foreground flex items-center gap-2"><Wallet className="w-4 h-4 text-muted-foreground" /> Histórico de Acertos (Resolvidos)</h3>
+             {resolvedAcertos.length === 0 ? (
+                <div className="card-container text-center py-10 text-muted-foreground text-sm border-dashed">Nenhum acerto em lote resolvido.</div>
+             ) : (
+               resolvedAcertos.map(a => {
+                  const finalStatus = a.status === 'aprovar' ? 'aprovado' : a.status === 'rejeitar' ? 'rejeitado' : a.status;
+                  
+                 return (
+                 <div key={a.id} className="card-container p-4 flex flex-col bg-muted/20">
+                   <div className="flex items-start justify-between">
+                     <div>
+                       <p className="font-bold text-sm text-foreground">{a.vendedores_rifa?.nome || 'Vendedor'}</p>
+                       <p className="text-xs text-muted-foreground mt-0.5">{format(new Date(a.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}</p>
+                     </div>
+                     <div className="text-right">
+                        <p className="text-[10px] uppercase font-bold text-muted-foreground">Valor Acertado</p>
+                        <p className="text-xl font-black text-foreground">R$ {Number(a.valor).toFixed(2)}</p>
+                     </div>
+                   </div>
+                   <div className="flex items-center justify-between pt-3 mt-3 border-t">
+                      <div className="flex items-center gap-2">
+                         <Badge className={finalStatus === 'aprovado' ? 'bg-success text-white' : 'bg-destructive text-white'}>
+                             {finalStatus.toUpperCase()}
+                         </Badge>
+                         {finalStatus === 'aprovado' && (
+                             a.repasse_concluido ? (
+                               <Badge variant="outline" className="text-[9px] bg-green-500/10 text-green-700 border-green-500/30 font-bold">
+                                 <CheckCircle2 className="w-2.5 h-2.5 mr-1" /> Lucro Creditado
+                               </Badge>
+                             ) : (
+                               <Badge variant="outline" className="text-[9px] bg-red-500/10 text-red-700 border-red-500/30 font-bold animate-pulse">
+                                 <AlertTriangle className="w-2.5 h-2.5 mr-1" /> Erro no Repasse
+                               </Badge>
+                             )
+                         )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                         {finalStatus === 'aprovado' && !a.repasse_concluido && (
+                            <Button size="icon" variant="ghost" className="h-8 w-8 text-amber-600 hover:bg-amber-100" title="Saldo não entrou no Caixa? Forçar Repasse" onClick={() => setAcertoForcarRepasse(a)}>
+                              <AlertTriangle className="w-4 h-4" />
+                            </Button>
+                         )}
+                         <Button variant="ghost" size="sm" onClick={() => handleViewComprovante(a.comprovante_url, false)}><Eye className="w-4 h-4 mr-2" /> Comprovante</Button>
+                      </div>
+                   </div>
+                 </div>
+               )})
+             )}
+          </div>
+
         </TabsContent>
       </Tabs>
 

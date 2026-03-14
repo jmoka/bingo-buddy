@@ -13,7 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose, DialogDescription } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Check, X, Eye, ExternalLink, MessageSquare, Trash2, Coins, RefreshCw, Undo2, User, ShieldCheck, Loader2, CreditCard, Store, HandCoins, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, Check, X, Eye, ExternalLink, MessageSquare, Trash2, Coins, RefreshCw, Undo2, User, ShieldCheck, Loader2, CreditCard, Store, HandCoins, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import PlayerAvatar from '@/components/PlayerAvatar';
 import { CreditRequest, CreditRequestMessage } from '@/types/match';
 import { AcertoVendedor } from '@/types/rifa';
@@ -296,7 +296,7 @@ const CreditRequestsAdmin = () => {
                   <TableHead>Data</TableHead>
                   <TableHead>Origem / Jogador</TableHead>
                   <TableHead>Valor</TableHead>
-                  <TableHead>Status / Forma</TableHead>
+                  <TableHead>Status</TableHead>
                   <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
@@ -330,12 +330,24 @@ const CreditRequestsAdmin = () => {
                       <div className="flex flex-col items-start gap-1.5">
                         <Badge className={`${config.color} border-none`}>{config.label}</Badge>
                         <Badge variant="outline" className="text-[9px] bg-amber-500/5 text-amber-600 border-amber-500/20">Acerto (PIX)</Badge>
+                        
+                        {finalStatus === 'aprovado' && (
+                          acerto.repasse_concluido ? (
+                            <Badge variant="outline" className="text-[9px] bg-green-500/10 text-green-700 border-green-500/30 font-bold">
+                              <CheckCircle2 className="w-2.5 h-2.5 mr-1" /> Lucro Creditado
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="text-[9px] bg-red-500/10 text-red-700 border-red-500/30 font-bold animate-pulse">
+                              <AlertTriangle className="w-2.5 h-2.5 mr-1" /> Erro no Repasse
+                            </Badge>
+                          )
+                        )}
                       </div>
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1.5">
-                        {finalStatus === 'aprovado' && (
-                          <Button size="icon" variant="ghost" className="h-8 w-8 text-amber-600 hover:bg-amber-100" title="Saldo não entrou na sua conta? Forçar Repasse" onClick={() => setAcertoForcarRepasse(acerto)}>
+                        {finalStatus === 'aprovado' && !acerto.repasse_concluido && (
+                          <Button size="icon" variant="ghost" className="h-8 w-8 text-amber-600 hover:bg-amber-100" title="Saldo não entrou no Caixa? Forçar Repasse" onClick={() => setAcertoForcarRepasse(acerto)}>
                             <AlertTriangle className="w-4 h-4" />
                           </Button>
                         )}
@@ -476,7 +488,7 @@ const CreditRequestsAdmin = () => {
                <strong>Atenção:</strong> Utilize esta opção apenas se o sistema não tiver creditado o valor de <strong>R$ {Number(acertoForcarRepasse?.valor || 0).toFixed(2)}</strong> no Caixa do Admin ao aprovar.
              </div>
              <p className="text-sm text-muted-foreground">
-               Ao confirmar, o sistema adicionará esse valor diretamente ao seu Caixa. Como o vendedor já reteve a comissão em dinheiro na venda física, não há repasse de créditos para ele.
+               Ao confirmar, o sistema adicionará esse valor diretamente ao seu Caixa.
              </p>
              <p className="text-xs font-bold text-destructive">
                Importante: Se você clicar aqui e o saldo já tiver sido pago antes, o valor será duplicado indevidamente no Caixa.

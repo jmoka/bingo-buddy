@@ -488,7 +488,10 @@ export const useRifaAdmin = () => {
     if (status === 'aprovado' && valorRepasse > 0) {
       // O valor líquido cai diretamente no Caixa Admin
       await supabase.rpc('increment_admin_profit', { amount: valorRepasse });
+      await supabase.from('acertos_vendedor').update({ repasse_concluido: true }).eq('id', acertoId);
       queryClient.invalidateQueries({ queryKey: ['gameSettings'] }); 
+    } else if (status === 'rejeitado') {
+      await supabase.from('acertos_vendedor').update({ repasse_concluido: false }).eq('id', acertoId);
     }
 
     toast.success(`Acerto ${status} com sucesso!`);
@@ -514,10 +517,12 @@ export const useRifaAdmin = () => {
 
     if (valorRepasse > 0) {
       await supabase.rpc('increment_admin_profit', { amount: valorRepasse });
+      await supabase.from('acertos_vendedor').update({ repasse_concluido: true }).eq('id', acertoId);
       queryClient.invalidateQueries({ queryKey: ['gameSettings'] });
     }
     
     toast.success("Saldo repassado ao Caixa Admin com sucesso!");
+    queryClient.invalidateQueries({ queryKey: ['acertosAdmin'] });
     return true;
   };
 
