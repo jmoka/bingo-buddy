@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
+import { Switch } from '@/components/ui/switch';
 import { Loader2, CheckCircle2, XCircle, Users, Copy, ShieldBan, ShieldCheck, Edit, Wallet, HandCoins, AlertTriangle, Eye, ExternalLink, Grid3X3, SmartphoneNfc, Ticket, TrendingUp, BadgeDollarSign, HeartHandshake, PenTool } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -31,6 +32,7 @@ const VendedoresAdmin = () => {
     resolverAcerto,
     pagarComissaoManual,
     forcarRepasseAcerto,
+    estornarRepasseAcerto
   } = useRifaAdmin();
 
   const [editandoVendedor, setEditandoVendedor] = useState<any | null>(null);
@@ -47,6 +49,7 @@ const VendedoresAdmin = () => {
   const [pagarComissaoOpen, setPagarComissaoOpen] = useState(false);
   const [acertoComissao, setAcertoComissao] = useState<AcertoVendedor | null>(null);
   const [valorComissao, setValorComissao] = useState<number>(0);
+  const [descontarDoAdmin, setDescontarDoAdmin] = useState(true);
   const [isPagandoComissao, setIsPagandoComissao] = useState(false);
 
   const pendentes = solicitacoesVendedor.filter(s => s.status === 'pendente');
@@ -209,13 +212,14 @@ const VendedoresAdmin = () => {
 
     setAcertoComissao(acerto);
     setValorComissao(sugestao);
+    setDescontarDoAdmin(true); // O padrão é sim, porque nas antigas o admin tinha recebido 100%
     setPagarComissaoOpen(true);
   };
 
   const handlePagarComissao = async () => {
     if (!acertoComissao) return;
     setIsPagandoComissao(true);
-    const ok = await pagarComissaoManual(acertoComissao.id, valorComissao);
+    const ok = await pagarComissaoManual(acertoComissao.id, valorComissao, descontarDoAdmin);
     setIsPagandoComissao(false);
     if (ok) setPagarComissaoOpen(false);
   };
@@ -468,6 +472,11 @@ const VendedoresAdmin = () => {
                               <AlertTriangle className="w-4 h-4" />
                             </Button>
                          )}
+                         {finalStatus === 'aprovado' && (
+                            <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive hover:bg-destructive/10" title="Estornar Acerto e Repasses" onClick={() => estornarRepasseAcerto(a.id)}>
+                              <Undo2 className="w-4 h-4" />
+                            </Button>
+                         )}
                          <Button variant="ghost" size="sm" onClick={() => handleViewComprovante(a.comprovante_url, false)}><Eye className="w-4 h-4 mr-2" /> Comprovante</Button>
                       </div>
                    </div>
@@ -528,8 +537,18 @@ const VendedoresAdmin = () => {
                     className="font-bold text-lg h-12 text-amber-700" 
                  />
                  <p className="text-[10px] text-muted-foreground">
-                    Ao confirmar, este valor será descontado do seu Caixa e creditado no saldo do vendedor.
+                    Ao confirmar, este valor será creditado no saldo do vendedor.
                  </p>
+             </div>
+
+             <div className="flex items-center justify-between p-3 border rounded-lg bg-background mt-4">
+                <div>
+                  <Label className="text-sm font-bold">Descontar do Caixa do Admin?</Label>
+                  <p className="text-[10px] text-muted-foreground">
+                    Se ativo, o valor da comissão será subtraído do lucro da plataforma (recomendado).
+                  </p>
+                </div>
+                <Switch checked={descontarDoAdmin} onCheckedChange={setDescontarDoAdmin} />
              </div>
           </div>
           <DialogFooter>
@@ -580,7 +599,7 @@ const VendedoresAdmin = () => {
           <DialogFooter>
             <Button variant="ghost" onClick={() => setAcertoForcarRepasse(null)}>Cancelar</Button>
             <Button onClick={handleForcarRepasse} disabled={isForcandoRepasse} className="bg-amber-600 hover:bg-amber-700 text-white">
-              {isForcandoRepasse && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              {isForcandoRepasse && <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
               Confirmar e Enviar p/ Caixa
             </Button>
           </DialogFooter>

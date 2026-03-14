@@ -412,10 +412,11 @@ export const useRifaAdmin = () => {
     return true;
   };
 
-  const pagarComissaoManual = async (acertoId: string, valorComissao: number): Promise<boolean> => {
+  const pagarComissaoManual = async (acertoId: string, valorComissao: number, descontarAdmin: boolean): Promise<boolean> => {
     const { data, error } = await supabase.rpc('pagar_comissao_acerto_manual', {
       p_acerto_id: acertoId,
-      p_valor_comissao: valorComissao
+      p_valor_comissao: valorComissao,
+      p_descontar_admin: descontarAdmin
     });
 
     if (error || !data?.success) {
