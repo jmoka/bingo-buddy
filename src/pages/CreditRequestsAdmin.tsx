@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useGame } from '@/contexts/GameContext';
 import { useAuth } from '@/contexts/AuthContext';
+import { useRifaAdmin } from '@/hooks/useRifaAdmin';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -12,9 +13,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose, DialogDescription } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Check, X, Eye, ExternalLink, MessageSquare, Trash2, Coins, RefreshCw, Undo2, User, ShieldCheck, Loader2, CreditCard } from 'lucide-react';
+import { ArrowLeft, Check, X, Eye, ExternalLink, MessageSquare, Trash2, Coins, RefreshCw, Undo2, User, ShieldCheck, Loader2, CreditCard, Store, HandCoins, AlertTriangle } from 'lucide-react';
 import PlayerAvatar from '@/components/PlayerAvatar';
 import { CreditRequest, CreditRequestMessage } from '@/types/match';
+import { AcertoVendedor } from '@/types/rifa';
 import { format, formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { supabase } from '@/integrations/supabase/client';
@@ -22,30 +24,40 @@ import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
-const statusConfig = {
+const statusConfig: Record<string, { label: string, color: string }> = {
   pending: { label: 'Pendente', color: 'bg-amber-500/10 text-amber-600' },
   approved: { label: 'Aprovada', color: 'bg-success/10 text-success' },
+  aprovado: { label: 'Aprovada', color: 'bg-success/10 text-success' },
   rejected: { label: 'Rejeitada', color: 'bg-destructive/10 text-destructive' },
+  rejeitado: { label: 'Rejeitada', color: 'bg-destructive/10 text-destructive' },
 };
 
 const CreditRequestsAdmin = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { profile } = useAuth();
-  const { allCreditRequests, resolveCreditRequest, deleteCreditRequest, unblockCreditRequest, fetchRequestMessages, isLoading } = useGame();
+  const { allCreditRequests, resolveCreditRequest, deleteCreditRequest, unblockCreditRequest, fetchRequestMessages, isLoading: isGameLoading } = useGame();
+  const { acertosPendentes, resolverAcerto, isLoading: isRifaLoading } = useRifaAdmin();
   
+  // States - Credit Requests
   const [selectedRequest, setSelectedRequest] = useState<CreditRequest | null>(null);
   const [conversationRequest, setConversationRequest] = useState<CreditRequest | null>(null);
   const [messages, setMessages] = useState<CreditRequestMessage[]>([]);
   const [isLoadingMessages, setIsLoadingMessages] = useState(false);
-  
   const [creditsToGrant, setCreditsToGrant] = useState(0);
   const [rejectionNotes, setRejectionNotes] = useState('');
   const [isResolveDialogOpen, setIsResolveDialogOpen] = useState(false);
   const [actionType, setActionType] = useState<'approve' | 'reject' | 'delete' | null>(null);
-  const [isRefreshing, setIsRefreshing] = useState(false);
+  
+  // States - Acertos
+  const [acaoAcerto, setAcaoAcerto] = useState<{tipo: 'aprovado' | 'rejeitado', acerto: AcertoVendedor} | null>(null);
+  const [isProcessandoAcerto, setIsProcessandoAcerto] = useState(false);
 
+  // Generics
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [comprovanteUrl, setComprovanteUrl] = useState<string | null>(null);
+
+  const isLoading = isGameLoading || isRifaLoading;
 
   useEffect(() => {
     if (!profile || profile.role !== 'admin') {
@@ -71,6 +83,7 @@ const CreditRequestsAdmin = () => {
   const handleRefresh = async () => {
     setIsRefreshing(true);
     await queryClient.invalidateQueries({ queryKey: ['rawCreditRequests'] });
+    await queryClient.invalidateQueries({ queryKey: ['acertosAdmin'] });
     setTimeout(() => setIsRefreshing(false), 500);
   };
 
@@ -84,7 +97,6 @@ const CreditRequestsAdmin = () => {
 
   const handleResolve = async () => {
     if (!selectedRequest || !actionType) return;
-    
     if (actionType === 'delete') {
       await deleteCreditRequest(selectedRequest.id);
     } else if (actionType === 'approve') {
@@ -95,17 +107,23 @@ const CreditRequestsAdmin = () => {
     setIsResolveDialogOpen(false);
   };
 
+  const handleResolverAcerto = async () => {
+    if (!acaoAcerto) return;
+    setIsProcessandoAcerto(true);
+    const ok = await resolverAcerto(acaoAcerto.acerto.id, acaoAcerto.tipo);
+    setIsProcessandoAcerto(false);
+    if (ok) setAcaoAcerto(null);
+  };
+
   const handleViewReceipt = async (path: string) => {
     if (!path) {
       toast.error('Nenhum comprovante anexado.');
       return;
     }
-    
     if (path === 'AUTOMATIC_PAYMENT' || path.startsWith('STRIPE_')) {
         toast.info('Pagamento processado automaticamente via Cartão (Stripe). Não existe arquivo de imagem.', { duration: 5000 });
         return;
     }
-
     try {
       const { data, error } = await supabase.storage.from('receipts').createSignedUrl(path, 3600);
       if (error) throw error;
@@ -118,6 +136,11 @@ const CreditRequestsAdmin = () => {
   const pendingRequests = allCreditRequests.filter(r => r.status === 'pending');
   const resolvedRequests = allCreditRequests.filter(r => r.status !== 'pending');
 
+  const pendingAcertos = acertosPendentes.filter(a => a.status === 'pendente' || a.status === 'em_analise');
+  const resolvedAcertos = acertosPendentes.filter(a => a.status === 'aprovado' || a.status === 'rejeitado' || a.status === 'aprovar' || a.status === 'rejeitar');
+
+  const totalPendentes = pendingRequests.length + pendingAcertos.length;
+
   return (
     <>
       <div className="flex items-center justify-between mb-6">
@@ -125,7 +148,7 @@ const CreditRequestsAdmin = () => {
           <Button variant="ghost" size="icon" onClick={() => navigate('/admin')}>
             <ArrowLeft className="w-5 h-5" />
           </Button>
-          <h1 className="font-heading text-2xl md:text-3xl font-bold text-foreground">Gerenciar Créditos</h1>
+          <h1 className="font-heading text-2xl md:text-3xl font-bold text-foreground">Entradas do Caixa</h1>
         </div>
         <Button variant="ghost" size="sm" onClick={handleRefresh} disabled={isRefreshing || isLoading}>
           <RefreshCw className={`w-4 h-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} /> Atualizar
@@ -136,14 +159,14 @@ const CreditRequestsAdmin = () => {
         <TabsList className="grid w-full grid-cols-2 mb-6 h-12">
           <TabsTrigger value="pending" className="flex items-center gap-2">
             Pendentes 
-            {pendingRequests.length > 0 && (
+            {totalPendentes > 0 && (
               <span className="flex h-5 w-5 items-center justify-center rounded-full bg-amber-500 text-[10px] font-bold text-white">
-                {pendingRequests.length}
+                {totalPendentes}
               </span>
             )}
           </TabsTrigger>
           <TabsTrigger value="resolved" className="flex items-center gap-2">
-            Resolvidas
+            Resolvidas (Histórico)
           </TabsTrigger>
         </TabsList>
 
@@ -152,14 +175,51 @@ const CreditRequestsAdmin = () => {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Jogador</TableHead>
+                  <TableHead>Origem / Jogador</TableHead>
                   <TableHead>Data</TableHead>
-                  <TableHead>Pedido</TableHead>
+                  <TableHead>Valor PIX</TableHead>
                   <TableHead className="text-center">Comprovante</TableHead>
                   <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
+                {/* 1. MAP DE ACERTOS DE VENDEDORES (Dinheiro direto pro caixa) */}
+                {pendingAcertos.map(acerto => (
+                  <TableRow key={acerto.id} className="bg-amber-50/50 dark:bg-amber-900/10">
+                    <TableCell className="min-w-[250px]">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-amber-100 dark:bg-amber-800 flex items-center justify-center shrink-0 border border-amber-200">
+                          <Store className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="font-bold text-amber-900 dark:text-amber-400">{acerto.vendedores_rifa?.nome || 'Vendedor'}</span>
+                          <Badge variant="outline" className="w-fit text-[9px] mt-1 bg-amber-100 text-amber-800 border-amber-300">Acerto de Vendas (Vendedor)</Badge>
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-sm min-w-[150px]">
+                      <div className="font-medium">{format(new Date(acerto.created_at), "dd/MM/yy HH:mm", { locale: ptBR })}</div>
+                      <div className="text-[10px] text-muted-foreground">{formatDistanceToNow(new Date(acerto.created_at), { addSuffix: true, locale: ptBR })}</div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="font-bold text-success text-lg">R$ {Number(acerto.valor).toFixed(2).replace('.', ',')}</div>
+                      <div className="text-[10px] uppercase font-bold text-muted-foreground">Direto p/ Caixa Admin</div>
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <Button variant="outline" size="sm" onClick={() => handleViewReceipt(acerto.comprovante_url)}>
+                        <Eye className="w-3.5 h-3.5 mr-1" /> Ver PIX
+                      </Button>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-1.5">
+                        <Button size="icon" variant="ghost" className="text-destructive h-9 w-9 bg-destructive/10 hover:bg-destructive/20" onClick={() => setAcaoAcerto({ tipo: 'rejeitado', acerto })}><X className="w-4 h-4" /></Button>
+                        <Button size="icon" variant="ghost" className="text-success h-9 w-9 bg-success/10 hover:bg-success/20" onClick={() => setAcaoAcerto({ tipo: 'aprovado', acerto })}><Check className="w-4 h-4" /></Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+
+                {/* 2. MAP DE COMPRA DE CRÉDITOS (Jogadores Comuns) */}
                 {pendingRequests.map(req => (
                   <TableRow key={req.id}>
                     <TableCell className="min-w-[250px]">
@@ -188,23 +248,29 @@ const CreditRequestsAdmin = () => {
                       <div className="text-[10px] text-muted-foreground">{formatDistanceToNow(new Date(req.requested_at), { addSuffix: true, locale: ptBR })}</div>
                     </TableCell>
                     <TableCell>
-                      <div className="font-bold text-primary">{(req.credits_requested || 0)} cr.</div>
-                      <div className="text-xs text-muted-foreground">R$ {Number(req.amount_paid || 0).toFixed(2).replace('.', ',')}</div>
+                      <div className="font-bold text-primary text-lg">R$ {Number(req.amount_paid || 0).toFixed(2).replace('.', ',')}</div>
+                      <div className="text-xs font-medium text-muted-foreground">Pediu: {(req.credits_requested || 0)} cr.</div>
                     </TableCell>
                     <TableCell className="text-center">
                       <Button variant="outline" size="sm" onClick={() => handleViewReceipt(req.receipt_url)}>
-                        <Eye className="w-3.5 h-3.5 mr-1" /> Ver Anexo
+                        <Eye className="w-3.5 h-3.5 mr-1" /> Ver PIX
                       </Button>
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1.5">
-                        <Button size="icon" variant="ghost" className="text-destructive h-8 w-8" onClick={() => handleOpenDialog(req, 'reject')}><X className="w-4 h-4" /></Button>
-                        <Button size="icon" variant="ghost" className="text-success h-8 w-8" onClick={() => handleOpenDialog(req, 'approve')}><Check className="w-4 h-4" /></Button>
-                        <Button size="icon" variant="ghost" className="text-muted-foreground h-8 w-8" onClick={() => handleOpenDialog(req, 'delete')}><Trash2 className="w-4 h-4" /></Button>
+                        <Button size="icon" variant="ghost" className="text-destructive h-9 w-9 bg-destructive/10 hover:bg-destructive/20" onClick={() => handleOpenDialog(req, 'reject')}><X className="w-4 h-4" /></Button>
+                        <Button size="icon" variant="ghost" className="text-success h-9 w-9 bg-success/10 hover:bg-success/20" onClick={() => handleOpenDialog(req, 'approve')}><Check className="w-4 h-4" /></Button>
+                        <Button size="icon" variant="ghost" className="text-muted-foreground h-9 w-9 hover:bg-muted" onClick={() => handleOpenDialog(req, 'delete')}><Trash2 className="w-4 h-4" /></Button>
                       </div>
                     </TableCell>
                   </TableRow>
                 ))}
+
+                {totalPendentes === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center py-10 text-muted-foreground">Nenhuma entrada pendente no momento.</TableCell>
+                  </TableRow>
+                )}
               </TableBody>
             </Table>
           </div>
@@ -216,16 +282,59 @@ const CreditRequestsAdmin = () => {
               <TableHeader>
                 <TableRow>
                   <TableHead>Data</TableHead>
-                  <TableHead>Jogador</TableHead>
-                  <TableHead>Pedido (R$)</TableHead>
+                  <TableHead>Origem / Jogador</TableHead>
+                  <TableHead>Valor</TableHead>
                   <TableHead>Status / Forma</TableHead>
                   <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
+                {/* 1. MAP DE ACERTOS DE VENDEDORES (RESOLVIDOS) */}
+                {resolvedAcertos.map(acerto => {
+                  const finalStatus = acerto.status === 'aprovar' ? 'aprovado' : acerto.status === 'rejeitar' ? 'rejeitado' : acerto.status;
+                  const config = statusConfig[finalStatus] || { label: finalStatus, color: 'bg-muted text-muted-foreground' };
+                  
+                  return (
+                  <TableRow key={acerto.id} className="opacity-90 bg-amber-50/20 dark:bg-amber-900/5">
+                    <TableCell className="text-sm min-w-[120px]">
+                      <div className="font-medium">{format(new Date(acerto.resolved_at || acerto.created_at), "dd/MM/yy", { locale: ptBR })}</div>
+                      <div className="text-[10px] text-muted-foreground">{format(new Date(acerto.resolved_at || acerto.created_at), "HH:mm", { locale: ptBR })}</div>
+                    </TableCell>
+                    <TableCell className="min-w-[200px]">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center shrink-0">
+                          <Store className="w-4 h-4 text-amber-600" />
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="font-medium">{acerto.vendedores_rifa?.nome || 'Vendedor'}</span>
+                          <span className="text-[10px] text-amber-600 font-medium">Acerto Financeiro</span>
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="font-bold text-success">R$ {Number(acerto.valor).toFixed(2).replace('.', ',')}</div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex flex-col items-start gap-1.5">
+                        <Badge className={`${config.color} border-none`}>{config.label}</Badge>
+                        <Badge variant="outline" className="text-[9px] bg-amber-500/5 text-amber-600 border-amber-500/20">Acerto (PIX)</Badge>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-1.5">
+                        <Button size="icon" variant="ghost" className="h-8 w-8 text-primary" title="Ver Comprovante PIX" onClick={() => handleViewReceipt(acerto.comprovante_url)}>
+                          <Eye className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                )})}
+
+                {/* 2. MAP DE COMPRA DE CRÉDITOS (RESOLVIDOS) */}
                 {resolvedRequests.map(req => {
                   const isStripe = req.receipt_url?.startsWith('STRIPE_') || req.receipt_url === 'AUTOMATIC_PAYMENT';
-                  
+                  const config = statusConfig[req.status] || { label: req.status, color: 'bg-muted text-muted-foreground' };
+
                   return (
                   <TableRow key={req.id} className="opacity-90">
                     <TableCell className="text-sm min-w-[120px]">
@@ -242,16 +351,16 @@ const CreditRequestsAdmin = () => {
                       </div>
                     </TableCell>
                     <TableCell>
-                      <div className="font-bold text-primary">{(req.credits_granted || 0)} cr.</div>
-                      <div className="text-xs text-muted-foreground">R$ {Number(req.amount_paid || 0).toFixed(2).replace('.', ',')}</div>
+                      <div className="font-bold text-primary">R$ {Number(req.amount_paid || 0).toFixed(2).replace('.', ',')}</div>
+                      <div className="text-xs text-muted-foreground">{(req.credits_granted || 0)} cr. liberados</div>
                     </TableCell>
                     <TableCell>
                       <div className="flex flex-col items-start gap-1.5">
-                         <Badge className={`${statusConfig[req.status]?.color || 'bg-muted'} border-none`}>{statusConfig[req.status]?.label}</Badge>
+                         <Badge className={`${config.color} border-none`}>{config.label}</Badge>
                          {isStripe ? (
                            <Badge variant="outline" className="text-[9px] bg-primary/5 text-primary border-primary/20"><CreditCard className="w-3 h-3 mr-1"/> Cartão (Stripe)</Badge>
                          ) : (
-                           <Badge variant="outline" className="text-[9px] bg-amber-500/5 text-amber-600 border-amber-500/20">PIX / Manual</Badge>
+                           <Badge variant="outline" className="text-[9px] bg-blue-500/5 text-blue-600 border-blue-500/20">Recarga PIX</Badge>
                          )}
                       </div>
                     </TableCell>
@@ -281,6 +390,7 @@ const CreditRequestsAdmin = () => {
         </TabsContent>
       </Tabs>
 
+      {/* DIALOG DE VISUALIZAR COMPROVANTE */}
       <Dialog open={!!comprovanteUrl} onOpenChange={(open) => !open && setComprovanteUrl(null)}>
         <DialogContent className="max-w-3xl">
           <DialogHeader>
@@ -309,6 +419,34 @@ const CreditRequestsAdmin = () => {
         </DialogContent>
       </Dialog>
 
+      {/* DIALOG DE RESOLVER ACERTOS DE VENDEDOR */}
+      <Dialog open={!!acaoAcerto} onOpenChange={open => !open && setAcaoAcerto(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {acaoAcerto?.tipo === 'aprovado' ? <HandCoins className="w-5 h-5 text-green-600" /> : <AlertTriangle className="w-5 h-5 text-destructive" />}
+              {acaoAcerto?.tipo === 'aprovado' ? 'Confirmar Acerto de Vendas' : 'Rejeitar Acerto'}
+            </DialogTitle>
+            <DialogDescription className="sr-only">Aprove ou rejeite o PIX do vendedor.</DialogDescription>
+          </DialogHeader>
+          <div className="py-4 space-y-3">
+            {acaoAcerto?.tipo === 'aprovado' ? (
+              <p className="text-sm text-muted-foreground">Você conferiu o PIX e o valor de <strong className="text-success text-lg">R$ {Number(acaoAcerto.acerto.valor).toFixed(2)}</strong> realmente caiu na sua conta?</p>
+            ) : (
+              <p className="text-sm text-muted-foreground">O comprovante é inválido ou o dinheiro não caiu?</p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setAcaoAcerto(null)}>Cancelar</Button>
+            <Button className={acaoAcerto?.tipo === 'aprovado' ? 'bg-green-600 hover:bg-green-700 text-white' : ''} variant={acaoAcerto?.tipo === 'rejeitado' ? 'destructive' : 'default'} onClick={handleResolverAcerto} disabled={isProcessandoAcerto}>
+              {isProcessandoAcerto && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              {acaoAcerto?.tipo === 'aprovado' ? 'Sim, o dinheiro caiu!' : 'Rejeitar Acerto'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* DIALOG DE CHAT COM O JOGADOR (SOLICITACOES DE CREDITO) */}
       <Dialog open={!!conversationRequest} onOpenChange={(open) => !open && setConversationRequest(null)}>
         <DialogContent className="max-w-md h-[70vh] flex flex-col p-0">
           <DialogHeader className="p-6 pb-2 border-b">
@@ -323,7 +461,6 @@ const CreditRequestsAdmin = () => {
                 <div className="flex justify-center py-10"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>
             ) : (
                 <div className="space-y-4">
-                    {/* Caso não tenha mensagens, mas tenha nota do sistema (Ex: Compra automática antiga via Stripe) */}
                     {messages.length === 0 && conversationRequest?.notes && (
                         <div className="flex flex-col items-start space-y-1">
                             <div className="flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-widest text-primary ml-2">
@@ -336,7 +473,6 @@ const CreditRequestsAdmin = () => {
                         </div>
                     )}
 
-                    {/* Caso realmente não tenha NADA */}
                     {messages.length === 0 && !conversationRequest?.notes && (
                         <div className="text-center py-10 text-muted-foreground">Nenhuma mensagem no histórico.</div>
                     )}
@@ -369,6 +505,7 @@ const CreditRequestsAdmin = () => {
         </DialogContent>
       </Dialog>
 
+      {/* DIALOG DE APROVAR/REJEITAR SOLICITACAO DE CREDITO JOGADOR */}
       <Dialog open={isResolveDialogOpen} onOpenChange={setIsResolveDialogOpen}>
         <DialogContent>
           <DialogHeader>
@@ -382,11 +519,11 @@ const CreditRequestsAdmin = () => {
           {selectedRequest && actionType !== 'delete' && (
             <div className="space-y-4 py-2">
               <div className="p-3 bg-muted rounded-lg flex items-center justify-between">
-                <div><p className="text-[10px] uppercase font-bold text-muted-foreground">Solicitado</p><p className="text-lg font-bold">{selectedRequest.credits_requested} créditos</p></div>
-                <Coins className="w-8 h-8 text-primary/20" />
+                <div><p className="text-[10px] uppercase font-bold text-muted-foreground">O Jogador Pagou (PIX)</p><p className="text-xl font-black text-primary">R$ {Number(selectedRequest.amount_paid || 0).toFixed(2).replace('.', ',')}</p></div>
+                <div className="text-right"><p className="text-[10px] uppercase font-bold text-muted-foreground">Créditos Solicitados</p><p className="text-xl font-bold">{selectedRequest.credits_requested} cr.</p></div>
               </div>
               {actionType === 'approve' && (
-                <div className="space-y-2"><Label>Créditos a Liberar</Label><Input type="number" value={creditsToGrant} onChange={e => setCreditsToGrant(+e.target.value || 0)} className="text-lg font-bold" /></div>
+                <div className="space-y-2"><Label>Créditos a Liberar no Saldo dele</Label><Input type="number" value={creditsToGrant} onChange={e => setCreditsToGrant(+e.target.value || 0)} className="text-lg font-bold" /></div>
               )}
               <div className="space-y-2">
                 <Label className="flex items-center gap-2"><MessageSquare className="w-4 h-4" /> Mensagem para o Jogador</Label>

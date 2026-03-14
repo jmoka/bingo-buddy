@@ -15,7 +15,7 @@ const Admin = () => {
   const navigate = useNavigate();
   const { profile } = useAuth();
   const { allCreditRequests, allRedeemRequests, players, gameSettings } = useGame();
-  const { solicitacoesVendedor, todasFolhasBingo } = useRifaAdmin();
+  const { solicitacoesVendedor, todasFolhasBingo, acertosPendentes } = useRifaAdmin();
 
   useEffect(() => {
     if (profile && profile.role !== 'admin') {
@@ -34,10 +34,14 @@ const Admin = () => {
     return null;
   }
 
+  // Lógica de Notificações
   const pendingRequestsCount = (allCreditRequests || []).filter(r => r.status === 'pending').length;
+  const pendingAcertosCount = acertosPendentes.filter(a => a.status === 'pendente' || a.status === 'em_analise').length;
+  const totalEntradasPendentes = pendingRequestsCount + pendingAcertosCount;
+
   const pendingRedeemsCount = (allRedeemRequests || []).filter(r => r.status === 'pending').length;
   
-  // LOGICA DE VENDEDORES: Inscrições + Pagamentos Diretos de Clientes
+  // Vendedores
   const pendingVendedoresCount = solicitacoesVendedor.filter(s => s.status === 'pendente').length;
   const pendingPixClientesCount = todasFolhasBingo.filter(f => f.status === 'em_analise').length;
   const totalVendedoresPendencies = pendingVendedoresCount + pendingPixClientesCount;
@@ -58,7 +62,7 @@ const Admin = () => {
               <p className="text-xs">Existem {pendingPixClientesCount} comprovante(s) enviado(s) por clientes de bingo físico para você conferir.</p>
             </div>
           </div>
-          <p className="text-[10px] font-black uppercase bg-blue-600 text-white px-2 py-1 rounded">Confira na aba Vendedores</p>
+          <p className="text-[10px] font-black uppercase bg-blue-600 text-white px-2 py-1 rounded">Confira na aba Vendas</p>
         </div>
       )}
 
@@ -91,7 +95,7 @@ const Admin = () => {
           <TabsTrigger value="matches" className="flex-1 py-3 min-w-[80px]">Partidas</TabsTrigger>
           <TabsTrigger value="credits" className="flex-1 py-3 min-w-[80px] relative">
             Entradas
-            {pendingRequestsCount > 0 && <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-[9px] font-bold text-white border border-background">{pendingRequestsCount}</span>}
+            {totalEntradasPendentes > 0 && <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-[9px] font-bold text-white border border-background">{totalEntradasPendentes}</span>}
           </TabsTrigger>
           <TabsTrigger value="redeems" className="flex-1 py-3 min-w-[80px] relative">
             Saídas
@@ -119,9 +123,9 @@ const Admin = () => {
 
         <TabsContent value="credits">
           <div className="card-container">
-            <h2 className="font-heading text-xl font-bold text-foreground mb-4">Solicitações de Entrada</h2>
-            <p className="text-muted-foreground mb-6">Aprovação de comprovantes e liberação de créditos.</p>
-            <Button className="w-full py-6 text-lg gradient-primary" onClick={() => navigate('/admin/credit-requests')}>Gerenciar Entradas <ArrowRight className="w-5 h-5 ml-2" /></Button>
+            <h2 className="font-heading text-xl font-bold text-foreground mb-4">Gerenciar Entradas</h2>
+            <p className="text-muted-foreground mb-6">Aprovação de comprovantes (PIX), acertos de vendedores e liberação de créditos.</p>
+            <Button className="w-full py-6 text-lg gradient-primary" onClick={() => navigate('/admin/credit-requests')}>Ver Entradas <ArrowRight className="w-5 h-5 ml-2" /></Button>
           </div>
         </TabsContent>
 
