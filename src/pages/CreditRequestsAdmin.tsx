@@ -37,7 +37,7 @@ const CreditRequestsAdmin = () => {
   const queryClient = useQueryClient();
   const { profile } = useAuth();
   const { allCreditRequests, resolveCreditRequest, deleteCreditRequest, unblockCreditRequest, fetchRequestMessages, isLoading: isGameLoading } = useGame();
-  const { acertosPendentes, resolverAcerto, isLoading: isRifaLoading } = useRifaAdmin();
+  const { acertosPendentes, resolverAcerto, forcarRepasseAcerto, isLoading: isRifaLoading } = useRifaAdmin();
   
   // States - Credit Requests
   const [selectedRequest, setSelectedRequest] = useState<CreditRequest | null>(null);
@@ -52,6 +52,10 @@ const CreditRequestsAdmin = () => {
   // States - Acertos
   const [acaoAcerto, setAcaoAcerto] = useState<{tipo: 'aprovado' | 'rejeitado', acerto: AcertoVendedor} | null>(null);
   const [isProcessandoAcerto, setIsProcessandoAcerto] = useState(false);
+
+  // States - Forçar Repasse
+  const [acertoForcarRepasse, setAcertoForcarRepasse] = useState<AcertoVendedor | null>(null);
+  const [isForcandoRepasse, setIsForcandoRepasse] = useState(false);
 
   // Generics
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -113,6 +117,14 @@ const CreditRequestsAdmin = () => {
     const ok = await resolverAcerto(acaoAcerto.acerto.id, acaoAcerto.tipo);
     setIsProcessandoAcerto(false);
     if (ok) setAcaoAcerto(null);
+  };
+
+  const handleForcarRepasse = async () => {
+    if (!acertoForcarRepasse) return;
+    setIsForcandoRepasse(true);
+    await forcarRepasseAcerto(acertoForcarRepasse.id);
+    setIsForcandoRepasse(false);
+    setAcertoForcarRepasse(null);
   };
 
   const handleViewReceipt = async (path: string) => {
@@ -322,6 +334,11 @@ const CreditRequestsAdmin = () => {
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1.5">
+                        {finalStatus === 'aprovado' && (
+                          <Button size="icon" variant="ghost" className="h-8 w-8 text-amber-600 hover:bg-amber-100" title="Comissão não repassada? Forçar Repasse" onClick={() => setAcertoForcarRepasse(acerto)}>
+                            <AlertTriangle className="w-4 h-4" />
+                          </Button>
+                        )}
                         <Button size="icon" variant="ghost" className="h-8 w-8 text-primary" title="Ver Comprovante PIX" onClick={() => handleViewReceipt(acerto.comprovante_url)}>
                           <Eye className="w-4 h-4" />
                         </Button>
@@ -441,6 +458,35 @@ const CreditRequestsAdmin = () => {
             <Button className={acaoAcerto?.tipo === 'aprovado' ? 'bg-green-600 hover:bg-green-700 text-white' : ''} variant={acaoAcerto?.tipo === 'rejeitado' ? 'destructive' : 'default'} onClick={handleResolverAcerto} disabled={isProcessandoAcerto}>
               {isProcessandoAcerto && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
               {acaoAcerto?.tipo === 'aprovado' ? 'Sim, o dinheiro caiu!' : 'Rejeitar Acerto'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* DIALOG DE FORÇAR REPASSE DE ACERTO */}
+      <Dialog open={!!acertoForcarRepasse} onOpenChange={open => !open && setAcertoForcarRepasse(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-amber-600">
+              <AlertTriangle className="w-6 h-6" /> Forçar Repasse de Saldos
+            </DialogTitle>
+          </DialogHeader>
+          <div className="py-4 space-y-4">
+             <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
+               <strong>Atenção:</strong> Utilize esta opção apenas se ocorreu uma falha técnica anterior e os saldos (Comissão do Vendedor e Lucro do Caixa) não foram distribuídos ao aprovar este acerto no passado.
+             </div>
+             <p className="text-sm text-muted-foreground">
+               Ao confirmar, o sistema calculará matematicamente a comissão que este vendedor deveria ter recebido na época e repassará a diferença para a sua caixa (Admin).
+             </p>
+             <p className="text-xs font-bold text-destructive">
+               Importante: Se você clicar aqui e os saldos já tiverem sido pagos na primeira vez, os valores serão duplicados indevidamente.
+             </p>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setAcertoForcarRepasse(null)}>Cancelar</Button>
+            <Button onClick={handleForcarRepasse} disabled={isForcandoRepasse} className="bg-amber-600 hover:bg-amber-700 text-white">
+              {isForcandoRepasse && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Confirmar e Repassar Saldos
             </Button>
           </DialogFooter>
         </DialogContent>

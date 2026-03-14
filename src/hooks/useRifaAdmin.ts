@@ -464,7 +464,6 @@ export const useRifaAdmin = () => {
     let sellerCommissionToPay = 0;
     let sellerUserId = null;
 
-    // Se for aprovado, calculamos a comissão exata e o valor que deve ir pro Caixa do Admin
     if (status === 'aprovado') {
       const { data: acerto } = await supabase
           .from('acertos_vendedor')
@@ -475,14 +474,12 @@ export const useRifaAdmin = () => {
       if (acerto) {
         sellerUserId = acerto.vendedores_rifa?.user_id;
         
-        // Pega comissão específica do vendedor ou a comissão global
         const { data: cfg } = await supabase.from('configuracoes').select('comissao_vendedor_global').single();
         const comissaoPerc = Number(acerto.vendedores_rifa?.comissao_percentual || cfg?.comissao_vendedor_global || 0);
 
         let bingoProfit = 0;
         let rifaProfit = 0;
 
-        // Loop nos Bingos do Acerto
         if (acerto.bingo_ids && acerto.bingo_ids.length > 0) {
           const { data: bingos } = await supabase.from('vendas_bingo_fisico')
             .select('valor_pago, partidas(status)')
@@ -491,13 +488,12 @@ export const useRifaAdmin = () => {
           bingos?.forEach(b => {
             const val = Number(b.valor_pago);
             if (b.partidas?.status === 'finished') {
-              bingoProfit += val; // Se a partida já acabou, vai pro Caixa do Admin
+              bingoProfit += val; 
             }
-            sellerCommissionToPay += val * (comissaoPerc / 100.0); // Comissão garantida
+            sellerCommissionToPay += val * (comissaoPerc / 100.0); 
           });
         }
 
-        // Loop nas Rifas do Acerto
         if (acerto.rifa_ids && acerto.rifa_ids.length > 0) {
            const { data: rifas } = await supabase.from('compras_rifa')
             .select('valor_total')
@@ -505,17 +501,15 @@ export const useRifaAdmin = () => {
             
            rifas?.forEach(r => {
               const val = Number(r.valor_total);
-              rifaProfit += val; // Rifas sempre vão diretas pro Caixa do Admin
-              sellerCommissionToPay += val * (comissaoPerc / 100.0); // Comissão garantida
+              rifaProfit += val; 
+              sellerCommissionToPay += val * (comissaoPerc / 100.0); 
            });
         }
 
-        // O Admin ganha o que entrou das Rifas e Bingos Fechados, menos a comissão devida ao Vendedor!
         amountToDirectProfit = bingoProfit + rifaProfit - sellerCommissionToPay;
       }
     }
 
-    // Chama o RPC nativo para aprovar o status no banco e jogar os bingos no Pote (caso estejam rolando)
     const { data, error } = await supabase.rpc('resolver_acerto_vendedor', {
       p_acerto_id: acertoId,
       p_status: status
@@ -526,7 +520,6 @@ export const useRifaAdmin = () => {
       return false;
     }
 
-    // Executa as transferências do Saldo (Para Caixa Admin e Vendedor)
     if (status === 'aprovado') {
       if (amountToDirectProfit !== 0) {
         await supabase.rpc('increment_admin_profit', { amount: amountToDirectProfit });
@@ -534,12 +527,71 @@ export const useRifaAdmin = () => {
       if (sellerCommissionToPay > 0 && sellerUserId) {
         await supabase.rpc('increment_player_credits', { p_player_id: sellerUserId, p_amount: sellerCommissionToPay });
       }
-      queryClient.invalidateQueries({ queryKey: ['gameSettings'] }); // Atualiza Caixa do admin na tela
+      queryClient.invalidateQueries({ queryKey: ['gameSettings'] }); 
+      queryClient.invalidateQueries({ queryKey: ['players'] });
     }
 
     toast.success(`Acerto ${status} com sucesso!`);
     queryClient.invalidateQueries({ queryKey: ['acertosAdmin'] });
     queryClient.invalidateQueries({ queryKey: ['todasComprasRifa'] });
+    return true;
+  };
+
+  // Nova função para forçar o repasse caso o sistema tenha falhado anteriormente
+  const forcarRepasseAcerto = async (acertoId: string): Promise<boolean> => {
+    let amountToDirectProfit = 0;
+    let sellerCommissionToPay = 0;
+    let sellerUserId = null;
+
+    const { data: acerto } = await supabase
+        .from('acertos_vendedor')
+        .select('*, vendedores_rifa(user_id, comissao_percentual)')
+        .eq('id', acertoId)
+        .single();
+    
+    if (!acerto) {
+      toast.error("Acerto não encontrado.");
+      return false;
+    }
+
+    sellerUserId = acerto.vendedores_rifa?.user_id;
+    
+    const { data: cfg } = await supabase.from('configuracoes').select('comissao_vendedor_global').single();
+    const comissaoPerc = Number(acerto.vendedores_rifa?.comissao_percentual || cfg?.comissao_vendedor_global || 0);
+
+    let bingoProfit = 0;
+    let rifaProfit = 0;
+
+    if (acerto.bingo_ids && acerto.bingo_ids.length > 0) {
+      const { data: bingos } = await supabase.from('vendas_bingo_fisico').select('valor_pago, partidas(status)').in('id', acerto.bingo_ids);
+      bingos?.forEach(b => {
+        const val = Number(b.valor_pago);
+        if (b.partidas?.status === 'finished') bingoProfit += val;
+        sellerCommissionToPay += val * (comissaoPerc / 100.0);
+      });
+    }
+
+    if (acerto.rifa_ids && acerto.rifa_ids.length > 0) {
+       const { data: rifas } = await supabase.from('compras_rifa').select('valor_total').in('id', acerto.rifa_ids);
+       rifas?.forEach(r => {
+          const val = Number(r.valor_total);
+          rifaProfit += val;
+          sellerCommissionToPay += val * (comissaoPerc / 100.0);
+       });
+    }
+
+    amountToDirectProfit = bingoProfit + rifaProfit - sellerCommissionToPay;
+
+    if (amountToDirectProfit !== 0) {
+      await supabase.rpc('increment_admin_profit', { amount: amountToDirectProfit });
+    }
+    if (sellerCommissionToPay > 0 && sellerUserId) {
+      await supabase.rpc('increment_player_credits', { p_player_id: sellerUserId, p_amount: sellerCommissionToPay });
+    }
+    
+    queryClient.invalidateQueries({ queryKey: ['gameSettings'] });
+    queryClient.invalidateQueries({ queryKey: ['players'] });
+    toast.success("Saldos e comissões repassados forçadamente com sucesso!");
     return true;
   };
 
@@ -569,5 +621,6 @@ export const useRifaAdmin = () => {
     getCartelasCompra,
     registrarVendaVendedor,
     resolverAcerto,
+    forcarRepasseAcerto,
   };
 };
