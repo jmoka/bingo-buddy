@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -16,6 +16,8 @@ const Admin = () => {
   const { profile } = useAuth();
   const { allCreditRequests, allRedeemRequests, players, gameSettings } = useGame();
   const { solicitacoesVendedor, todasFolhasBingo, todasCompras, acertosPendentes } = useRifaAdmin();
+
+  const [activeTab, setActiveTab] = useState('matches');
 
   useEffect(() => {
     if (profile && profile.role !== 'admin') {
@@ -54,7 +56,10 @@ const Admin = () => {
 
       {/* Alerta de Pagamento Direto de Cliente */}
       {pendingPixClientesCount > 0 && (
-        <div className="card-container bg-blue-50 border-2 border-blue-200 mb-6 p-4 flex items-center justify-between animate-pulse">
+        <div 
+            className="card-container bg-blue-50 hover:bg-blue-100 transition-colors border-2 border-blue-200 mb-6 p-4 flex items-center justify-between animate-pulse cursor-pointer"
+            onClick={() => setActiveTab('vendedores')}
+        >
           <div className="flex items-center gap-3 text-blue-700">
             <SmartphoneNfc className="w-8 h-8" />
             <div>
@@ -62,7 +67,7 @@ const Admin = () => {
               <p className="text-xs">Existem {pendingPixClientesCount} comprovante(s) enviado(s) por clientes para você conferir.</p>
             </div>
           </div>
-          <p className="text-[10px] font-black uppercase bg-blue-600 text-white px-2 py-1 rounded">Confira na aba Vendas</p>
+          <p className="text-[10px] font-black uppercase bg-blue-600 text-white px-2 py-1 rounded hidden sm:block">Clique para abrir a aba Vendas</p>
         </div>
       )}
 
@@ -90,7 +95,7 @@ const Admin = () => {
         </div>
       </div>
 
-      <Tabs defaultValue="matches" className="w-full">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="flex flex-wrap h-auto gap-1 mb-8 bg-muted p-1 rounded-lg">
           <TabsTrigger value="matches" className="flex-1 py-3 min-w-[80px]">Partidas</TabsTrigger>
           <TabsTrigger value="credits" className="flex-1 py-3 min-w-[80px] relative">
@@ -104,7 +109,7 @@ const Admin = () => {
           <TabsTrigger value="players" className="flex-1 py-3 min-w-[80px]">Jogadores</TabsTrigger>
           <TabsTrigger value="rifas" className="flex-1 py-3 min-w-[80px]">Rifas</TabsTrigger>
           <TabsTrigger value="vendedores" className="flex-1 py-3 min-w-[80px] relative">
-            Vendas
+            Vendas / Validar
             {totalVendedoresPendencies > 0 && (
               <span className={cn(
                 "absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full text-[9px] font-bold text-white border border-background",

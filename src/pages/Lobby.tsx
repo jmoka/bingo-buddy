@@ -12,7 +12,7 @@ import { Match, MatchStatus, PlayerCard } from '@/types/match';
 import { gameTypeLabels } from '@/utils/bingoUtils';
 import { 
   Coins, Plus, Trophy, Users, Settings, 
-  Timer, DoorOpen, Ticket, Zap, ZapOff, Tv, Archive, Trash2, RotateCcw, Star, Loader2, CalendarDays, Clock, Crown, ChevronDown, ChevronUp, Gift, BellRing, Search
+  Timer, DoorOpen, Ticket, Zap, ZapOff, Tv, Archive, Trash2, RotateCcw, Star, Loader2, CalendarDays, Clock, Crown, ChevronDown, ChevronUp, Gift, BellRing, Search, SmartphoneNfc
 } from 'lucide-react';
 import PlayerAvatar from '@/components/PlayerAvatar';
 import { 
@@ -52,7 +52,7 @@ const Lobby = () => {
   } = useGame();
   
   const { rifas } = useRifas();
-  const { acertosPendentes, solicitacoesVendedor } = useRifaAdmin();
+  const { acertosPendentes, solicitacoesVendedor, todasFolhasBingo, todasCompras } = useRifaAdmin();
 
   const [now, setNow] = useState(Date.now());
   const [isCreateCardOpen, setCreateCardOpen] = useState(false);
@@ -76,7 +76,13 @@ const Lobby = () => {
   const pendingRedeemsCount = allRedeemRequests?.filter(r => r.status === 'pending').length || 0;
   const pendingAcertosCount = acertosPendentes?.filter(a => a.status === 'pendente' || a.status === 'em_analise').length || 0;
   const pendingVendedorCount = solicitacoesVendedor?.filter(s => s.status === 'pendente').length || 0;
-  const totalPendingAdminActions = pendingCreditsCount + pendingRedeemsCount + pendingAcertosCount + pendingVendedorCount;
+  
+  // NOVA VALIDAÇÃO: Puxar e contar os PIX dos Clientes (Físico -> App)
+  const pendingPixClientesCount = 
+    (todasFolhasBingo?.filter(f => f.status === 'em_analise').length || 0) + 
+    (todasCompras?.filter(c => c.status === 'em_analise').length || 0);
+
+  const totalPendingAdminActions = pendingCreditsCount + pendingRedeemsCount + pendingAcertosCount + pendingVendedorCount + pendingPixClientesCount;
 
   // Lógica de Notificações do Usuário (Pendências próprias)
   const myPendingCreditsCount = creditRequests?.filter(r => r.status === 'pending').length || 0;
@@ -492,6 +498,7 @@ const Lobby = () => {
                    {pendingAcertosCount > 0 && <span className="flex items-center gap-1">• {pendingAcertosCount} acerto(s) de vendedor</span>}
                    {pendingRedeemsCount > 0 && <span className="flex items-center gap-1">• {pendingRedeemsCount} resgate(s)</span>}
                    {pendingVendedorCount > 0 && <span className="flex items-center gap-1">• {pendingVendedorCount} inscrição(ões) de vendedor</span>}
+                   {pendingPixClientesCount > 0 && <span className="flex items-center gap-1 text-blue-700 dark:text-blue-400 font-bold">• <SmartphoneNfc className="w-3 h-3"/> {pendingPixClientesCount} PIX de Cliente(s) para validar</span>}
                 </div>
               </div>
             </div>
