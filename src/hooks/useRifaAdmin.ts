@@ -394,7 +394,6 @@ export const useRifaAdmin = () => {
   };
 
   const resolverAcerto = async (acertoId: string, status: 'aprovado' | 'rejeitado'): Promise<boolean> => {
-    // Agora o banco de dados calcula a comissão, paga o vendedor e dá o lucro líquido para o Admin sozinho!
     const { data, error } = await supabase.rpc('resolver_acerto_vendedor', {
       p_acerto_id: acertoId,
       p_status: status
@@ -409,6 +408,24 @@ export const useRifaAdmin = () => {
     queryClient.invalidateQueries({ queryKey: ['acertosAdmin'] });
     queryClient.invalidateQueries({ queryKey: ['todasComprasRifa'] });
     queryClient.invalidateQueries({ queryKey: ['gameSettings'] }); 
+    queryClient.invalidateQueries({ queryKey: ['perfis'] });
+    return true;
+  };
+
+  const pagarComissaoManual = async (acertoId: string, valorComissao: number): Promise<boolean> => {
+    const { data, error } = await supabase.rpc('pagar_comissao_acerto_manual', {
+      p_acerto_id: acertoId,
+      p_valor_comissao: valorComissao
+    });
+
+    if (error || !data?.success) {
+      toast.error('Erro ao pagar comissão manualmente.');
+      return false;
+    }
+
+    toast.success('Comissão paga e creditada na conta do vendedor!');
+    queryClient.invalidateQueries({ queryKey: ['acertosAdmin'] });
+    queryClient.invalidateQueries({ queryKey: ['gameSettings'] });
     queryClient.invalidateQueries({ queryKey: ['perfis'] });
     return true;
   };
@@ -492,25 +509,6 @@ export const useRifaAdmin = () => {
     return data as CartelaRifa[];
   };
 
-  const registrarVendaVendedor = async (rifaId: string, vendedorId: string, numeros: number[], clienteId?: string): Promise<boolean> => {
-    console.warn("Using deprecated function registrarVendaVendedor");
-    const { data, error } = await supabase.rpc('reservar_numeros_vendedor', {
-      p_rifa_id: rifaId,
-      p_numeros: numeros,
-      p_pagar_depois: false,
-    });
-    if (error || !data?.success) {
-      toast.error('Erro ao registrar venda: ' + (data?.error || error?.message));
-      return false;
-    }
-    toast.success('Venda registrada com sucesso!');
-    queryClient.invalidateQueries({ queryKey: ['minhasReservasVendedor'] });
-    queryClient.invalidateQueries({ queryKey: ['minhasVendasVendedor'] });
-    queryClient.invalidateQueries({ queryKey: ['numerosRifa'] });
-    queryClient.invalidateQueries({ queryKey: ['profile'] });
-    return true;
-  };
-
   return {
     todasRifas,
     vendedores,
@@ -535,8 +533,8 @@ export const useRifaAdmin = () => {
     rejeitarVendedor,
     getNumerosRifaAdmin,
     getCartelasCompra,
-    registrarVendaVendedor,
     resolverAcerto,
+    pagarComissaoManual,
     forcarRepasseAcerto,
     estornarRepasseAcerto,
   };

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useRifaAdmin } from '@/hooks/useRifaAdmin';
+import { useGame } from '@/contexts/GameContext';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -8,14 +9,16 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
-import { Loader2, CheckCircle2, XCircle, Users, Copy, ShieldBan, ShieldCheck, Edit, Wallet, HandCoins, AlertTriangle, Eye, ExternalLink, Grid3X3, SmartphoneNfc, Ticket, TrendingUp, BadgeDollarSign, HeartHandshake } from 'lucide-react';
+import { Loader2, CheckCircle2, XCircle, Users, Copy, ShieldBan, ShieldCheck, Edit, Wallet, HandCoins, AlertTriangle, Eye, ExternalLink, Grid3X3, SmartphoneNfc, Ticket, TrendingUp, BadgeDollarSign, HeartHandshake, PenTool } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { AcertoVendedor } from '@/types/rifa';
 import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
 
 const VendedoresAdmin = () => {
   const queryClient = useQueryClient();
+  const { gameSettings } = useGame();
   const {
     solicitacoesVendedor,
     vendedoresComStats,
@@ -26,6 +29,7 @@ const VendedoresAdmin = () => {
     atualizarVendedor,
     salvarEdicaoCompletaVendedor,
     resolverAcerto,
+    pagarComissaoManual,
     forcarRepasseAcerto,
   } = useRifaAdmin();
 
@@ -39,6 +43,11 @@ const VendedoresAdmin = () => {
 
   const [acertoForcarRepasse, setAcertoForcarRepasse] = useState<AcertoVendedor | null>(null);
   const [isForcandoRepasse, setIsForcandoRepasse] = useState(false);
+
+  const [pagarComissaoOpen, setPagarComissaoOpen] = useState(false);
+  const [acertoComissao, setAcertoComissao] = useState<AcertoVendedor | null>(null);
+  const [valorComissao, setValorComissao] = useState<number>(0);
+  const [isPagandoComissao, setIsPagandoComissao] = useState(false);
 
   const pendentes = solicitacoesVendedor.filter(s => s.status === 'pendente');
   const acertosParaAnalisar = acertosPendentes.filter(a => a.status === 'pendente' || a.status === 'em_analise');
@@ -191,6 +200,24 @@ const VendedoresAdmin = () => {
     await forcarRepasseAcerto(acertoForcarRepasse.id);
     setIsForcandoRepasse(false);
     setAcertoForcarRepasse(null);
+  };
+
+  const openPagarComissao = (acerto: AcertoVendedor) => {
+    const vendedor = vendedoresComStats.find((v: any) => v.id === acerto.vendedor_id);
+    const comissaoPerc = vendedor?.comissao_percentual > 0 ? vendedor.comissao_percentual : (gameSettings?.comissao_vendedor_global || 0);
+    const sugestao = Number(acerto.valor) * (comissaoPerc / 100);
+
+    setAcertoComissao(acerto);
+    setValorComissao(sugestao);
+    setPagarComissaoOpen(true);
+  };
+
+  const handlePagarComissao = async () => {
+    if (!acertoComissao) return;
+    setIsPagandoComissao(true);
+    const ok = await pagarComissaoManual(acertoComissao.id, valorComissao);
+    setIsPagandoComissao(false);
+    if (ok) setPagarComissaoOpen(false);
   };
 
   if (isLoadingSolicitacoes) {
@@ -390,15 +417,31 @@ const VendedoresAdmin = () => {
                    </div>
                    
                    {finalStatus === 'aprovado' && (
-                       <div className="flex items-center justify-between my-3 p-2.5 bg-background rounded-lg border border-border/50">
-                           <div className="text-center">
-                               <p className="text-[9px] uppercase font-bold text-amber-600">Comissão Paga</p>
-                               <p className="font-mono font-bold text-sm text-amber-700">R$ {comissao.toFixed(2)}</p>
+                       <div className="flex flex-col gap-2 my-3 p-2.5 bg-background rounded-lg border border-border/50">
+                           <div className="flex items-center justify-between">
+                               <div className="text-center">
+                                   <p className="text-[9px] uppercase font-bold text-amber-600">Comissão Paga</p>
+                                   <p className="font-mono font-bold text-sm text-amber-700">R$ {comissao.toFixed(2)}</p>
+                               </div>
+                               <div className="text-center border-l pl-4">
+                                   <p className="text-[9px] uppercase font-bold text-success">Líquido no Caixa</p>
+                                   <p className="font-mono font-bold text-sm text-success">R$ {liquido.toFixed(2)}</p>
+                               </div>
                            </div>
-                           <div className="text-center border-l pl-4">
-                               <p className="text-[9px] uppercase font-bold text-success">Líquido no Caixa</p>
-                               <p className="font-mono font-bold text-sm text-success">R$ {liquido.toFixed(2)}</p>
-                           </div>
+                           
+                           {/* BOTÃO PARA CORREÇÃO MANUAL DE COMISSÃO ZERADA */}
+                           {comissao === 0 && (
+                               <div className="border-t pt-2 mt-1">
+                                   <Button 
+                                      variant="outline" 
+                                      size="sm" 
+                                      className="w-full text-amber-600 border-amber-300 hover:bg-amber-50 h-8 text-[10px] font-bold"
+                                      onClick={() => openPagarComissao(a)}
+                                   >
+                                      <PenTool className="w-3 h-3 mr-1.5" /> Corrigir: Pagar Comissão Faltante
+                                   </Button>
+                               </div>
+                           )}
                        </div>
                    )}
 
@@ -436,6 +479,7 @@ const VendedoresAdmin = () => {
         </TabsContent>
       </Tabs>
 
+      {/* MODAL DE EDIÇÃO DE VENDEDOR */}
       <Dialog open={!!editandoVendedor} onOpenChange={(open) => !open && setEditandoVendedor(null)}>
         <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle className="flex items-center gap-2"><Edit className="w-5 h-5 text-primary" /> Editar Vendedor</DialogTitle></DialogHeader>
@@ -457,6 +501,43 @@ const VendedoresAdmin = () => {
           <DialogFooter>
             {comprovanteUrl && <Button asChild variant="outline" className="gap-2"><a href={comprovanteUrl} target="_blank" rel="noopener noreferrer"><ExternalLink className="w-4 h-4" /> Abrir Original / Baixar</a></Button>}
             <Button variant="default" onClick={() => setComprovanteUrl(null)}>Fechar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* MODAL CORRIGIR COMISSÃO MANUAL (PARA ACERTOS ANTIGOS) */}
+      <Dialog open={pagarComissaoOpen} onOpenChange={setPagarComissaoOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-amber-600">
+              <PenTool className="w-5 h-5" /> Corrigir Comissão Pendente
+            </DialogTitle>
+          </DialogHeader>
+          <div className="py-4 space-y-4">
+             <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
+               Neste acerto antigo, o valor de <strong>R$ {Number(acertoComissao?.valor || 0).toFixed(2)}</strong> foi todo para o seu caixa, e a comissão não foi repassada para o vendedor.
+             </div>
+             
+             <div className="space-y-2">
+                 <Label>Valor da Comissão para o Vendedor (R$)</Label>
+                 <Input 
+                    type="number" 
+                    step="0.01" 
+                    value={valorComissao} 
+                    onChange={e => setValorComissao(Number(e.target.value))} 
+                    className="font-bold text-lg h-12 text-amber-700" 
+                 />
+                 <p className="text-[10px] text-muted-foreground">
+                    Ao confirmar, este valor será descontado do seu Caixa e creditado no saldo do vendedor.
+                 </p>
+             </div>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setPagarComissaoOpen(false)}>Cancelar</Button>
+            <Button onClick={handlePagarComissao} disabled={isPagandoComissao || valorComissao <= 0} className="bg-amber-600 hover:bg-amber-700 text-white">
+              {isPagandoComissao ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <HandCoins className="w-4 h-4 mr-2" />}
+              Transferir para Vendedor
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
