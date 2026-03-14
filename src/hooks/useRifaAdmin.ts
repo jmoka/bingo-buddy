@@ -68,7 +68,7 @@ export const useRifaAdmin = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('vendas_bingo_fisico')
-        .select('*, partidas(name), vendedores_rifa(nome, codigo_ref)'); // CORREÇÃO: Puxa todas as colunas para o admin ver status e URL
+        .select('*, partidas(name), vendedores_rifa(nome, codigo_ref)'); 
       if (error) throw error;
       return data as any[];
     },
@@ -460,6 +460,30 @@ export const useRifaAdmin = () => {
   };
 
   const resolverAcerto = async (acertoId: string, status: 'aprovado' | 'rejeitado'): Promise<boolean> => {
+    let amountToDirectProfit = 0;
+
+    if (status === 'aprovado') {
+      const { data: acerto } = await supabase.from('acertos_vendedor').select('*').eq('id', acertoId).single();
+      
+      if (acerto) {
+        amountToDirectProfit = Number(acerto.valor);
+
+        // Subtrai apenas a parcela de Bingos que ainda estão ABERTOS/EM ANDAMENTO.
+        // Pois os fechados e as Rifas devem ir diretamente pro Caixa Admin agora.
+        if (acerto.bingo_ids && acerto.bingo_ids.length > 0) {
+          const { data: bingos } = await supabase.from('vendas_bingo_fisico')
+            .select('valor_pago, partidas(status)')
+            .in('id', acerto.bingo_ids);
+            
+          bingos?.forEach(b => {
+            if (b.partidas?.status !== 'finished') {
+              amountToDirectProfit -= Number(b.valor_pago);
+            }
+          });
+        }
+      }
+    }
+
     const { data, error } = await supabase.rpc('resolver_acerto_vendedor', {
       p_acerto_id: acertoId,
       p_status: status
@@ -468,6 +492,12 @@ export const useRifaAdmin = () => {
     if (error || !data?.success) {
       toast.error(`Erro ao ${status === 'aprovado' ? 'aprovar' : 'rejeitar'} o acerto financeiro.`);
       return false;
+    }
+
+    // Credita diretamente o lucro das Rifas e Bingos já encerrados ao Caixa
+    if (status === 'aprovado' && amountToDirectProfit > 0) {
+      await supabase.rpc('increment_admin_profit', { amount: amountToDirectProfit });
+      queryClient.invalidateQueries({ queryKey: ['gameSettings'] });
     }
 
     toast.success(`Acerto ${status} com sucesso!`);
