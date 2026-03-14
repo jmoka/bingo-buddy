@@ -129,7 +129,7 @@ export const useAdminData = () => {
       }
     }
 
-    await supabase.from('solicitacoes_credito').update({
+    const { error: updErr } = await supabase.from('solicitacoes_credito').update({
       status, 
       credits_granted: status === 'approved' ? creditsGranted : null,
       repasse_concluido: repasseConcluido,
@@ -137,6 +137,10 @@ export const useAdminData = () => {
       resolved_by: user.id, 
       notes: notes || null,
     }).eq('id', requestId);
+
+    if (updErr && repasseConcluido) {
+        toast.error("Ocorreu um erro no servidor ao marcar como concluído.");
+    }
 
     if (notes) {
         await supabase.from('mensagens_solicitacao').insert({
@@ -166,7 +170,11 @@ export const useAdminData = () => {
 
     if (amount > 0) {
       await supabase.rpc('increment_admin_profit', { amount });
-      await supabase.from('solicitacoes_credito').update({ repasse_concluido: true }).eq('id', requestId);
+      const { error: updErr } = await supabase.from('solicitacoes_credito').update({ repasse_concluido: true }).eq('id', requestId);
+      if (updErr) {
+          toast.error("Você precisa verificar as políticas RLS para atualizar a tabela.");
+          return false;
+      }
       queryClient.invalidateQueries({ queryKey: ['gameSettings'] });
     }
     

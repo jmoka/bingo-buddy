@@ -462,7 +462,6 @@ export const useRifaAdmin = () => {
   const resolverAcerto = async (acertoId: string, status: 'aprovado' | 'rejeitado'): Promise<boolean> => {
     let valorRepasse = 0;
 
-    // Pega o valor exato que o vendedor repassou, pois a comissão já foi descontada antes do PIX.
     if (status === 'aprovado') {
       const { data: acerto } = await supabase
           .from('acertos_vendedor')
@@ -486,9 +485,15 @@ export const useRifaAdmin = () => {
     }
 
     if (status === 'aprovado' && valorRepasse > 0) {
-      // O valor líquido cai diretamente no Caixa Admin
+      // Tenta incrementar o admin_profit
       await supabase.rpc('increment_admin_profit', { amount: valorRepasse });
-      await supabase.from('acertos_vendedor').update({ repasse_concluido: true }).eq('id', acertoId);
+      
+      // Validação rigorosa do UPDATE de repasse_concluido
+      const { error: updateErr } = await supabase.from('acertos_vendedor').update({ repasse_concluido: true }).eq('id', acertoId);
+      if (updateErr) {
+        console.error("Falta de permissão (RLS):", updateErr);
+        toast.error("O dinheiro entrou no caixa, mas faltam permissões no banco. Execute o comando SQL no painel!");
+      }
       queryClient.invalidateQueries({ queryKey: ['gameSettings'] }); 
     } else if (status === 'rejeitado') {
       await supabase.from('acertos_vendedor').update({ repasse_concluido: false }).eq('id', acertoId);
@@ -500,7 +505,6 @@ export const useRifaAdmin = () => {
     return true;
   };
 
-  // Função para forçar o repasse caso o sistema tenha falhado anteriormente
   const forcarRepasseAcerto = async (acertoId: string): Promise<boolean> => {
     const { data: acerto } = await supabase
         .from('acertos_vendedor')
@@ -516,8 +520,15 @@ export const useRifaAdmin = () => {
     const valorRepasse = Number(acerto.valor);
 
     if (valorRepasse > 0) {
+      // Incrementa o lucro
       await supabase.rpc('increment_admin_profit', { amount: valorRepasse });
-      await supabase.from('acertos_vendedor').update({ repasse_concluido: true }).eq('id', acertoId);
+      
+      // Tenta atualizar. Se der erro, avisa e retorna falso para não fechar modal.
+      const { error: updErr } = await supabase.from('acertos_vendedor').update({ repasse_concluido: true }).eq('id', acertoId);
+      if (updErr) {
+        toast.error("Você precisa executar o comando SQL no Supabase para liberar o acesso a essa tabela!");
+        return false;
+      }
       queryClient.invalidateQueries({ queryKey: ['gameSettings'] });
     }
     
