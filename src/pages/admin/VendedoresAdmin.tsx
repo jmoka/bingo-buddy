@@ -212,7 +212,7 @@ const VendedoresAdmin = () => {
 
     setAcertoComissao(acerto);
     setValorComissao(sugestao);
-    setDescontarDoAdmin(true); // O padrão é sim, porque nas antigas o admin tinha recebido 100%
+    setDescontarDoAdmin(true);
     setPagarComissaoOpen(true);
   };
 
@@ -573,10 +573,7 @@ const VendedoresAdmin = () => {
           </div>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setAcaoAcerto(null)}>Cancelar</Button>
-            <Button className={acaoAcerto?.tipo === 'aprovado' ? 'bg-green-600 hover:bg-green-700 text-white' : ''} variant={acaoAcerto?.tipo === 'rejeitado' ? 'destructive' : 'default'} onClick={handleResolverAcerto} disabled={isProcessandoAcerto}>
-              {isProcessandoAcerto && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-              {acaoAcerto?.tipo === 'aprovado' ? 'Sim, o dinheiro caiu!' : 'Rejeitar Acerto'}
-            </Button>
+            <Button className={acaoAcerto?.tipo === 'aprovado' ? 'bg-green-600 hover:bg-green-700 text-white' : ''} variant={acaoAcerto?.tipo === 'rejeitado' ? 'destructive' : 'default'} onClick={handleResolverAcerto} disabled={isProcessandoAcerto}>{isProcessandoAcerto && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}{acaoAcerto?.tipo === 'aprovado' ? 'Sim, o dinheiro caiu!' : 'Rejeitar Acerto'}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -602,7 +599,7 @@ const VendedoresAdmin = () => {
           <DialogFooter>
             <Button variant="ghost" onClick={() => setAcertoForcarRepasse(null)}>Cancelar</Button>
             <Button onClick={handleForcarRepasse} disabled={isForcandoRepasse} className="bg-amber-600 hover:bg-amber-700 text-white">
-              {isForcandoRepasse && <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+              {isForcandoRepasse && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
               Confirmar e Enviar p/ Caixa
             </Button>
           </DialogFooter>
