@@ -183,7 +183,7 @@ export default function ValidarCartela() {
   const buscarNumeroRifa = async () => {
     if (!numeroRifa.trim()) { toast.error('Digite o número.'); return; }
     setLoadingRifa(true); setBuscadoRifa(false); setResultadoRifa(null);
-    let query = supabase.from('numeros_rifa').select('*, rifas(id, nome, status, numero_ganhador, custo_por_numero, data_encerramento), cartelas_rifa(compras_rifa(status)), vendedores_rifa(id, nome, codigo_ref, perfis(avatar_url))').eq('numero', parseInt(numeroRifa)).in('status', ['reservado', 'vendido']);
+    let query = supabase.from('numeros_rifa').select('*, rifas(id, nome, status, numero_ganhador, custo_por_numero, data_encerramento), cartelas_rifa(codigo_validacao, compras_rifa(status)), vendedores_rifa(id, nome, codigo_ref, perfis(avatar_url))').eq('numero', parseInt(numeroRifa)).in('status', ['reservado', 'vendido']);
     if (rifaIdSelecionada && rifaIdSelecionada !== 'todas') query = query.eq('rifa_id', rifaIdSelecionada);
     const { data, error } = await query.limit(10);
     setLoadingRifa(false); setBuscadoRifa(true); setResultadoRifa(error || !data || data.length === 0 ? null : data);
@@ -397,7 +397,27 @@ export default function ValidarCartela() {
                        </div>
                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm relative z-20 mb-4">
                          <div className="space-y-1"><p className="text-xs text-muted-foreground font-bold uppercase">Comprador</p><p className="font-semibold text-base">{num.nome_comprador ? <span className="bg-primary text-primary-foreground px-1.5 py-0.5 rounded text-sm">{num.nome_comprador}</span> : <span className="bg-blue-600 text-white px-1.5 py-0.5 rounded text-sm">Nome não registrado</span>}</p></div>
-                         <div className="space-y-1"><p className="text-xs text-muted-foreground font-bold uppercase">Situação Financeira</p><p className="font-semibold flex items-center gap-1.5">{isPago ? <Badge className="bg-success text-white border-none">PAGO</Badge> : <Badge variant="outline" className="text-amber-600 border-amber-400 bg-amber-100">AGUARDANDO PAGAMENTO</Badge>}</p></div>
+                         <div className="space-y-1">
+                           <p className="text-xs text-muted-foreground font-bold uppercase">Situação Financeira</p>
+                           <div className="font-semibold flex flex-wrap items-center gap-2 mt-1">
+                             {isPago ? (
+                               <Badge className="bg-success text-white border-none">PAGO</Badge>
+                             ) : (
+                               <>
+                                 <Badge variant="outline" className="text-amber-600 border-amber-400 bg-amber-100">AGUARDANDO PAGAMENTO</Badge>
+                                 {num.cartelas_rifa?.[0]?.codigo_validacao && (
+                                   <Button
+                                     size="sm"
+                                     className="h-6 text-[10px] bg-amber-600 hover:bg-amber-700 text-white shadow-sm"
+                                     onClick={() => navigate(`/pagar-cartela?codigo=${num.cartelas_rifa[0].codigo_validacao}`)}
+                                   >
+                                     Deseja pagar?
+                                   </Button>
+                                 )}
+                               </>
+                             )}
+                           </div>
+                         </div>
                        </div>
                        {num.vendedores_rifa && (
                          <div className="pt-4 border-t border-border/40 flex items-center justify-between">
