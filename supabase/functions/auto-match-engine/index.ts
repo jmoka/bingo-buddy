@@ -105,7 +105,8 @@ serve(async (req) => {
       start_time: nextStartTime.toISOString(),
       status: 'open',
       is_auto_calling: true,
-      min_players: 1
+      min_players: 1,
+      admin_id: settings.admin_id
     };
 
     const { data: created, error: createError } = await supabaseAdmin.from('partidas').insert(newMatch).select().single();

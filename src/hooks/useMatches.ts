@@ -21,7 +21,7 @@ const useUpdateMatchMutation = () => {
     },
     onError: (err, variables, context) => {
       if (context?.previousMatches) queryClient.setQueryData(['matches'], context.previousMatches);
-      toast.error("Erro ao atualizar partida.");
+      toast.error(`Erro ao atualizar partida: ${err.message}`);
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['matches'] });

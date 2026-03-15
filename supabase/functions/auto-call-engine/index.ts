@@ -118,7 +118,8 @@ serve(async (req) => {
                   start_time: nextStart,
                   status: 'open',
                   is_auto_calling: true,
-                  min_players: 1
+                  min_players: 1,
+                  admin_id: settings.admin_id
                 };
                 await supabaseAdmin.from('partidas').insert([newMatch]);
                 console.log(`[auto-call-engine] Garantia: Criada nova partida ${newMatch.name}`);
