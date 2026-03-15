@@ -578,6 +578,29 @@ const VendedoresAdmin = () => {
             <div className="space-y-2"><Label>Nome Completo</Label><Input value={formEdicao.nome_completo} onChange={e => setFormEdicao(p => ({...p, nome_completo: e.target.value}))} /></div>
             <div className="grid grid-cols-2 gap-4"><div className="space-y-2"><Label>CPF</Label><Input value={formEdicao.cpf} onChange={e => setFormEdicao(p => ({...p, cpf: e.target.value}))} /></div><div className="space-y-2"><Label>RG</Label><Input value={formEdicao.rg} onChange={e => setFormEdicao(p => ({...p, rg: e.target.value}))} /></div></div>
             <div className="border-t pt-4 grid grid-cols-2 gap-4"><div className="space-y-2"><Label>Desconto Físico (%)</Label><Input type="number" step="0.1" value={formEdicao.desconto} onChange={e => setFormEdicao(p => ({...p, desconto: Number(e.target.value)}))} /></div><div className="space-y-2"><Label>Comissão Online (%)</Label><Input type="number" step="0.1" value={formEdicao.comissao} onChange={e => setFormEdicao(p => ({...p, comissao: Number(e.target.value)}))} /></div></div>
+            
+            {editandoVendedor?.cadastro && (editandoVendedor.cadastro.foto_url || editandoVendedor.cadastro.documento_url || editandoVendedor.cadastro.comprovante_endereco_url) && (
+              <div className="border-t pt-4 space-y-3">
+                <Label>Documentos Anexados</Label>
+                <div className="flex flex-wrap gap-2">
+                  {editandoVendedor.cadastro.foto_url && (
+                    <Button type="button" variant="outline" size="sm" onClick={() => handleViewComprovante(editandoVendedor.cadastro.foto_url, false, 'avatars')}>
+                      <Eye className="w-4 h-4 mr-1.5" /> Selfie
+                    </Button>
+                  )}
+                  {editandoVendedor.cadastro.documento_url && (
+                    <Button type="button" variant="outline" size="sm" onClick={() => handleViewComprovante(editandoVendedor.cadastro.documento_url, false, 'receipts')}>
+                      <Eye className="w-4 h-4 mr-1.5" /> Doc Identidade
+                    </Button>
+                  )}
+                  {editandoVendedor.cadastro.comprovante_endereco_url && (
+                    <Button type="button" variant="outline" size="sm" onClick={() => handleViewComprovante(editandoVendedor.cadastro.comprovante_endereco_url, false, 'receipts')}>
+                      <Eye className="w-4 h-4 mr-1.5" /> Comp. Endereço
+                    </Button>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
           <DialogFooter><Button variant="ghost" onClick={() => setEditandoVendedor(null)}>Cancelar</Button><Button onClick={handleSaveEdit} disabled={isSavingEdit}>{isSavingEdit ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <CheckCircle2 className="w-4 h-4 mr-2" />}Salvar Alterações</Button></DialogFooter>
         </DialogContent>
