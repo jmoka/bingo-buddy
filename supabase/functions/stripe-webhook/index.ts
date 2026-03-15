@@ -16,14 +16,13 @@ serve(async (req) => {
     { auth: { persistSession: false } }
   )
 
-  const { data: settings, error: settingsError } = await supabaseAdmin
+  const { data: settings } = await supabaseAdmin
     .from('configuracoes')
-    .select('stripe_secret_key, stripe_webhook_secret')
+    .select('id, stripe_secret_key, stripe_webhook_secret, comissao_vendedor_global, admin_profit')
     .limit(1)
     .maybeSingle();
 
-  if (settingsError || !settings?.stripe_secret_key || !settings?.stripe_webhook_secret) {
-      console.error("[stripe-webhook] Erro: Chaves do Stripe não configuradas.");
+  if (!settings?.stripe_secret_key || !settings?.stripe_webhook_secret) {
       return new Response('Config Error', { status: 500 });
   }
 
@@ -33,45 +32,114 @@ serve(async (req) => {
   })
 
   const signature = req.headers.get('stripe-signature')
-  if (!signature) {
-      return new Response('No signature', { status: 400 });
-  }
+  if (!signature) return new Response('No signature', { status: 400 });
 
   try {
     const body = await req.text()
-    
-    const event = await stripe.webhooks.constructEventAsync(
-      body,
-      signature,
-      settings.stripe_webhook_secret.trim()
-    )
+    const event = await stripe.webhooks.constructEventAsync(body, signature, settings.stripe_webhook_secret.trim())
 
     if (event.type === 'checkout.session.completed' || event.type === 'checkout.session.async_payment_succeeded') {
       const session = event.data.object
       
       if (session.payment_status === 'paid') {
-        const userId = session.client_reference_id || session.metadata?.user_id;
+        const userId = session.client_reference_id || session.metadata?.user_id || 'anonymous';
         const paymentType = session.metadata?.payment_type;
         const amountPaidByCustomer = session.amount_total ? session.amount_total / 100 : 0;
         const originalAmount = session.metadata?.original_amount ? Number(session.metadata.original_amount) : amountPaidByCustomer;
-        const creditsRequested = Number(session.metadata?.credits_requested || originalAmount);
-        const vendaId = session.metadata?.venda_id || null;
 
-        // Chama a função matemática blindada que acabamos de criar no banco!
-        const { data, error } = await supabaseAdmin.rpc('process_stripe_payment', {
-            p_session_id: session.id,
-            p_user_id: userId === 'anonymous' ? null : userId,
-            p_amount: amountPaidByCustomer,
-            p_payment_type: paymentType || 'unknown',
-            p_original_amount: originalAmount,
-            p_credits_requested: creditsRequested,
-            p_venda_id: vendaId
+        console.log(`[stripe-webhook] Tipo: ${paymentType} | Usr: ${userId} | Valor Real (S/ Taxas): R$ ${originalAmount}`);
+
+        // Previne duplicidade
+        const { data: existing } = await supabaseAdmin.from('stripe_payments').select('status').eq('stripe_session_id', session.id).maybeSingle();
+        if (existing?.status === 'completed') {
+            return new Response(JSON.stringify({ received: true }), { status: 200, headers: corsHeaders });
+        }
+
+        await supabaseAdmin.from('stripe_payments').insert({ 
+            stripe_session_id: session.id, user_id: userId === 'anonymous' ? null : userId,
+            amount: amountPaidByCustomer, status: 'completed', payment_type: paymentType || 'unknown'
         });
 
-        if (error) {
-            console.error("[stripe-webhook] Erro no banco de dados:", error);
-        } else {
-            console.log(`[stripe-webhook] Sucesso: ${JSON.stringify(data)}`);
+        // =========================================================
+        // 1. COMPRA DE CRÉDITOS (ADICIONAR SALDO)
+        // =========================================================
+        if (paymentType === 'credits' && userId !== 'anonymous') {
+          const creditsToGrant = Number(session.metadata?.credits_requested || originalAmount);
+          
+          // Adiciona saldo ao usuário puxando o saldo atual e somando
+          const { data: profile } = await supabaseAdmin.from('perfis').select('credits').eq('id', userId).single();
+          if (profile) await supabaseAdmin.from('perfis').update({ credits: Number(profile.credits || 0) + creditsToGrant }).eq('id', userId);
+
+          // Adiciona saldo ao Caixa do Admin
+          await supabaseAdmin.from('configuracoes').update({ admin_profit: Number(settings.admin_profit || 0) + originalAmount }).eq('id', settings.id);
+
+          const { data: historyData } = await supabaseAdmin.from('solicitacoes_credito').insert({
+            player_id: userId, status: 'approved', credits_requested: creditsToGrant, credits_granted: creditsToGrant,
+            amount_paid: amountPaidByCustomer, receipt_url: `STRIPE_${session.id}`, notes: 'Pagamento via Cartão (Stripe)', resolved_at: new Date().toISOString(), repasse_concluido: true
+          }).select('id').single();
+
+          if (historyData) await supabaseAdmin.from('mensagens_solicitacao').insert({ credit_request_id: historyData.id, sender_id: userId, message: `✅ Pagamento de R$ ${amountPaidByCustomer.toFixed(2)} aprovado no Cartão.` });
+        } 
+        
+        // =========================================================
+        // 2. PAGAMENTO DE CARTELA FÍSICA (BINGO)
+        // =========================================================
+        else if (paymentType === 'venda_bingo' && session.metadata?.venda_id) {
+            const vendaId = session.metadata.venda_id;
+            const { data: venda } = await supabaseAdmin.from('vendas_bingo_fisico').select('*, vendedores_rifa(user_id, comissao_percentual)').eq('id', vendaId).single();
+
+            if (venda && venda.status !== 'pago') {
+                await supabaseAdmin.from('vendas_bingo_fisico').update({ status: 'pago' }).eq('id', vendaId);
+                
+                // Pote da partida
+                const { data: match } = await supabaseAdmin.from('partidas').select('pot').eq('id', venda.match_id).single();
+                if (match) await supabaseAdmin.from('partidas').update({ pot: Number(match.pot || 0) + originalAmount }).eq('id', venda.match_id);
+
+                let comissaoValor = 0;
+                if (venda.vendedor_id && venda.vendedores_rifa?.user_id) {
+                    let comissaoPerc = Number(venda.vendedores_rifa.comissao_percentual || 0);
+                    if (comissaoPerc === 0) comissaoPerc = Number(settings.comissao_vendedor_global || 0);
+                    if (comissaoPerc > 0) comissaoValor = originalAmount * (comissaoPerc / 100.0);
+                    
+                    if (comissaoValor > 0) {
+                        const { data: vProfile } = await supabaseAdmin.from('perfis').select('credits').eq('id', venda.vendedores_rifa.user_id).single();
+                        if (vProfile) await supabaseAdmin.from('perfis').update({ credits: Number(vProfile.credits || 0) + comissaoValor }).eq('id', venda.vendedores_rifa.user_id);
+                    }
+                }
+                
+                // Admin recebe o que sobrou (descontado a comissão do vendedor)
+                const lucroAdmin = originalAmount - comissaoValor;
+                await supabaseAdmin.from('configuracoes').update({ admin_profit: Number(settings.admin_profit || 0) + lucroAdmin }).eq('id', settings.id);
+            }
+        }
+
+        // =========================================================
+        // 3. PAGAMENTO DE RIFA
+        // =========================================================
+        else if (paymentType === 'venda_rifa' && session.metadata?.venda_id) {
+            const vendaId = session.metadata.venda_id;
+            const { data: compra } = await supabaseAdmin.from('compras_rifa').select('*, vendedores_rifa(user_id, comissao_percentual)').eq('id', vendaId).single();
+
+            if (compra && compra.status !== 'pago') {
+                await supabaseAdmin.from('compras_rifa').update({ status: 'pago' }).eq('id', vendaId);
+
+                let comissaoValor = 0;
+                const vId = compra.vendedor_id || compra.ref_vendedor_id;
+                if (vId && compra.vendedores_rifa?.user_id) {
+                    let comissaoPerc = Number(compra.vendedores_rifa.comissao_percentual || 0);
+                    if (comissaoPerc === 0) comissaoPerc = Number(settings.comissao_vendedor_global || 0);
+                    if (comissaoPerc > 0) comissaoValor = originalAmount * (comissaoPerc / 100.0);
+                    
+                    if (comissaoValor > 0) {
+                        const { data: vProfile } = await supabaseAdmin.from('perfis').select('credits').eq('id', compra.vendedores_rifa.user_id).single();
+                        if (vProfile) await supabaseAdmin.from('perfis').update({ credits: Number(vProfile.credits || 0) + comissaoValor }).eq('id', compra.vendedores_rifa.user_id);
+                    }
+                }
+                
+                // Admin recebe o que sobrou
+                const lucroAdmin = originalAmount - comissaoValor;
+                await supabaseAdmin.from('configuracoes').update({ admin_profit: Number(settings.admin_profit || 0) + lucroAdmin }).eq('id', settings.id);
+            }
         }
       } 
     }
