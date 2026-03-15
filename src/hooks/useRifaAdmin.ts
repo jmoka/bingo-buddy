@@ -117,14 +117,19 @@ export const useRifaAdmin = () => {
       if (!data || data.length === 0) return [];
 
       const userIds = [...new Set(data.map(s => s.user_id))];
-      const { data: profilesData } = await supabase
-        .from('perfis')
-        .select('id, full_name, avatar_url')
-        .in('id', userIds);
+      
+      const [resPerfis, resCadastros] = await Promise.all([
+        supabase.from('perfis').select('id, full_name, avatar_url').in('id', userIds),
+        supabase.from('cadastro_vendedor').select('*').in('user_id', userIds)
+      ]);
+
+      const profilesData = resPerfis.data || [];
+      const cadastrosData = resCadastros.data || [];
 
       return data.map(s => ({
         ...s,
-        perfis: profilesData?.find(p => p.id === s.user_id) || null
+        perfis: profilesData.find(p => p.id === s.user_id) || null,
+        cadastro: cadastrosData.find(c => c.user_id === s.user_id) || null
       })) as SolicitacaoVendedor[];
     },
     enabled: isAdmin,

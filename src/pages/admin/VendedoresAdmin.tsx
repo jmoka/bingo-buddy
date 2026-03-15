@@ -188,7 +188,7 @@ const VendedoresAdmin = () => {
     if (ok) setEditandoVendedor(null);
   };
 
-  const handleViewComprovante = async (path: string | null, isPublic: boolean = false) => {
+  const handleViewComprovante = async (path: string | null, isPublic: boolean = false, bucket: string = 'receipts') => {
     if (!path) {
         toast.error('Nenhum comprovante de imagem foi anexado a esta transação.');
         return;
@@ -196,6 +196,11 @@ const VendedoresAdmin = () => {
     if (isPublic) {
         setComprovanteUrl(path);
         return;
+    }
+    if (bucket === 'avatars') {
+      const { data } = supabase.storage.from('avatars').getPublicUrl(path);
+      setComprovanteUrl(data.publicUrl);
+      return;
     }
     try {
       const { data, error } = await supabase.storage.from('receipts').createSignedUrl(path, 3600);
@@ -312,6 +317,28 @@ const VendedoresAdmin = () => {
                    </div>
                    <Badge variant="outline" className="text-[10px] text-amber-600 border-amber-300 bg-amber-50">Novo Cadastro</Badge>
                  </div>
+                 
+                 {s.cadastro && (s.cadastro.foto_url || s.cadastro.documento_url || s.cadastro.comprovante_endereco_url) && (
+                   <div className="mt-3 bg-muted/30 p-2.5 rounded-lg border border-border/50 text-xs flex flex-wrap gap-2">
+                     <span className="font-semibold text-muted-foreground mr-1 w-full flex items-center gap-1.5 mb-1"><Eye className="w-3.5 h-3.5" /> Anexos do Vendedor:</span>
+                     {s.cadastro.foto_url && (
+                       <Button variant="outline" size="sm" className="h-7 text-[10px]" onClick={() => handleViewComprovante(s.cadastro?.foto_url, false, 'avatars')}>
+                         Selfie
+                       </Button>
+                     )}
+                     {s.cadastro.documento_url && (
+                       <Button variant="outline" size="sm" className="h-7 text-[10px]" onClick={() => handleViewComprovante(s.cadastro?.documento_url, false, 'receipts')}>
+                         Doc Identidade
+                       </Button>
+                     )}
+                     {s.cadastro.comprovante_endereco_url && (
+                       <Button variant="outline" size="sm" className="h-7 text-[10px]" onClick={() => handleViewComprovante(s.cadastro?.comprovante_endereco_url, false, 'receipts')}>
+                         Comp. Endereço
+                       </Button>
+                     )}
+                   </div>
+                 )}
+
                  <div className="flex items-center gap-3 pt-3 mt-3 border-t">
                     <Button
                       variant="destructive"

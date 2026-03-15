@@ -105,6 +105,7 @@ export interface SolicitacaoVendedor {
     full_name: string | null;
     avatar_url: string | null;
   };
+  cadastro?: CadastroVendedor | null;
 }
 
 export interface CadastroVendedor {
