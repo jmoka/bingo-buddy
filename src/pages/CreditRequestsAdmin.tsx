@@ -492,6 +492,69 @@ const CreditRequestsAdmin = () => {
         </TabsContent>
       </Tabs>
 
+      {/* DIALOG DE RESOLVER SOLICITAÇÕES DE CRÉDITO (Aprovar/Rejeitar/Excluir) */}
+      <Dialog open={isResolveDialogOpen} onOpenChange={setIsResolveDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {actionType === 'delete' && <Trash2 className="w-5 h-5 text-destructive" />}
+              {actionType === 'approve' && <Check className="w-5 h-5 text-success" />}
+              {actionType === 'reject' && <X className="w-5 h-5 text-destructive" />}
+              {actionType === 'delete' ? 'Excluir Solicitação' : actionType === 'approve' ? 'Confirmar Liberação de Créditos' : 'Rejeitar Comprovante'}
+            </DialogTitle>
+          </DialogHeader>
+
+          {selectedRequest && actionType !== 'delete' && (
+            <div className="space-y-4 py-2">
+              <p className="text-sm text-muted-foreground">
+                Você está prestes a <strong>{actionType === 'approve' ? 'APROVAR' : 'REJEITAR'}</strong> a solicitação de <strong>{selectedRequest.perfis?.full_name || 'Usuário'}</strong>.
+              </p>
+
+              {actionType === 'approve' && (
+                <div className="space-y-2">
+                  <Label>Créditos a Liberar (Já preenchido com o solicitado)</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={creditsToGrant}
+                    onChange={e => setCreditsToGrant(Number(e.target.value) || 0)}
+                    className="font-bold text-xl h-12 text-primary"
+                  />
+                  <p className="text-[10px] text-muted-foreground">O valor de R$ {Number(selectedRequest.amount_paid || 0).toFixed(2)} irá para o seu Caixa.</p>
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <Label>Mensagem para o Jogador {actionType === 'reject' ? '(Obrigatório)' : '(Opcional)'}</Label>
+                <Textarea
+                  placeholder={actionType === 'reject' ? 'Explique por que o PIX foi rejeitado...' : 'Ex: Pagamento confirmado, boa sorte!'}
+                  value={rejectionNotes}
+                  onChange={e => setRejectionNotes(e.target.value)}
+                />
+              </div>
+            </div>
+          )}
+          
+          {actionType === 'delete' && (
+            <div className="py-4">
+              <p className="text-sm text-muted-foreground">Tem certeza que deseja excluir permanentemente esta solicitação do sistema?</p>
+            </div>
+          )}
+
+          <DialogFooter>
+            <DialogClose asChild><Button variant="ghost">Cancelar</Button></DialogClose>
+            <Button
+              variant={actionType === 'approve' ? 'default' : 'destructive'}
+              className={actionType === 'approve' ? 'bg-green-600 hover:bg-green-700 text-white' : ''}
+              onClick={handleResolve}
+              disabled={(actionType === 'reject' && !rejectionNotes.trim()) || (actionType === 'approve' && creditsToGrant <= 0)}
+            >
+              {actionType === 'approve' ? 'Liberar Créditos' : actionType === 'reject' ? 'Confirmar Rejeição' : 'Sim, Excluir'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* DIALOG DE VISUALIZAR COMPROVANTE */}
       <Dialog open={!!comprovanteUrl} onOpenChange={(open) => !open && setComprovanteUrl(null)}>
         <DialogContent className="max-w-3xl">
