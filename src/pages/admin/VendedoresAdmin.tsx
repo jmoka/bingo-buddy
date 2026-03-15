@@ -40,7 +40,7 @@ const VendedoresAdmin = () => {
 
   const [editandoVendedor, setEditandoVendedor] = useState<any | null>(null);
   const [isSavingEdit, setIsSavingEdit] = useState(false);
-  const [formEdicao, setFormEdicao] = useState({ nome_completo: '', telefone: '', cpf: '', rg: '', endereco: '', comissao: 0, desconto: 0 });
+  const [formEdicao, setFormEdicao] = useState({ nome_completo: '', telefone: '', cpf: '', rg: '', endereco: '', comissao: '' as string | number, desconto: '' as string | number });
   
   const [acaoAcerto, setAcaoAcerto] = useState<{tipo: 'aprovado' | 'rejeitado', acerto: AcertoVendedor} | null>(null);
   const [isProcessandoAcerto, setIsProcessandoAcerto] = useState(false);
@@ -171,8 +171,8 @@ const VendedoresAdmin = () => {
       cpf: vendedor.cadastro?.cpf || vendedor.documento || '',
       rg: vendedor.cadastro?.rg || '',
       endereco: vendedor.cadastro?.endereco || '',
-      comissao: vendedor.comissao_percentual || 0,
-      desconto: vendedor.percentual_desconto || 0,
+      comissao: vendedor.comissao_percentual ?? 0,
+      desconto: vendedor.percentual_desconto ?? 0,
     });
   };
 
@@ -183,8 +183,8 @@ const VendedoresAdmin = () => {
       nome: formEdicao.nome_completo, 
       telefone: formEdicao.telefone, 
       documento: formEdicao.cpf, 
-      comissao_percentual: Number(formEdicao.comissao), 
-      percentual_desconto: Number(formEdicao.desconto) 
+      comissao_percentual: Number(formEdicao.comissao) || 0, 
+      percentual_desconto: Number(formEdicao.desconto) || 0
     };
     const payloadCadastro = { 
       nome_completo: formEdicao.nome_completo, 
@@ -290,8 +290,8 @@ const VendedoresAdmin = () => {
                      </div>
                      <div className="flex flex-wrap gap-x-4 gap-y-0.5 mt-1 text-xs text-muted-foreground">
                        {v.telefone && <span>{v.telefone}</span>}
-                       <span>Desconto: {v.percentual_desconto}%</span>
-                       <span>Comissão: {v.comissao_percentual}%</span>
+                       <span>Desconto: {Number(v.percentual_desconto || 0).toFixed(2)}%</span>
+                       <span>Comissão: {Number(v.comissao_percentual || 0).toFixed(2)}%</span>
                      </div>
                    </div>
                    <div className="flex flex-col gap-1.5 shrink-0">
@@ -587,7 +587,16 @@ const VendedoresAdmin = () => {
           <div className="space-y-4 py-2">
             <div className="space-y-2"><Label>Nome Completo</Label><Input value={formEdicao.nome_completo} onChange={e => setFormEdicao(p => ({...p, nome_completo: e.target.value}))} /></div>
             <div className="grid grid-cols-2 gap-4"><div className="space-y-2"><Label>CPF</Label><Input value={formEdicao.cpf} onChange={e => setFormEdicao(p => ({...p, cpf: e.target.value}))} /></div><div className="space-y-2"><Label>RG</Label><Input value={formEdicao.rg} onChange={e => setFormEdicao(p => ({...p, rg: e.target.value}))} /></div></div>
-            <div className="border-t pt-4 grid grid-cols-2 gap-4"><div className="space-y-2"><Label>Desconto Físico (%)</Label><Input type="number" step="0.1" value={formEdicao.desconto} onChange={e => setFormEdicao(p => ({...p, desconto: Number(e.target.value)}))} /></div><div className="space-y-2"><Label>Comissão Online (%)</Label><Input type="number" step="0.1" value={formEdicao.comissao} onChange={e => setFormEdicao(p => ({...p, comissao: Number(e.target.value)}))} /></div></div>
+            <div className="border-t pt-4 grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Desconto Físico (%)</Label>
+                <Input type="number" step="0.01" value={formEdicao.desconto} onChange={e => setFormEdicao(p => ({...p, desconto: e.target.value}))} />
+              </div>
+              <div className="space-y-2">
+                <Label>Comissão Online (%)</Label>
+                <Input type="number" step="0.01" value={formEdicao.comissao} onChange={e => setFormEdicao(p => ({...p, comissao: e.target.value}))} />
+              </div>
+            </div>
             
             {editandoVendedor?.cadastro && (editandoVendedor.cadastro.foto_url || editandoVendedor.cadastro.documento_url || editandoVendedor.cadastro.comprovante_endereco_url) && (
               <div className="border-t pt-4 space-y-3">
