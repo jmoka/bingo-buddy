@@ -99,7 +99,7 @@ serve(async (req) => {
     const newMatch = {
       name: `Bingo Automático #${nextNumber}`,
       game_type: settings.auto_engine_game_type,
-      max_cards_per_player: 100,
+      max_cards_per_player: 3,
       card_price: settings.auto_engine_card_price,
       prize: { type: settings.auto_engine_prize_type, value: settings.auto_engine_prize_value },
       start_time: nextStartTime.toISOString(),

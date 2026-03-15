@@ -472,7 +472,7 @@ const Lobby = () => {
                             onClick={() => openJoinDialog(match)}
                             disabled={myMatchCards.length >= match.max_cards_per_player}
                           >
-                            {!profile ? 'LOGIN PARA ENTRAR' : (myMatchCards.length >= match.max_cards_per_player) ? `MÁX. DE ${match.max_cards_per_player} ATINGIDO` : alreadyJoined ? 'ADICIONAR MAIS' : 'ENTRAR'}
+                            {!profile ? 'LOGIN PARA ENTRAR' : (myMatchCards.length >= match.max_cards_per_player) ? 'LIMITE ATINGIDO' : alreadyJoined ? 'ADICIONAR MAIS' : 'ENTRAR'}
                           </Button>
                         </>
                       )}
