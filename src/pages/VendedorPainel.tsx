@@ -136,19 +136,23 @@ const VendedorPainel = () => {
     return folhasEmitidas.filter(f => f.match_id === bingoFilterMatchId);
   }, [folhasEmitidas, bingoFilterMatchId]);
 
-  const reservasPorRifa = useMemo(() => {
-    const map: Record<string, NumeroRifaVendedor[]> = {};
-    const filtradas = minhasReservas.filter(r => {
-      if (r.rifas?.status !== 'ativa') return false;
+  // Contadores dos Cards
+  const reservasFiltradasStats = useMemo(() => {
+    return minhasReservas.filter(r => {
+      if (r.rifas?.status !== 'ativa') return false; // Exclui rifas finalizadas/canceladas
       if (rifaFilterId !== 'todas' && r.rifa_id !== rifaFilterId) return false;
       return true;
     });
-    for (const r of filtradas) {
+  }, [minhasReservas, rifaFilterId]);
+
+  const reservasPorRifa = useMemo(() => {
+    const map: Record<string, NumeroRifaVendedor[]> = {};
+    for (const r of reservasFiltradasStats) {
       if (!map[r.rifa_id]) map[r.rifa_id] = [];
       map[r.rifa_id].push(r);
     }
     return map;
-  }, [minhasReservas, rifaFilterId]);
+  }, [reservasFiltradasStats]);
 
   const filteredPendingFolhas = useMemo(() => {
     if (acertoBingoFilterId === 'todas') return pendingFolhas;
@@ -448,9 +452,18 @@ const VendedorPainel = () => {
 
         <TabsContent value="rifas" className="space-y-6 mt-0">
           <div className="grid grid-cols-3 gap-3">
-             <div className="card-container p-3 text-center border-2 border-primary/20"><p className="text-[10px] text-muted-foreground">Reservados (Total)</p><p className="text-xl font-bold font-heading text-primary">{minhasReservas.length}</p></div>
-             <div className="card-container p-3 text-center border-2 border-green-500/20"><p className="text-[10px] text-muted-foreground">Validados</p><p className="text-xl font-bold font-heading text-green-600">{minhasReservas.filter(n => (n.status === 'vendido' || n.cartelas_rifa?.[0]?.compras_rifa?.status === 'pago') && !!n.nome_comprador?.trim()).length}</p></div>
-             <div className="card-container p-3 text-center border-2 border-amber-500/20"><p className="text-[10px] text-muted-foreground">Pendentes</p><p className="text-xl font-bold font-heading text-amber-600">{minhasReservas.filter(n => !((n.status === 'vendido' || n.cartelas_rifa?.[0]?.compras_rifa?.status === 'pago') && !!n.nome_comprador?.trim())).length}</p></div>
+             <div className="card-container p-3 text-center border-2 border-primary/20">
+                 <p className="text-[10px] text-muted-foreground">Reservados (Total)</p>
+                 <p className="text-xl font-bold font-heading text-primary">{reservasFiltradasStats.length}</p>
+             </div>
+             <div className="card-container p-3 text-center border-2 border-green-500/20">
+                 <p className="text-[10px] text-muted-foreground">Validados</p>
+                 <p className="text-xl font-bold font-heading text-green-600">{reservasFiltradasStats.filter(n => (n.status === 'vendido' || n.cartelas_rifa?.[0]?.compras_rifa?.status === 'pago') && !!n.nome_comprador?.trim()).length}</p>
+             </div>
+             <div className="card-container p-3 text-center border-2 border-amber-500/20">
+                 <p className="text-[10px] text-muted-foreground">Pendentes</p>
+                 <p className="text-xl font-bold font-heading text-amber-600">{reservasFiltradasStats.filter(n => !((n.status === 'vendido' || n.cartelas_rifa?.[0]?.compras_rifa?.status === 'pago') && !!n.nome_comprador?.trim())).length}</p>
+             </div>
           </div>
 
           <div className="card-container p-4 space-y-4">
@@ -502,7 +515,7 @@ const VendedorPainel = () => {
                   <ShoppingBag className="w-8 h-8 mx-auto mb-2 opacity-30" /> Nenhuma reserva ativa para a seleção atual.
                 </div>
               ) : (
-                Object.entries(reservasPorRifa).filter(([, nums]) => nums[0]?.rifas?.status === 'ativa').map(([rifaId, numeros]) => (
+                Object.entries(reservasPorRifa).map(([rifaId, numeros]) => (
                     <div key={rifaId} className="space-y-3 bg-muted/30 p-3 rounded-lg border border-border/50">
                       <div className="flex items-center justify-between">
                         <h4 className="font-heading font-bold text-sm">{numeros[0]?.rifas?.nome ?? 'Rifa'}</h4>
@@ -520,7 +533,6 @@ const VendedorPainel = () => {
                           
                           const isTotalmenteFinalizado = numeroEstaPago && temNome;
                           const isPagoSemNome = numeroEstaPago && !temNome;
-                          const isPendente = !numeroEstaPago; // Fiado ou análise
 
                           let badgeText = 'PAGO';
                           let badgeClass = 'text-green-700 bg-green-100';
