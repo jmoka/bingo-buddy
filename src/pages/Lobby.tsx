@@ -466,8 +466,13 @@ const Lobby = () => {
                           {alreadyJoined && (
                             <Button variant="ghost" size="sm" className="text-destructive" onClick={() => leaveMatch(match.id)}>Sair</Button>
                           )}
-                          <Button size="sm" className="gradient-accent text-white font-bold" onClick={() => openJoinDialog(match)}>
-                            {!profile ? 'LOGIN PARA ENTRAR' : alreadyJoined ? 'ADICIONAR MAIS' : 'ENTRAR'}
+                          <Button
+                            size="sm"
+                            className="gradient-accent text-white font-bold"
+                            onClick={() => openJoinDialog(match)}
+                            disabled={myMatchCards.length >= match.max_cards_per_player}
+                          >
+                            {!profile ? 'LOGIN PARA ENTRAR' : (myMatchCards.length >= match.max_cards_per_player) ? 'LIMITE ATINGIDO' : alreadyJoined ? 'ADICIONAR MAIS' : 'ENTRAR'}
                           </Button>
                         </>
                       )}
@@ -752,24 +757,38 @@ const Lobby = () => {
         <DialogContent className="max-w-md max-h-[80vh] overflow-y-auto">
           <DialogHeader><DialogTitle>Entrar na Partida</DialogTitle></DialogHeader>
           <div className="space-y-3 py-2">
-            {profile && activeCards.filter(card => !new Set(getPlayerMatchCards(selectedMatch?.id || '', profile.id).map(c => c.player_card_id)).has(card.id)).map(card => {
-              const isSelected = cardsToJoin.has(card.id);
-              const isDisabled = card.uses_left === 0;
-              return (
-                <div 
-                  key={card.id} 
-                  onClick={() => !isDisabled && setCardsToJoin(prev => { const next = new Set(prev); if (isSelected) next.delete(card.id); else next.add(card.id); return next; })} 
-                  className={cn("p-3 rounded-lg border-2 transition-all flex justify-between items-center", isSelected ? 'border-primary bg-primary/5' : 'border-transparent bg-secondary', isDisabled && 'opacity-50')}
-                >
-                  <span className="text-sm font-bold">{card.name}</span>
-                  {isDisabled ? (
-                    <Button size="sm" variant="outline" className="h-7 text-[10px]" onClick={(e) => { e.stopPropagation(); handleRechargeInDialog(card.id); }}>Recarregar</Button>
-                  ) : (
-                    <Badge variant="outline" className="text-[10px]">{card.uses_left} usos</Badge>
-                  )}
-                </div>
-              );
-            })}
+            {(() => {
+              if (!profile) return null;
+              const availableCardsToJoin = activeCards.filter(card => !new Set(getPlayerMatchCards(selectedMatch?.id || '', profile.id).map(c => c.player_card_id)).has(card.id));
+              
+              if (availableCardsToJoin.length === 0) {
+                return (
+                  <div className="text-center p-6 bg-muted/50 rounded-lg border border-dashed">
+                     <p className="text-sm font-bold text-foreground">Nenhuma cartela disponível.</p>
+                     <p className="text-xs mt-2 text-muted-foreground">Você já adicionou todas as suas cartelas nesta partida. Volte ao lobby e crie novas cartelas na aba "Minhas Cartelas" se desejar adicionar mais.</p>
+                  </div>
+                );
+              }
+
+              return availableCardsToJoin.map(card => {
+                const isSelected = cardsToJoin.has(card.id);
+                const isDisabled = card.uses_left === 0;
+                return (
+                  <div
+                    key={card.id}
+                    onClick={() => !isDisabled && setCardsToJoin(prev => { const next = new Set(prev); if (isSelected) next.delete(card.id); else next.add(card.id); return next; })}
+                    className={cn("p-3 rounded-lg border-2 transition-all flex justify-between items-center cursor-pointer", isSelected ? 'border-primary bg-primary/5' : 'border-transparent bg-secondary hover:bg-secondary/80', isDisabled && 'opacity-50 cursor-not-allowed')}
+                  >
+                    <span className="text-sm font-bold">{card.name}</span>
+                    {isDisabled ? (
+                      <Button size="sm" variant="outline" className="h-7 text-[10px]" onClick={(e) => { e.stopPropagation(); handleRechargeInDialog(card.id); }}>Recarregar</Button>
+                    ) : (
+                      <Badge variant="outline" className="text-[10px] bg-background">{card.uses_left} usos</Badge>
+                    )}
+                  </div>
+                );
+              });
+            })()}
           </div>
           <DialogFooter className="flex-col sm:flex-row gap-3">
             <div className="text-center sm:text-left">

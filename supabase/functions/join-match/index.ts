@@ -60,6 +60,19 @@ serve(async (req) => {
     const profile = profileRes.data;
     const playerCards = playerCardsRes.data;
 
+    // Verifica limite de cartelas ativas na partida para o usuário
+    const { count: currentCardsCount, error: countError } = await supabaseAdmin
+      .from('cartelas_partida')
+      .select('*', { count: 'exact', head: true })
+      .eq('match_id', matchId)
+      .eq('player_id', user.id);
+
+    if (countError) throw new Error("Erro ao verificar o limite de cartelas.");
+
+    if ((currentCardsCount || 0) + playerCardIds.length > match.max_cards_per_player) {
+      throw new Error(`Limite excedido! Você só pode ter no máximo ${match.max_cards_per_player} cartelas nesta partida.`);
+    }
+
     if (profile.bloqueado) {
       throw new Error("Sua conta está bloqueada.");
     }
