@@ -50,7 +50,7 @@ const MatchManager = () => {
   const [matchForm, setMatchForm] = useState({
     name: '',
     gameType: 'full' as GameType,
-    maxCardsPerPlayer: 3,
+    maxCardsPerPlayer: 100,
     cardPrice: 10,
     startTime: '',
     min_players: 1,
