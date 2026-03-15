@@ -492,6 +492,49 @@ const CreditRequestsAdmin = () => {
         </TabsContent>
       </Tabs>
 
+      {/* DIALOG DE MENSAGENS / CONVERSA */}
+      <Dialog open={!!conversationRequest} onOpenChange={(open) => !open && setConversationRequest(null)}>
+        <DialogContent className="max-w-md h-[70vh] flex flex-col p-0">
+          <DialogHeader className="p-6 pb-2 border-b">
+            <DialogTitle className="flex items-center gap-2 font-heading">
+              <MessageSquare className="w-5 h-5 text-primary" /> Chat / Histórico
+            </DialogTitle>
+          </DialogHeader>
+
+          <ScrollArea className="flex-grow p-4">
+            {isLoadingMessages ? (
+                <div className="flex justify-center py-10"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>
+            ) : (
+                <div className="space-y-4">
+                    {messages.map(msg => {
+                        const isMe = msg.sender_id === profile?.id;
+                        return (
+                            <div key={msg.id} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'} space-y-1`}>
+                                <div className={`flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-widest ${isMe ? 'text-muted-foreground mr-2' : 'text-primary ml-2'}`}>
+                                    {isMe ? <ShieldCheck className="w-3 h-3" /> : <User className="w-3 h-3" />}
+                                    {isMe ? 'Admin (Você)' : 'Jogador'} • {format(new Date(msg.created_at), "HH:mm")}
+                                </div>
+                                <div className={`p-3 rounded-2xl shadow-sm max-w-[85%] text-sm border ${
+                                    isMe ? 'bg-muted border-border rounded-tr-none' : 'bg-primary/10 border-primary/20 rounded-tl-none'
+                                }`}>
+                                    {msg.message}
+                                </div>
+                            </div>
+                        );
+                    })}
+                    {messages.length === 0 && (
+                        <p className="text-center text-muted-foreground text-sm py-10">Nenhuma mensagem neste histórico.</p>
+                    )}
+                </div>
+            )}
+          </ScrollArea>
+
+          <DialogFooter className="p-4 border-t bg-muted/20">
+            <DialogClose asChild><Button variant="outline" className="w-full">Fechar</Button></DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* DIALOG DE RESOLVER SOLICITAÇÕES DE CRÉDITO (Aprovar/Rejeitar/Excluir) */}
       <Dialog open={isResolveDialogOpen} onOpenChange={setIsResolveDialogOpen}>
         <DialogContent>
