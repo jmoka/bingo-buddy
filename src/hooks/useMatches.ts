@@ -76,17 +76,15 @@ export const useMatches = () => {
     const match = matches.find(m => m.id === matchId);
     if (!match) return;
 
-    const { count } = await supabase.from('cartelas_partida').select('*', { count: 'exact', head: true }).eq('match_id', matchId);
-    const playersInMatch = count || 0;
+    if (!force) {
+      // Conta cartelas apenas se não estiver forçando o início
+      const { count } = await supabase.from('cartelas_partida').select('*', { count: 'exact', head: true }).eq('match_id', matchId);
+      const playersInMatch = count || 0;
 
-    if (playersInMatch < 1) {
-      toast.error("A partida precisa de jogadores para ser iniciada manualmente.");
-      return;
-    }
-
-    if (!force && playersInMatch < match.min_players) {
-      toast.error(`Mínimo de ${match.min_players} jogadores necessário.`);
-      return;
+      if (playersInMatch < match.min_players) {
+        toast.error(`Mínimo de ${match.min_players} jogadores necessário.`);
+        return;
+      }
     }
     
     const updates: any = { status: 'in_progress' };
