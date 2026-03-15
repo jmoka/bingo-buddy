@@ -255,7 +255,7 @@ const Lobby = () => {
           const winCount = wins.filter(w => w.player_card_id === card.id).length;
           const isFake = (card as any).credit_type === 'fake';
           return (
-            <div key={card.id} className={cn("card-container p-3", card.uses_left === 0 && 'opacity-80')}>
+            <div key={card.id} className="card-container p-3">
               <div className="flex justify-between items-start mb-2 gap-2">
                 <div className="min-w-0">
                   <div className="flex items-center gap-1.5 flex-wrap">
@@ -266,9 +266,6 @@ const Lobby = () => {
                   <p className="text-[9px] text-muted-foreground font-mono">...{card.id.slice(-6).toUpperCase()}</p>
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
-                  <Badge variant={card.uses_left > 0 ? "default" : "destructive"} className={cn("text-[9px] h-5 px-1.5", card.uses_left > 0 && "bg-success hover:bg-success/90 text-white")}>
-                    {card.uses_left} uso(s)
-                  </Badge>
                   <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => toggleArchivePlayerCard(card.id, !card.is_archived)}>
                     {card.is_archived ? <RotateCcw className="w-3.5 h-3.5" /> : <Archive className="w-3.5 h-3.5" />}
                   </Button>
@@ -772,19 +769,13 @@ const Lobby = () => {
 
               return availableCardsToJoin.map(card => {
                 const isSelected = cardsToJoin.has(card.id);
-                const isDisabled = card.uses_left === 0;
                 return (
                   <div
                     key={card.id}
-                    onClick={() => !isDisabled && setCardsToJoin(prev => { const next = new Set(prev); if (isSelected) next.delete(card.id); else next.add(card.id); return next; })}
-                    className={cn("p-3 rounded-lg border-2 transition-all flex justify-between items-center cursor-pointer", isSelected ? 'border-primary bg-primary/5' : 'border-transparent bg-secondary hover:bg-secondary/80', isDisabled && 'opacity-50 cursor-not-allowed')}
+                    onClick={() => setCardsToJoin(prev => { const next = new Set(prev); if (isSelected) next.delete(card.id); else next.add(card.id); return next; })}
+                    className={cn("p-3 rounded-lg border-2 transition-all flex justify-between items-center cursor-pointer", isSelected ? 'border-primary bg-primary/5' : 'border-transparent bg-secondary hover:bg-secondary/80')}
                   >
                     <span className="text-sm font-bold">{card.name}</span>
-                    {isDisabled ? (
-                      <Button size="sm" variant="outline" className="h-7 text-[10px]" onClick={(e) => { e.stopPropagation(); handleRechargeInDialog(card.id); }}>Recarregar</Button>
-                    ) : (
-                      <Badge variant="outline" className="text-[10px] bg-background">{card.uses_left} usos</Badge>
-                    )}
                   </div>
                 );
               });

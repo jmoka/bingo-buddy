@@ -139,13 +139,6 @@ serve(async (req) => {
       await supabaseAdmin.rpc('increment_admin_profit', { amount: -commissionAmount });
     }
 
-    for (const card of playerCards) {
-        await supabaseAdmin
-            .from('cartelas_jogador')
-            .update({ uses_left: Math.max(0, card.uses_left - 1) })
-            .eq('id', card.id);
-    }
-
     // INSERE O VENDEDOR ID NA CARTELA DA PARTIDA!
     const newMatchCards = playerCards.map(card => ({
       player_id: user.id,
