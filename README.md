@@ -1,6 +1,8 @@
 # Bingo App - Documentação Técnica Completa
 
-## 1. Visão Geral do Sistema 6.4
+## 1. Visão Geral do Sistema 6.5
+
+- correção o layout dos botões do painel dos vendedores e jogadores
 criar credito strip para registrar os valores recebidos no strip
 
 0- configurar as key
