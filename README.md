@@ -1,6 +1,30 @@
 # Bingo App - Documentação Técnica Completa
 
 ## 1. Visão Geral do Sistema 6.4
+criar credito strip para registrar os valores recebidos no strip
+
+0- configurar as key
+1- Ativar a opção
+2- Configurar as taxas
+3- Abrir o checkout
+4- realizar o pagamento
+5- receber o pagamento(strip)
+6- creditar o valor no credito strip
+7- opão:
+
+- credito do cliente compra de credito( credita para o usuario / vendedor e credito escrip)
+*-compra de rifa direta (paga a rifa e credita o valor no strip)
+- compra de bingo direta(paga a rifa e credita o valor no strip)
+tem que esta logado
+
+8- compra do bingo e rifa cartela fisica
+
+- o usuario ao realizar a compra o estrip confirmou:
+-- creditrar o valor para os creditos strip admin
+-- creditar para o vendedor o a comissão
+-- usuario paga a cartela
+-- após pagar e realizar toda a operação pedir para o usuario validar com os dados do comprador nome , cpf telefone e endereço( os seus propios dados )
+sem logar
 
 Este documento fornece uma análise técnica detalhada do Bingo App. O sistema é uma aplicação web real-time para jogos de bingo, com gerenciamento de partidas, jogadores, cartelas e um sistema financeiro robusto baseado em **créditos decimais**.
 

@@ -204,10 +204,16 @@ const PlayersAdmin = () => {
           </div>
 
           <Tabs defaultValue="credits" className="w-full">
-            <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="credits">Gerenciar Créditos</TabsTrigger>
-              <TabsTrigger value="cards">Cartelas ({selectedPlayerCards.length})</TabsTrigger>
-              <TabsTrigger value="wins">Vitórias ({selectedPlayerWins.length})</TabsTrigger>
+            <TabsList className="flex flex-wrap h-auto w-full bg-muted p-1 gap-1">
+              <TabsTrigger value="credits" className="flex-1 py-2 text-[10px] sm:text-sm">
+                <span className="hidden sm:inline">Gerenciar </span>Créditos
+              </TabsTrigger>
+              <TabsTrigger value="cards" className="flex-1 py-2 text-[10px] sm:text-sm">
+                Cartelas ({selectedPlayerCards.length})
+              </TabsTrigger>
+              <TabsTrigger value="wins" className="flex-1 py-2 text-[10px] sm:text-sm">
+                Vitórias ({selectedPlayerWins.length})
+              </TabsTrigger>
             </TabsList>
             <TabsContent value="credits">
               <div className="py-4 space-y-4">
