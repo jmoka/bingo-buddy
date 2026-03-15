@@ -95,6 +95,7 @@ export const useMatches = () => {
     }
     
     updateMatchMutation.mutate({ matchId, updates });
+    toast.success("Partida iniciada com sucesso! Movida para 'Ao Vivo'.");
   };
 
   const finishMatch = (matchId: string) => {

@@ -365,25 +365,29 @@ const MatchManager = () => {
                   {match.status === 'waiting' && <Button size="sm" className="flex-1 sm:flex-none" onClick={() => openMatch(match.id)}>Abrir</Button>}
                   
                   {match.status === 'open' && (
-                    !canStart ? (
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button size="sm" className="flex-1 sm:flex-none" title={`Requer ${match.min_players} jogadores. Atualmente: ${playersInMatchCount}.`}>Iniciar</Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Forçar início da partida?</AlertDialogTitle>
-                            <AlertDialogDescription>Esta partida não atingiu o número mínimo de {match.min_players} jogadores.</AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                            <AlertDialogAction onClick={() => startMatch(match.id, true)}>Forçar Início</AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
-                    ) : (
-                      <Button size="sm" className="flex-1 sm:flex-none" onClick={() => startMatch(match.id)}>Iniciar</Button>
-                    )
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button size="sm" className="flex-1 sm:flex-none" title={!canStart ? `Requer ${match.min_players} jogadores. Atualmente: ${playersInMatchCount}.` : undefined}>
+                          Iniciar
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>{!canStart ? "Forçar início da partida?" : "Iniciar Partida?"}</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            {!canStart
+                              ? `Esta partida não atingiu o número mínimo de ${match.min_players} jogadores. Deseja forçar o início mesmo assim?`
+                              : "A partida será movida para 'Ao Vivo' e o sorteio poderá começar. Deseja continuar?"}
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                          <AlertDialogAction onClick={() => startMatch(match.id, !canStart)}>
+                            {!canStart ? "Forçar Início" : "Sim, Iniciar Partida"}
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
                   )}
 
                   {match.status === 'in_progress' && <Button size="sm" variant="outline" className="flex-1 sm:flex-none" onClick={() => finishMatch(match.id)}>Finalizar</Button>}
