@@ -127,7 +127,7 @@ export interface AcertoVendedor {
   valor: number;
   comissao_paga?: number;
   comprovante_url: string;
-  status: 'pendente' | 'aprovado' | 'rejeitado' | 'aprovar' | 'rejeitar';
+  status: 'pendente' | 'aprovado' | 'rejeitado' | 'aprovar' | 'rejeitar' | 'em_analise';
   bingo_ids: string[];
   rifa_ids: string[];
   created_at: string;

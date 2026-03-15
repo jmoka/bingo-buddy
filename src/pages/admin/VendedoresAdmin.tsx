@@ -32,7 +32,9 @@ const VendedoresAdmin = () => {
     resolverAcerto,
     pagarComissaoManual,
     forcarRepasseAcerto,
-    estornarRepasseAcerto
+    estornarRepasseAcerto,
+    aprovarVendedor,
+    rejeitarVendedor
   } = useRifaAdmin();
 
   const [editandoVendedor, setEditandoVendedor] = useState<any | null>(null);
@@ -41,6 +43,7 @@ const VendedoresAdmin = () => {
   
   const [acaoAcerto, setAcaoAcerto] = useState<{tipo: 'aprovado' | 'rejeitado', acerto: AcertoVendedor} | null>(null);
   const [isProcessandoAcerto, setIsProcessandoAcerto] = useState(false);
+  const [isProcessandoSolicitacao, setIsProcessandoSolicitacao] = useState(false);
   const [comprovanteUrl, setComprovanteUrl] = useState<string | null>(null);
 
   const [acertoForcarRepasse, setAcertoForcarRepasse] = useState<AcertoVendedor | null>(null);
@@ -131,6 +134,18 @@ const VendedoresAdmin = () => {
 
   const handleToggleAtivo = async (vendedorId: string, ativo: boolean) => {
     await atualizarVendedor(vendedorId, { ativo: !ativo });
+  };
+
+  const handleAprovarVendedor = async (id: string) => {
+    setIsProcessandoSolicitacao(true);
+    await aprovarVendedor(id);
+    setIsProcessandoSolicitacao(false);
+  };
+
+  const handleRejeitarVendedor = async (id: string) => {
+    setIsProcessandoSolicitacao(true);
+    await rejeitarVendedor(id);
+    setIsProcessandoSolicitacao(false);
   };
 
   const handleCopyRef = (codigo: string) => {
@@ -286,8 +301,36 @@ const VendedoresAdmin = () => {
            ) : (
              pendentes.map(s => (
                <div key={s.id} className="card-container p-4 border-l-4 border-l-amber-500">
-                 <p>{s.nome}</p>
-                 {/* ... restante dos itens de solicitacoes não mudou */}
+                 <div className="flex items-start justify-between">
+                   <div>
+                     <p className="font-bold text-sm text-foreground">{s.nome || s.perfis?.full_name || 'Usuário'}</p>
+                     <div className="text-xs text-muted-foreground mt-1 space-y-0.5">
+                       {s.telefone && <p>Tel: {s.telefone}</p>}
+                       {s.documento && <p>Doc: {s.documento}</p>}
+                       <p>Data: {format(new Date(s.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}</p>
+                     </div>
+                   </div>
+                   <Badge variant="outline" className="text-[10px] text-amber-600 border-amber-300 bg-amber-50">Novo Cadastro</Badge>
+                 </div>
+                 <div className="flex items-center gap-3 pt-3 mt-3 border-t">
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      className="flex-1 h-9"
+                      onClick={() => handleRejeitarVendedor(s.id)}
+                      disabled={isProcessandoSolicitacao}
+                    >
+                      <XCircle className="w-4 h-4 mr-2" /> Rejeitar
+                    </Button>
+                    <Button
+                      className="flex-1 bg-green-600 hover:bg-green-700 text-white h-9"
+                      size="sm"
+                      onClick={() => handleAprovarVendedor(s.id)}
+                      disabled={isProcessandoSolicitacao}
+                    >
+                      <CheckCircle2 className="w-4 h-4 mr-2" /> Aprovar
+                    </Button>
+                 </div>
                </div>
              ))
            )}
