@@ -373,17 +373,28 @@ const MatchManager = () => {
                       </AlertDialogTrigger>
                       <AlertDialogContent>
                         <AlertDialogHeader>
-                          <AlertDialogTitle>{!canStart ? "Forçar início da partida?" : "Iniciar Partida?"}</AlertDialogTitle>
+                          <AlertDialogTitle>
+                            {playersInMatchCount === 0
+                              ? "Excluir Partida Vazia?"
+                              : (!canStart ? "Forçar início da partida?" : "Iniciar Partida?")}
+                          </AlertDialogTitle>
                           <AlertDialogDescription>
-                            {!canStart
-                              ? `Esta partida não atingiu o número mínimo de ${match.min_players} jogadores. Deseja forçar o início mesmo assim?`
-                              : "A partida será movida para 'Ao Vivo' e o sorteio poderá começar. Deseja continuar?"}
+                            {playersInMatchCount === 0
+                              ? "Esta partida não possui nenhum jogador. Partidas sem jogadores não podem ser iniciadas e devem ser excluídas."
+                              : (!canStart
+                                ? `Esta partida não atingiu o número mínimo de ${match.min_players} jogadores. Deseja forçar o início mesmo assim?`
+                                : "A partida será movida para 'Ao Vivo' e o sorteio poderá começar. Deseja continuar?")}
                           </AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>
                           <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                          <AlertDialogAction onClick={() => startMatch(match.id, !canStart)}>
-                            {!canStart ? "Forçar Início" : "Sim, Iniciar Partida"}
+                          <AlertDialogAction
+                            className={playersInMatchCount === 0 ? "bg-destructive text-destructive-foreground hover:bg-destructive/90" : ""}
+                            onClick={() => playersInMatchCount === 0 ? deleteMatch(match.id) : startMatch(match.id, !canStart)}
+                          >
+                            {playersInMatchCount === 0
+                              ? "Excluir Partida"
+                              : (!canStart ? "Forçar Início" : "Sim, Iniciar Partida")}
                           </AlertDialogAction>
                         </AlertDialogFooter>
                       </AlertDialogContent>
@@ -391,7 +402,7 @@ const MatchManager = () => {
                   )}
 
                   {match.status === 'in_progress' && <Button size="sm" variant="outline" className="flex-1 sm:flex-none" onClick={() => finishMatch(match.id)}>Finalizar</Button>}
-                  {(match.status === 'waiting' || (match.status === 'finished' && !hasMoreRounds)) && <Button size="sm" variant="destructive" className="flex-1 sm:flex-none" onClick={() => deleteMatch(match.id)}><Trash2 className="w-4 h-4" /></Button>}
+                  {(match.status === 'waiting' || match.status === 'open' || (match.status === 'finished' && !hasMoreRounds)) && <Button size="sm" variant="destructive" className="flex-1 sm:flex-none" onClick={() => deleteMatch(match.id)}><Trash2 className="w-4 h-4" /></Button>}
                   
                   {/* BOTÃO MÁGICO DO FESTIVAL */}
                   {match.status === 'finished' && hasMoreRounds && (
