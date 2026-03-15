@@ -779,7 +779,14 @@ const Lobby = () => {
                     onClick={() => !isDisabled && setCardsToJoin(prev => { const next = new Set(prev); if (isSelected) next.delete(card.id); else next.add(card.id); return next; })}
                     className={cn("p-3 rounded-lg border-2 transition-all flex justify-between items-center cursor-pointer", isSelected ? 'border-primary bg-primary/5' : 'border-transparent bg-secondary hover:bg-secondary/80', isDisabled && 'opacity-50 cursor-not-allowed')}
                   >
-                    <span className="text-sm font-bold">{card.name}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-bold">{card.name}</span>
+                      {card.credit_type === 'fake' ? (
+                        <Badge variant="outline" className="text-[9px] h-4 py-0 px-1.5 border-amber-400 text-amber-600 bg-amber-50">Brincar</Badge>
+                      ) : (
+                        <Badge variant="outline" className="text-[9px] h-4 py-0 px-1.5 border-blue-400 text-blue-600 bg-blue-50">Real</Badge>
+                      )}
+                    </div>
                     {isDisabled ? (
                       <Button size="sm" variant="outline" className="h-7 text-[10px]" onClick={(e) => { e.stopPropagation(); handleRechargeInDialog(card.id); }}>Recarregar</Button>
                     ) : (
