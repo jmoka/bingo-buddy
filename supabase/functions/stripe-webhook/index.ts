@@ -16,10 +16,9 @@ serve(async (req) => {
     { auth: { persistSession: false } }
   )
 
-  // CORREÇÃO AQUI: Usa limit(1).maybeSingle() em vez de eq('singleton', true)
   const { data: settings, error: settingsError } = await supabaseAdmin
     .from('configuracoes')
-    .select('stripe_secret_key, stripe_webhook_secret, comissao_vendedor_global')
+    .select('id, stripe_secret_key, stripe_webhook_secret, comissao_vendedor_global, admin_profit')
     .limit(1)
     .maybeSingle();
 
@@ -58,12 +57,12 @@ serve(async (req) => {
         const paymentType = session.metadata?.payment_type;
         const amountPaidByCustomer = session.amount_total ? session.amount_total / 100 : 0;
         
-        // RECUPERA O VALOR ORIGINAL (ANTES DAS TAXAS), PARA CALCULAR O LUCRO LIMPO DO ADMIN
+        // Valor original antes das taxas do Stripe
         const originalAmount = session.metadata?.original_amount ? Number(session.metadata.original_amount) : amountPaidByCustomer;
 
-        console.log(`[stripe-webhook] Pagamento recebido: Usuário: ${userId} | Valor Pago (Cliente): R$ ${amountPaidByCustomer} | Valor Original (Líquido Esperado): R$ ${originalAmount} | Tipo: ${paymentType}`);
+        console.log(`[stripe-webhook] Pagamento OK! Usuário: ${userId} | Valor Original: R$ ${originalAmount} | Tipo: ${paymentType}`);
 
-        // 1. Evita processar a mesma compra 2 vezes
+        // Evita processar a mesma compra 2 vezes
         const { data: existing } = await supabaseAdmin
           .from('stripe_payments')
           .select('status')
@@ -71,11 +70,11 @@ serve(async (req) => {
           .maybeSingle();
 
         if (existing?.status === 'completed') {
-            console.log(`[stripe-webhook] Sessão ${session.id} já processada. Ignorando.`);
+            console.log(`[stripe-webhook] Sessão já processada. Ignorando.`);
             return new Response(JSON.stringify({ received: true }), { status: 200, headers: corsHeaders });
         }
 
-        // 2. Registra a transação de cartão na tabela
+        // Registra transação do Stripe
         await supabaseAdmin.from('stripe_payments').insert({ 
             stripe_session_id: session.id,
             user_id: userId === 'anonymous' ? null : userId,
@@ -84,16 +83,26 @@ serve(async (req) => {
             payment_type: paymentType || 'unknown'
         });
 
-        // 3. SE FOR COMPRA DE CRÉDITOS NA CONTA
+        // 1. SE FOR COMPRA DE CRÉDITOS NA CONTA
         if (paymentType === 'credits' && userId !== 'anonymous') {
           const creditsToGrant = Number(session.metadata?.credits_requested || originalAmount);
           
-          await supabaseAdmin.rpc('increment_player_credits', { p_player_id: userId, p_amount: creditsToGrant });
-          await supabaseAdmin.rpc('increment_admin_profit', { amount: originalAmount });
+          // ATUALIZA CRÉDITO DO JOGADOR
+          const { data: profile } = await supabaseAdmin.from('perfis').select('credits').eq('id', userId).single();
+          if (profile) {
+              await supabaseAdmin.from('perfis').update({ credits: Number(profile.credits || 0) + creditsToGrant }).eq('id', userId);
+          }
 
+          // ATUALIZA CAIXA DO ADMIN (Lucro)
+          const { data: cfg } = await supabaseAdmin.from('configuracoes').select('admin_profit').eq('id', settings.id).single();
+          if (cfg) {
+              await supabaseAdmin.from('configuracoes').update({ admin_profit: Number(cfg.admin_profit || 0) + originalAmount }).eq('id', settings.id);
+          }
+
+          // Registra o Histórico
           const { data: historyData } = await supabaseAdmin.from('solicitacoes_credito').insert({
             player_id: userId, status: 'approved', credits_requested: creditsToGrant, credits_granted: creditsToGrant,
-            amount_paid: amountPaidByCustomer, receipt_url: `STRIPE_${session.id}`, notes: 'Pagamento automático via Cartão de Crédito (Stripe).', resolved_at: new Date().toISOString()
+            amount_paid: amountPaidByCustomer, receipt_url: `STRIPE_${session.id}`, notes: 'Pagamento via Cartão (Stripe).', resolved_at: new Date().toISOString(), repasse_concluido: true
           }).select('id').single();
 
           if (historyData) {
@@ -103,79 +112,78 @@ serve(async (req) => {
           }
         } 
         
-        // 4. SE FOR PAGAMENTO DE UMA CARTELA FÍSICA (PagarCartela)
-        else if (paymentType === 'venda_bingo' || paymentType === 'venda_rifa') {
-            const vendaId = session.metadata?.venda_id;
-            console.log(`[stripe-webhook] Aprovando financeiramente venda/cartela ID: ${vendaId}`);
-            
-            if (vendaId && paymentType === 'venda_bingo') {
-                const { data: venda } = await supabaseAdmin.from('vendas_bingo_fisico')
-                  .select('*, vendedores_rifa(user_id, comissao_percentual)')
-                  .eq('id', vendaId).single();
+        // 2. SE FOR PAGAMENTO DE UMA CARTELA FÍSICA (Bingo)
+        else if (paymentType === 'venda_bingo' && session.metadata?.venda_id) {
+            const vendaId = session.metadata.venda_id;
+            const { data: venda } = await supabaseAdmin.from('vendas_bingo_fisico')
+              .select('*, vendedores_rifa(user_id, comissao_percentual)')
+              .eq('id', vendaId).single();
 
-                if (venda && venda.status !== 'pago') {
-                    let precoTotal = Number(venda.valor_pago);
-                    const desconto = Number(venda.desconto_aplicado || 0);
-                    if (desconto < 100 && desconto > 0) precoTotal = precoTotal / (1 - (desconto / 100.0));
+            if (venda && venda.status !== 'pago') {
+                let precoTotal = Number(venda.valor_pago);
+                const desconto = Number(venda.desconto_aplicado || 0);
+                if (desconto < 100 && desconto > 0) precoTotal = precoTotal / (1 - (desconto / 100.0));
 
-                    // Ativa a cartela apenas financeiramente
-                    await supabaseAdmin.from('vendas_bingo_fisico').update({ status: 'pago' }).eq('id', vendaId);
-                    
-                    // Alimenta o pote da partida
-                    const { data: match } = await supabaseAdmin.from('partidas').select('pot').eq('id', venda.match_id).single();
-                    if (match) await supabaseAdmin.from('partidas').update({ pot: Number(match.pot || 0) + precoTotal }).eq('id', venda.match_id);
+                await supabaseAdmin.from('vendas_bingo_fisico').update({ status: 'pago' }).eq('id', vendaId);
+                
+                const { data: match } = await supabaseAdmin.from('partidas').select('pot').eq('id', venda.match_id).single();
+                if (match) await supabaseAdmin.from('partidas').update({ pot: Number(match.pot || 0) + precoTotal }).eq('id', venda.match_id);
 
-                    // Calcula Comissão do Vendedor
-                    let comissaoValor = 0;
-                    const vendedorUserId = venda.vendedores_rifa?.user_id;
+                let comissaoValor = 0;
+                const vendedorUserId = venda.vendedores_rifa?.user_id;
 
-                    if (vendedorUserId) {
-                        let comissaoPerc = Number(venda.vendedores_rifa?.comissao_percentual || 0);
-                        if (comissaoPerc === 0) comissaoPerc = Number(settings.comissao_vendedor_global || 0);
-                        if (comissaoPerc > 0) comissaoValor = precoTotal * (comissaoPerc / 100.0);
-                    }
-
-                    // Paga vendedor (se houver) e o resto vai pro Admin
-                    if (comissaoValor > 0 && vendedorUserId) {
-                        console.log(`[stripe-webhook] Pagando comissão de BINGO (R$ ${comissaoValor}) ao Vendedor ${vendedorUserId}`);
-                        await supabaseAdmin.rpc('increment_player_credits', { p_player_id: vendedorUserId, p_amount: comissaoValor });
-                    }
-                    await supabaseAdmin.rpc('increment_admin_profit', { amount: originalAmount - comissaoValor });
-                    
-                    console.log("[stripe-webhook] Venda Bingo ativada com sucesso. Comissão calculada e repassada na hora.");
+                if (vendedorUserId) {
+                    let comissaoPerc = Number(venda.vendedores_rifa?.comissao_percentual || 0);
+                    if (comissaoPerc === 0) comissaoPerc = Number(settings.comissao_vendedor_global || 0);
+                    if (comissaoPerc > 0) comissaoValor = precoTotal * (comissaoPerc / 100.0);
                 }
-            } else if (vendaId && paymentType === 'venda_rifa') {
-                const { data: compra } = await supabaseAdmin.from('compras_rifa')
-                  .select('*, vendedores_rifa(user_id, comissao_percentual)')
-                  .eq('id', vendaId).single();
 
-                if (compra && compra.status !== 'pago') {
-                    let precoTotal = Number(compra.valor_total);
-                    const desconto = Number(compra.desconto_aplicado || 0);
-                    if (desconto < 100 && desconto > 0) precoTotal = precoTotal / (1 - (desconto / 100.0));
-
-                    // Ativa a cartela da rifa apenas financeiramente
-                    await supabaseAdmin.from('compras_rifa').update({ status: 'pago' }).eq('id', vendaId);
-
-                    // Calcula Comissão do Vendedor
-                    let comissaoValor = 0;
-                    const vendedorUserId = compra.vendedores_rifa?.user_id;
-
-                    if (vendedorUserId) {
-                        let comissaoPerc = Number(compra.vendedores_rifa?.comissao_percentual || 0);
-                        if (comissaoPerc === 0) comissaoPerc = Number(settings.comissao_vendedor_global || 0);
-                        if (comissaoPerc > 0) comissaoValor = precoTotal * (comissaoPerc / 100.0);
-                    }
-
-                    // Paga vendedor (se houver) e o resto vai pro Admin
-                    if (comissaoValor > 0 && vendedorUserId) {
-                        console.log(`[stripe-webhook] Pagando comissão de RIFA (R$ ${comissaoValor}) ao Vendedor ${vendedorUserId}`);
-                        await supabaseAdmin.rpc('increment_player_credits', { p_player_id: vendedorUserId, p_amount: comissaoValor });
-                    }
-                    await supabaseAdmin.rpc('increment_admin_profit', { amount: originalAmount - comissaoValor });
-
-                    console.log("[stripe-webhook] Venda Rifa ativada com sucesso. Comissão calculada e repassada na hora.");
+                // Paga vendedor (se houver)
+                if (comissaoValor > 0 && vendedorUserId) {
+                    const { data: vProfile } = await supabaseAdmin.from('perfis').select('credits').eq('id', vendedorUserId).single();
+                    if (vProfile) await supabaseAdmin.from('perfis').update({ credits: Number(vProfile.credits || 0) + comissaoValor }).eq('id', vendedorUserId);
                 }
+                
+                // Resto vai pro Admin
+                const lucroAdmin = originalAmount - comissaoValor;
+                const { data: cfg } = await supabaseAdmin.from('configuracoes').select('admin_profit').eq('id', settings.id).single();
+                if (cfg) await supabaseAdmin.from('configuracoes').update({ admin_profit: Number(cfg.admin_profit || 0) + lucroAdmin }).eq('id', settings.id);
+            }
+        }
+
+        // 3. SE FOR PAGAMENTO DE UMA RIFA
+        else if (paymentType === 'venda_rifa' && session.metadata?.venda_id) {
+            const vendaId = session.metadata.venda_id;
+            const { data: compra } = await supabaseAdmin.from('compras_rifa')
+              .select('*, vendedores_rifa(user_id, comissao_percentual)')
+              .eq('id', vendaId).single();
+
+            if (compra && compra.status !== 'pago') {
+                let precoTotal = Number(compra.valor_total);
+                const desconto = Number(compra.desconto_aplicado || 0);
+                if (desconto < 100 && desconto > 0) precoTotal = precoTotal / (1 - (desconto / 100.0));
+
+                await supabaseAdmin.from('compras_rifa').update({ status: 'pago' }).eq('id', vendaId);
+
+                let comissaoValor = 0;
+                const vendedorUserId = compra.vendedores_rifa?.user_id;
+
+                if (vendedorUserId) {
+                    let comissaoPerc = Number(compra.vendedores_rifa?.comissao_percentual || 0);
+                    if (comissaoPerc === 0) comissaoPerc = Number(settings.comissao_vendedor_global || 0);
+                    if (comissaoPerc > 0) comissaoValor = precoTotal * (comissaoPerc / 100.0);
+                }
+
+                // Paga vendedor (se houver)
+                if (comissaoValor > 0 && vendedorUserId) {
+                    const { data: vProfile } = await supabaseAdmin.from('perfis').select('credits').eq('id', vendedorUserId).single();
+                    if (vProfile) await supabaseAdmin.from('perfis').update({ credits: Number(vProfile.credits || 0) + comissaoValor }).eq('id', vendedorUserId);
+                }
+                
+                // Resto vai pro Admin
+                const lucroAdmin = originalAmount - comissaoValor;
+                const { data: cfg } = await supabaseAdmin.from('configuracoes').select('admin_profit').eq('id', settings.id).single();
+                if (cfg) await supabaseAdmin.from('configuracoes').update({ admin_profit: Number(cfg.admin_profit || 0) + lucroAdmin }).eq('id', settings.id);
             }
         }
       } 
