@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Switch } from '@/components/ui/switch';
+import { Textarea } from '@/components/ui/textarea';
 import { Loader2, CheckCircle2, XCircle, Users, Copy, ShieldBan, ShieldCheck, Edit, Wallet, HandCoins, AlertTriangle, Eye, ExternalLink, Grid3X3, SmartphoneNfc, Ticket, TrendingUp, BadgeDollarSign, HeartHandshake, PenTool, Undo2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -45,6 +46,10 @@ const VendedoresAdmin = () => {
   const [isProcessandoAcerto, setIsProcessandoAcerto] = useState(false);
   const [isProcessandoSolicitacao, setIsProcessandoSolicitacao] = useState(false);
   const [comprovanteUrl, setComprovanteUrl] = useState<string | null>(null);
+
+  const [acaoPagamentoCliente, setAcaoPagamentoCliente] = useState<{vendaId: string, aprovar: boolean, isBingo: boolean, nome: string, valor: number, telefone: string} | null>(null);
+  const [acaoSolicitacao, setAcaoSolicitacao] = useState<{id: string, aprovar: boolean, nome: string} | null>(null);
+  const [mensagemSolicitacao, setMensagemSolicitacao] = useState('');
 
   const [acertoForcarRepasse, setAcertoForcarRepasse] = useState<AcertoVendedor | null>(null);
   const [isForcandoRepasse, setIsForcandoRepasse] = useState(false);
@@ -109,8 +114,11 @@ const VendedoresAdmin = () => {
   
   const [isProcessandoPagCliente, setIsProcessandoPagCliente] = useState(false);
 
-  const handleResolverPagamentoCliente = async (vendaId: string, aprovar: boolean, isBingo: boolean) => {
+  const handleConfirmarPagamentoCliente = async () => {
+    if (!acaoPagamentoCliente) return;
     setIsProcessandoPagCliente(true);
+    const { vendaId, aprovar, isBingo } = acaoPagamentoCliente;
+    
     let fnName = '';
     if (isBingo) {
       fnName = aprovar ? 'aprovar_pagamento_cliente_bingo' : 'rejeitar_pagamento_cliente_bingo';
@@ -118,7 +126,7 @@ const VendedoresAdmin = () => {
       fnName = aprovar ? 'aprovar_pagamento_cliente_rifa' : 'rejeitar_pagamento_cliente_rifa';
     }
     
-    const { data, error } = await supabase.rpc(fnName, { p_venda_id: vendaId });
+    const { data, error } = await supabase.rpc(fnName as any, { p_venda_id: vendaId });
     setIsProcessandoPagCliente(false);
 
     if (error || !data?.success) {
@@ -127,6 +135,7 @@ const VendedoresAdmin = () => {
     }
     
     toast.success(aprovar ? 'Comprovante do cliente aprovado! Comissão do vendedor gerada.' : 'Comprovante rejeitado.');
+    setAcaoPagamentoCliente(null);
     queryClient.invalidateQueries({ queryKey: ['todasFolhasBingoAdmin'] });
     queryClient.invalidateQueries({ queryKey: ['todasComprasRifa'] });
     queryClient.invalidateQueries({ queryKey: ['vendedoresComStats'] });
@@ -136,16 +145,17 @@ const VendedoresAdmin = () => {
     await atualizarVendedor(vendedorId, { ativo: !ativo });
   };
 
-  const handleAprovarVendedor = async (id: string) => {
+  const handleConfirmarSolicitacao = async () => {
+    if (!acaoSolicitacao) return;
     setIsProcessandoSolicitacao(true);
-    await aprovarVendedor(id);
+    if (acaoSolicitacao.aprovar) {
+      await aprovarVendedor(acaoSolicitacao.id, mensagemSolicitacao);
+    } else {
+      await rejeitarVendedor(acaoSolicitacao.id, mensagemSolicitacao);
+    }
     setIsProcessandoSolicitacao(false);
-  };
-
-  const handleRejeitarVendedor = async (id: string) => {
-    setIsProcessandoSolicitacao(true);
-    await rejeitarVendedor(id);
-    setIsProcessandoSolicitacao(false);
+    setAcaoSolicitacao(null);
+    setMensagemSolicitacao('');
   };
 
   const handleCopyRef = (codigo: string) => {
@@ -344,7 +354,7 @@ const VendedoresAdmin = () => {
                       variant="destructive"
                       size="sm"
                       className="flex-1 h-9"
-                      onClick={() => handleRejeitarVendedor(s.id)}
+                      onClick={() => setAcaoSolicitacao({ id: s.id, aprovar: false, nome: s.nome || s.perfis?.full_name || 'Usuário' })}
                       disabled={isProcessandoSolicitacao}
                     >
                       <XCircle className="w-4 h-4 mr-2" /> Rejeitar
@@ -352,7 +362,7 @@ const VendedoresAdmin = () => {
                     <Button
                       className="flex-1 bg-green-600 hover:bg-green-700 text-white h-9"
                       size="sm"
-                      onClick={() => handleAprovarVendedor(s.id)}
+                      onClick={() => setAcaoSolicitacao({ id: s.id, aprovar: true, nome: s.nome || s.perfis?.full_name || 'Usuário' })}
                       disabled={isProcessandoSolicitacao}
                     >
                       <CheckCircle2 className="w-4 h-4 mr-2" /> Aprovar
@@ -412,8 +422,8 @@ const VendedoresAdmin = () => {
                           <Eye className="w-4 h-4 mr-2" /> Comprovante
                         </Button>
                         <div className="flex gap-2">
-                          <Button size="icon" variant="destructive" className="h-9 w-9" onClick={() => handleResolverPagamentoCliente(venda.id, false, venda.isBingo)} disabled={isProcessandoPagCliente}><XCircle className="w-4 h-4" /></Button>
-                          <Button size="icon" className="h-9 w-9 bg-green-600 hover:bg-green-700" onClick={() => handleResolverPagamentoCliente(venda.id, true, venda.isBingo)} disabled={isProcessandoPagCliente}><CheckCircle2 className="w-4 h-4" /></Button>
+                          <Button size="icon" variant="destructive" className="h-9 w-9" onClick={() => setAcaoPagamentoCliente({ vendaId: venda.id, aprovar: false, isBingo: venda.isBingo, nome: venda.displayNome || 'Comprador', valor: valorCheio, telefone: venda.displayTelefone || '' })} disabled={isProcessandoPagCliente}><XCircle className="w-4 h-4" /></Button>
+                          <Button size="icon" className="h-9 w-9 bg-green-600 hover:bg-green-700" onClick={() => setAcaoPagamentoCliente({ vendaId: venda.id, aprovar: true, isBingo: venda.isBingo, nome: venda.displayNome || 'Comprador', valor: valorCheio, telefone: venda.displayTelefone || '' })} disabled={isProcessandoPagCliente}><CheckCircle2 className="w-4 h-4" /></Button>
                         </div>
                      </div>
                    </div>
@@ -709,6 +719,85 @@ const VendedoresAdmin = () => {
             <Button onClick={handleForcarRepasse} disabled={isForcandoRepasse} className="bg-amber-600 hover:bg-amber-700 text-white">
               {isForcandoRepasse && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
               Confirmar e Enviar p/ Caixa
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* MODAL CONFIRMAR SOLICITAÇÃO DE VENDEDOR */}
+      <Dialog open={!!acaoSolicitacao} onOpenChange={open => { if(!open) { setAcaoSolicitacao(null); setMensagemSolicitacao(''); } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {acaoSolicitacao?.aprovar ? <ShieldCheck className="w-5 h-5 text-green-600" /> : <AlertTriangle className="w-5 h-5 text-destructive" />}
+              {acaoSolicitacao?.aprovar ? 'Aprovar Vendedor' : 'Rejeitar Inscrição'}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="py-4 space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Você está prestes a <strong>{acaoSolicitacao?.aprovar ? 'aprovar' : 'rejeitar'}</strong> a inscrição de <strong>{acaoSolicitacao?.nome}</strong>.
+            </p>
+            <div className="space-y-2">
+              <Label>Mensagem / Motivo (Opcional)</Label>
+              <Textarea
+                placeholder={acaoSolicitacao?.aprovar ? "Mensagem de boas-vindas..." : "Explique por que foi rejeitado (faltou documento, etc)..."}
+                value={mensagemSolicitacao}
+                onChange={e => setMensagemSolicitacao(e.target.value)}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => { setAcaoSolicitacao(null); setMensagemSolicitacao(''); }}>Cancelar</Button>
+            <Button
+              className={acaoSolicitacao?.aprovar ? 'bg-green-600 hover:bg-green-700 text-white' : ''}
+              variant={acaoSolicitacao?.aprovar ? 'default' : 'destructive'}
+              onClick={handleConfirmarSolicitacao}
+              disabled={isProcessandoSolicitacao}
+            >
+              {isProcessandoSolicitacao && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Confirmar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* MODAL CONFIRMAR PAGAMENTO DE CLIENTE (PIX DIRETO) */}
+      <Dialog open={!!acaoPagamentoCliente} onOpenChange={open => !open && setAcaoPagamentoCliente(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {acaoPagamentoCliente?.aprovar ? <ShieldCheck className="w-5 h-5 text-green-600" /> : <AlertTriangle className="w-5 h-5 text-destructive" />}
+              {acaoPagamentoCliente?.aprovar ? 'Confirmar Pagamento' : 'Rejeitar Comprovante'}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="py-4 space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Você está prestes a <strong>{acaoPagamentoCliente?.aprovar ? 'APROVAR' : 'REJEITAR'}</strong> o comprovante de <strong>{acaoPagamentoCliente?.nome}</strong> no valor de R$ {Number(acaoPagamentoCliente?.valor || 0).toFixed(2)}.
+            </p>
+            {!acaoPagamentoCliente?.aprovar && acaoPagamentoCliente?.telefone ? (
+              <div className="p-3 bg-muted rounded-lg border text-sm">
+                <p className="font-bold mb-1">Dica:</p>
+                <p>Como clientes públicos não possuem uma caixa de entrada no app, recomendamos avisá-lo(a) pelo WhatsApp caso tenha rejeitado:</p>
+                <a href={`https://wa.me/55${acaoPagamentoCliente.telefone.replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline font-medium mt-2 inline-block">
+                  Chamar {acaoPagamentoCliente.telefone} no WhatsApp
+                </a>
+              </div>
+            ) : (
+               <p className="text-xs text-muted-foreground bg-muted p-3 rounded-lg border">
+                 {acaoPagamentoCliente?.aprovar ? "A cartela do cliente será ativada e a comissão será creditada na conta do vendedor." : "A cartela voltará a ficar com o status de aguardando pagamento."}
+               </p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setAcaoPagamentoCliente(null)}>Cancelar</Button>
+            <Button
+              className={acaoPagamentoCliente?.aprovar ? 'bg-green-600 hover:bg-green-700 text-white' : ''}
+              variant={acaoPagamentoCliente?.aprovar ? 'default' : 'destructive'}
+              onClick={handleConfirmarPagamentoCliente}
+              disabled={isProcessandoPagCliente}
+            >
+              {isProcessandoPagCliente && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              {acaoPagamentoCliente?.aprovar ? 'Confirmar Aprovação' : 'Sim, Rejeitar'}
             </Button>
           </DialogFooter>
         </DialogContent>
