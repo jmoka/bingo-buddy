@@ -84,7 +84,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     queryFn: async () => {
       const { data, error } = await supabase
         .from('vendedores_rifa')
-        .select('*, perfis:user_id(avatar_url)')
+        .select('*')
         .eq('ativo', true)
         .order('nome');
         
@@ -93,17 +93,23 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return [];
       }
 
-      // Buscar os cadastros separadamente para juntar e contornar problemas de foreign key ambígua
       const userIds = data.map(v => v.user_id).filter(Boolean);
+      let perfisData: any[] = [];
       let cadastrosData: any[] = [];
       
       if (userIds.length > 0) {
-        const { data: cad } = await supabase.from('cadastro_vendedor').select('user_id, foto_url').in('user_id', userIds);
-        if (cad) cadastrosData = cad;
+        const [resPerfis, resCadastros] = await Promise.all([
+          supabase.from('perfis').select('id, avatar_url').in('id', userIds),
+          supabase.from('cadastro_vendedor').select('user_id, foto_url').in('user_id', userIds)
+        ]);
+        
+        if (resPerfis.data) perfisData = resPerfis.data;
+        if (resCadastros.data) cadastrosData = resCadastros.data;
       }
 
       return data.map(v => ({
         ...v,
+        perfis: perfisData.find(p => p.id === v.user_id) || null,
         cadastro: cadastrosData.find(c => c.user_id === v.user_id) || null
       }));
     }
