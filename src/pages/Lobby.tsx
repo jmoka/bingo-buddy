@@ -776,7 +776,21 @@ const Lobby = () => {
                 return (
                   <div
                     key={card.id}
-                    onClick={() => !isDisabled && setCardsToJoin(prev => { const next = new Set(prev); if (isSelected) next.delete(card.id); else next.add(card.id); return next; })}
+                    onClick={() => !isDisabled && setCardsToJoin(prev => {
+                      const next = new Set(prev);
+                      if (isSelected) {
+                        next.delete(card.id);
+                      } else {
+                        const myCurrentCount = getPlayerMatchCards(selectedMatch?.id || '', profile.id).length;
+                        const maxAllowed = (selectedMatch?.max_cards_per_player || 0) - myCurrentCount;
+                        if (next.size < maxAllowed) {
+                          next.add(card.id);
+                        } else {
+                          toast.error(`Limite da partida: você só pode adicionar mais ${maxAllowed} cartela(s).`);
+                        }
+                      }
+                      return next;
+                    })}
                     className={cn("p-3 rounded-lg border-2 transition-all flex justify-between items-center cursor-pointer", isSelected ? 'border-primary bg-primary/5' : 'border-transparent bg-secondary hover:bg-secondary/80', isDisabled && 'opacity-50 cursor-not-allowed')}
                   >
                     <div className="flex items-center gap-2">
