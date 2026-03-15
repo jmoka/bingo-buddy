@@ -38,6 +38,9 @@ serve(async (req) => {
     if (matchError) throw new Error(`Partida não encontrada.`);
     if (match.status !== 'open') throw new Error("Você só pode sair de partidas que estão abertas para inscrição.");
 
+    const { data: settings, error: settingsError } = await supabaseAdmin.from('configuracoes').select('custo_recarga_cartela, usos_por_recarga').single();
+    if (settingsError) throw new Error("Erro ao buscar configurações.");
+
     const { data: matchCardsToRemove, error: cardsError } = await supabaseAdmin
       .from('cartelas_partida')
       .select('id, player_card_id, credit_type')
@@ -55,8 +58,13 @@ serve(async (req) => {
     const realCardsToRemove = matchCardsToRemove.filter(c => c.credit_type === 'real');
     const fakeCardsToRemove = matchCardsToRemove.filter(c => c.credit_type === 'fake');
     
-    const realRefundAmount = realCardsToRemove.length * match.card_price;
-    const fakeRefundAmount = fakeCardsToRemove.length * match.card_price;
+    // Usa o mesmo cálculo reverso para devolver apenas a diferença exata e recuperar o "uso"
+    const valorPorUso = (settings?.custo_recarga_cartela || 0) / (settings?.usos_por_recarga || 1);
+    const effectivePrice = match.card_price - valorPorUso;
+    
+    const realRefundAmount = realCardsToRemove.length * effectivePrice;
+    const fakeRefundAmount = fakeCardsToRemove.length * effectivePrice;
+    const fullRealCostForPot = realCardsToRemove.length * match.card_price;
     
     const playerCardIdsToRestore = matchCardsToRemove.map(c => c.player_card_id).filter(id => id);
     const matchCardIdsToDelete = matchCardsToRemove.map(c => c.id);
@@ -67,19 +75,19 @@ serve(async (req) => {
       .in('id', matchCardIdsToDelete);
     if (deleteError) throw new Error(`Erro ao remover as cartelas da partida.`);
 
-    if (realRefundAmount > 0 || fakeRefundAmount > 0) {
+    if (realRefundAmount !== 0 || fakeRefundAmount !== 0) {
       const { data: profile, error: profileError } = await supabaseAdmin.from('perfis').select('credits, fake_credits').eq('id', user.id).single();
       if (profileError) throw new Error("Erro ao buscar seu perfil para o estorno.");
 
       const updates: any = {};
-      if (realRefundAmount > 0) updates.credits = Number(profile.credits || 0) + realRefundAmount;
-      if (fakeRefundAmount > 0) updates.fake_credits = Number(profile.fake_credits || 0) + fakeRefundAmount;
+      if (realRefundAmount !== 0) updates.credits = Number(profile.credits || 0) + realRefundAmount;
+      if (fakeRefundAmount !== 0) updates.fake_credits = Number(profile.fake_credits || 0) + fakeRefundAmount;
 
       await supabaseAdmin.from('perfis').update(updates).eq('id', user.id);
       
-      if (realRefundAmount > 0) {
+      if (fullRealCostForPot > 0) {
         const currentPot = Number(match.pot || 0);
-        await supabaseAdmin.from('partidas').update({ pot: Math.max(0, currentPot - realRefundAmount) }).eq('id', matchId);
+        await supabaseAdmin.from('partidas').update({ pot: Math.max(0, currentPot - fullRealCostForPot) }).eq('id', matchId);
       }
     }
 

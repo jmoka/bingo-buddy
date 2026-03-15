@@ -46,19 +46,22 @@ serve(async (req) => {
         throw new Error("Uma ou mais cartelas já estão na partida.");
     }
 
-    const [matchRes, profileRes, playerCardsRes] = await Promise.all([
+    const [matchRes, profileRes, playerCardsRes, settingsRes] = await Promise.all([
       supabaseAdmin.from('partidas').select('card_price, pot').eq('id', matchId).single(),
       supabaseAdmin.from('perfis').select('credits, fake_credits, bloqueado').eq('id', user.id).single(),
-      supabaseAdmin.from('cartelas_jogador').select('*').in('id', playerCardIds)
+      supabaseAdmin.from('cartelas_jogador').select('*').in('id', playerCardIds),
+      supabaseAdmin.from('configuracoes').select('custo_recarga_cartela, usos_por_recarga, comissao_vendedor_global').single()
     ]);
 
     if (matchRes.error) throw new Error(`Partida não encontrada.`);
     if (profileRes.error) throw new Error(`Perfil não encontrado.`);
     if (playerCardsRes.error) throw new Error(`Erro ao buscar cartelas.`);
+    if (settingsRes.error) throw new Error(`Erro ao buscar configurações.`);
 
     const match = matchRes.data;
     const profile = profileRes.data;
     const playerCards = playerCardsRes.data;
+    const settings = settingsRes.data;
 
     // Verifica limite de cartelas ativas na partida para o usuário
     const { count: currentCardsCount, error: countError } = await supabaseAdmin
@@ -80,15 +83,22 @@ serve(async (req) => {
     const realCards = playerCards.filter(c => c.credit_type === 'real');
     const fakeCards = playerCards.filter(c => c.credit_type === 'fake');
     
-    const realCost = realCards.length * match.card_price;
-    const fakeCost = fakeCards.length * match.card_price;
+    // Matemática Inteligente: Abate o valor do uso da cartela do preço da partida
+    const valorPorUso = (settings.custo_recarga_cartela || 0) / (settings.usos_por_recarga || 1);
+    const effectivePrice = match.card_price - valorPorUso;
 
-    if (profile.credits < realCost) {
-      throw new Error(`Créditos reais insuficientes! Você precisa de ${realCost} créditos reais.`);
+    const realCost = realCards.length * effectivePrice;
+    const fakeCost = fakeCards.length * effectivePrice;
+    
+    // O valor integral que vai para o Pote e calcula Comissão (pq o admin já recebeu a recarga antes)
+    const fullRealCostForPot = realCards.length * match.card_price;
+
+    if (realCost > 0 && profile.credits < realCost) {
+      throw new Error(`Créditos reais insuficientes! O valor de entrada requer mais ${realCost.toFixed(2)} créditos.`);
     }
     
-    if ((profile.fake_credits || 0) < fakeCost) {
-      throw new Error(`Créditos de brincar insuficientes! Você precisa de ${fakeCost} créditos de brincar.`);
+    if (fakeCost > 0 && (profile.fake_credits || 0) < fakeCost) {
+      throw new Error(`Créditos de brincar insuficientes! Requer mais ${fakeCost.toFixed(2)} créditos.`);
     }
 
     // --- LÓGICA DE COMISSÃO DO BINGO VIA LINK DE INDICAÇÃO (Apenas Crédito Real) ---
@@ -96,7 +106,7 @@ serve(async (req) => {
     let sellerUserId = null;
     let vendedorDaTabelaId = null;
 
-    if (refCode && realCost > 0) {
+    if (refCode && fullRealCostForPot > 0) {
       const { data: seller } = await supabaseAdmin
         .from('vendedores_rifa')
         .select('id, user_id, comissao_percentual')
@@ -109,27 +119,26 @@ serve(async (req) => {
         vendedorDaTabelaId = seller.id;
 
         if (!comissao || comissao === 0) {
-          const { data: cfg } = await supabaseAdmin.from('configuracoes').select('comissao_vendedor_global').single();
-          comissao = cfg?.comissao_vendedor_global || 0;
+          comissao = settings.comissao_vendedor_global || 0;
         }
         if (comissao > 0) {
-          commissionAmount = realCost * (comissao / 100.0);
+          commissionAmount = fullRealCostForPot * (comissao / 100.0);
           sellerUserId = seller.user_id;
         }
       }
     }
 
-    // 1. Desconta o custo do jogador (Real e Brincar)
+    // 1. Desconta ou Devolve o custo do jogador (Real e Brincar)
     const profileUpdates: any = {};
-    if (realCost > 0) profileUpdates.credits = profile.credits - realCost;
-    if (fakeCost > 0) profileUpdates.fake_credits = (profile.fake_credits || 0) - fakeCost;
+    if (realCost !== 0) profileUpdates.credits = Number(profile.credits) - realCost;
+    if (fakeCost !== 0) profileUpdates.fake_credits = Number(profile.fake_credits || 0) - fakeCost;
 
     if (Object.keys(profileUpdates).length > 0) {
       const { error: creditError } = await supabaseAdmin
         .from('perfis')
         .update(profileUpdates)
         .eq('id', user.id);
-      if (creditError) throw new Error(`Falha ao debitar os créditos.`);
+      if (creditError) throw new Error(`Falha ao processar a cobrança dos créditos.`);
     }
 
     // 2. Paga a comissão ao vendedor e desconta do lucro do admin (Apenas Real)
@@ -167,9 +176,9 @@ serve(async (req) => {
         throw new Error(`Falha ao alocar as cartelas na partida.`);
     }
 
-    if (realCost > 0) {
+    if (fullRealCostForPot > 0) {
       const currentPot = Number(match.pot || 0);
-      await supabaseAdmin.from('partidas').update({ pot: currentPot + realCost }).eq('id', matchId);
+      await supabaseAdmin.from('partidas').update({ pot: currentPot + fullRealCostForPot }).eq('id', matchId);
     }
 
     return new Response(JSON.stringify({ success: true, data: insertedMatchCards }), {

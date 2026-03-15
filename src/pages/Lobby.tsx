@@ -791,12 +791,25 @@ const Lobby = () => {
             })()}
           </div>
           <DialogFooter className="flex-col sm:flex-row gap-3">
-            <div className="text-center sm:text-left">
-              <p className="text-xs text-muted-foreground">Total</p>
-              <p className="text-lg font-bold">{Number(cardsToJoin.size * (selectedMatch?.card_price || 0)).toFixed(2)} cr.</p>
+            <div className="text-center sm:text-left flex flex-col justify-center">
+              {(() => {
+                const valorPorUso = (gameSettings?.custo_recarga_cartela || 0) / (gameSettings?.usos_por_recarga || 1);
+                const effectivePrice = (selectedMatch?.card_price || 0) - valorPorUso;
+                const totalCost = cardsToJoin.size * effectivePrice;
+                return (
+                  <>
+                    <p className="text-[10px] uppercase font-bold text-muted-foreground leading-none">
+                      {totalCost > 0 ? 'Total a Pagar (Diferença)' : totalCost < 0 ? 'Troco a Receber' : 'Custo Adicional'}
+                    </p>
+                    <p className={cn("text-xl font-black font-heading mt-0.5", totalCost < 0 ? "text-success" : "text-primary")}>
+                      {totalCost < 0 ? '+' : ''}{Math.abs(totalCost).toFixed(2)} cr.
+                    </p>
+                  </>
+                );
+              })()}
             </div>
-            <Button onClick={handleJoinMatch} disabled={cardsToJoin.size === 0 || isJoining} className="w-full sm:w-auto">
-              {isJoining ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Confirmar'}
+            <Button onClick={handleJoinMatch} disabled={cardsToJoin.size === 0 || isJoining} className="w-full sm:w-auto h-12">
+              {isJoining ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Confirmar Entrada'}
             </Button>
           </DialogFooter>
         </DialogContent>
