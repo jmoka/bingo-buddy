@@ -25,15 +25,19 @@ serve(async (req) => {
 
     const { data: settings, error: settingsError } = await supabaseAdmin
       .from('configuracoes')
-      .select('stripe_secret_key, stripe_pass_fees_to_customer, stripe_fee_percentage, stripe_fee_fixed')
+      .select('stripe_secret_key, stripe_secret_key_test, stripe_env, stripe_pass_fees_to_customer, stripe_fee_percentage, stripe_fee_fixed')
       .limit(1)
       .maybeSingle();
 
-    if (settingsError || !settings?.stripe_secret_key) {
-        throw new Error("Chave do Stripe não configurada no Painel do Administrador.");
+    if (settingsError) throw new Error("Erro ao buscar configurações do Stripe.");
+
+    const secretKey = settings.stripe_env === 'live' ? settings.stripe_secret_key : settings.stripe_secret_key_test;
+
+    if (!secretKey) {
+        throw new Error(`Chave secreta do Stripe para o ambiente '${settings.stripe_env}' não está configurada.`);
     }
 
-    const stripe = new Stripe(settings.stripe_secret_key.trim(), {
+    const stripe = new Stripe(secretKey.trim(), {
       apiVersion: '2024-06-20',
     })
 

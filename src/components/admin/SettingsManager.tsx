@@ -57,6 +57,9 @@ const SettingsManager = () => {
     stripe_pass_fees_to_customer: false,
     stripe_fee_percentage: 3.99,
     stripe_fee_fixed: 0.39,
+    stripe_env: 'test' as 'test' | 'live',
+    stripe_secret_key_test: '',
+    stripe_webhook_secret_test: '',
   });
   const [isSaving, setIsSaving] = useState(false);
   const [justSaved, setJustSaved] = useState(false);
@@ -98,6 +101,9 @@ const SettingsManager = () => {
         stripe_pass_fees_to_customer: gameSettings.stripe_pass_fees_to_customer === true,
         stripe_fee_percentage: gameSettings.stripe_fee_percentage ?? 3.99,
         stripe_fee_fixed: gameSettings.stripe_fee_fixed ?? 0.39,
+        stripe_env: gameSettings.stripe_env || 'test',
+        stripe_secret_key_test: gameSettings.stripe_secret_key_test || '',
+        stripe_webhook_secret_test: gameSettings.stripe_webhook_secret_test || '',
       });
     }
   }, [gameSettings]);
@@ -266,6 +272,14 @@ const SettingsManager = () => {
               <Switch checked={currentSettings.stripe_enabled} onCheckedChange={(checked) => handleToggleChange('stripe_enabled', checked)} />
             </div>
 
+            <div className="space-y-2">
+              <Label className="text-xs">Ambiente Stripe</Label>
+              <RadioGroup value={currentSettings.stripe_env} onValueChange={(v: any) => handleSelectChange('stripe_env', v)} className="grid grid-cols-2 gap-2">
+                <Label className={cn("flex items-center justify-center rounded-md border-2 p-3 cursor-pointer", currentSettings.stripe_env === 'test' ? 'border-primary bg-primary/10' : 'border-muted bg-popover')}><RadioGroupItem value="test" className="sr-only" />Modo Teste</Label>
+                <Label className={cn("flex items-center justify-center rounded-md border-2 p-3 cursor-pointer", currentSettings.stripe_env === 'live' ? 'border-primary bg-primary/10' : 'border-muted bg-popover')}><RadioGroupItem value="live" className="sr-only" />Modo Produção</Label>
+              </RadioGroup>
+            </div>
+
             <div className="space-y-3 p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl">
                <div className="flex items-center justify-between mb-2">
                  <div className="space-y-0.5">
@@ -288,8 +302,11 @@ const SettingsManager = () => {
                )}
             </div>
 
-            <div className="space-y-1.5"><Label className="text-xs">Stripe Secret Key</Label><Input name="stripe_secret_key" type="password" value={currentSettings.stripe_secret_key} onChange={handleSettingsChange} className="text-xs" /></div>
-            <div className="space-y-1.5"><Label className="text-xs">Stripe Webhook Secret</Label><Input name="stripe_webhook_secret" type="password" value={currentSettings.stripe_webhook_secret} onChange={handleSettingsChange} className="text-xs" /></div>
+            <div className="space-y-1.5"><Label className="text-xs">Stripe Secret Key (Produção)</Label><Input name="stripe_secret_key" type="password" value={currentSettings.stripe_secret_key} onChange={handleSettingsChange} className="text-xs" /></div>
+            <div className="space-y-1.5"><Label className="text-xs">Stripe Webhook Secret (Produção)</Label><Input name="stripe_webhook_secret" type="password" value={currentSettings.stripe_webhook_secret} onChange={handleSettingsChange} className="text-xs" /></div>
+            <div className="space-y-1.5"><Label className="text-xs">Stripe Secret Key (Teste)</Label><Input name="stripe_secret_key_test" type="password" value={currentSettings.stripe_secret_key_test} onChange={handleSettingsChange} className="text-xs" /></div>
+            <div className="space-y-1.5"><Label className="text-xs">Stripe Webhook Secret (Teste)</Label><Input name="stripe_webhook_secret_test" type="password" value={currentSettings.stripe_webhook_secret_test} onChange={handleSettingsChange} className="text-xs" /></div>
+            
             <p className="text-[9px] text-muted-foreground bg-background p-2 rounded border border-dashed overflow-hidden">
               <strong>Webhook URL:</strong><br/>
               <code className="font-bold text-primary break-all">https://vqvnodwojefubbbnbyar.supabase.co/functions/v1/stripe-webhook</code>

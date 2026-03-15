@@ -18,16 +18,20 @@ serve(async (req) => {
 
   const { data: settings } = await supabaseAdmin
     .from('configuracoes')
-    .select('id, stripe_secret_key, stripe_webhook_secret, comissao_vendedor_global, admin_profit')
+    .select('id, stripe_secret_key, stripe_webhook_secret, stripe_secret_key_test, stripe_webhook_secret_test, stripe_env, comissao_vendedor_global, admin_profit')
     .limit(1)
     .maybeSingle();
 
-  if (!settings?.stripe_secret_key || !settings?.stripe_webhook_secret) {
-      console.error("[stripe-webhook] Erro: Chaves do Stripe não configuradas.");
+  const isLiveMode = settings?.stripe_env === 'live';
+  const secretKey = isLiveMode ? settings?.stripe_secret_key : settings?.stripe_secret_key_test;
+  const webhookSecret = isLiveMode ? settings?.stripe_webhook_secret : settings?.stripe_webhook_secret_test;
+
+  if (!secretKey || !webhookSecret) {
+      console.error(`[stripe-webhook] Erro: Chaves do Stripe para o ambiente '${settings?.stripe_env}' não configuradas.`);
       return new Response('Config Error', { status: 500 });
   }
 
-  const stripe = new Stripe(settings.stripe_secret_key.trim(), {
+  const stripe = new Stripe(secretKey.trim(), {
     apiVersion: '2024-06-20',
     httpClient: Stripe.createFetchHttpClient(),
   })
@@ -39,7 +43,7 @@ serve(async (req) => {
 
   try {
     const body = await req.text()
-    const event = await stripe.webhooks.constructEventAsync(body, signature, settings.stripe_webhook_secret.trim())
+    const event = await stripe.webhooks.constructEventAsync(body, signature, webhookSecret.trim())
 
     if (event.type === 'checkout.session.completed' || event.type === 'checkout.session.async_payment_succeeded') {
       const session = event.data.object
@@ -51,8 +55,6 @@ serve(async (req) => {
         const originalAmount = session.metadata?.original_amount ? Number(session.metadata.original_amount) : amountPaidByCustomer;
 
         // *** BLINDAGEM DE SEGURANÇA ***
-        // Se o metadado 'credits_requested' existir, FORÇAMOS o tipo para 'credits',
-        // ignorando qualquer tipo incorreto que o Stripe possa ter enviado.
         if (session.metadata?.credits_requested) {
             paymentType = 'credits';
         }
