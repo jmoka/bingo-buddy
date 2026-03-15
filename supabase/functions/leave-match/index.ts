@@ -53,7 +53,11 @@ serve(async (req) => {
     }
 
     const realCardsToRemove = matchCardsToRemove.filter(c => c.credit_type === 'real');
-    const refundAmount = realCardsToRemove.length * match.card_price;
+    const fakeCardsToRemove = matchCardsToRemove.filter(c => c.credit_type === 'fake');
+    
+    const realRefundAmount = realCardsToRemove.length * match.card_price;
+    const fakeRefundAmount = fakeCardsToRemove.length * match.card_price;
+    
     const playerCardIdsToRestore = matchCardsToRemove.map(c => c.player_card_id).filter(id => id);
     const matchCardIdsToDelete = matchCardsToRemove.map(c => c.id);
 
@@ -63,27 +67,33 @@ serve(async (req) => {
       .in('id', matchCardIdsToDelete);
     if (deleteError) throw new Error(`Erro ao remover as cartelas da partida.`);
 
-    if (refundAmount > 0) {
-      const { data: profile, error: profileError } = await supabaseAdmin.from('perfis').select('credits').eq('id', user.id).single();
+    if (realRefundAmount > 0 || fakeRefundAmount > 0) {
+      const { data: profile, error: profileError } = await supabaseAdmin.from('perfis').select('credits, fake_credits').eq('id', user.id).single();
       if (profileError) throw new Error("Erro ao buscar seu perfil para o estorno.");
 
-      await supabaseAdmin.from('perfis').update({ credits: profile.credits + refundAmount }).eq('id', user.id);
+      const updates: any = {};
+      if (realRefundAmount > 0) updates.credits = Number(profile.credits || 0) + realRefundAmount;
+      if (fakeRefundAmount > 0) updates.fake_credits = Number(profile.fake_credits || 0) + fakeRefundAmount;
+
+      await supabaseAdmin.from('perfis').update(updates).eq('id', user.id);
       
-      const currentPot = Number(match.pot || 0);
-      await supabaseAdmin.from('partidas').update({ pot: Math.max(0, currentPot - refundAmount) }).eq('id', matchId);
+      if (realRefundAmount > 0) {
+        const currentPot = Number(match.pot || 0);
+        await supabaseAdmin.from('partidas').update({ pot: Math.max(0, currentPot - realRefundAmount) }).eq('id', matchId);
+      }
     }
 
     if (playerCardIdsToRestore.length > 0) {
         const { data: playerCards, error: playerCardsError } = await supabaseAdmin.from('cartelas_jogador').select('id, uses_left').in('id', playerCardIdsToRestore);
         if (!playerCardsError && playerCards) {
-            const restorePromises = playerCards.map(card => 
+            const restorePromises = playerCards.map(card =>
                 supabaseAdmin.from('cartelas_jogador').update({ uses_left: card.uses_left + 1 }).eq('id', card.id)
             );
             await Promise.all(restorePromises);
         }
     }
 
-    return new Response(JSON.stringify({ success: true, refunded: refundAmount }), {
+    return new Response(JSON.stringify({ success: true, refundedReal: realRefundAmount, refundedFake: fakeRefundAmount }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
     })

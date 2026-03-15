@@ -48,7 +48,7 @@ serve(async (req) => {
 
     const [matchRes, profileRes, playerCardsRes] = await Promise.all([
       supabaseAdmin.from('partidas').select('card_price, pot').eq('id', matchId).single(),
-      supabaseAdmin.from('perfis').select('credits, bloqueado').eq('id', user.id).single(),
+      supabaseAdmin.from('perfis').select('credits, fake_credits, bloqueado').eq('id', user.id).single(),
       supabaseAdmin.from('cartelas_jogador').select('*').in('id', playerCardIds)
     ]);
 
@@ -65,18 +65,25 @@ serve(async (req) => {
     }
 
     const realCards = playerCards.filter(c => c.credit_type === 'real');
-    const totalCost = realCards.length * match.card_price;
+    const fakeCards = playerCards.filter(c => c.credit_type === 'fake');
+    
+    const realCost = realCards.length * match.card_price;
+    const fakeCost = fakeCards.length * match.card_price;
 
-    if (profile.credits < totalCost) {
-      throw new Error(`Créditos insuficientes! Você precisa de ${totalCost} créditos.`);
+    if (profile.credits < realCost) {
+      throw new Error(`Créditos reais insuficientes! Você precisa de ${realCost} créditos reais.`);
+    }
+    
+    if ((profile.fake_credits || 0) < fakeCost) {
+      throw new Error(`Créditos de brincar insuficientes! Você precisa de ${fakeCost} créditos de brincar.`);
     }
 
-    // --- LÓGICA DE COMISSÃO DO BINGO VIA LINK DE INDICAÇÃO ---
+    // --- LÓGICA DE COMISSÃO DO BINGO VIA LINK DE INDICAÇÃO (Apenas Crédito Real) ---
     let commissionAmount = 0;
     let sellerUserId = null;
     let vendedorDaTabelaId = null;
 
-    if (refCode && totalCost > 0) {
+    if (refCode && realCost > 0) {
       const { data: seller } = await supabaseAdmin
         .from('vendedores_rifa')
         .select('id, user_id, comissao_percentual')
@@ -93,22 +100,26 @@ serve(async (req) => {
           comissao = cfg?.comissao_vendedor_global || 0;
         }
         if (comissao > 0) {
-          commissionAmount = totalCost * (comissao / 100.0);
+          commissionAmount = realCost * (comissao / 100.0);
           sellerUserId = seller.user_id;
         }
       }
     }
 
-    // 1. Desconta o custo total do jogador
-    if (totalCost > 0) {
+    // 1. Desconta o custo do jogador (Real e Brincar)
+    const profileUpdates: any = {};
+    if (realCost > 0) profileUpdates.credits = profile.credits - realCost;
+    if (fakeCost > 0) profileUpdates.fake_credits = (profile.fake_credits || 0) - fakeCost;
+
+    if (Object.keys(profileUpdates).length > 0) {
       const { error: creditError } = await supabaseAdmin
         .from('perfis')
-        .update({ credits: profile.credits - totalCost })
+        .update(profileUpdates)
         .eq('id', user.id);
-      if (creditError) throw new Error(`Falha ao processar o pagamento.`);
+      if (creditError) throw new Error(`Falha ao debitar os créditos.`);
     }
 
-    // 2. Paga a comissão ao vendedor e desconta do lucro do admin para manter a economia perfeita
+    // 2. Paga a comissão ao vendedor e desconta do lucro do admin (Apenas Real)
     if (sellerUserId && commissionAmount > 0) {
       console.log(`[join-match] Pagando comissão de ${commissionAmount} ao vendedor ${sellerUserId}`);
       await supabaseAdmin.rpc('increment_player_credits', { p_player_id: sellerUserId, p_amount: commissionAmount });
@@ -128,8 +139,8 @@ serve(async (req) => {
       match_id: matchId,
       player_card_id: card.id,
       name: card.name,
-      numbers: card.numbers, 
-      marked_numbers: [0], 
+      numbers: card.numbers,
+      marked_numbers: [0],
       credit_type: card.credit_type,
       vendedor_id: vendedorDaTabelaId
     }));
@@ -143,9 +154,9 @@ serve(async (req) => {
         throw new Error(`Falha ao alocar as cartelas na partida.`);
     }
 
-    if (totalCost > 0) {
+    if (realCost > 0) {
       const currentPot = Number(match.pot || 0);
-      await supabaseAdmin.from('partidas').update({ pot: currentPot + totalCost }).eq('id', matchId);
+      await supabaseAdmin.from('partidas').update({ pot: currentPot + realCost }).eq('id', matchId);
     }
 
     return new Response(JSON.stringify({ success: true, data: insertedMatchCards }), {
