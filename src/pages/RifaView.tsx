@@ -27,6 +27,8 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Rifa } from '@/types/rifa';
 import { cn } from '@/lib/utils';
+import { useGame } from '@/contexts/GameContext';
+import { useVendedor } from '@/hooks/useVendedor';
 
 type NumberFilter = 'todos' | 'disponivel' | 'vendido';
 
@@ -43,6 +45,8 @@ const RifaView = () => {
   const refCodigo = searchParams.get('ref') || undefined;
   const { profile } = useAuth();
   const { rifas, isLoadingRifas, getRifa, getNumerosRifa, comprarNumeros, minhasCompras, confirmarRecebimento } = useRifas();
+  const { gameSettings } = useGame();
+  const { meuVendedor, reservarNumeros } = useVendedor();
 
   const [selectedNumbers, setSelectedNumbers] = useState<number[]>([]);
   const [filter, setFilter] = useState<NumberFilter>('todos');
@@ -130,16 +134,28 @@ const RifaView = () => {
     );
   };
 
+  const isVendedor = profile?.role === 'vendedor';
+  const descontoVendedor = isVendedor ? (meuVendedor?.percentual_desconto || gameSettings?.desconto_vendedor_global || 0) : 0;
+  
+  const totalPriceOriginal = rifa ? selectedNumbers.length * rifa.custo_por_numero : 0;
+  const totalPriceDiscounted = totalPriceOriginal * (1 - (descontoVendedor / 100));
+
   const handleComprar = async () => {
     if (!id || selectedNumbers.length === 0) return;
     setIsBuying(true);
-    const ref = localStorage.getItem('bingo_ref') || undefined;
-    const success = await comprarNumeros(id, selectedNumbers, ref);
+    
+    let success = false;
+    if (isVendedor) {
+      // O vendedor compra diretamente usando seu desconto (pagamento com saldo deduzido na hora = false para pagar_depois)
+      success = await reservarNumeros(id, selectedNumbers, false);
+    } else {
+      const ref = localStorage.getItem('bingo_ref') || undefined;
+      success = await comprarNumeros(id, selectedNumbers, ref);
+    }
+    
     if (success) setSelectedNumbers([]);
     setIsBuying(false);
   };
-
-  const totalPrice = rifa ? selectedNumbers.length * rifa.custo_por_numero : 0;
 
   if (isLoadingRifas && !rifa) {
     return (
@@ -475,13 +491,31 @@ const RifaView = () => {
 
           {rifa.status === 'ativa' && (
             <div className="card-container space-y-3">
-              <div className="flex items-center justify-between flex-wrap gap-2">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between flex-wrap gap-2">
                 <span className="text-sm text-muted-foreground">
                   {selectedNumbers.length} número(s) selecionado(s)
                 </span>
-                <span className="text-sm font-bold">
-                  Total: {totalPrice.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} ({totalPrice} créditos)
-                </span>
+                <div className="text-right">
+                  {isVendedor && descontoVendedor > 0 ? (
+                    <div className="flex flex-col items-end">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-xs text-muted-foreground line-through">
+                          R$ {totalPriceOriginal.toFixed(2)}
+                        </span>
+                        <Badge className="bg-amber-500/10 text-amber-600 border-none text-[10px]">
+                          -{descontoVendedor}% de Desconto
+                        </Badge>
+                      </div>
+                      <span className="text-lg font-black text-primary">
+                        Total: R$ {totalPriceDiscounted.toFixed(2)}
+                      </span>
+                    </div>
+                  ) : (
+                    <span className="text-sm font-bold">
+                      Total: R$ {totalPriceOriginal.toFixed(2)} ({totalPriceOriginal} créditos)
+                    </span>
+                  )}
+                </div>
               </div>
 
               {!profile ? (
