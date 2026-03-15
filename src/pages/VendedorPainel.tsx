@@ -448,9 +448,9 @@ const VendedorPainel = () => {
 
         <TabsContent value="rifas" className="space-y-6 mt-0">
           <div className="grid grid-cols-3 gap-3">
-             <div className="card-container p-3 text-center border-2 border-primary/20"><p className="text-[10px] text-muted-foreground">Reservados</p><p className="text-xl font-bold font-heading text-primary">{minhasReservas.length}</p></div>
-             <div className="card-container p-3 text-center border-2 border-green-500/20"><p className="text-[10px] text-muted-foreground">Validados</p><p className="text-xl font-bold font-heading text-green-600">{minhasReservas.filter(n => n.status === 'vendido').length}</p></div>
-             <div className="card-container p-3 text-center border-2 border-amber-500/20"><p className="text-[10px] text-muted-foreground">Pendentes</p><p className="text-xl font-bold font-heading text-amber-600">{minhasReservas.filter(n => n.status === 'reservado').length}</p></div>
+             <div className="card-container p-3 text-center border-2 border-primary/20"><p className="text-[10px] text-muted-foreground">Reservados (Total)</p><p className="text-xl font-bold font-heading text-primary">{minhasReservas.length}</p></div>
+             <div className="card-container p-3 text-center border-2 border-green-500/20"><p className="text-[10px] text-muted-foreground">Validados</p><p className="text-xl font-bold font-heading text-green-600">{minhasReservas.filter(n => (n.status === 'vendido' || n.cartelas_rifa?.[0]?.compras_rifa?.status === 'pago') && !!n.nome_comprador?.trim()).length}</p></div>
+             <div className="card-container p-3 text-center border-2 border-amber-500/20"><p className="text-[10px] text-muted-foreground">Pendentes</p><p className="text-xl font-bold font-heading text-amber-600">{minhasReservas.filter(n => !((n.status === 'vendido' || n.cartelas_rifa?.[0]?.compras_rifa?.status === 'pago') && !!n.nome_comprador?.trim())).length}</p></div>
           </div>
 
           <div className="card-container p-4 space-y-4">
