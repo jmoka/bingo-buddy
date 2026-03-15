@@ -16,11 +16,12 @@ serve(async (req) => {
     { auth: { persistSession: false } }
   )
 
+  // CORREÇÃO AQUI: Usa limit(1).maybeSingle() em vez de eq('singleton', true)
   const { data: settings, error: settingsError } = await supabaseAdmin
     .from('configuracoes')
     .select('stripe_secret_key, stripe_webhook_secret, comissao_vendedor_global')
-    .eq('singleton', true)
-    .single();
+    .limit(1)
+    .maybeSingle();
 
   if (settingsError || !settings?.stripe_secret_key || !settings?.stripe_webhook_secret) {
       console.error("[stripe-webhook] Erro: Chaves do Stripe não configuradas.");

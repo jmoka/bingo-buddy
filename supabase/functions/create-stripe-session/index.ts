@@ -19,14 +19,15 @@ serve(async (req) => {
       { auth: { persistSession: false } }
     )
 
+    // CORREÇÃO AQUI: Usa limit(1).maybeSingle() em vez de eq('singleton', true)
     const { data: settings, error: settingsError } = await supabaseAdmin
       .from('configuracoes')
       .select('stripe_secret_key, stripe_pass_fees_to_customer, stripe_fee_percentage, stripe_fee_fixed')
-      .eq('singleton', true)
-      .single();
+      .limit(1)
+      .maybeSingle();
 
     if (settingsError || !settings?.stripe_secret_key) {
-        throw new Error("Chave do Stripe não configurada no Admin.");
+        throw new Error("Chave do Stripe não configurada no Painel do Administrador.");
     }
 
     const stripe = new Stripe(settings.stripe_secret_key.trim(), {
@@ -46,7 +47,7 @@ serve(async (req) => {
         const { data } = await userSupabaseClient.auth.getUser()
         if (data?.user) user = data.user;
       } catch(e) {
-          console.error("Auth pass-through falhou", e);
+          console.error("[create-stripe-session] Auth pass-through falhou", e);
       }
     }
     
@@ -59,13 +60,8 @@ serve(async (req) => {
     if (settings.stripe_pass_fees_to_customer) {
       const percentage = Number(settings.stripe_fee_percentage || 0);
       const fixed = Number(settings.stripe_fee_fixed || 0);
-      // Fórmula para descobrir quanto cobrar para receber exatamente o "amount":
-      // Final = (Amount + Fixed) / (1 - Percentage/100)
       finalAmount = (amount + fixed) / (1 - (percentage / 100));
-      
-      // Arredonda pra cima nos centavos para garantir que a taxa não coma 1 centavo
       finalAmount = Math.ceil(finalAmount * 100) / 100;
-      
       console.log(`[create-stripe-session] Valor original: R$${amount}. Repassando taxas. Novo valor: R$${finalAmount}`);
     }
 
@@ -103,7 +99,7 @@ serve(async (req) => {
         ...metadata,
         user_id: user?.id || 'anonymous',
         payment_type: type,
-        original_amount: amount // Guarda o valor original para o webhook usar!
+        original_amount: amount // Guarda o valor original para o webhook usar
       },
     })
 
@@ -113,7 +109,7 @@ serve(async (req) => {
     })
 
   } catch (error: any) {
-    console.error('💥 FATAL ERROR in create-stripe-session:', error);
+    console.error('[create-stripe-session] 💥 FATAL ERROR:', error);
     return new Response(JSON.stringify({ error: error.message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 400,
