@@ -268,11 +268,20 @@ const VendedoresAdmin = () => {
       </div>
 
       <Tabs defaultValue="acertos">
-        <TabsList className="grid w-full grid-cols-4 h-auto p-1">
-          <TabsTrigger value="vendedores" className="py-3">Vendedores</TabsTrigger>
-          <TabsTrigger value="solicitacoes" className="relative py-3">Inscrições {pendentes.length > 0 && <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-amber-500 text-[9px] font-bold text-white">{pendentes.length}</span>}</TabsTrigger>
-          <TabsTrigger value="acertos" className="relative py-3">Acertos (Lote) {acertosParaAnalisar.length > 0 && <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-green-500 text-[9px] font-bold text-white">{acertosParaAnalisar.length}</span>}</TabsTrigger>
-          <TabsTrigger value="clientes" className="relative py-3">PIX Direto {pagamentosClientes.length > 0 && <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-blue-500 text-[9px] font-bold text-white">{pagamentosClientes.length}</span>}</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 h-auto p-1 gap-1 bg-muted/50 rounded-xl">
+          <TabsTrigger value="vendedores" className="py-3 text-xs sm:text-sm">Vendedores</TabsTrigger>
+          <TabsTrigger value="solicitacoes" className="relative py-3 text-xs sm:text-sm">
+            Inscrições 
+            {pendentes.length > 0 && <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-amber-500 text-[9px] font-bold text-white border border-background">{pendentes.length}</span>}
+          </TabsTrigger>
+          <TabsTrigger value="acertos" className="relative py-3 text-xs sm:text-sm">
+            Acertos (Lote) 
+            {acertosParaAnalisar.length > 0 && <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-green-500 text-[9px] font-bold text-white border border-background">{acertosParaAnalisar.length}</span>}
+          </TabsTrigger>
+          <TabsTrigger value="clientes" className="relative py-3 text-xs sm:text-sm">
+            PIX Direto 
+            {pagamentosClientes.length > 0 && <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-blue-500 text-[9px] font-bold text-white border border-background">{pagamentosClientes.length}</span>}
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="vendedores" className="space-y-3 mt-4">
