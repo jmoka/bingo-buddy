@@ -515,22 +515,20 @@ const VendedorPainel = () => {
                           const isSelected = selectedToValidate.has(n.id);
                           const statusCompra = n.cartelas_rifa?.[0]?.compras_rifa?.status;
                           
-                          const isPago = statusCompra === 'pago';
-                          const isPendente = statusCompra === 'pendente';
-                          const isEmAnalise = statusCompra === 'em_analise';
-                          
                           const temNome = !!n.nome_comprador?.trim();
+                          const numeroEstaPago = statusCompra === 'pago' || n.status === 'vendido';
                           
-                          const isPagoSemNome = (n.status === 'reservado' || n.status === 'vendido') && isPago && !temNome;
-                          const isTotalmenteFinalizado = n.status === 'vendido' || (n.status === 'reservado' && isPago && temNome);
+                          const isTotalmenteFinalizado = numeroEstaPago && temNome;
+                          const isPagoSemNome = numeroEstaPago && !temNome;
+                          const isPendente = !numeroEstaPago; // Fiado ou análise
 
                           let badgeText = 'PAGO';
                           let badgeClass = 'text-green-700 bg-green-100';
 
-                          if (isPendente) {
+                          if (statusCompra === 'pendente') {
                             badgeText = 'FIADO';
                             badgeClass = 'text-red-700 bg-red-100';
-                          } else if (isEmAnalise) {
+                          } else if (statusCompra === 'em_analise') {
                             badgeText = 'ANÁLISE';
                             badgeClass = 'text-amber-700 bg-amber-100';
                           }
@@ -553,7 +551,7 @@ const VendedorPainel = () => {
                                     }}
                                     className={`w-full rounded-lg p-2 flex flex-col items-center justify-center gap-0.5 transition-all min-h-[85px] border 
                                         ${isTotalmenteFinalizado ? 'bg-green-50/50 text-green-700 border-green-200 opacity-90' : 
-                                          isPagoSemNome ? 'bg-green-600 text-white border-green-700 shadow-inner hover:bg-green-700' :
+                                          isPagoSemNome ? 'bg-blue-50 text-blue-700 border-blue-300 hover:bg-blue-100 cursor-pointer shadow-sm' :
                                           'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100 cursor-pointer'}
                                         ${modoSelecao && isSelected ? 'ring-2 ring-primary border-primary bg-primary/10 text-primary' : ''}
                                     `}
@@ -564,10 +562,10 @@ const VendedorPainel = () => {
                                         </div>
                                     )}
 
-                                    <span className={`text-2xl font-black font-heading leading-none ${isPagoSemNome ? 'text-white' : ''}`}>{n.numero}</span>
+                                    <span className={`text-2xl font-black font-heading leading-none ${isPagoSemNome ? 'text-blue-700' : ''}`}>{n.numero}</span>
                                     
                                     {isPagoSemNome && (
-                                        <p className="text-[6px] font-black leading-tight text-center px-1 mt-1 animate-pulse uppercase">
+                                        <p className="text-[6px] font-black leading-tight text-center px-1 mt-1 animate-pulse uppercase text-blue-600">
                                             Informe o cliente
                                         </p>
                                     )}
@@ -582,7 +580,7 @@ const VendedorPainel = () => {
                                         </span>
                                     ) : null}
                                 </button>
-                                {n.status === 'reservado' && !isPago && !modoSelecao && (
+                                {n.status === 'reservado' && !numeroEstaPago && !modoSelecao && (
                                     <button onClick={e => { e.stopPropagation(); setCancelarNumero(n); }} className="absolute -top-1 -right-1 opacity-0 group-hover:opacity-100 bg-red-500 text-white rounded-full p-1 shadow-md hover:bg-red-600 transition-colors z-10">
                                         <Undo2 className="w-3 h-3" />
                                     </button>
