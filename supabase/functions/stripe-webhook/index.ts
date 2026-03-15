@@ -23,6 +23,7 @@ serve(async (req) => {
     .maybeSingle();
 
   if (!settings?.stripe_secret_key || !settings?.stripe_webhook_secret) {
+      console.error("[stripe-webhook] Erro: Chaves do Stripe não configuradas.");
       return new Response('Config Error', { status: 500 });
   }
 
@@ -32,7 +33,9 @@ serve(async (req) => {
   })
 
   const signature = req.headers.get('stripe-signature')
-  if (!signature) return new Response('No signature', { status: 400 });
+  if (!signature) {
+      return new Response('No signature', { status: 400 });
+  }
 
   try {
     const body = await req.text()
@@ -43,11 +46,18 @@ serve(async (req) => {
       
       if (session.payment_status === 'paid') {
         const userId = session.client_reference_id || session.metadata?.user_id || 'anonymous';
-        const paymentType = session.metadata?.payment_type;
+        let paymentType = session.metadata?.payment_type;
         const amountPaidByCustomer = session.amount_total ? session.amount_total / 100 : 0;
         const originalAmount = session.metadata?.original_amount ? Number(session.metadata.original_amount) : amountPaidByCustomer;
 
-        console.log(`[stripe-webhook] Tipo: ${paymentType} | Usr: ${userId} | Valor Real (S/ Taxas): R$ ${originalAmount}`);
+        // *** BLINDAGEM DE SEGURANÇA ***
+        // Se o metadado 'credits_requested' existir, FORÇAMOS o tipo para 'credits',
+        // ignorando qualquer tipo incorreto que o Stripe possa ter enviado.
+        if (session.metadata?.credits_requested) {
+            paymentType = 'credits';
+        }
+
+        console.log(`[stripe-webhook] Tipo (Após Verificação): ${paymentType} | Usr: ${userId} | Valor Original: R$ ${originalAmount}`);
 
         // Previne duplicidade
         const { data: existing } = await supabaseAdmin.from('stripe_payments').select('status').eq('stripe_session_id', session.id).maybeSingle();
@@ -66,11 +76,9 @@ serve(async (req) => {
         if (paymentType === 'credits' && userId !== 'anonymous') {
           const creditsToGrant = Number(session.metadata?.credits_requested || originalAmount);
           
-          // Adiciona saldo ao usuário puxando o saldo atual e somando
           const { data: profile } = await supabaseAdmin.from('perfis').select('credits').eq('id', userId).single();
           if (profile) await supabaseAdmin.from('perfis').update({ credits: Number(profile.credits || 0) + creditsToGrant }).eq('id', userId);
 
-          // Adiciona saldo ao Caixa do Admin
           await supabaseAdmin.from('configuracoes').update({ admin_profit: Number(settings.admin_profit || 0) + originalAmount }).eq('id', settings.id);
 
           const { data: historyData } = await supabaseAdmin.from('solicitacoes_credito').insert({
@@ -91,7 +99,6 @@ serve(async (req) => {
             if (venda && venda.status !== 'pago') {
                 await supabaseAdmin.from('vendas_bingo_fisico').update({ status: 'pago' }).eq('id', vendaId);
                 
-                // Pote da partida
                 const { data: match } = await supabaseAdmin.from('partidas').select('pot').eq('id', venda.match_id).single();
                 if (match) await supabaseAdmin.from('partidas').update({ pot: Number(match.pot || 0) + originalAmount }).eq('id', venda.match_id);
 
@@ -107,7 +114,6 @@ serve(async (req) => {
                     }
                 }
                 
-                // Admin recebe o que sobrou (descontado a comissão do vendedor)
                 const lucroAdmin = originalAmount - comissaoValor;
                 await supabaseAdmin.from('configuracoes').update({ admin_profit: Number(settings.admin_profit || 0) + lucroAdmin }).eq('id', settings.id);
             }
@@ -136,7 +142,6 @@ serve(async (req) => {
                     }
                 }
                 
-                // Admin recebe o que sobrou
                 const lucroAdmin = originalAmount - comissaoValor;
                 await supabaseAdmin.from('configuracoes').update({ admin_profit: Number(settings.admin_profit || 0) + lucroAdmin }).eq('id', settings.id);
             }
