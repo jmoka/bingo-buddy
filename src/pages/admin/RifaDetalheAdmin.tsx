@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useRifaAdmin } from '@/hooks/useRifaAdmin';
 import { useRifas } from '@/hooks/useRifas';
+import { useGame } from '@/contexts/GameContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -22,6 +23,7 @@ import { ArrowLeft, Trophy, Users, DollarSign, Hash, Loader2, CheckCircle, XCirc
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { NumeroRifa, CompraRifa, Rifa } from '@/types/rifa';
+import PlayerAvatar from '@/components/PlayerAvatar';
 
 type FiltroNumeros = 'todos' | 'disponivel' | 'vendido' | 'reservado';
 
@@ -111,6 +113,7 @@ const RifaDetalheAdmin = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { todasRifas, todasCompras, vendedores, getNumerosRifaAdmin, finalizarRifa, cancelarRifa, atualizarRifa, deletarRifa, uploadImagemRifa } = useRifaAdmin();
+  const { players } = useGame();
   useRifas();
 
   const rifa = todasRifas.find(r => r.id === id);
@@ -264,7 +267,7 @@ const RifaDetalheAdmin = () => {
 
   const cfg = statusConfig[rifa.status] ?? statusConfig.cancelada;
 
-  // Info Ganhador (Agora buscando o vendedor corretamente da lista global de vendedores)
+  // Info Ganhador
   const numeroGanhadorInfo = numeros.find(n => n.numero === rifa.numero_ganhador);
   const isVendaFisica = !!numeroGanhadorInfo?.vendedor_id;
   const vendedorNome = numeroGanhadorInfo?.vendedor_id 
@@ -613,19 +616,38 @@ const RifaDetalheAdmin = () => {
               </div>
             ) : (
               comprasRifa.map(compra => {
-                let vendedorNome = '';
-                if (compra.vendedor_id) {
-                  vendedorNome = vendedores.find(v => v.id === compra.vendedor_id)?.nome || '';
-                } else if (compra.ref_vendedor_id) {
-                  vendedorNome = vendedores.find(v => v.id === compra.ref_vendedor_id)?.nome || '';
+                let vendedorInfo = null;
+                const targetVendedorId = compra.vendedor_id || compra.ref_vendedor_id;
+                if (targetVendedorId) {
+                  const v = vendedores.find(v => v.id === targetVendedorId);
+                  if (v) {
+                    const vProfile = players.find(p => p.id === v.user_id);
+                    vendedorInfo = {
+                      nome: v.nome,
+                      avatar_url: vProfile?.avatar_url
+                    };
+                  }
+                }
+
+                let compradorInfo = { nome: 'Desconhecido', avatar_url: null as string | null };
+                if (compra.comprador_id) {
+                  const p = players.find(p => p.id === compra.comprador_id);
+                  if (p) {
+                    compradorInfo = { nome: p.full_name || 'Usuário', avatar_url: p.avatar_url };
+                  }
+                } else {
+                  const nomeFisico = compra.cartelas_rifa?.[0]?.numeros_rifa?.nome_comprador;
+                  if (nomeFisico) {
+                    compradorInfo = { nome: nomeFisico, avatar_url: null };
+                  }
                 }
 
                 return (
                   <CompraCard 
                     key={compra.id} 
                     compra={compra} 
-                    custo={rifa.custo_por_numero} 
-                    vendedorNome={vendedorNome}
+                    vendedorInfo={vendedorInfo}
+                    compradorInfo={compradorInfo}
                   />
                 );
               })
@@ -996,36 +1018,66 @@ const RifaDetalheAdmin = () => {
   );
 };
 
-const CompraCard = ({ compra, custo, vendedorNome }: { compra: CompraRifa; custo: number; vendedorNome?: string }) => {
+const CompraCard = ({ 
+  compra, 
+  vendedorInfo,
+  compradorInfo
+}: { 
+  compra: any; 
+  vendedorInfo?: { nome: string, avatar_url?: string | null } | null;
+  compradorInfo: { nome: string, avatar_url?: string | null };
+}) => {
   return (
-    <div className="card-container p-4 flex flex-col sm:flex-row sm:items-center gap-3">
-      <div className="flex-1 min-w-0">
-        <div className="flex flex-wrap gap-1 mb-2">
-          {compra.numeros.map(n => (
-            <span
-              key={n}
-              className="inline-flex items-center justify-center rounded-md bg-green-500/15 text-green-700 border border-green-500/30 text-xs font-bold px-1.5 py-0.5"
-            >
-              {n}
-            </span>
-          ))}
+    <div className="card-container p-4 flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center">
+      <div className="flex-1 min-w-0 space-y-3">
+        {/* Comprador (Buyer) */}
+        <div className="flex items-center gap-3">
+          <PlayerAvatar url={compradorInfo.avatar_url} fallback={compradorInfo.nome} className="w-10 h-10 border shadow-sm" />
+          <div>
+            <p className="font-bold text-sm leading-none text-foreground">{compradorInfo.nome}</p>
+            <div className="flex items-center gap-2 mt-1.5 text-xs text-muted-foreground">
+              <span>{format(new Date(compra.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}</span>
+              <Badge variant="outline" className="text-[9px] capitalize px-1.5 py-0 bg-muted">
+                {compra.tipo_pagamento === 'creditos' ? 'Saldo App' : 'Vendedor Físico'}
+              </Badge>
+            </div>
+          </div>
         </div>
-        <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-          <span>{format(new Date(compra.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}</span>
-          {vendedorNome && (
-            <span className="flex items-center gap-1 bg-primary/10 text-primary px-1.5 py-0.5 rounded font-medium">
-              <Store className="w-3 h-3" /> {vendedorNome}
-            </span>
+
+        {/* Números e Vendedor */}
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 pl-[52px]">
+           <div className="flex flex-wrap gap-1">
+            {compra.numeros.map((n: number) => (
+              <span
+                key={n}
+                className="inline-flex items-center justify-center rounded-md bg-green-500/15 text-green-700 border border-green-500/30 text-[10px] font-bold px-1.5 py-0.5"
+              >
+                {n}
+              </span>
+            ))}
+          </div>
+          
+          {vendedorInfo && (
+            <div className="flex items-center gap-1.5 bg-muted/50 px-2 py-1 rounded-full text-[10px] font-medium text-muted-foreground border w-fit">
+              <Store className="w-3 h-3" />
+              <span>Vendido por:</span>
+              <PlayerAvatar url={vendedorInfo.avatar_url} fallback={vendedorInfo.nome} className="w-4 h-4" />
+              <strong className="text-foreground">{vendedorInfo.nome}</strong>
+            </div>
           )}
         </div>
       </div>
-      <div className="flex flex-col items-end gap-1 shrink-0">
-        <span className="font-bold text-primary text-sm">
-          R${Number(compra.valor_total).toFixed(2).replace('.', ',')}
-        </span>
-        <Badge variant="outline" className="text-[10px] capitalize">
-          {compra.tipo_pagamento}
-        </Badge>
+      
+      <div className="flex flex-row sm:flex-col items-center sm:items-end justify-between w-full sm:w-auto gap-2 shrink-0 border-t sm:border-t-0 pt-3 sm:pt-0">
+         <div className="text-left sm:text-right">
+           <p className="text-[10px] uppercase font-bold text-muted-foreground">Valor Total</p>
+           <span className="font-bold text-lg text-primary leading-none">
+             R$ {Number(compra.valor_total).toFixed(2).replace('.', ',')}
+           </span>
+         </div>
+         {compra.status === 'pendente' && <Badge variant="outline" className="bg-amber-100 text-amber-700 border-amber-300">FIADO</Badge>}
+         {compra.status === 'em_analise' && <Badge variant="outline" className="bg-blue-100 text-blue-700 border-blue-300">ANÁLISE</Badge>}
+         {compra.status === 'pago' && <Badge variant="outline" className="bg-green-100 text-green-700 border-green-300">PAGO</Badge>}
       </div>
     </div>
   );
