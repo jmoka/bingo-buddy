@@ -101,6 +101,7 @@ export interface GameSettings {
   auto_engine_prize_type: PrizeType;
   auto_engine_prize_value: number;
   auto_engine_start_hour: number;
+  auto_engine_max_cards: number;
   desconto_vendedor_global: number;
   comissao_vendedor_global: number;
   cartelas_por_folha_bingo: number;

@@ -47,6 +47,7 @@ const SettingsManager = () => {
     auto_engine_prize_type: 'percentage' as any,
     auto_engine_prize_value: 80,
     auto_engine_start_hour: 0,
+    auto_engine_max_cards: 3,
     desconto_vendedor_global: 0,
     comissao_vendedor_global: 0,
     cartelas_por_folha_bingo: 4,
@@ -87,6 +88,7 @@ const SettingsManager = () => {
         auto_engine_prize_type: gameSettings.auto_engine_prize_type || 'percentage',
         auto_engine_prize_value: gameSettings.auto_engine_prize_value || 80,
         auto_engine_start_hour: gameSettings.auto_engine_start_hour || 0,
+        auto_engine_max_cards: gameSettings.auto_engine_max_cards || 3,
         desconto_vendedor_global: gameSettings.desconto_vendedor_global || 0,
         comissao_vendedor_global: gameSettings.comissao_vendedor_global || 0,
         cartelas_por_folha_bingo: gameSettings.cartelas_por_folha_bingo || 4,
@@ -159,6 +161,7 @@ const SettingsManager = () => {
       auto_engine_card_price: Number(currentSettings.auto_engine_card_price),
       auto_engine_prize_value: Number(currentSettings.auto_engine_prize_value),
       auto_engine_start_hour: parseInt(currentSettings.auto_engine_start_hour as any, 10),
+      auto_engine_max_cards: parseInt(currentSettings.auto_engine_max_cards as any, 10),
       desconto_vendedor_global: Number(currentSettings.desconto_vendedor_global),
       comissao_vendedor_global: Number(currentSettings.comissao_vendedor_global),
       cartelas_por_folha_bingo: parseInt(currentSettings.cartelas_por_folha_bingo as any, 10),
@@ -311,6 +314,7 @@ const SettingsManager = () => {
               <div className="space-y-1.5"><Label className="text-xs">Intervalo (min)</Label><Input name="auto_engine_interval_mins" type="number" value={currentSettings.auto_engine_interval_mins} onChange={handleSettingsChange} /></div>
               <div className="space-y-1.5"><Label className="text-xs">Partidas/Dia</Label><Input name="auto_engine_matches_per_day" type="number" value={currentSettings.auto_engine_matches_per_day} onChange={handleSettingsChange} /></div>
               <div className="space-y-1.5"><Label className="text-xs">Preço Cartela (cr)</Label><Input name="auto_engine_card_price" type="number" step="0.01" value={currentSettings.auto_engine_card_price} onChange={handleSettingsChange} /></div>
+              <div className="space-y-1.5"><Label className="text-xs">Máx Cartelas/Jogador</Label><Input name="auto_engine_max_cards" type="number" value={currentSettings.auto_engine_max_cards} onChange={handleSettingsChange} /></div>
               
               <div className="space-y-1.5">
                 <Label className="text-xs">Tipo de Jogo</Label>
