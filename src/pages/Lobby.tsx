@@ -585,10 +585,10 @@ const Lobby = () => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {gameSettings?.auto_engine_enabled && (
-          <div className="lg:col-span-3 order-2 lg:order-1">
-            <div className="card-container p-0 border-2 border-primary/20 overflow-hidden mb-6">
-              <button
+        <div className="lg:col-span-3 order-2 lg:order-1 space-y-6">
+          {gameSettings?.auto_engine_enabled && (
+            <div className="card-container p-0 border-2 border-primary/20 overflow-hidden">
+              <button 
                 onClick={() => setIsAgendaOpen(!isAgendaOpen)}
                 className="w-full p-4 flex items-center justify-between bg-primary/5 hover:bg-primary/10 transition-colors"
               >
@@ -614,36 +614,36 @@ const Lobby = () => {
                 </div>
               </div>
             </div>
+          )}
 
-            {/* CARD DE VENDEDORES (Para o Dashboard Público) */}
-            <div className="card-container p-0 border-2 border-blue-500/20 overflow-hidden bg-blue-50/30">
-               <div className="p-4 bg-blue-500/10 border-b border-blue-500/20 flex items-center justify-between">
-                 <h3 className="font-heading font-bold text-sm flex items-center gap-2 text-blue-800">
-                   <UserPlus className="w-4 h-4" /> Vendedores Autorizados
-                 </h3>
-               </div>
-               <div className="p-4 space-y-3 max-h-[400px] overflow-y-auto custom-scrollbar">
-                 {publicSellers && publicSellers.length > 0 ? (
-                   publicSellers.map((seller: any) => (
-                     <div key={seller.id} className="flex items-center gap-3 p-2 bg-white rounded-lg border border-blue-100 shadow-sm cursor-pointer hover:border-blue-300 transition-colors" onClick={() => navigate(`/vendedor-perfil/${seller.id}`)}>
-                       <PlayerAvatar url={seller.perfis?.avatar_url || seller.cadastro?.foto_url} fallback={seller.nome} className="w-10 h-10 shadow-sm" />
-                       <div className="min-w-0 flex-1">
-                         <p className="font-bold text-sm text-blue-900 truncate">{seller.nome}</p>
-                         <div className="flex items-center gap-1 mt-0.5">
-                           <Badge variant="outline" className="text-[9px] bg-green-50 text-green-700 border-green-200 py-0 px-1.5"><ShieldCheck className="w-2.5 h-2.5 mr-1" /> Verificado</Badge>
-                         </div>
+          {/* CARD DE VENDEDORES (Para o Dashboard Público) */}
+          <div className="card-container p-0 border-2 border-blue-500/20 overflow-hidden bg-blue-50/30">
+             <div className="p-4 bg-blue-500/10 border-b border-blue-500/20 flex items-center justify-between">
+               <h3 className="font-heading font-bold text-sm flex items-center gap-2 text-blue-800">
+                 <UserPlus className="w-4 h-4" /> Vendedores Autorizados
+               </h3>
+             </div>
+             <div className="p-4 space-y-3 max-h-[400px] overflow-y-auto custom-scrollbar">
+               {publicSellers && publicSellers.length > 0 ? (
+                 publicSellers.map((seller: any) => (
+                   <div key={seller.id} className="flex items-center gap-3 p-2 bg-white rounded-lg border border-blue-100 shadow-sm cursor-pointer hover:border-blue-300 transition-colors" onClick={() => navigate(`/vendedor/perfil/${seller.codigo_ref}`)}>
+                     <PlayerAvatar url={seller.perfis?.avatar_url || seller.cadastro?.foto_url} fallback={seller.nome} className="w-10 h-10 shadow-sm" />
+                     <div className="min-w-0 flex-1">
+                       <p className="font-bold text-sm text-blue-900 truncate">{seller.nome}</p>
+                       <div className="flex items-center gap-1 mt-0.5">
+                         <Badge variant="outline" className="text-[9px] bg-green-50 text-green-700 border-green-200 py-0 px-1.5"><ShieldCheck className="w-2.5 h-2.5 mr-1" /> Verificado</Badge>
                        </div>
                      </div>
-                   ))
-                 ) : (
-                   <p className="text-xs text-muted-foreground text-center py-4">Nenhum vendedor disponível no momento.</p>
-                 )}
-               </div>
-            </div>
+                   </div>
+                 ))
+               ) : (
+                 <p className="text-xs text-muted-foreground text-center py-4">Nenhum vendedor disponível no momento.</p>
+               )}
+             </div>
           </div>
-        )}
+        </div>
 
-        <div className={cn("space-y-8 order-1 lg:order-2", gameSettings?.auto_engine_enabled ? "lg:col-span-9" : "lg:col-span-12")}>
+        <div className={cn("space-y-8 order-1 lg:order-2", "lg:col-span-9")}>
           <section>
             <div className="flex items-center gap-2 mb-4">
               <DoorOpen className="w-5 h-5 text-accent" />

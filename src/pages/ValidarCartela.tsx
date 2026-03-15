@@ -94,18 +94,18 @@ export default function ValidarCartela() {
     const code = codigoOverride || codigoCartela;
     if (!code.trim()) { toast.error('Digite o código de validação.'); return; }
     
-    setLoadingCartela(true);
-    setBuscadoCartela(false);
+    setLoadingCartela(true); 
+    setBuscadoCartela(false); 
     setResultadoCartela(null);
     setComprovanteFile(null);
 
     const { data, error } = await supabase.from('cartelas_rifa')
-      .select('*, compras_rifa(*, rifas(nome, status, numero_ganhador), vendedores_rifa(id, nome, perfis(avatar_url))), numeros_rifa(numero, status, nome_comprador, telefone_comprador)')
+      .select('*, compras_rifa(*, rifas(nome, status, numero_ganhador), vendedores_rifa(id, nome, codigo_ref, perfis(avatar_url))), numeros_rifa(numero, status, nome_comprador, telefone_comprador)')
       .eq('codigo_validacao', code.toUpperCase().trim())
       .single();
     
-    setLoadingCartela(false);
-    setBuscadoCartela(true);
+    setLoadingCartela(false); 
+    setBuscadoCartela(true); 
     setResultadoCartela(error || !data ? null : data);
   };
 
@@ -183,7 +183,7 @@ export default function ValidarCartela() {
   const buscarNumeroRifa = async () => {
     if (!numeroRifa.trim()) { toast.error('Digite o número.'); return; }
     setLoadingRifa(true); setBuscadoRifa(false); setResultadoRifa(null);
-    let query = supabase.from('numeros_rifa').select('*, rifas(id, nome, status, numero_ganhador, custo_por_numero, data_encerramento), cartelas_rifa(compras_rifa(status)), vendedores_rifa(id, nome, perfis(avatar_url))').eq('numero', parseInt(numeroRifa)).in('status', ['reservado', 'vendido']);
+    let query = supabase.from('numeros_rifa').select('*, rifas(id, nome, status, numero_ganhador, custo_por_numero, data_encerramento), cartelas_rifa(compras_rifa(status)), vendedores_rifa(id, nome, codigo_ref, perfis(avatar_url))').eq('numero', parseInt(numeroRifa)).in('status', ['reservado', 'vendido']);
     if (rifaIdSelecionada && rifaIdSelecionada !== 'todas') query = query.eq('rifa_id', rifaIdSelecionada);
     const { data, error } = await query.limit(10);
     setLoadingRifa(false); setBuscadoRifa(true); setResultadoRifa(error || !data || data.length === 0 ? null : data);
@@ -405,7 +405,7 @@ export default function ValidarCartela() {
                              <span className="text-xs text-muted-foreground uppercase font-bold">Bilhete em posse do vendedor:</span>
                              <span className="font-semibold">{num.vendedores_rifa.nome}</span>
                            </div>
-                           <Button size="sm" variant="outline" className="text-xs h-8" onClick={() => navigate(`/vendedor-perfil/${num.vendedores_rifa.id}`)}>
+                           <Button size="sm" variant="outline" className="text-xs h-8" onClick={() => navigate(`/vendedor/perfil/${num.vendedores_rifa.codigo_ref}`)}>
                              Detalhes do vendedor
                            </Button>
                          </div>
@@ -497,7 +497,7 @@ export default function ValidarCartela() {
                              <span className="text-xs text-muted-foreground uppercase font-bold">Bilhete em posse do vendedor:</span>
                              <span className="font-semibold">{c.compras_rifa.vendedores_rifa.nome}</span>
                            </div>
-                           <Button size="sm" variant="outline" className="text-xs h-8" onClick={() => navigate(`/vendedor-perfil/${c.compras_rifa.vendedores_rifa.id}`)}>
+                           <Button size="sm" variant="outline" className="text-xs h-8" onClick={() => navigate(`/vendedor/perfil/${c.compras_rifa.vendedores_rifa.codigo_ref}`)}>
                              Detalhes do vendedor
                            </Button>
                          </div>
