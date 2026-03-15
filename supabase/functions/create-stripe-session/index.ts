@@ -8,10 +8,14 @@ const corsHeaders = {
 }
 
 serve(async (req) => {
+  console.log(`[create-stripe-session] 🟢 INÍCIO DA REQUISIÇÃO: ${req.method}`);
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders })
 
   try {
-    const { amount, type, metadata = {} } = await req.json()
+    const body = await req.json();
+    console.log("[create-stripe-session] DADOS RECEBIDOS DO APP:", body);
+
+    const { amount, type, metadata = {} } = body;
     
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -19,7 +23,6 @@ serve(async (req) => {
       { auth: { persistSession: false } }
     )
 
-    // CORREÇÃO AQUI: Usa limit(1).maybeSingle() em vez de eq('singleton', true)
     const { data: settings, error: settingsError } = await supabaseAdmin
       .from('configuracoes')
       .select('stripe_secret_key, stripe_pass_fees_to_customer, stripe_fee_percentage, stripe_fee_fixed')
@@ -55,14 +58,12 @@ serve(async (req) => {
         throw new Error("Usuário não autenticado para compra de créditos.");
     }
 
-    // Calcula o valor final com as taxas do Stripe embutidas (se o Admin ativou a função)
     let finalAmount = Number(amount);
     if (settings.stripe_pass_fees_to_customer) {
       const percentage = Number(settings.stripe_fee_percentage || 0);
       const fixed = Number(settings.stripe_fee_fixed || 0);
       finalAmount = (amount + fixed) / (1 - (percentage / 100));
       finalAmount = Math.ceil(finalAmount * 100) / 100;
-      console.log(`[create-stripe-session] Valor original: R$${amount}. Repassando taxas. Novo valor: R$${finalAmount}`);
     }
 
     console.log(`[create-stripe-session] Criando checkout - Tipo: ${type} | R$ ${finalAmount}`);
@@ -99,7 +100,7 @@ serve(async (req) => {
         ...metadata,
         user_id: user?.id || 'anonymous',
         payment_type: type,
-        original_amount: amount // Guarda o valor original para o webhook usar
+        original_amount: amount
       },
     })
 
