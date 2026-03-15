@@ -10,9 +10,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Match, MatchStatus, PlayerCard } from '@/types/match';
 import { gameTypeLabels } from '@/utils/bingoUtils';
-import { 
-  Coins, Plus, Trophy, Users, Settings, 
-  Timer, DoorOpen, Ticket, Zap, ZapOff, Tv, Archive, Trash2, RotateCcw, Star, Loader2, CalendarDays, Clock, Crown, ChevronDown, ChevronUp, Gift, BellRing, Search, SmartphoneNfc
+import {
+  Coins, Plus, Trophy, Users, Settings,
+  Timer, DoorOpen, Ticket, Zap, ZapOff, Tv, Archive, Trash2, RotateCcw, Star, Loader2, CalendarDays, Clock, Crown, ChevronDown, ChevronUp, Gift, BellRing, Search, SmartphoneNfc, UserPlus, ShieldCheck
 } from 'lucide-react';
 import PlayerAvatar from '@/components/PlayerAvatar';
 import { 
@@ -44,11 +44,12 @@ const Lobby = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { session, profile } = useAuth();
-  const { 
-    matches, joinMatch, getPlayerMatchCards, playerCards, 
+  const {
+    matches, joinMatch, getPlayerMatchCards, playerCards,
     buyCardUses, createPlayerCard, deletePlayerCard,
     toggleArchivePlayerCard, matchCards, wins, leaveMatch, gameSettings,
-    allCreditRequests, allRedeemRequests, creditRequests, redeemRequests
+    allCreditRequests, allRedeemRequests, creditRequests, redeemRequests,
+    publicSellers
   } = useGame();
   
   const { rifas } = useRifas();
@@ -265,7 +266,7 @@ const Lobby = () => {
                   <p className="text-[9px] text-muted-foreground font-mono">...{card.id.slice(-6).toUpperCase()}</p>
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
-                  <Badge variant={card.uses_left > 0 ? "success" : "destructive"} className="text-[9px] h-5 px-1.5">
+                  <Badge variant={card.uses_left > 0 ? "default" : "destructive"} className={cn("text-[9px] h-5 px-1.5", card.uses_left > 0 && "bg-success hover:bg-success/90 text-white")}>
                     {card.uses_left} uso(s)
                   </Badge>
                   <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => toggleArchivePlayerCard(card.id, !card.is_archived)}>
@@ -586,8 +587,8 @@ const Lobby = () => {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {gameSettings?.auto_engine_enabled && (
           <div className="lg:col-span-3 order-2 lg:order-1">
-            <div className="card-container p-0 border-2 border-primary/20 overflow-hidden">
-              <button 
+            <div className="card-container p-0 border-2 border-primary/20 overflow-hidden mb-6">
+              <button
                 onClick={() => setIsAgendaOpen(!isAgendaOpen)}
                 className="w-full p-4 flex items-center justify-between bg-primary/5 hover:bg-primary/10 transition-colors"
               >
@@ -612,6 +613,32 @@ const Lobby = () => {
                   ))}
                 </div>
               </div>
+            </div>
+
+            {/* CARD DE VENDEDORES (Para o Dashboard Público) */}
+            <div className="card-container p-0 border-2 border-blue-500/20 overflow-hidden bg-blue-50/30">
+               <div className="p-4 bg-blue-500/10 border-b border-blue-500/20 flex items-center justify-between">
+                 <h3 className="font-heading font-bold text-sm flex items-center gap-2 text-blue-800">
+                   <UserPlus className="w-4 h-4" /> Vendedores Autorizados
+                 </h3>
+               </div>
+               <div className="p-4 space-y-3 max-h-[400px] overflow-y-auto custom-scrollbar">
+                 {publicSellers && publicSellers.length > 0 ? (
+                   publicSellers.map((seller: any) => (
+                     <div key={seller.id} className="flex items-center gap-3 p-2 bg-white rounded-lg border border-blue-100 shadow-sm cursor-pointer hover:border-blue-300 transition-colors" onClick={() => navigate(`/vendedor-perfil/${seller.id}`)}>
+                       <PlayerAvatar url={seller.perfis?.avatar_url || seller.cadastro?.foto_url} fallback={seller.nome} className="w-10 h-10 shadow-sm" />
+                       <div className="min-w-0 flex-1">
+                         <p className="font-bold text-sm text-blue-900 truncate">{seller.nome}</p>
+                         <div className="flex items-center gap-1 mt-0.5">
+                           <Badge variant="outline" className="text-[9px] bg-green-50 text-green-700 border-green-200 py-0 px-1.5"><ShieldCheck className="w-2.5 h-2.5 mr-1" /> Verificado</Badge>
+                         </div>
+                       </div>
+                     </div>
+                   ))
+                 ) : (
+                   <p className="text-xs text-muted-foreground text-center py-4">Nenhum vendedor disponível no momento.</p>
+                 )}
+               </div>
             </div>
           </div>
         )}

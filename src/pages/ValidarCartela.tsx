@@ -80,7 +80,7 @@ export default function ValidarCartela() {
       setResultadoBingo(null);
     } else {
       const match = data.partidas;
-      const calledNumbersSet = new Set(match.called_numbers || []);
+      const calledNumbersSet = new Set<number>(match.called_numbers || []);
       const processedGrids = data.grids.map((gridMatrix: number[][], index: number) => {
         const tempCard: BingoCard = { id: `folha-${data.id}-grid-${index}`, name: `Cartela ${index + 1}`, numbers: gridMatrix, markedNumbers: calledNumbersSet };
         const winResult = checkWin(tempCard, match.game_type as any);
@@ -94,18 +94,18 @@ export default function ValidarCartela() {
     const code = codigoOverride || codigoCartela;
     if (!code.trim()) { toast.error('Digite o código de validação.'); return; }
     
-    setLoadingCartela(true); 
-    setBuscadoCartela(false); 
+    setLoadingCartela(true);
+    setBuscadoCartela(false);
     setResultadoCartela(null);
     setComprovanteFile(null);
 
     const { data, error } = await supabase.from('cartelas_rifa')
-      .select('*, compras_rifa(*, rifas(nome, status, numero_ganhador)), numeros_rifa(numero, status, nome_comprador, telefone_comprador)')
+      .select('*, compras_rifa(*, rifas(nome, status, numero_ganhador), vendedores_rifa(id, nome, perfis(avatar_url))), numeros_rifa(numero, status, nome_comprador, telefone_comprador)')
       .eq('codigo_validacao', code.toUpperCase().trim())
       .single();
     
-    setLoadingCartela(false); 
-    setBuscadoCartela(true); 
+    setLoadingCartela(false);
+    setBuscadoCartela(true);
     setResultadoCartela(error || !data ? null : data);
   };
 
@@ -183,7 +183,7 @@ export default function ValidarCartela() {
   const buscarNumeroRifa = async () => {
     if (!numeroRifa.trim()) { toast.error('Digite o número.'); return; }
     setLoadingRifa(true); setBuscadoRifa(false); setResultadoRifa(null);
-    let query = supabase.from('numeros_rifa').select('*, rifas(id, nome, status, numero_ganhador, custo_por_numero, data_encerramento), cartelas_rifa(compras_rifa(status))').eq('numero', parseInt(numeroRifa)).in('status', ['reservado', 'vendido']);
+    let query = supabase.from('numeros_rifa').select('*, rifas(id, nome, status, numero_ganhador, custo_por_numero, data_encerramento), cartelas_rifa(compras_rifa(status)), vendedores_rifa(id, nome, perfis(avatar_url))').eq('numero', parseInt(numeroRifa)).in('status', ['reservado', 'vendido']);
     if (rifaIdSelecionada && rifaIdSelecionada !== 'todas') query = query.eq('rifa_id', rifaIdSelecionada);
     const { data, error } = await query.limit(10);
     setLoadingRifa(false); setBuscadoRifa(true); setResultadoRifa(error || !data || data.length === 0 ? null : data);
@@ -395,10 +395,21 @@ export default function ValidarCartela() {
                            <p className={`text-4xl font-black font-heading ${isGanhador ? 'text-success' : 'text-foreground'}`}>{String(num.numero).padStart(3, '0')}</p>
                          </div>
                        </div>
-                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm relative z-20">
-                         <div className="space-y-1"><p className="text-xs text-muted-foreground font-bold uppercase">Comprador</p><p className="font-semibold text-base">{num.nome_comprador || 'Nome não registrado'}</p></div>
+                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm relative z-20 mb-4">
+                         <div className="space-y-1"><p className="text-xs text-muted-foreground font-bold uppercase">Comprador</p><p className="font-semibold text-base">{num.nome_comprador ? <span className="bg-primary text-primary-foreground px-1.5 py-0.5 rounded text-sm">{num.nome_comprador}</span> : <span className="bg-blue-600 text-white px-1.5 py-0.5 rounded text-sm">Nome não registrado</span>}</p></div>
                          <div className="space-y-1"><p className="text-xs text-muted-foreground font-bold uppercase">Situação Financeira</p><p className="font-semibold flex items-center gap-1.5">{isPago ? <Badge className="bg-success text-white border-none">PAGO</Badge> : <Badge variant="outline" className="text-amber-600 border-amber-400 bg-amber-100">AGUARDANDO PAGAMENTO</Badge>}</p></div>
                        </div>
+                       {num.vendedores_rifa && (
+                         <div className="pt-4 border-t border-border/40 flex items-center justify-between">
+                           <div className="flex flex-col">
+                             <span className="text-xs text-muted-foreground uppercase font-bold">Bilhete em posse do vendedor:</span>
+                             <span className="font-semibold">{num.vendedores_rifa.nome}</span>
+                           </div>
+                           <Button size="sm" variant="outline" className="text-xs h-8" onClick={() => navigate(`/vendedor-perfil/${num.vendedores_rifa.id}`)}>
+                             Detalhes do vendedor
+                           </Button>
+                         </div>
+                       )}
                      </div>
                    );
                  })}
@@ -475,10 +486,22 @@ export default function ValidarCartela() {
                           <p className={`text-4xl font-black font-heading ${isGanhador ? 'text-success' : 'text-foreground'}`}>{String(c.numeros_rifa?.numero).padStart(3, '0')}</p>
                         </div>
                       </div>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm relative z-20">
-                        <div className="space-y-1"><p className="text-xs text-muted-foreground font-bold uppercase">Comprador</p><p className="font-semibold text-base">{c.numeros_rifa?.nome_comprador || 'Nome não registrado'}</p></div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm relative z-20 mb-4">
+                        <div className="space-y-1"><p className="text-xs text-muted-foreground font-bold uppercase">Comprador</p><p className="font-semibold text-base">{c.numeros_rifa?.nome_comprador ? <span className="bg-primary text-primary-foreground px-1.5 py-0.5 rounded text-sm">{c.numeros_rifa?.nome_comprador}</span> : <span className="bg-blue-600 text-white px-1.5 py-0.5 rounded text-sm">Nome não registrado</span>}</p></div>
                         <div className="space-y-1"><p className="text-xs text-muted-foreground font-bold uppercase">Situação Financeira</p><p className="font-semibold flex items-center gap-1.5"><Badge className="bg-success text-white border-none">PAGO E HABILITADO</Badge></p></div>
                       </div>
+                      
+                      {c.compras_rifa?.vendedores_rifa && (
+                         <div className="pt-4 border-t border-border/40 flex items-center justify-between">
+                           <div className="flex flex-col">
+                             <span className="text-xs text-muted-foreground uppercase font-bold">Bilhete em posse do vendedor:</span>
+                             <span className="font-semibold">{c.compras_rifa.vendedores_rifa.nome}</span>
+                           </div>
+                           <Button size="sm" variant="outline" className="text-xs h-8" onClick={() => navigate(`/vendedor-perfil/${c.compras_rifa.vendedores_rifa.id}`)}>
+                             Detalhes do vendedor
+                           </Button>
+                         </div>
+                      )}
                     </div>
                   )}
                  </div>

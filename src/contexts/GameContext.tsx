@@ -20,6 +20,7 @@ type GameContextType =
   {
     wins: Win[];
     allWins: Win[];
+    publicSellers: any[] | null;
   };
 
 const GameContext = createContext<GameContextType | null>(null);
@@ -77,6 +78,37 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => { supabase.removeChannel(channel); };
   }, [queryClient]);
 
+  // Buscar Vendedores Públicos (Ativos)
+  const { data: publicSellers = [] } = useQuery({
+    queryKey: ['publicSellers'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('vendedores_rifa')
+        .select('*, perfis:user_id(avatar_url)')
+        .eq('ativo', true)
+        .order('nome');
+        
+      if (error) {
+        console.error("Erro ao buscar vendedores", error);
+        return [];
+      }
+
+      // Buscar os cadastros separadamente para juntar e contornar problemas de foreign key ambígua
+      const userIds = data.map(v => v.user_id).filter(Boolean);
+      let cadastrosData: any[] = [];
+      
+      if (userIds.length > 0) {
+        const { data: cad } = await supabase.from('cadastro_vendedor').select('user_id, foto_url').in('user_id', userIds);
+        if (cad) cadastrosData = cad;
+      }
+
+      return data.map(v => ({
+        ...v,
+        cadastro: cadastrosData.find(c => c.user_id === v.user_id) || null
+      }));
+    }
+  });
+
   const value = {
     ...gameSettingsHook,
     ...matchesHook,
@@ -86,6 +118,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     ...adminDataHook,
     wins,
     allWins: adminDataHook.allWins,
+    publicSellers,
   };
 
   return (
