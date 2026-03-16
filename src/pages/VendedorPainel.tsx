@@ -1169,7 +1169,9 @@ const VendedorPainel = () => {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Repassar Valor ao Sistema</DialogTitle>
-            <DialogDescription className="sr-only">Faça o upload do seu comprovante de PIX.</DialogDescription>
+            <DialogDescription>
+              Faça o PIX para a chave do administrador e anexe o comprovante para validar o pagamento.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="p-4 bg-muted rounded-xl text-center space-y-2">
@@ -1207,6 +1209,9 @@ const VendedorPainel = () => {
         <DialogContent>
             <DialogHeader>
                 <DialogTitle>Pagar Acerto com Saldo</DialogTitle>
+                <DialogDescription>
+                    Confirme o pagamento do acerto utilizando seu saldo de créditos disponível.
+                </DialogDescription>
             </DialogHeader>
             <div className="py-4 space-y-4">
                 <p className="text-sm text-muted-foreground">
