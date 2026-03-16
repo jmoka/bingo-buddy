@@ -145,6 +145,31 @@ export const useVendedor = () => {
     }
   };
 
+  const pagarAcertoComSaldo = async (bingoIds: string[], rifaIds: string[]): Promise<boolean> => {
+    if (!user) return false;
+    const { data, error } = await supabase.rpc('pagar_acerto_com_saldo', {
+      p_bingo_ids: bingoIds,
+      p_rifa_ids: rifaIds,
+    });
+
+    if (error || !data?.success) {
+      if (data?.error === 'insufficient_credits') toast.error('Saldo de créditos insuficiente para pagar este acerto.');
+      else toast.error('Erro ao processar pagamento com saldo.', { description: error?.message || data?.error });
+      return false;
+    }
+
+    toast.success(`Acerto pago com seu saldo!`, {
+      description: `Você recebeu R$ ${Number(data.comissao_recebida || 0).toFixed(2)} de comissão.`
+    });
+    
+    queryClient.invalidateQueries({ queryKey: ['meusAcertosVendedor'] });
+    queryClient.invalidateQueries({ queryKey: ['folhasBingoFisico'] });
+    queryClient.invalidateQueries({ queryKey: ['minhasVendasVendedor'] });
+    queryClient.invalidateQueries({ queryKey: ['profile'] });
+    queryClient.invalidateQueries({ queryKey: ['gameSettings'] }); // admin_profit changes
+    return true;
+  };
+
   const pagarComprasComSaldo = async (compraIds: string[]): Promise<boolean> => {
     if (!user) return false;
     const { data, error } = await supabase.rpc('pagar_compras_saldo', {
@@ -245,6 +270,7 @@ export const useVendedor = () => {
     validarMultiplasVendas,
     gerarLink,
     enviarAcerto,
+    pagarAcertoComSaldo,
     pagarComprasComSaldo,
   };
 };

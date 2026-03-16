@@ -27,7 +27,7 @@ const VendedorPainel = () => {
   const navigate = useNavigate();
   const { profile } = useAuth();
   
-  const { meuVendedor, minhasReservas, minhasVendas, meusAcertos, isLoading, reservarNumeros, cancelarReserva, validarMultiplasVendas, enviarAcerto, pagarComprasComSaldo } = useVendedor();
+  const { meuVendedor, minhasReservas, minhasVendas, meusAcertos, isLoading, reservarNumeros, cancelarReserva, validarMultiplasVendas, enviarAcerto, pagarAcertoComSaldo, pagarComprasComSaldo } = useVendedor();
   const { rifas, getNumerosRifa } = useRifas();
   
   const { matches, gameSettings } = useGame();
@@ -73,6 +73,9 @@ const VendedorPainel = () => {
   const [acertoFile, setAcertoFile] = useState<File | null>(null);
   const [isEnviandoAcerto, setIsEnviandoAcerto] = useState(false);
   const acertoFileRef = useRef<HTMLInputElement>(null);
+
+  const [pagarComSaldoOpen, setPagarComSaldoOpen] = useState(false);
+  const [isPagandoComSaldo, setIsPagandoComSaldo] = useState(false);
 
   const [selectedAcertosBingo, setSelectedAcertosBingo] = useState<Set<string>>(new Set());
   const [selectedAcertosRifa, setSelectedAcertosRifa] = useState<Set<string>>(new Set());
@@ -333,6 +336,19 @@ const VendedorPainel = () => {
     }
   };
 
+  const handlePagarComSaldo = async () => {
+    setIsPagandoComSaldo(true);
+    const bingoIds = selectedFaturas.bingo.items.map(f => f.id);
+    const rifaIds = selectedFaturas.rifa.items.map(r => r.id);
+    const ok = await pagarAcertoComSaldo(bingoIds, rifaIds);
+    setIsPagandoComSaldo(false);
+    if (ok) {
+        setPagarComSaldoOpen(false);
+        setSelectedAcertosBingo(new Set());
+        setSelectedAcertosRifa(new Set());
+    }
+  };
+
   const handleSelectAllFolhas = (checked: boolean) => {
     const newSet = new Set(selectedFolhas);
     if (checked) {
@@ -387,6 +403,7 @@ const VendedorPainel = () => {
 
   const showBingoSection = acertoTipoFilter !== 'rifa' && filteredPendingFolhas.length > 0;
   const showRifaSection = acertoTipoFilter !== 'bingo' && filteredPendingVendas.length > 0;
+  const saldoSuficiente = (profile?.credits || 0) >= selectedFaturas.geral.bruto;
 
   return (
     <div className="space-y-6">
@@ -830,22 +847,37 @@ const VendedorPainel = () => {
                   </div>
                 )}
                 
-                <div className="flex flex-col sm:flex-row items-center justify-between p-4 bg-amber-100 dark:bg-amber-900/20 border-2 border-amber-400 rounded-xl mt-6 gap-4">
-                    <div className="text-center sm:text-left">
-                        <p className="text-sm font-bold text-amber-800 dark:text-amber-500 uppercase tracking-widest flex items-center justify-center sm:justify-start gap-2">
-                            <BadgePercent className="w-5 h-5" /> REPASSE SELECIONADO
-                        </p>
-                        <p className="text-xs text-amber-700/80 mt-1">Ao quitar este valor (bruto), você receberá <strong>{comissaoAtiva}%</strong> de comissão no saldo do App.</p>
-                    </div>
-                    <div className="flex flex-col items-center sm:items-end gap-2 w-full sm:w-auto">
-                        <p className="text-3xl font-black font-heading text-amber-700 dark:text-amber-400">R$ {selectedFaturas.geral.bruto.toFixed(2).replace('.', ',')}</p>
-                        {selectedFaturas.geral.bruto > 0 && (
-                            <Button className="bg-amber-600 hover:bg-amber-700 text-white shadow-sm font-bold animate-pulse w-full sm:w-auto" onClick={() => setPagarAcertoOpen(true)} size="lg">
-                                Pagar R$ {selectedFaturas.geral.bruto.toFixed(2)}
-                            </Button>
-                        )}
-                    </div>
-                </div>
+                {selectedFaturas.geral.bruto > 0 && (
+                  <div className="flex flex-col sm:flex-row items-center justify-between p-4 bg-amber-100 dark:bg-amber-900/20 border-2 border-amber-400 rounded-xl mt-6 gap-4">
+                      <div className="text-center sm:text-left">
+                          <p className="text-sm font-bold text-amber-800 dark:text-amber-500 uppercase tracking-widest flex items-center justify-center sm:justify-start gap-2">
+                              <BadgePercent className="w-5 h-5" /> REPASSE SELECIONADO
+                          </p>
+                          <p className="text-xs text-amber-700/80 mt-1">Ao quitar este valor (bruto), você receberá <strong>{comissaoAtiva}%</strong> de comissão no saldo do App.</p>
+                      </div>
+                      <div className="flex flex-col items-center sm:items-end gap-2 w-full sm:w-auto">
+                          <p className="text-3xl font-black font-heading text-amber-700 dark:text-amber-400">R$ {selectedFaturas.geral.bruto.toFixed(2).replace('.', ',')}</p>
+                          <div className="flex flex-col sm:flex-row gap-2 w-full">
+                              <Button 
+                                  className="bg-amber-600 hover:bg-amber-700 text-white shadow-sm font-bold" 
+                                  onClick={() => setPagarAcertoOpen(true)}
+                              >
+                                  Pagar com PIX
+                              </Button>
+                              <Button 
+                                  variant="outline"
+                                  className="border-primary/30 text-primary hover:bg-primary/10 font-bold"
+                                  onClick={() => setPagarComSaldoOpen(true)}
+                                  disabled={!saldoSuficiente}
+                                  title={!saldoSuficiente ? `Saldo insuficiente. Você tem ${profile?.credits.toFixed(2)} cr.` : `Pagar com seu saldo de ${profile?.credits.toFixed(2)} cr.`}
+                              >
+                                  <WalletCards className="w-4 h-4 mr-2" />
+                                  Pagar com Saldo
+                              </Button>
+                          </div>
+                      </div>
+                  </div>
+                )}
               </div>
             )}
 
@@ -1150,7 +1182,7 @@ const VendedorPainel = () => {
                 <Label>Chave PIX do Admin</Label>
                 <div className="flex gap-2">
                   <Input value={gameSettings.pix_key} readOnly className="font-mono bg-muted font-bold" />
-                  <Button variant="outline" onClick={() => { navigator.clipboard.writeText(gameSettings.pix_key || ''); toast.success('Copiado'); }}><Copy className="w-4 h-4" /></Button>
+                  <Button variant="outline" onClick={() => { navigator.clipboard.writeText(gameSettings.pix_key || ''); toast.success('Copiado!'); }}><Copy className="w-4 h-4" /></Button>
                 </div>
               </div>
             )}
@@ -1168,6 +1200,41 @@ const VendedorPainel = () => {
               {isEnviandoAcerto ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <CheckSquare className="w-4 h-4 mr-2" />} Enviar para Análise
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={pagarComSaldoOpen} onOpenChange={setPagarComSaldoOpen}>
+        <DialogContent>
+            <DialogHeader>
+                <DialogTitle>Pagar Acerto com Saldo</DialogTitle>
+            </DialogHeader>
+            <div className="py-4 space-y-4">
+                <p className="text-sm text-muted-foreground">
+                    Você está prestes a quitar o valor de <strong>R$ {selectedFaturas.geral.bruto.toFixed(2)}</strong> usando seu saldo de créditos.
+                </p>
+                <div className="p-3 bg-muted rounded-lg border text-center">
+                    <p className="text-xs text-muted-foreground">Seu saldo atual</p>
+                    <p className="text-lg font-bold">{profile?.credits.toFixed(2)} cr.</p>
+                    <p className="text-xs text-destructive">- {selectedFaturas.geral.bruto.toFixed(2)} cr.</p>
+                    <hr className="my-2" />
+                    <p className="text-xs text-muted-foreground">Saldo após pagamento</p>
+                    <p className="text-lg font-bold text-primary">{( (profile?.credits || 0) - selectedFaturas.geral.bruto ).toFixed(2)} cr.</p>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                    Após a confirmação, sua comissão de <strong>{comissaoAtiva}%</strong> (R$ {(selectedFaturas.geral.bruto * (comissaoAtiva / 100)).toFixed(2)}) será creditada de volta na sua conta.
+                </p>
+            </div>
+            <DialogFooter>
+                <Button variant="ghost" onClick={() => setPagarComSaldoOpen(false)}>Cancelar</Button>
+                <Button 
+                    onClick={handlePagarComSaldo} 
+                    disabled={isPagandoComSaldo}
+                    className="bg-primary text-primary-foreground"
+                >
+                    {isPagandoComSaldo ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <WalletCards className="w-4 h-4 mr-2" />}
+                    Confirmar Pagamento
+                </Button>
+            </DialogFooter>
         </DialogContent>
       </Dialog>
 
