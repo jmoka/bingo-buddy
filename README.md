@@ -1,91 +1,173 @@
-# Bingo App - Documentação Técnica Completa
+# 🎱 Bingo Show de Prêmios - Documentação Técnica
 
-## 1. Visão Geral do Sistema 6.5
+Bem-vindo à documentação técnica completa do **Bingo Show de Prêmios**, uma plataforma web _real-time_ e multi-tenant para gerenciamento e execução de jogos de bingo e rifas online.
 
-- correção o layout dos botões do painel dos vendedores e jogadores
-criar credito strip para registrar os valores recebidos no strip
+Este sistema foi projetado para ser uma solução robusta e escalável, permitindo que múltiplos administradores (operadores de bingo) gerenciem seus próprios ecossistemas de jogadores, vendedores e finanças de forma isolada e segura.
 
-0- configurar as key
-1- Ativar a opção
-2- Configurar as taxas
-3- Abrir o checkout
-4- realizar o pagamento
-5- receber o pagamento(strip)
-6- creditar o valor no credito strip
-7- opão:
+## ✨ Funcionalidades Principais
 
-- credito do cliente compra de credito( credita para o usuario / vendedor e credito escrip)
-*-compra de rifa direta (paga a rifa e credita o valor no strip)
-- compra de bingo direta(paga a rifa e credita o valor no strip)
-tem que esta logado
+O sistema é dividido em três personas principais, cada uma com um conjunto rico de funcionalidades.
 
-8- compra do bingo e rifa cartela fisica
+### 👨‍💻 Para Administradores (Operadores)
 
-- o usuario ao realizar a compra o estrip confirmou:
--- creditrar o valor para os creditos strip admin
--- creditar para o vendedor o a comissão
--- usuario paga a cartela
--- após pagar e realizar toda a operação pedir para o usuario validar com os dados do comprador nome , cpf telefone e endereço( os seus propios dados )
-sem logar
+-   **Painel de Controle Multi-Tenant:** Gestão completa de partidas, rifas, jogadores, vendedores e finanças, com dados isolados por administrador.
+-   **Gestão Financeira:** Aprovação de entradas de caixa (PIX de jogadores, acertos de vendedores) e processamento de saídas (resgates de prêmios).
+-   **Motor de Automação:** Configuração de um "piloto automático" para criar e iniciar partidas de bingo em horários pré-definidos, garantindo um lobby sempre ativo.
+-   **Sistema de Vendedores:** Aprovação de cadastros, definição de comissões/descontos e acompanhamento de vendas físicas e online.
+-   **Caixa do Admin:** Acompanhamento de lucro acumulado e funcionalidade para realizar retiradas.
 
-Este documento fornece uma análise técnica detalhada do Bingo App. O sistema é uma aplicação web real-time para jogos de bingo, com gerenciamento de partidas, jogadores, cartelas e um sistema financeiro robusto baseado em **créditos decimais**.
+### 🏪 Para Vendedores
 
-## 2. Funcionalidades Principais..
+-   **Painel Dedicado:** Visão geral de vendas, comissões e dívidas (fiado).
+-   **Venda Física e Híbrida:** Emissão de bilhetes de bingo e rifas para impressão, com QR Codes para validação e pagamento online pelo cliente.
+-   **Gestão de Fiado:** Sistema para registrar vendas "fiadas" e realizar o acerto financeiro posteriormente via PIX ou com o saldo em conta.
+-   **Links de Indicação:** Geração de links de venda personalizados que garantem comissão automática em compras online.
+-   **Perfil Público:** Página de perfil verificada para que clientes possam confirmar a autenticidade do vendedor.
 
-### Para Jogadores
--   **Lobby de Partidas:** Visualização de partidas em tempo real (Ao Vivo, Abertas, Agendadas e Finalizadas).
--   **Hall da Fama (Ranking):** Sistema de classificação que destaca os maiores vencedores da plataforma.
--   **Gerenciamento de Cartelas:** Criação de cartelas (Manual ou Aleatória) com suporte a créditos Reais ou de Brincar.
--   **Sistema de Créditos Decimais:** Compra e resgate de créditos com precisão de centavos (ex: 10.50 cr).
--   **Jogo em Tempo Real:** Marcação automática de números e detecção instantânea de vencedores.
--   **Agenda de Partidas:** Visualização dos próximos horários cravados baseados no motor automático.
+### 🎮 Para Jogadores
 
-### Para Administradores
--   **Painel de Controle:** Gestão de partidas, usuários e configurações globais.
--   **Gestão Financeira:** Aprovação de entradas (PIX) e processamento de saídas (Resgates) com chat integrado.
--   **Motor Automático:** Configuração de intervalos, preços e prêmios decimais para automação total do lobby.
--   **Caixa do Admin:** Acompanhamento de lucro acumulado e realização de retiradas.
+-   **Lobby Real-Time:** Visualização de partidas (Ao Vivo, Abertas, Agendadas) com atualização em tempo real.
+-   **Hall da Fama (Ranking):** Tabela de classificação que exibe os maiores vencedores da plataforma.
+-   **Gerenciamento de Cartelas:** Criação de cartelas personalizadas (manuais ou aleatórias).
+-   **Sistema de Créditos Decimais:** Suporte a créditos "Reais" (comprados) e "de Brincar" (gratuitos), com precisão de centavos.
+-   **Gameplay Interativo:** Marcação automática ou manual de números e detecção instantânea de "BINGO!".
+-   **Histórico Pessoal:** Área para acompanhar vitórias, solicitações de crédito e resgates.
 
-## 3. Arquitetura e Tecnologias
+## 🛠️ Arquitetura e Stack Tecnológica
 
--   **Frontend:** React, Vite, TypeScript, Tailwind CSS.
--   **Estado & Cache:** TanStack Query (React Query) para sincronização de dados.
--   **Backend:** Supabase (PostgreSQL, Auth, Edge Functions, Realtime).
--   **Precisão Numérica:** Uso do tipo `numeric` no banco de dados e `Number` no JavaScript para evitar erros de arredondamento.
+| Categoria          | Tecnologia                                                                                             |
+| ------------------ | ------------------------------------------------------------------------------------------------------ |
+| **Frontend**       | [React](https://react.dev/), [Vite](https://vitejs.dev/), [TypeScript](https://www.typescriptlang.org/) |
+| **UI & Estilização** | [Tailwind CSS](https://tailwindcss.com/), [shadcn/ui](https://ui.shadcn.com/)                           |
+| **Estado & Cache**   | [TanStack Query](https://tanstack.com/query) (Server State), React Context (Client State)              |
+| **Roteamento**       | [React Router](https://reactrouter.com/)                                                               |
+| **Formulários**      | [React Hook Form](https://react-hook-form.com/) + [Zod](https://zod.dev/)                                |
+| **Backend**        | [Supabase](https://supabase.com/) (PostgreSQL, Auth, Edge Functions, Realtime, Storage)                |
 
-## 4. Funcionamento Detalhado
+## 🗃️ Modelo de Dados (Schema PostgreSQL)
 
-### 4.1. Banco de Dados (Schema `public`)
+O banco de dados é o coração do sistema. Todas as colunas financeiras utilizam o tipo `numeric` para garantir precisão decimal. A segurança é garantida por políticas de **Row Level Security (RLS)** em todas as tabelas críticas.
 
-Todas as colunas financeiras utilizam `numeric(10,2)` para suportar casas decimais:
+### Entidades Principais
 
--   **`perfis`**: `credits` (saldo real) e `fake_credits` (saldo de brincar).
--   **`configuracoes`**: Custos globais, lucro do admin e parâmetros do motor automático.
--   **`partidas`**: Preço da cartela, pote acumulado e lucro gerado por partida.
--   **`vitorias`**: Registro histórico de cada bingo realizado, utilizado para gerar o **Ranking**.
+| Tabela                 | Descrição                                                                                                                            |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `perfis`               | Armazena dados de todos os usuários (jogadores, vendedores, admins). Contém os saldos `credits` e `fake_credits`.                      |
+| `partidas`             | Define as partidas de bingo, incluindo tipo, preço, prêmio, status e números sorteados (`called_numbers`).                            |
+| `cartelas_jogador`     | As cartelas "mestras" que um jogador possui em sua conta, com os números e usos restantes (`uses_left`).                               |
+| `cartelas_partida`     | Uma "cópia" de uma `cartelas_jogador` quando ela é usada para entrar em uma `partida` específica. Armazena os números marcados.        |
+| `configuracoes`        | Tabela singleton que armazena todas as configurações globais do sistema, incluindo o lucro do admin (`admin_profit`).                  |
+| `vitorias`             | Registro histórico de cada vitória, usado para alimentar o Hall da Fama e o perfil do jogador.                                       |
 
-### 4.2. Lógica de Negócio (Edge Functions)
+### Módulo de Vendedores e Vendas Físicas
 
--   **`call-number`**: Processa o sorteio, marca cartelas, verifica vencedores e distribui prêmios.
--   **`auto-match-engine`**: Cria partidas em slots de tempo fixos respeitando a agenda configurada.
--   **`join-match` / `leave-match`**: Gerencia a entrada e saída de jogadores com estorno exato.
+| Tabela                  | Descrição                                                                                                                            |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `vendedores_rifa`       | Perfil oficial do vendedor, contendo taxas de comissão/desconto e o código de referência (`codigo_ref`).                               |
+| `solicitacoes_vendedor` | Registra os pedidos de usuários para se tornarem vendedores, aguardando aprovação do admin.                                          |
+| `vendas_bingo_fisico`   | Armazena cada "folha" de bingo impressa por um vendedor, com seus grids, código de validação e status de pagamento.                   |
+| `compras_rifa`          | Similar ao anterior, mas para cotas de rifas vendidas por vendedores.                                                                |
+| `acertos_vendedor`      | Registra as transações de "acerto de contas", onde o vendedor repassa o dinheiro das vendas (fiado) para o admin.                      |
+
+### Módulo Financeiro
+
+| Tabela                 | Descrição                                                                                                                            |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `solicitacoes_credito` | Pedidos de compra de créditos feitos por jogadores via PIX, aguardando aprovação do admin.                                           |
+| `solicitacoes_resgate` | Pedidos de jogadores para converter seus créditos em dinheiro (saque), aguardando pagamento do admin.                                |
+| `mensagens_solicitacao` | Sistema de chat vinculado a cada solicitação de crédito para comunicação entre jogador e admin.                                      |
+| `stripe_payments`      | Log de todas as transações processadas via Stripe para auditoria e prevenção de duplicidade.                                         |
+
+## 🔐 Modelo de Segurança (Row Level Security)
+
+A segurança e o isolamento de dados são pilares da arquitetura, garantidos por políticas RLS.
+
+-   **Isolamento de Usuário:** A política mais comum garante que um usuário só possa ver e modificar seus próprios dados.
+    ```sql
+    -- Exemplo: Usuários só podem ver suas próprias cartelas.
+    CREATE POLICY "Users can manage their own cards"
+    ON public.cartelas_jogador FOR ALL
+    USING (auth.uid() = player_id);
+    ```
+-   **Isolamento de Tenant (Multi-Tenant):** A coluna `admins_id` está presente em quase todas as tabelas. As políticas de RLS para administradores garantem que um admin só possa acessar os dados pertencentes ao seu "tenant".
+    ```sql
+    -- Exemplo: Admins só podem ver partidas que eles criaram.
+    CREATE POLICY "Admins view own matches"
+    ON public.partidas FOR SELECT
+    USING (is_admin() AND admin_id = auth.uid());
+    ```
+-   **Acesso Público Controlado:** Dados que precisam ser públicos, como partidas no lobby, possuem políticas explícitas para `SELECT`.
+    ```sql
+    -- Exemplo: Qualquer pessoa (logada ou não) pode ver as partidas.
+    CREATE POLICY "Anon read partidas"
+    ON public.partidas FOR SELECT
+    USING (true);
+    ```
+
+## ⚙️ Lógica de Backend (RPCs & Edge Functions)
+
+A lógica de negócio complexa é encapsulada em Funções PostgreSQL (acessíveis via RPC) e Deno Edge Functions.
+
+### Funções PostgreSQL (RPC)
+
+-   `pagar_acerto_com_saldo()`: Processa o pagamento de dívidas de um vendedor usando seu próprio saldo de créditos, calculando e creditando a comissão automaticamente.
+-   `reservar_numeros_vendedor()`: Gerencia a venda de cotas de rifa por vendedores, aplicando descontos e tratando pagamentos (à vista ou fiado).
+-   `call-number()`: **O coração do jogo.** Sorteia um número, marca automaticamente as cartelas (`mark_number_for_match_cards`), verifica se há vencedores, e se houver, finaliza a partida e distribui os prêmios.
+-   `join-match()` / `leave-match()`: Funções seguras que gerenciam a entrada e saída de jogadores, realizando as transações de crédito e estorno de forma atômica.
+
+### Deno Edge Functions (Automação)
+
+As Edge Functions são usadas para tarefas assíncronas e agendadas (cron jobs).
+
+-   **`auto-match-engine`**: Executado a cada X minutos, verifica a agenda configurada pelo admin e cria novas partidas de bingo automaticamente para preencher os "slots" de horários vagos.
+-   **`auto-call-engine`**: Executado a cada minuto, este motor verifica:
+    1.  Partidas automáticas cujo horário de início já passou e as inicia.
+    2.  Partidas em andamento que precisam de um novo número sorteado.
+    3.  Se o lobby de partidas automáticas está vazio, ele força a criação de uma nova para garantir atividade contínua.
+-   **`stripe-webhook`**: Endpoint seguro para receber eventos do Stripe, processar pagamentos e liberar créditos ou validar cartelas automaticamente.
+
+## 🚀 Estrutura do Projeto
+
+```
+/
+├── supabase/                # Configurações e scripts do Supabase
+│   ├── functions/           # Código das Deno Edge Functions
+│   └── migrations/          # Migrações do schema do banco de dados
+└── src/                     # Código-fonte do frontend React
+    ├── components/          # Componentes reutilizáveis (incluindo /ui para shadcn)
+    ├── contexts/            # Provedores de Contexto (AuthContext, GameContext)
+    ├── hooks/               # Hooks customizados para lógica de negócio e data fetching
+    ├── integrations/        # Configuração de clientes de serviços (Supabase)
+    ├── pages/               # Componentes de página (rotas)
+    ├── types/               # Definições de tipos TypeScript
+    └── utils/               # Funções utilitárias
+```
+
+## 🏁 Como Executar Localmente
+
+1.  **Clone o repositório:**
+    ```bash
+    git clone <repository-url>
+    ```
+2.  **Instale as dependências:**
+    ```bash
+    npm install
+    ```
+3.  **Inicie o ambiente Supabase:**
+    (Requer [Supabase CLI](https://supabase.com/docs/guides/cli))
+    ```bash
+    supabase start
+    ```
+    Isso iniciará um container Docker com o banco de dados, Auth e outros serviços. As credenciais serão exibidas no terminal.
+4.  **Aplique as migrações:**
+    ```bash
+    supabase db reset
+    ```
+5.  **Inicie o servidor de desenvolvimento:**
+    ```bash
+    npm run dev
+    ```
+    A aplicação estará disponível em `http://localhost:8080`.
 
 ---
-
-## 5. Evolução Recente
-
-### Versão 1.1: Gamificação e Engajamento
--   Implementação do **Hall da Fama**: Uma página dedicada a listar os jogadores com mais vitórias, incentivando a competição saudável.
--   Integração do Ranking no Lobby e Menu Lateral para acesso rápido.
-
-### Versão 1.0: Créditos Decimais
--   Migração completa de números inteiros para decimais em todo o ecossistema financeiro do app.
--   Adição de suporte a "Créditos de Brincar" com botão de recarga gratuita para testes e diversão.
-
----
-
-## 6. Próximos Passos e Melhorias
-
--   **Otimização de Realtime**: Refinar as inscrições de canais do Supabase para reduzir o tráfego.
--   **Relatórios Avançados**: Criação de gráficos de lucro e volume de apostas no painel administrativo.
--   **Notificações Push**: Avisar jogadores quando uma partida automática estiver prestes a começar.
+*Este documento foi gerado para fornecer uma visão técnica aprofundada do sistema. Para mais detalhes sobre uma funcionalidade específica, consulte o código-fonte nos hooks e componentes relevantes.*
