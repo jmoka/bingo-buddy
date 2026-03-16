@@ -83,7 +83,7 @@ export function MatchDetailsModal({ match, onClose }: Props) {
 
   return (
     <Dialog open={!!match} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-muted/10">
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-card">
         <DialogHeader>
           <DialogTitle className="text-2xl font-heading flex items-center gap-2">
             Raio-X da Partida: {match.name}
