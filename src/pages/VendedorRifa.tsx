@@ -225,9 +225,18 @@ export default function VendedorRifaPage() {
                         <span className="text-sm font-medium">
                           Números: {c.numeros.join(', ')}
                         </span>
-                        <span className="font-semibold text-green-600">
-                          R$ {c.valor_total.toFixed(2)}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold text-green-600">
+                            R$ {c.valor_total.toFixed(2)}
+                          </span>
+                          <Button 
+                            variant="outline" 
+                            size="icon" 
+                            onClick={() => navigate(`/vendedor/imprimir-rifa/${c.id}`)}
+                          >
+                            <Printer className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </div>
                       <p className="text-xs text-muted-foreground">
                         {new Date(c.created_at).toLocaleString('pt-BR')}

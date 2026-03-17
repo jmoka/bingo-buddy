@@ -34,6 +34,7 @@ import VendedorPainel from "./pages/VendedorPainel";
 import VendedoresAdmin from "./pages/admin/VendedoresAdmin";
 import VendedorPerfilPublico from "./pages/VendedorPerfilPublico";
 import VendedorImprimirBingo from "./pages/VendedorImprimirBingo";
+import VendedorImprimirRifa from "./pages/VendedorImprimirRifa";
 import PagarCartela from "./pages/PagarCartela";
 import LandingPage from "./pages/Landing";
 import { Loader2 } from "lucide-react";
@@ -127,6 +128,7 @@ const App = () => (
               <Route path="/solicitar-vendedor" element={<ProtectedRoute><SolicitarVendedor /></ProtectedRoute>} />
               <Route path="/admin/vendedores" element={<ProtectedRoute><VendedoresAdmin /></ProtectedRoute>} />
               <Route path="/vendedor/imprimir-bingo/:folhaId" element={<ProtectedRoute><VendedorImprimirBingo /></ProtectedRoute>} />
+              <Route path="/vendedor/imprimir-rifa/:compraId" element={<ProtectedRoute><VendedorImprimirRifa /></ProtectedRoute>} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </GameProvider>
