@@ -17,14 +17,17 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import {
   ArrowLeft, Loader2, Copy, Link2, CheckSquare, ShoppingBag, UserCheck, Ticket,
   Printer, Plus, Undo2, Grid3X3, DollarSign, Wallet, Upload, CheckCircle2, XCircle,
-  BadgePercent, ListChecks, AlertTriangle, WalletCards, Filter, User, HeartHandshake, BadgeDollarSign
+  BadgePercent, ListChecks, AlertTriangle, WalletCards, Filter, User, HeartHandshake, BadgeDollarSign, Edit, Save
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { supabase } from '@/integrations/supabase/client';
+import { useQueryClient } from '@tanstack/react-query';
 
 const VendedorPainel = () => {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { profile } = useAuth();
   
   const { meuVendedor, minhasReservas, minhasVendas, meusAcertos, isLoading, reservarNumeros, cancelarReserva, validarMultiplasVendas, enviarAcerto, pagarAcertoComSaldo, pagarComprasComSaldo } = useVendedor();
@@ -54,6 +57,9 @@ const VendedorPainel = () => {
   const [isCancelando, setIsCancelando] = useState(false);
 
   const [detalhesNumero, setDetalhesNumero] = useState<NumeroRifaVendedor | null>(null);
+  const [isEditingDetalhes, setIsEditingDetalhes] = useState(false);
+  const [editDetalhesForm, setEditDetalhesForm] = useState({ nome: '', telefone: '', endereco: '' });
+  const [isSavingDetalhes, setIsSavingDetalhes] = useState(false);
 
   const [comprarBingoOpen, setComprarBingoOpen] = useState(false);
   const [selectedBingoMatch, setSelectedBingoMatch] = useState('');
@@ -305,6 +311,40 @@ const VendedorPainel = () => {
     setValidarOpen(false);
     setSelectedToValidate(new Set());
     setModoSelecao(false);
+  };
+
+  const handleSaveDetalhes = async () => {
+    if (!detalhesNumero) return;
+    setIsSavingDetalhes(true);
+    
+    try {
+      const { data, error } = await supabase.functions.invoke('update-buyer', {
+        body: {
+          numero_id: detalhesNumero.id,
+          nome: editDetalhesForm.nome,
+          telefone: editDetalhesForm.telefone,
+          endereco: editDetalhesForm.endereco
+        }
+      });
+
+      if (error || !data?.success) {
+        throw new Error(data?.error || error?.message || 'Erro ao atualizar dados.');
+      }
+
+      toast.success('Dados atualizados com sucesso!');
+      setDetalhesNumero({
+        ...detalhesNumero,
+        nome_comprador: editDetalhesForm.nome,
+        telefone_comprador: editDetalhesForm.telefone,
+        endereco_comprador: editDetalhesForm.endereco
+      });
+      setIsEditingDetalhes(false);
+      queryClient.invalidateQueries({ queryKey: ['minhasReservasVendedor'] });
+    } catch (e: any) {
+      toast.error(e.message);
+    } finally {
+      setIsSavingDetalhes(false);
+    }
   };
 
   const handleGerarFolhasBingo = async () => {
@@ -580,6 +620,12 @@ const VendedorPainel = () => {
                                         }
                                         if (isTotalmenteFinalizado) {
                                             setDetalhesNumero(n);
+                                            setEditDetalhesForm({ 
+                                                nome: n.nome_comprador || '', 
+                                                telefone: n.telefone_comprador || '', 
+                                                endereco: n.endereco_comprador || '' 
+                                            });
+                                            setIsEditingDetalhes(false);
                                             return;
                                         }
                                         setValidarNumeros([n]);
@@ -989,21 +1035,56 @@ const VendedorPainel = () => {
                 </div>
 
                 <div className="space-y-3 border-t pt-3">
-                    <h3 className="text-sm font-bold flex items-center gap-2 text-foreground"><User className="w-4 h-4 text-muted-foreground" /> Dados do Comprador</h3>
-                    <div className="grid grid-cols-2 gap-3 text-sm">
-                        <div className="col-span-2">
-                            <p className="text-xs text-muted-foreground font-semibold">Nome</p>
-                            <p className="font-medium">{detalhesNumero.nome_comprador}</p>
-                        </div>
-                        <div>
-                            <p className="text-xs text-muted-foreground font-semibold">WhatsApp</p>
-                            <p className="font-medium">{detalhesNumero.telefone_comprador || 'Não informado'}</p>
-                        </div>
-                        <div>
-                            <p className="text-xs text-muted-foreground font-semibold">Endereço</p>
-                            <p className="font-medium">{detalhesNumero.endereco_comprador || 'Não informado'}</p>
-                        </div>
+                    <div className="flex items-center justify-between">
+                        <h3 className="text-sm font-bold flex items-center gap-2 text-foreground">
+                            <User className="w-4 h-4 text-muted-foreground" /> Dados do Comprador
+                        </h3>
+                        {!isEditingDetalhes && (
+                            <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => setIsEditingDetalhes(true)}>
+                                <Edit className="w-3.5 h-3.5 mr-1.5" /> Editar
+                            </Button>
+                        )}
                     </div>
+                    
+                    {isEditingDetalhes ? (
+                        <div className="space-y-3 animate-in fade-in slide-in-from-top-2">
+                            <div className="space-y-1.5">
+                                <Label className="text-xs">Nome Completo</Label>
+                                <Input value={editDetalhesForm.nome} onChange={e => setEditDetalhesForm(p => ({...p, nome: e.target.value}))} />
+                            </div>
+                            <div className="grid grid-cols-2 gap-3">
+                                <div className="space-y-1.5">
+                                    <Label className="text-xs">WhatsApp</Label>
+                                    <Input value={editDetalhesForm.telefone} onChange={e => setEditDetalhesForm(p => ({...p, telefone: e.target.value}))} />
+                                </div>
+                                <div className="space-y-1.5">
+                                    <Label className="text-xs">Endereço</Label>
+                                    <Input value={editDetalhesForm.endereco} onChange={e => setEditDetalhesForm(p => ({...p, endereco: e.target.value}))} />
+                                </div>
+                            </div>
+                            <div className="flex gap-2 pt-2">
+                                <Button variant="outline" size="sm" className="flex-1" onClick={() => setIsEditingDetalhes(false)} disabled={isSavingDetalhes}>Cancelar</Button>
+                                <Button size="sm" className="flex-1 bg-green-600 hover:bg-green-700 text-white" onClick={handleSaveDetalhes} disabled={isSavingDetalhes || !editDetalhesForm.nome.trim()}>
+                                    {isSavingDetalhes ? <Loader2 className="w-3 h-3 mr-2 animate-spin" /> : <Save className="w-3 h-3 mr-2" />} Salvar
+                                </Button>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="grid grid-cols-2 gap-3 text-sm">
+                            <div className="col-span-2">
+                                <p className="text-xs text-muted-foreground font-semibold">Nome</p>
+                                <p className="font-medium">{detalhesNumero.nome_comprador}</p>
+                            </div>
+                            <div>
+                                <p className="text-xs text-muted-foreground font-semibold">WhatsApp</p>
+                                <p className="font-medium">{detalhesNumero.telefone_comprador || 'Não informado'}</p>
+                            </div>
+                            <div>
+                                <p className="text-xs text-muted-foreground font-semibold">Endereço</p>
+                                <p className="font-medium">{detalhesNumero.endereco_comprador || 'Não informado'}</p>
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 <div className="space-y-3 border-t pt-3">
