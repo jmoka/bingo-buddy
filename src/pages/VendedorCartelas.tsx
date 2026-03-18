@@ -125,6 +125,7 @@ export default function VendedorCartelas() {
       .bg-gray-50\\/50 { background-color: #f9fafb !important; } 
       .bg-emerald-50 { background-color: #ecfdf5 !important; } 
       .bg-blue-50 { background-color: #eff6ff !important; } 
+      .custom-scrollbar { overflow: visible !important; }
     }`,
     thermal_58: `@media print { @page { size: 58mm 300mm; margin: 0; } body { background: white !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; } }`,
     thermal_80: `@media print { @page { size: 80mm 300mm; margin: 0; } body { background: white !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; } }`,
@@ -177,155 +178,162 @@ export default function VendedorCartelas() {
           <>
             {printFormat === 'a4' ? (
               /* ======================= LAYOUT A4 ======================= */
-              <div className="flex flex-col gap-4 max-w-4xl mx-auto print:max-w-none print:mx-0 print:gap-2">
-                {bilhetes.map((b, idx) => {
-                  const pagarUrl = `${BASE_URL}/pagar-cartela?codigo=${b.codigoValidacao}`;
-                  const conferirUrl = `${BASE_URL}/validar-cartela?codigo=${b.codigoValidacao}`;
-                  
-                  const isPendente = b.status_compra === 'pendente';
-                  const isPago = b.status_compra === 'pago';
-                  const isEmAnalise = b.status_compra === 'em_analise';
+              /* Envolto em overflow-x-auto para rolar no celular sem quebrar o layout */
+              <div className="w-full overflow-x-auto pb-4 custom-scrollbar">
+                <div className="flex flex-col gap-4 print:gap-2 min-w-[700px] max-w-4xl mx-auto print:max-w-none print:mx-0">
+                  {bilhetes.map((b, idx) => {
+                    const pagarUrl = `${BASE_URL}/pagar-cartela?codigo=${b.codigoValidacao}`;
+                    const conferirUrl = `${BASE_URL}/validar-cartela?codigo=${b.codigoValidacao}`;
+                    
+                    const isPendente = b.status_compra === 'pendente';
+                    const isPago = b.status_compra === 'pago';
+                    const isEmAnalise = b.status_compra === 'em_analise';
 
-                  return (
-                    <div key={`${b.numero}-${idx}`} className="print:break-inside-avoid">
-                      <div className="bg-white rounded-xl overflow-hidden shadow border border-gray-200 print:shadow-none print:border print:border-gray-400 print:rounded-none flex min-w-0 h-[200px] relative">
-                        
-                        {isPago && (
-                          <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20 overflow-hidden">
-                            <p className="text-6xl font-black text-green-600/15 border-8 border-green-600/15 p-4 rounded-xl rotate-[-25deg] uppercase tracking-tighter whitespace-nowrap">
-                              JÁ FOI PAGO
-                            </p>
-                          </div>
-                        )}
-                        
-                        {isEmAnalise && (
-                          <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20 overflow-hidden">
-                            <p className="text-5xl font-black text-blue-600/20 border-8 border-blue-600/20 p-4 rounded-xl rotate-[-25deg] uppercase tracking-tighter whitespace-nowrap">
-                              EM ANÁLISE
-                            </p>
-                          </div>
-                        )}
+                    return (
+                      <div key={`${b.numero}-${idx}`} className="print:break-inside-avoid">
+                        <div className="bg-white rounded-xl overflow-hidden shadow-sm border border-gray-300 print:shadow-none print:border-gray-400 print:rounded-none flex h-[190px] relative">
+                          
+                          {/* Marca d'água de Status */}
+                          {isPago && (
+                            <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20 overflow-hidden">
+                              <p className="text-6xl font-black text-green-600/15 border-8 border-green-600/15 p-4 rounded-xl rotate-[-25deg] uppercase tracking-tighter whitespace-nowrap">
+                                JÁ FOI PAGO
+                              </p>
+                            </div>
+                          )}
+                          
+                          {isEmAnalise && (
+                            <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20 overflow-hidden">
+                              <p className="text-5xl font-black text-blue-600/20 border-8 border-blue-600/20 p-4 rounded-xl rotate-[-25deg] uppercase tracking-tighter whitespace-nowrap">
+                                EM ANÁLISE
+                              </p>
+                            </div>
+                          )}
 
-                        <div className="flex-1 flex min-w-0">
-                          <div className="bg-emerald-600 flex flex-col items-center justify-center px-3 shrink-0 text-white">
-                            <p className="text-[8px] uppercase font-bold rotate-180 [writing-mode:vertical-lr]">BILHETE OFICIAL</p>
-                            <p className="text-2xl font-black font-mono mt-2">{String(b.numero).padStart(3, '0')}</p>
+                          {/* Faixa Esquerda (Verde) */}
+                          <div className="bg-emerald-600 flex flex-col items-center justify-center px-2 shrink-0 text-white w-12">
+                            <p className="text-[7px] uppercase font-bold rotate-180 [writing-mode:vertical-lr] tracking-widest opacity-90">Bilhete Oficial</p>
+                            <p className="text-xl font-black font-mono mt-3 rotate-180 [writing-mode:vertical-lr]">{String(b.numero).padStart(3, '0')}</p>
                           </div>
 
+                          {/* Corpo Principal do Bilhete */}
                           <div className="flex-1 p-4 flex flex-col justify-between min-w-0">
-                            <div className="flex justify-between items-start gap-2">
-                              <div className="min-w-0">
+                            
+                            {/* Linha Superior: Título + QRs */}
+                            <div className="flex justify-between items-start gap-4">
+                              <div className="min-w-0 flex-1">
                                 <h2 className="text-lg font-black text-gray-800 uppercase truncate leading-tight">{b.rifa?.nome}</h2>
-                                <p className="text-[10px] text-gray-500 font-bold mt-0.5">CÓDIGO: <span className="text-gray-800 font-mono">{b.codigoValidacao}</span></p>
+                                <p className="text-[10px] text-gray-500 font-bold mt-1">CÓDIGO: <span className="text-gray-800 font-mono text-xs">{b.codigoValidacao}</span></p>
                               </div>
                               
                               <div className="flex gap-2 shrink-0">
+                                {/* Caixa Pagar */}
                                 <div className={cn(
-                                    "text-center flex flex-col items-center border rounded p-1 min-w-[65px] shadow-sm",
-                                    isPago ? "border-gray-200 bg-gray-50 opacity-50" : isEmAnalise ? "border-blue-200 bg-blue-50" : "border-emerald-600 bg-emerald-50"
+                                    "text-center flex flex-col items-center justify-center border rounded p-1 w-[70px] shadow-sm",
+                                    isPago ? "border-gray-200 bg-gray-50 opacity-50" : isEmAnalise ? "border-blue-200 bg-blue-50" : "border-emerald-500 bg-emerald-50"
                                 )}>
-                                  <p className={cn("text-[5px] font-black flex items-center gap-0.5 mb-0.5 uppercase", isPago ? "text-gray-500" : isEmAnalise ? "text-blue-700" : "text-emerald-700")}>
-                                    <Smartphone className="w-2 h-2" /> {isPago ? 'PAGO' : isEmAnalise ? 'ANÁLISE' : 'PAGAR'}
+                                  <p className={cn("text-[6px] font-black flex items-center gap-0.5 mb-1 uppercase", isPago ? "text-gray-500" : isEmAnalise ? "text-blue-700" : "text-emerald-700")}>
+                                    {isPago ? 'PAGO' : isEmAnalise ? 'ANÁLISE' : 'PAGAR (PIX)'}
                                   </p>
                                   <div className="p-0.5 bg-white rounded shadow-sm">
-                                    <QRCodeSVG value={pagarUrl} size={35} />
+                                    <QRCodeSVG value={pagarUrl} size={42} />
                                   </div>
                                 </div>
 
-                                <div className="text-center flex flex-col items-center border border-blue-200 bg-blue-50 rounded p-1 min-w-[65px] shadow-sm">
-                                  <p className="text-[5px] font-black text-blue-700 flex items-center gap-0.5 mb-0.5 uppercase">
-                                    <Search className="w-2 h-2" /> CONFERIR / VALIDAR
+                                {/* Caixa Conferir */}
+                                <div className="text-center flex flex-col items-center justify-center border border-blue-200 bg-blue-50 rounded p-1 w-[70px] shadow-sm">
+                                  <p className="text-[6px] font-black text-blue-700 flex items-center gap-0.5 mb-1 uppercase">
+                                    CONFERIR
                                   </p>
                                   <div className="p-0.5 bg-white rounded shadow-sm border border-blue-100">
-                                    <QRCodeSVG value={conferirUrl} size={35} />
+                                    <QRCodeSVG value={conferirUrl} size={42} />
                                   </div>
                                 </div>
                               </div>
                             </div>
 
-                            <div className="grid grid-cols-2 gap-4 border-y border-gray-100 py-2 my-1">
+                            {/* Informações Data e Valor */}
+                            <div className="grid grid-cols-2 gap-4 border-y border-gray-100 py-2 my-2">
                               <div>
-                                <p className="text-[7px] text-gray-400 uppercase font-bold">Data do Sorteio</p>
-                                <p className="text-[10px] font-bold text-gray-700">{formatDate(b.rifa?.data_encerramento ?? null)}</p>
+                                <p className="text-[8px] text-gray-400 uppercase font-bold">Data do Sorteio</p>
+                                <p className="text-xs font-bold text-gray-700">{formatDate(b.rifa?.data_encerramento ?? null)}</p>
                               </div>
                               <div className="text-right">
-                                <p className="text-[8px] text-gray-400 uppercase font-bold">Valor</p>
+                                <p className="text-[8px] text-gray-400 uppercase font-bold">Valor da Cota</p>
                                 <p className="text-sm font-black text-emerald-600">R$ {Number(b.rifa?.custo_por_numero).toFixed(2)}</p>
                               </div>
                             </div>
 
+                            {/* Vendedor Info */}
                             <div className="flex items-center gap-3">
                               <div className="shrink-0 flex flex-col items-center">
                                 {b.vendedor?.codigo_ref && (
-                                  <QRCodeSVG value={`${BASE_URL}/vendedor/perfil/${b.vendedor.codigo_ref}`} size={45} />
+                                  <div className="bg-white p-0.5 border border-gray-200 rounded">
+                                    <QRCodeSVG value={`${BASE_URL}/vendedor/perfil/${b.vendedor.codigo_ref}`} size={38} />
+                                  </div>
                                 )}
                                 <p className="text-[6px] text-gray-400 font-bold mt-1 uppercase">Vendedor</p>
                               </div>
                               <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-1 text-emerald-600">
+                                <div className="flex items-center gap-1 text-emerald-600 mb-0.5">
                                   <ShieldCheck className="h-3 w-3" />
-                                  <span className="text-[8px] font-black uppercase">Vendedor Autorizado</span>
+                                  <span className="text-[8px] font-black uppercase tracking-wide">Vendedor Autorizado</span>
                                 </div>
-                                <p className="text-[10px] font-bold text-gray-700 truncate">{b.vendedor?.nome}</p>
+                                <p className="text-[11px] font-bold text-gray-800 truncate">{b.vendedor?.nome}</p>
                                 <p className="text-[8px] text-gray-500">Ref: {b.vendedor?.codigo_ref}</p>
                               </div>
                             </div>
                           </div>
-                        </div>
 
-                        <div className="w-0 border-l-2 border-dashed border-gray-300 relative">
-                          <div className="absolute -top-2 -left-2 w-4 h-4 bg-gray-100 rounded-full border border-gray-300 print:bg-white" />
-                          <div className="absolute -bottom-2 -left-2 w-4 h-4 bg-gray-100 rounded-full border border-gray-300 print:bg-white" />
-                        </div>
+                          {/* Linha Tracejada Divisória */}
+                          <div className="w-0 border-l-2 border-dashed border-gray-300 relative shrink-0">
+                            <div className="absolute -top-2 -left-2 w-4 h-4 bg-gray-100 rounded-full border border-gray-300 print:bg-white" />
+                            <div className="absolute -bottom-2 -left-2 w-4 h-4 bg-gray-100 rounded-full border border-gray-300 print:bg-white" />
+                          </div>
 
-                        <div className="w-[240px] bg-gray-50/50 p-3 flex flex-col shrink-0">
-                          <div className="flex justify-between items-start mb-2">
-                            <p className="text-[8px] font-black text-gray-400 uppercase pt-1">Canhoto Vendedor</p>
-                            <div className="text-right">
+                          {/* Canhoto do Vendedor */}
+                          <div className="w-[210px] bg-gray-50/80 p-3 flex flex-col shrink-0 justify-between">
+                            <div className="flex justify-between items-start mb-1">
+                              <p className="text-[9px] font-black text-gray-400 uppercase pt-1 tracking-widest">Canhoto</p>
                               <p className="text-sm font-black font-mono text-gray-800">Nº {String(b.numero).padStart(3, '0')}</p>
                             </div>
-                          </div>
 
-                          <div className="flex gap-2 mb-3">
-                            <div className={cn(
-                                "text-center flex flex-col items-center border rounded p-1 flex-1 shadow-sm",
-                                isPago ? "border-gray-200 bg-gray-50 opacity-50" : isEmAnalise ? "border-blue-200 bg-blue-50" : "border-emerald-600 bg-emerald-50"
-                            )}>
-                              <p className={cn("text-[6px] font-black flex items-center gap-0.5 mb-0.5 uppercase", isPago ? "text-gray-500" : isEmAnalise ? "text-blue-700" : "text-emerald-700")}>
-                                <Smartphone className="w-2 h-2" /> {isPago ? 'PAGO' : isEmAnalise ? 'ANÁLISE' : 'PAGAR'}
-                              </p>
-                              <div className="p-0.5 bg-white rounded shadow-sm">
-                                <QRCodeSVG value={pagarUrl} size={42} />
+                            <div className="flex gap-2 justify-center mb-2">
+                              {/* QR Pagar Canhoto */}
+                              <div className={cn(
+                                  "text-center flex flex-col items-center justify-center border rounded p-1 w-[65px] shadow-sm bg-white",
+                                  isPago ? "border-gray-200 opacity-50" : isEmAnalise ? "border-blue-200" : "border-emerald-500"
+                              )}>
+                                <p className={cn("text-[5px] font-black uppercase mb-1", isPago ? "text-gray-500" : isEmAnalise ? "text-blue-700" : "text-emerald-700")}>
+                                  {isPago ? 'PAGO' : isEmAnalise ? 'ANÁLISE' : 'PAGAR'}
+                                </p>
+                                <QRCodeSVG value={pagarUrl} size={38} />
                               </div>
-                              {isPendente && <p className="text-[7px] font-black text-emerald-900 mt-0.5">R$ {b.valor_final.toFixed(2)}</p>}
-                            </div>
 
-                            <div className="text-center flex flex-col items-center border border-blue-200 bg-blue-50 rounded p-1 flex-1 shadow-sm">
-                              <p className="text-[6px] font-black text-blue-700 flex items-center gap-0.5 mb-0.5 uppercase">
-                                <Search className="w-2 h-2" /> CONFERIR / VALIDAR
-                              </p>
-                              <div className="p-0.5 bg-white rounded shadow-sm border border-blue-100">
-                                <QRCodeSVG value={conferirUrl} size={42} />
+                              {/* QR Conferir Canhoto */}
+                              <div className="text-center flex flex-col items-center justify-center border border-blue-200 bg-white rounded p-1 w-[65px] shadow-sm">
+                                <p className="text-[5px] font-black text-blue-700 uppercase mb-1">CONFERIR</p>
+                                <QRCodeSVG value={conferirUrl} size={38} />
                               </div>
                             </div>
+
+                            <div className="space-y-2 mt-auto">
+                              <div className="border-b border-gray-400 border-dashed pb-0.5">
+                                <p className="text-[7px] text-gray-500 uppercase font-bold">Nome Comprador</p>
+                                <div className="h-3 text-[10px] font-bold text-gray-800 truncate">{b.nome_comprador || ''}</div>
+                              </div>
+                              <div className="border-b border-gray-400 border-dashed pb-0.5">
+                                <p className="text-[7px] text-gray-500 uppercase font-bold">Telefone / WhatsApp</p>
+                                <div className="h-3 text-[10px] font-bold text-gray-800 truncate">{b.telefone_comprador || ''}</div>
+                              </div>
+                            </div>
                           </div>
 
-                          <div className="space-y-1.5 flex-1">
-                            <div className="border-b border-gray-300 pb-0.5">
-                              <p className="text-[7px] text-gray-400 uppercase font-bold">Nome Comprador</p>
-                              <div className="h-2.5" />
-                            </div>
-                            <div className="border-b border-gray-300 pb-0.5">
-                              <p className="text-[7px] text-gray-400 uppercase font-bold">Telefone / WhatsApp</p>
-                              <div className="h-2.5" />
-                            </div>
-                          </div>
                         </div>
-
                       </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
               </div>
             ) : (
               /* ======================= LAYOUT TÉRMICO (58mm e 80mm) ======================= */
