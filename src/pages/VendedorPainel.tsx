@@ -516,14 +516,22 @@ const VendedorPainel = () => {
               {modoSelecao && selectedToValidate.size > 0 && (
                 <div className="p-3 bg-primary/10 border border-primary/30 rounded-lg flex items-center justify-between animate-in fade-in slide-in-from-top-2">
                    <span className="text-sm font-bold text-primary">{selectedToValidate.size} números selecionados</span>
-                   <Button size="sm" onClick={() => {
-                      const nums = minhasReservas.filter(n => selectedToValidate.has(n.id));
-                      setValidarNumeros(nums);
-                      setValidarForm({ nome: '', telefone: '', endereco: '' });
-                      setValidarOpen(true);
-                   }}>
-                      Validar Selecionados
-                   </Button>
+                   <div className="flex gap-2">
+                     <Button size="sm" variant="outline" className="border-primary text-primary hover:bg-primary/20" onClick={() => {
+                        const idsString = Array.from(selectedToValidate).join(',');
+                        navigate(`/vendedor/imprimir/todas?numeros=${idsString}`);
+                     }}>
+                        <Printer className="w-4 h-4 mr-1.5" /> Imprimir
+                     </Button>
+                     <Button size="sm" onClick={() => {
+                        const nums = minhasReservas.filter(n => selectedToValidate.has(n.id));
+                        setValidarNumeros(nums);
+                        setValidarForm({ nome: '', telefone: '', endereco: '' });
+                        setValidarOpen(true);
+                     }}>
+                        Validar
+                     </Button>
+                   </div>
                 </div>
               )}
 
@@ -537,7 +545,7 @@ const VendedorPainel = () => {
                       <div className="flex items-center justify-between">
                         <h4 className="font-heading font-bold text-sm">{numeros[0]?.rifas?.nome ?? 'Rifa'}</h4>
                         <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => navigate(`/vendedor/imprimir/${rifaId}`)}>
-                          <Printer className="w-3 h-3 mr-1" /> Imprimir
+                          <Printer className="w-3 h-3 mr-1" /> Imprimir Pendentes
                         </Button>
                       </div>
                       <div className="grid grid-cols-3 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8 gap-2">
@@ -566,17 +574,17 @@ const VendedorPainel = () => {
                             <div key={n.id} className="relative group">
                                 <button
                                     onClick={() => {
-                                        if (isTotalmenteFinalizado) {
-                                            if (!modoSelecao) setDetalhesNumero(n);
-                                            return;
-                                        }
                                         if (modoSelecao) {
                                             toggleValidar(n.id);
-                                        } else {
-                                            setValidarNumeros([n]);
-                                            setValidarForm({ nome: n.nome_comprador || '', telefone: n.telefone_comprador || '', endereco: n.endereco_comprador || '' });
-                                            setValidarOpen(true);
+                                            return;
                                         }
+                                        if (isTotalmenteFinalizado) {
+                                            setDetalhesNumero(n);
+                                            return;
+                                        }
+                                        setValidarNumeros([n]);
+                                        setValidarForm({ nome: n.nome_comprador || '', telefone: n.telefone_comprador || '', endereco: n.endereco_comprador || '' });
+                                        setValidarOpen(true);
                                     }}
                                     className={`w-full rounded-lg p-2 flex flex-col items-center justify-center gap-0.5 transition-all min-h-[85px] border 
                                         ${isTotalmenteFinalizado ? 'bg-green-50/50 text-green-700 border-green-200 opacity-90' : 
@@ -1015,7 +1023,10 @@ const VendedorPainel = () => {
                 </div>
              </div>
           )}
-          <DialogFooter>
+          <DialogFooter className="flex justify-between sm:justify-between w-full">
+             <Button variant="outline" onClick={() => navigate(`/vendedor/imprimir/todas?numeros=${detalhesNumero?.id}`)}>
+               <Printer className="w-4 h-4 mr-2" /> Imprimir Bilhete
+             </Button>
              <Button onClick={() => setDetalhesNumero(null)}>Fechar</Button>
           </DialogFooter>
         </DialogContent>

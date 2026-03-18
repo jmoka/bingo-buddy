@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -37,6 +37,9 @@ interface BilheteData {
 export default function VendedorCartelas() {
   const navigate = useNavigate();
   const { rifaId } = useParams<{ rifaId?: string }>();
+  const [searchParams] = useSearchParams();
+  const numerosIdsParam = searchParams.get('numeros');
+  
   const { user } = useAuth();
   const [bilhetes, setBilhetes] = useState<BilheteData[]>([]);
   const [loading, setLoading] = useState(true);
@@ -45,7 +48,7 @@ export default function VendedorCartelas() {
   useEffect(() => {
     (async () => {
       setLoading(true);
-      if (!user || !rifaId) { setLoading(false); return; }
+      if (!user || (!rifaId && !numerosIdsParam)) { setLoading(false); return; }
 
       const { data: v } = await supabase
         .from('vendedores_rifa')
@@ -55,13 +58,19 @@ export default function VendedorCartelas() {
         .single();
       if (!v) { setLoading(false); return; }
 
-      const { data: numerosDb } = await supabase
+      let query = supabase
         .from('numeros_rifa')
         .select('id, numero, nome_comprador, telefone_comprador, endereco_comprador, rifas(nome, data_encerramento, custo_por_numero)')
-        .eq('rifa_id', rifaId)
         .eq('vendedor_id', v.id)
-        .eq('status', 'reservado')
         .order('numero');
+
+      if (numerosIdsParam) {
+        query = query.in('id', numerosIdsParam.split(','));
+      } else if (rifaId && rifaId !== 'todas') {
+        query = query.eq('rifa_id', rifaId).eq('status', 'reservado');
+      }
+
+      const { data: numerosDb } = await query;
 
       if (!numerosDb || numerosDb.length === 0) { setLoading(false); return; }
 
@@ -100,7 +109,7 @@ export default function VendedorCartelas() {
       setBilhetes(lista);
       setLoading(false);
     })();
-  }, [rifaId, user]);
+  }, [rifaId, numerosIdsParam, user]);
 
   const formatDate = (iso: string | null) => {
     if (!iso) return '—';
@@ -162,7 +171,7 @@ export default function VendedorCartelas() {
         ) : bilhetes.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-64 gap-3 text-muted-foreground print:hidden">
             <Ticket className="h-10 w-10 opacity-30" />
-            <p>Nenhum bilhete reservado encontrado.</p>
+            <p>Nenhum bilhete encontrado para impressão.</p>
           </div>
         ) : (
           <>
