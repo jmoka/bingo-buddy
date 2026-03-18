@@ -327,6 +327,7 @@ export default function VendedorCartelas() {
                   const conferirUrl = `${BASE_URL}/validar-cartela?codigo=${b.codigoValidacao}`;
                   const isPago = b.status_compra === 'pago';
                   const isEmAnalise = b.status_compra === 'em_analise';
+                  const isPendente = b.status_compra === 'pendente';
 
                   return (
                     <div key={`${b.numero}-${idx}`} className={cn("bg-white text-black font-mono p-2 break-after-page", widthClass)}>
@@ -376,10 +377,25 @@ export default function VendedorCartelas() {
                         </div>
                       </div>
 
-                      <div className="border-t-2 border-black mt-3 pt-2 text-[9px] text-center leading-tight">
-                        <p className="font-bold uppercase">Vendedor: {b.vendedor?.nome || 'N/A'}</p>
-                        <p>Ref: {b.vendedor?.codigo_ref}</p>
-                        <p className="mt-2 uppercase font-bold text-[8px]">Guarde este bilhete oficial.</p>
+                      {b.vendedor?.codigo_ref && (
+                        <div className="mt-2 border-t-2 border-dashed border-black pt-2 text-center">
+                          <p className="text-[10px] font-bold uppercase mb-1">Vendedor Autorizado</p>
+                          <div className="flex justify-center p-1">
+                            <QRCodeSVG value={`${BASE_URL}/vendedor/perfil/${b.vendedor.codigo_ref}`} size={80} />
+                          </div>
+                          <p className="text-[10px] font-bold mt-1 uppercase">{b.vendedor.nome}</p>
+                          <p className="text-[8px]">Ref: {b.vendedor.codigo_ref}</p>
+                        </div>
+                      )}
+
+                      <div className="border-t-2 border-black mt-2 pt-2 text-[9px] text-center leading-tight">
+                        {!b.vendedor?.codigo_ref && (
+                          <>
+                            <p className="font-bold uppercase">Vendedor: {b.vendedor?.nome || 'N/A'}</p>
+                            <p>Ref: {b.vendedor?.codigo_ref}</p>
+                          </>
+                        )}
+                        <p className="mt-1 uppercase font-bold text-[8px]">Guarde este bilhete oficial.</p>
                         <p className="text-[8px]">Valide-o no sistema antes do sorteio.</p>
                       </div>
                     </div>
