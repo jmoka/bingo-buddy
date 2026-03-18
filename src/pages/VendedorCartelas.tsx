@@ -6,8 +6,11 @@ import { Button } from '@/components/ui/button';
 import { ArrowLeft, Printer, Loader2, Ticket, ShieldCheck, Smartphone, Search } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { cn } from '@/lib/utils';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const BASE_URL = window.location.origin;
+
+type PrintFormat = 'a4' | 'thermal_58' | 'thermal_80';
 
 interface BilheteData {
   id: string;
@@ -37,6 +40,7 @@ export default function VendedorCartelas() {
   const { user } = useAuth();
   const [bilhetes, setBilhetes] = useState<BilheteData[]>([]);
   const [loading, setLoading] = useState(true);
+  const [printFormat, setPrintFormat] = useState<PrintFormat>('a4');
 
   useEffect(() => {
     (async () => {
@@ -103,11 +107,25 @@ export default function VendedorCartelas() {
     return new Date(iso).toLocaleDateString('pt-BR');
   };
 
+  const printStyles = {
+    a4: `@media print { 
+      @page { size: A4 portrait; margin: 10mm; } 
+      body { background: white !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; } 
+      .bg-emerald-600 { background-color: #059669 !important; } 
+      .text-white { color: white !important; } 
+      .bg-gray-50\\/50 { background-color: #f9fafb !important; } 
+      .bg-emerald-50 { background-color: #ecfdf5 !important; } 
+      .bg-blue-50 { background-color: #eff6ff !important; } 
+    }`,
+    thermal_58: `@media print { @page { size: 58mm 300mm; margin: 0; } body { background: white !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; } }`,
+    thermal_80: `@media print { @page { size: 80mm 300mm; margin: 0; } body { background: white !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; } }`,
+  };
+
   const rifaInfo = bilhetes[0]?.rifa;
 
   return (
     <div className="min-h-screen bg-gray-100 print:bg-white">
-      <div className="print:hidden bg-white border-b px-3 py-3 flex items-center justify-between sticky top-0 z-10 shadow-sm gap-2">
+      <div className="print:hidden bg-white border-b px-3 py-3 flex flex-wrap items-center justify-between sticky top-0 z-10 shadow-sm gap-4">
         <div className="flex items-center gap-2 min-w-0">
           <Button variant="ghost" size="icon" className="shrink-0" onClick={() => navigate(-1)}>
             <ArrowLeft className="h-5 w-5" />
@@ -117,10 +135,23 @@ export default function VendedorCartelas() {
             {rifaInfo && <p className="text-xs text-muted-foreground truncate">{rifaInfo.nome} · {bilhetes.length} bilhete(s)</p>}
           </div>
         </div>
-        <Button onClick={() => window.print()} className="gradient-primary shrink-0 h-8 text-xs px-3">
-          <Printer className="h-3.5 w-3.5 mr-1.5" />
-          Imprimir
-        </Button>
+        
+        <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+          <Select value={printFormat} onValueChange={(value) => setPrintFormat(value as PrintFormat)}>
+            <SelectTrigger className="w-full sm:w-[160px] h-9 text-xs font-semibold">
+              <SelectValue placeholder="Formato" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="a4">Folha A4</SelectItem>
+              <SelectItem value="thermal_58">Térmica 58mm</SelectItem>
+              <SelectItem value="thermal_80">Térmica 80mm</SelectItem>
+            </SelectContent>
+          </Select>
+          <Button onClick={() => window.print()} className="gradient-primary shrink-0 h-9 text-xs px-4 font-bold shadow-sm">
+            <Printer className="h-4 w-4 mr-2" />
+            Imprimir
+          </Button>
+        </div>
       </div>
 
       <div className="p-4 print:p-0">
@@ -134,169 +165,232 @@ export default function VendedorCartelas() {
             <p>Nenhum bilhete reservado encontrado.</p>
           </div>
         ) : (
-          <div className="flex flex-col gap-4 max-w-4xl mx-auto print:max-w-none print:mx-0 print:gap-2">
-            {bilhetes.map((b, idx) => {
-              const pagarUrl = `${BASE_URL}/pagar-cartela?codigo=${b.codigoValidacao}`;
-              const conferirUrl = `${BASE_URL}/validar-cartela?codigo=${b.codigoValidacao}`;
-              
-              const isPendente = b.status_compra === 'pendente';
-              const isPago = b.status_compra === 'pago';
-              const isEmAnalise = b.status_compra === 'em_analise';
+          <>
+            {printFormat === 'a4' ? (
+              /* ======================= LAYOUT A4 ======================= */
+              <div className="flex flex-col gap-4 max-w-4xl mx-auto print:max-w-none print:mx-0 print:gap-2">
+                {bilhetes.map((b, idx) => {
+                  const pagarUrl = `${BASE_URL}/pagar-cartela?codigo=${b.codigoValidacao}`;
+                  const conferirUrl = `${BASE_URL}/validar-cartela?codigo=${b.codigoValidacao}`;
+                  
+                  const isPendente = b.status_compra === 'pendente';
+                  const isPago = b.status_compra === 'pago';
+                  const isEmAnalise = b.status_compra === 'em_analise';
 
-              return (
-                <div key={`${b.numero}-${idx}`} className="print:break-inside-avoid">
-                  <div className="bg-white rounded-xl overflow-hidden shadow border border-gray-200 print:shadow-none print:border print:border-gray-400 print:rounded-none flex min-w-0 h-[200px] relative">
-                    
-                    {isPago && (
-                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20 overflow-hidden">
-                        <p className="text-6xl font-black text-green-600/15 border-8 border-green-600/15 p-4 rounded-xl rotate-[-25deg] uppercase tracking-tighter whitespace-nowrap">
-                          JÁ FOI PAGO
-                        </p>
-                      </div>
-                    )}
-                    
-                    {isEmAnalise && (
-                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20 overflow-hidden">
-                        <p className="text-5xl font-black text-blue-600/20 border-8 border-blue-600/20 p-4 rounded-xl rotate-[-25deg] uppercase tracking-tighter whitespace-nowrap">
-                          EM ANÁLISE
-                        </p>
-                      </div>
-                    )}
-
-                    <div className="flex-1 flex min-w-0">
-                      <div className="bg-emerald-600 flex flex-col items-center justify-center px-3 shrink-0 text-white">
-                        <p className="text-[8px] uppercase font-bold rotate-180 [writing-mode:vertical-lr]">BILHETE OFICIAL</p>
-                        <p className="text-2xl font-black font-mono mt-2">{String(b.numero).padStart(3, '0')}</p>
-                      </div>
-
-                      <div className="flex-1 p-4 flex flex-col justify-between min-w-0">
-                        <div className="flex justify-between items-start gap-2">
-                          <div className="min-w-0">
-                            <h2 className="text-lg font-black text-gray-800 uppercase truncate leading-tight">{b.rifa?.nome}</h2>
-                            <p className="text-[10px] text-gray-500 font-bold mt-0.5">CÓDIGO: <span className="text-gray-800 font-mono">{b.codigoValidacao}</span></p>
+                  return (
+                    <div key={`${b.numero}-${idx}`} className="print:break-inside-avoid">
+                      <div className="bg-white rounded-xl overflow-hidden shadow border border-gray-200 print:shadow-none print:border print:border-gray-400 print:rounded-none flex min-w-0 h-[200px] relative">
+                        
+                        {isPago && (
+                          <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20 overflow-hidden">
+                            <p className="text-6xl font-black text-green-600/15 border-8 border-green-600/15 p-4 rounded-xl rotate-[-25deg] uppercase tracking-tighter whitespace-nowrap">
+                              JÁ FOI PAGO
+                            </p>
                           </div>
-                          
-                          <div className="flex gap-2 shrink-0">
+                        )}
+                        
+                        {isEmAnalise && (
+                          <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20 overflow-hidden">
+                            <p className="text-5xl font-black text-blue-600/20 border-8 border-blue-600/20 p-4 rounded-xl rotate-[-25deg] uppercase tracking-tighter whitespace-nowrap">
+                              EM ANÁLISE
+                            </p>
+                          </div>
+                        )}
+
+                        <div className="flex-1 flex min-w-0">
+                          <div className="bg-emerald-600 flex flex-col items-center justify-center px-3 shrink-0 text-white">
+                            <p className="text-[8px] uppercase font-bold rotate-180 [writing-mode:vertical-lr]">BILHETE OFICIAL</p>
+                            <p className="text-2xl font-black font-mono mt-2">{String(b.numero).padStart(3, '0')}</p>
+                          </div>
+
+                          <div className="flex-1 p-4 flex flex-col justify-between min-w-0">
+                            <div className="flex justify-between items-start gap-2">
+                              <div className="min-w-0">
+                                <h2 className="text-lg font-black text-gray-800 uppercase truncate leading-tight">{b.rifa?.nome}</h2>
+                                <p className="text-[10px] text-gray-500 font-bold mt-0.5">CÓDIGO: <span className="text-gray-800 font-mono">{b.codigoValidacao}</span></p>
+                              </div>
+                              
+                              <div className="flex gap-2 shrink-0">
+                                <div className={cn(
+                                    "text-center flex flex-col items-center border rounded p-1 min-w-[65px] shadow-sm",
+                                    isPago ? "border-gray-200 bg-gray-50 opacity-50" : isEmAnalise ? "border-blue-200 bg-blue-50" : "border-emerald-600 bg-emerald-50"
+                                )}>
+                                  <p className={cn("text-[5px] font-black flex items-center gap-0.5 mb-0.5 uppercase", isPago ? "text-gray-500" : isEmAnalise ? "text-blue-700" : "text-emerald-700")}>
+                                    <Smartphone className="w-2 h-2" /> {isPago ? 'PAGO' : isEmAnalise ? 'ANÁLISE' : 'PAGAR'}
+                                  </p>
+                                  <div className="p-0.5 bg-white rounded shadow-sm">
+                                    <QRCodeSVG value={pagarUrl} size={35} />
+                                  </div>
+                                </div>
+
+                                <div className="text-center flex flex-col items-center border border-blue-200 bg-blue-50 rounded p-1 min-w-[65px] shadow-sm">
+                                  <p className="text-[5px] font-black text-blue-700 flex items-center gap-0.5 mb-0.5 uppercase">
+                                    <Search className="w-2 h-2" /> CONFERIR / VALIDAR
+                                  </p>
+                                  <div className="p-0.5 bg-white rounded shadow-sm border border-blue-100">
+                                    <QRCodeSVG value={conferirUrl} size={35} />
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4 border-y border-gray-100 py-2 my-1">
+                              <div>
+                                <p className="text-[7px] text-gray-400 uppercase font-bold">Data do Sorteio</p>
+                                <p className="text-[10px] font-bold text-gray-700">{formatDate(b.rifa?.data_encerramento ?? null)}</p>
+                              </div>
+                              <div className="text-right">
+                                <p className="text-[8px] text-gray-400 uppercase font-bold">Valor</p>
+                                <p className="text-sm font-black text-emerald-600">R$ {Number(b.rifa?.custo_por_numero).toFixed(2)}</p>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-3">
+                              <div className="shrink-0 flex flex-col items-center">
+                                {b.vendedor?.codigo_ref && (
+                                  <QRCodeSVG value={`${BASE_URL}/vendedor/perfil/${b.vendedor.codigo_ref}`} size={45} />
+                                )}
+                                <p className="text-[6px] text-gray-400 font-bold mt-1 uppercase">Vendedor</p>
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-1 text-emerald-600">
+                                  <ShieldCheck className="h-3 w-3" />
+                                  <span className="text-[8px] font-black uppercase">Vendedor Autorizado</span>
+                                </div>
+                                <p className="text-[10px] font-bold text-gray-700 truncate">{b.vendedor?.nome}</p>
+                                <p className="text-[8px] text-gray-500">Ref: {b.vendedor?.codigo_ref}</p>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="w-0 border-l-2 border-dashed border-gray-300 relative">
+                          <div className="absolute -top-2 -left-2 w-4 h-4 bg-gray-100 rounded-full border border-gray-300 print:bg-white" />
+                          <div className="absolute -bottom-2 -left-2 w-4 h-4 bg-gray-100 rounded-full border border-gray-300 print:bg-white" />
+                        </div>
+
+                        <div className="w-[240px] bg-gray-50/50 p-3 flex flex-col shrink-0">
+                          <div className="flex justify-between items-start mb-2">
+                            <p className="text-[8px] font-black text-gray-400 uppercase pt-1">Canhoto Vendedor</p>
+                            <div className="text-right">
+                              <p className="text-sm font-black font-mono text-gray-800">Nº {String(b.numero).padStart(3, '0')}</p>
+                            </div>
+                          </div>
+
+                          <div className="flex gap-2 mb-3">
                             <div className={cn(
-                                "text-center flex flex-col items-center border rounded p-1 min-w-[65px] shadow-sm",
+                                "text-center flex flex-col items-center border rounded p-1 flex-1 shadow-sm",
                                 isPago ? "border-gray-200 bg-gray-50 opacity-50" : isEmAnalise ? "border-blue-200 bg-blue-50" : "border-emerald-600 bg-emerald-50"
                             )}>
-                              <p className={cn("text-[5px] font-black flex items-center gap-0.5 mb-0.5 uppercase", isPago ? "text-gray-500" : isEmAnalise ? "text-blue-700" : "text-emerald-700")}>
+                              <p className={cn("text-[6px] font-black flex items-center gap-0.5 mb-0.5 uppercase", isPago ? "text-gray-500" : isEmAnalise ? "text-blue-700" : "text-emerald-700")}>
                                 <Smartphone className="w-2 h-2" /> {isPago ? 'PAGO' : isEmAnalise ? 'ANÁLISE' : 'PAGAR'}
                               </p>
                               <div className="p-0.5 bg-white rounded shadow-sm">
-                                <QRCodeSVG value={pagarUrl} size={35} />
+                                <QRCodeSVG value={pagarUrl} size={42} />
                               </div>
+                              {isPendente && <p className="text-[7px] font-black text-emerald-900 mt-0.5">R$ {b.valor_final.toFixed(2)}</p>}
                             </div>
 
-                            <div className="text-center flex flex-col items-center border border-blue-200 bg-blue-50 rounded p-1 min-w-[65px] shadow-sm">
-                              <p className="text-[5px] font-black text-blue-700 flex items-center gap-0.5 mb-0.5 uppercase">
+                            <div className="text-center flex flex-col items-center border border-blue-200 bg-blue-50 rounded p-1 flex-1 shadow-sm">
+                              <p className="text-[6px] font-black text-blue-700 flex items-center gap-0.5 mb-0.5 uppercase">
                                 <Search className="w-2 h-2" /> CONFERIR / VALIDAR
                               </p>
                               <div className="p-0.5 bg-white rounded shadow-sm border border-blue-100">
-                                <QRCodeSVG value={conferirUrl} size={35} />
+                                <QRCodeSVG value={conferirUrl} size={42} />
                               </div>
                             </div>
                           </div>
-                        </div>
 
-                        <div className="grid grid-cols-2 gap-4 border-y border-gray-100 py-2 my-1">
-                          <div>
-                            <p className="text-[7px] text-gray-400 uppercase font-bold">Data do Sorteio</p>
-                            <p className="text-[10px] font-bold text-gray-700">{formatDate(b.rifa?.data_encerramento ?? null)}</p>
-                          </div>
-                          <div className="text-right">
-                            <p className="text-[8px] text-gray-400 uppercase font-bold">Valor</p>
-                            <p className="text-sm font-black text-emerald-600">R$ {Number(b.rifa?.custo_por_numero).toFixed(2)}</p>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-3">
-                          <div className="shrink-0 flex flex-col items-center">
-                            {b.vendedor?.codigo_ref && (
-                              <QRCodeSVG value={`${BASE_URL}/vendedor/perfil/${b.vendedor.codigo_ref}`} size={45} />
-                            )}
-                            <p className="text-[6px] text-gray-400 font-bold mt-1 uppercase">Vendedor</p>
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-1 text-emerald-600">
-                              <ShieldCheck className="h-3 w-3" />
-                              <span className="text-[8px] font-black uppercase">Vendedor Autorizado</span>
+                          <div className="space-y-1.5 flex-1">
+                            <div className="border-b border-gray-300 pb-0.5">
+                              <p className="text-[7px] text-gray-400 uppercase font-bold">Nome Comprador</p>
+                              <div className="h-2.5" />
                             </div>
-                            <p className="text-[10px] font-bold text-gray-700 truncate">{b.vendedor?.nome}</p>
-                            <p className="text-[8px] text-gray-500">Ref: {b.vendedor?.codigo_ref}</p>
+                            <div className="border-b border-gray-300 pb-0.5">
+                              <p className="text-[7px] text-gray-400 uppercase font-bold">Telefone / WhatsApp</p>
+                              <div className="h-2.5" />
+                            </div>
                           </div>
                         </div>
+
                       </div>
                     </div>
+                  );
+                })}
+              </div>
+            ) : (
+              /* ======================= LAYOUT TÉRMICO (58mm e 80mm) ======================= */
+              <div className="flex flex-col items-center gap-4 print:gap-0 print:p-0">
+                {bilhetes.map((b, idx) => {
+                  const widthClass = printFormat === 'thermal_58' ? 'w-[54mm]' : 'w-[76mm]';
+                  const pagarUrl = `${BASE_URL}/pagar-cartela?codigo=${b.codigoValidacao}`;
+                  const conferirUrl = `${BASE_URL}/validar-cartela?codigo=${b.codigoValidacao}`;
+                  const isPago = b.status_compra === 'pago';
+                  const isEmAnalise = b.status_compra === 'em_analise';
 
-                    <div className="w-0 border-l-2 border-dashed border-gray-300 relative">
-                      <div className="absolute -top-2 -left-2 w-4 h-4 bg-gray-100 rounded-full border border-gray-300 print:bg-white" />
-                      <div className="absolute -bottom-2 -left-2 w-4 h-4 bg-gray-100 rounded-full border border-gray-300 print:bg-white" />
-                    </div>
+                  return (
+                    <div key={`${b.numero}-${idx}`} className={cn("bg-white text-black font-mono p-2 break-after-page", widthClass)}>
+                      <div className="text-center mb-2 border-b-2 border-black pb-2">
+                        <h1 className="font-bold text-sm uppercase leading-tight">{b.rifa?.nome}</h1>
+                        <p className="text-[10px] mt-1">Sorteio: {formatDate(b.rifa?.data_encerramento ?? null)}</p>
+                      </div>
 
-                    <div className="w-[240px] bg-gray-50/50 p-3 flex flex-col shrink-0">
-                      <div className="flex justify-between items-start mb-2">
-                        <p className="text-[8px] font-black text-gray-400 uppercase pt-1">Canhoto Vendedor</p>
-                        <div className="text-right">
-                          <p className="text-sm font-black font-mono text-gray-800">Nº {String(b.numero).padStart(3, '0')}</p>
+                      <div className="border-2 border-black rounded-lg my-2 py-2 text-center bg-gray-100">
+                        <p className="text-[10px] uppercase font-bold mb-1">NÚMERO DA SORTE</p>
+                        <p className="font-black text-4xl tracking-widest">{String(b.numero).padStart(3, '0')}</p>
+                        <p className="text-[9px] mt-1 font-bold">CÓD: {b.codigoValidacao}</p>
+                      </div>
+
+                      <div className="text-[10px] space-y-1 mb-3 border-b-2 border-dashed border-black pb-2 text-left">
+                        <p><span className="font-bold uppercase">Cliente:</span> {b.nome_comprador || 'Não informado'}</p>
+                        <p><span className="font-bold uppercase">Contato:</span> {b.telefone_comprador || 'Não informado'}</p>
+                        <p><span className="font-bold uppercase">Valor Cota:</span> R$ {Number(b.valor_final).toFixed(2)}</p>
+                      </div>
+
+                      {isPago && (
+                        <div className="text-center border-2 border-black p-1.5 mb-3 bg-gray-200">
+                           <p className="font-black text-sm uppercase">PAGAMENTO OK</p>
                         </div>
-                      </div>
+                      )}
 
-                      <div className="flex gap-2 mb-3">
-                        <div className={cn(
-                            "text-center flex flex-col items-center border rounded p-1 flex-1 shadow-sm",
-                            isPago ? "border-gray-200 bg-gray-50 opacity-50" : isEmAnalise ? "border-blue-200 bg-blue-50" : "border-emerald-600 bg-emerald-50"
-                        )}>
-                          <p className={cn("text-[6px] font-black flex items-center gap-0.5 mb-0.5 uppercase", isPago ? "text-gray-500" : isEmAnalise ? "text-blue-700" : "text-emerald-700")}>
-                            <Smartphone className="w-2 h-2" /> {isPago ? 'PAGO' : isEmAnalise ? 'ANÁLISE' : 'PAGAR'}
-                          </p>
-                          <div className="p-0.5 bg-white rounded shadow-sm">
-                            <QRCodeSVG value={pagarUrl} size={42} />
+                      {isEmAnalise && (
+                        <div className="text-center border-2 border-black p-1.5 mb-3 bg-gray-100">
+                           <p className="font-black text-sm uppercase">EM ANÁLISE</p>
+                        </div>
+                      )}
+
+                      {!isPago && !isEmAnalise && (
+                        <div className="mb-3 text-center border-b-2 border-dashed border-black pb-2">
+                          <p className="text-[10px] font-bold uppercase mb-1">PAGAR E VALIDAR (PIX)</p>
+                          <div className="flex justify-center p-1">
+                            <QRCodeSVG value={pagarUrl} size={110} />
                           </div>
-                          {isPendente && <p className="text-[7px] font-black text-emerald-900 mt-0.5">R$ {b.valor_final.toFixed(2)}</p>}
+                          <p className="font-black text-sm mt-1">R$ {b.valor_final.toFixed(2)}</p>
                         </div>
+                      )}
 
-                        <div className="text-center flex flex-col items-center border border-blue-200 bg-blue-50 rounded p-1 flex-1 shadow-sm">
-                          <p className="text-[6px] font-black text-blue-700 flex items-center gap-0.5 mb-0.5 uppercase">
-                            <Search className="w-2 h-2" /> CONFERIR / VALIDAR
-                          </p>
-                          <div className="p-0.5 bg-white rounded shadow-sm border border-blue-100">
-                            <QRCodeSVG value={conferirUrl} size={42} />
-                          </div>
+                      <div className="text-center">
+                        <p className="text-[10px] font-bold uppercase mb-1">CONFERIR / VALIDAR</p>
+                        <div className="flex justify-center p-1">
+                          <QRCodeSVG value={conferirUrl} size={80} />
                         </div>
                       </div>
 
-                      <div className="space-y-1.5 flex-1">
-                        <div className="border-b border-gray-300 pb-0.5">
-                          <p className="text-[7px] text-gray-400 uppercase font-bold">Nome Comprador</p>
-                          <div className="h-2.5" />
-                        </div>
-                        <div className="border-b border-gray-300 pb-0.5">
-                          <p className="text-[7px] text-gray-400 uppercase font-bold">Telefone / WhatsApp</p>
-                          <div className="h-2.5" />
-                        </div>
+                      <div className="border-t-2 border-black mt-3 pt-2 text-[9px] text-center leading-tight">
+                        <p className="font-bold uppercase">Vendedor: {b.vendedor?.nome || 'N/A'}</p>
+                        <p>Ref: {b.vendedor?.codigo_ref}</p>
+                        <p className="mt-2 uppercase font-bold text-[8px]">Guarde este bilhete oficial.</p>
+                        <p className="text-[8px]">Valide-o no sistema antes do sorteio.</p>
                       </div>
                     </div>
-
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+                  );
+                })}
+              </div>
+            )}
+          </>
         )}
       </div>
-      <style>{`
-        @media print {
-          @page { size: A4; margin: 10mm; }
-          body { background: white !important; }
-          .bg-emerald-600 { background-color: #059669 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-          .text-white { color: white !important; }
-          .bg-gray-50\/50 { background-color: #f9fafb !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-          .bg-emerald-50 { background-color: #ecfdf5 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-          .bg-blue-50 { background-color: #eff6ff !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-        }
-      `}</style>
+      <style>{printStyles[printFormat]}</style>
     </div>
   );
 }
