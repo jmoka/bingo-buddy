@@ -22,7 +22,11 @@ export const useGameSettings = () => {
         stripe_enabled: false,
         stripe_pass_fees_to_customer: false,
         stripe_fee_percentage: 3.99,
-        stripe_fee_fixed: 0.39
+        stripe_fee_fixed: 0.39,
+        pagbank_enabled: false,
+        pagbank_env: 'sandbox',
+        pagbank_token_sandbox: '',
+        pagbank_token_producao: ''
       } as GameSettings;
       return data as GameSettings;
     }

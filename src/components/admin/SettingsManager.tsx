@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { Save, Settings, Check, Loader2, Bot, Link as LinkIcon, DollarSign, Banknote, Play, CalendarDays, Clock, Ticket, CreditCard } from 'lucide-react';
+import { Save, Settings, Check, Loader2, Bot, Link as LinkIcon, DollarSign, Banknote, Play, CalendarDays, Clock, Ticket, CreditCard, SmartphoneNfc } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { supabase } from '@/integrations/supabase/client';
@@ -60,6 +60,10 @@ const SettingsManager = () => {
     stripe_env: 'test' as 'test' | 'live',
     stripe_secret_key_test: '',
     stripe_webhook_secret_test: '',
+    pagbank_enabled: false,
+    pagbank_env: 'sandbox' as 'sandbox' | 'producao',
+    pagbank_token_sandbox: '',
+    pagbank_token_producao: '',
   });
   const [isSaving, setIsSaving] = useState(false);
   const [justSaved, setJustSaved] = useState(false);
@@ -104,6 +108,10 @@ const SettingsManager = () => {
         stripe_env: gameSettings.stripe_env || 'test',
         stripe_secret_key_test: gameSettings.stripe_secret_key_test || '',
         stripe_webhook_secret_test: gameSettings.stripe_webhook_secret_test || '',
+        pagbank_enabled: gameSettings.pagbank_enabled === true,
+        pagbank_env: gameSettings.pagbank_env || 'sandbox',
+        pagbank_token_sandbox: gameSettings.pagbank_token_sandbox || '',
+        pagbank_token_producao: gameSettings.pagbank_token_producao || '',
       });
     }
   }, [gameSettings]);
@@ -128,19 +136,15 @@ const SettingsManager = () => {
   };
 
   const handleToggleChange = async (name: string, checked: boolean) => {
-    // Atualiza o estado local imediatamente para feedback visual
     setCurrentSettings(prev => ({ ...prev, [name]: checked }));
-    
     try {
         const success = await updateGameSettings({ [name]: checked });
         if (success) {
-            toast.success(`${name.includes('stripe') ? 'Stripe' : 'Motor'} ${checked ? 'ativado' : 'desativado'}!`);
-            // Se ativou o motor, força uma execução imediata
+            toast.success(`Configuração ${checked ? 'ativada' : 'desativada'}!`);
             if (name === 'auto_engine_enabled' && checked) {
                 await supabase.functions.invoke('auto-match-engine', { body: { force: true } });
             }
         } else {
-            // Reverte se falhar
             setCurrentSettings(prev => ({ ...prev, [name]: !checked }));
         }
     } catch (e) {
@@ -260,9 +264,45 @@ const SettingsManager = () => {
           </div>
         </div>
 
+        {/* PAGBANK */}
+        <div className="space-y-6 p-4 bg-green-500/5 rounded-2xl border border-green-500/20">
+          <h3 className="font-heading font-bold text-green-700 dark:text-green-500 flex items-center gap-2"><SmartphoneNfc className="w-4 h-4" /> Integração PagBank</h3>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between p-3 bg-background rounded-xl border border-border/50">
+              <div className="space-y-0.5">
+                <Label className="text-sm font-bold">Ativar PagBank (PIX Automático)</Label>
+                <p className="text-[10px] text-muted-foreground">Substitui o envio manual de comprovante PIX.</p>
+              </div>
+              <Switch checked={currentSettings.pagbank_enabled} onCheckedChange={(checked) => handleToggleChange('pagbank_enabled', checked)} />
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-xs font-bold text-green-800 dark:text-green-400">Ambiente PagBank</Label>
+              <RadioGroup value={currentSettings.pagbank_env} onValueChange={(v: any) => handleSelectChange('pagbank_env', v)} className="grid grid-cols-2 gap-2">
+                <Label className={cn("flex items-center justify-center rounded-md border-2 p-3 cursor-pointer transition-colors", currentSettings.pagbank_env === 'sandbox' ? 'border-green-500 bg-green-500/10 text-green-800' : 'border-muted bg-popover')}><RadioGroupItem value="sandbox" className="sr-only" />Modo Teste</Label>
+                <Label className={cn("flex items-center justify-center rounded-md border-2 p-3 cursor-pointer transition-colors", currentSettings.pagbank_env === 'producao' ? 'border-green-500 bg-green-500/10 text-green-800' : 'border-muted bg-popover')}><RadioGroupItem value="producao" className="sr-only" />Modo Produção</Label>
+              </RadioGroup>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs">Token de Produção (PagBank)</Label>
+              <Input name="pagbank_token_producao" type="password" value={currentSettings.pagbank_token_producao} onChange={handleSettingsChange} className="text-xs" placeholder="••••••••••••••••••••••••" />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Token de Sandbox (Testes)</Label>
+              <Input name="pagbank_token_sandbox" type="password" value={currentSettings.pagbank_token_sandbox} onChange={handleSettingsChange} className="text-xs" placeholder="••••••••••••••••••••••••" />
+            </div>
+
+            <div className="p-3 bg-muted/50 rounded-lg text-[10px] text-muted-foreground leading-relaxed border border-dashed">
+              <p className="font-bold mb-1">Como funciona o Webhook do PagBank?</p>
+              <p>Não é necessário colar a URL aqui. O próprio aplicativo Bingo envia a URL <code className="bg-background px-1 py-0.5 rounded text-primary">/functions/v1/pagbank-webhook</code> automaticamente para o PagBank em cada cobrança gerada, garantindo que o sistema seja notificado assim que o cliente pagar.</p>
+            </div>
+          </div>
+        </div>
+
         {/* STRIPE */}
         <div className="space-y-6 p-4 bg-muted/20 rounded-2xl border border-border/50">
-          <h3 className="font-heading font-bold text-primary flex items-center gap-2"><CreditCard className="w-4 h-4" /> Pagamentos Automáticos (Stripe)</h3>
+          <h3 className="font-heading font-bold text-primary flex items-center gap-2"><CreditCard className="w-4 h-4" /> Pagamentos via Cartão (Stripe)</h3>
           <div className="space-y-4">
             <div className="flex items-center justify-between p-3 bg-background rounded-xl border border-border/50">
               <div className="space-y-0.5">
@@ -306,11 +346,6 @@ const SettingsManager = () => {
             <div className="space-y-1.5"><Label className="text-xs">Stripe Webhook Secret (Produção)</Label><Input name="stripe_webhook_secret" type="password" value={currentSettings.stripe_webhook_secret} onChange={handleSettingsChange} className="text-xs" /></div>
             <div className="space-y-1.5"><Label className="text-xs">Stripe Secret Key (Teste)</Label><Input name="stripe_secret_key_test" type="password" value={currentSettings.stripe_secret_key_test} onChange={handleSettingsChange} className="text-xs" /></div>
             <div className="space-y-1.5"><Label className="text-xs">Stripe Webhook Secret (Teste)</Label><Input name="stripe_webhook_secret_test" type="password" value={currentSettings.stripe_webhook_secret_test} onChange={handleSettingsChange} className="text-xs" /></div>
-            
-            <p className="text-[9px] text-muted-foreground bg-background p-2 rounded border border-dashed overflow-hidden">
-              <strong>Webhook URL:</strong><br/>
-              <code className="font-bold text-primary break-all">https://vqvnodwojefubbbnbyar.supabase.co/functions/v1/stripe-webhook</code>
-            </p>
           </div>
         </div>
 
@@ -378,10 +413,13 @@ const SettingsManager = () => {
           </div>
         </div>
         
-        {/* PIX E CRÉDITOS */}
+        {/* PIX MANUAL */}
         <div className="space-y-6 p-4 bg-muted/20 rounded-2xl border border-border/50">
-          <h3 className="font-heading font-bold text-primary flex items-center gap-2"><Banknote className="w-4 h-4" /> PIX e Créditos</h3>
+          <h3 className="font-heading font-bold text-primary flex items-center gap-2"><Banknote className="w-4 h-4" /> PIX Manual (Comprovante)</h3>
           <div className="space-y-4">
+            <div className="p-3 bg-muted/50 rounded-lg text-xs text-muted-foreground border border-dashed">
+                O PIX Manual é exibido para o cliente se o PagBank/Stripe estiverem desativados, exigindo o envio da foto do comprovante para o administrador aprovar.
+            </div>
             <div className="space-y-1.5"><Label className="text-xs">Chave PIX (Admin)</Label><Input name="pix_key" value={currentSettings.pix_key} onChange={handleSettingsChange} /></div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5"><Label className="text-xs">Nome Recebedor</Label><Input name="pix_name" value={currentSettings.pix_name} onChange={handleSettingsChange} /></div>

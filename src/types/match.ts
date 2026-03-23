@@ -114,6 +114,10 @@ export interface GameSettings {
   stripe_env?: 'test' | 'live';
   stripe_secret_key_test?: string;
   stripe_webhook_secret_test?: string;
+  pagbank_enabled?: boolean;
+  pagbank_env?: 'sandbox' | 'producao';
+  pagbank_token_sandbox?: string;
+  pagbank_token_producao?: string;
 }
 
 export interface FolhaBingoFisico {
