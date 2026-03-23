@@ -21,7 +21,7 @@ export default function PagarCartela() {
   const [loading, setLoading] = useState(true);
   const [isStripeLoading, setIsStripeLoading] = useState(false);
   
-  // PagBank States & User Identification
+  // PagBank States
   const [isPagbankLoading, setIsPagbankLoading] = useState(false);
   const [pagbankData, setPagbankData] = useState<{qr_code: string, qr_code_text: string} | null>(null);
   const [nomePagador, setNomePagador] = useState('');
@@ -70,6 +70,20 @@ export default function PagarCartela() {
     return Number(venda.valor_pago) / (1 - (desc / 100));
   }, [venda]);
 
+  // === CÁLCULO DE TAXAS (STRIPE) ===
+  const stripeFeeDetails = useMemo(() => {
+    if (!gameSettings?.stripe_pass_fees_to_customer) return null;
+    const perc = gameSettings.stripe_fee_percentage || 0;
+    const fix = gameSettings.stripe_fee_fixed || 0;
+    const final = (valorCheio + fix) / (1 - (perc / 100));
+    const finalRounded = Math.ceil(final * 100) / 100;
+    const fee = finalRounded - valorCheio;
+    return { final: finalRounded, fee };
+  }, [valorCheio, gameSettings]);
+
+  const finalStripeAmount = stripeFeeDetails ? stripeFeeDetails.final : valorCheio;
+
+  // === CÁLCULO DE TAXAS (PAGBANK) ===
   const calcFee = (method: 'pix' | 'card') => {
       if (!gameSettings?.pagbank_pass_fees_to_customer) return null;
       const perc = method === 'pix' ? (gameSettings.pagbank_pix_fee_percentage || 0) : (gameSettings.pagbank_card_fee_percentage || 0);
@@ -81,14 +95,6 @@ export default function PagarCartela() {
 
   const pixFeeDetails = calcFee('pix');
   const cardFeeDetails = calcFee('card');
-
-  const finalStripeAmount = useMemo(() => {
-    if (!gameSettings?.stripe_pass_fees_to_customer) return valorCheio;
-    const perc = gameSettings.stripe_fee_percentage || 0;
-    const fix = gameSettings.stripe_fee_fixed || 0;
-    const f = (valorCheio + fix) / (1 - (perc / 100));
-    return Math.ceil(f * 100) / 100;
-  }, [valorCheio, gameSettings]);
 
   const pixPayload = useMemo(() => {
     if (!gameSettings?.pix_key || !venda) return '';
@@ -195,11 +201,11 @@ export default function PagarCartela() {
                    {/* Cartão Checkout */}
                    <div className="bg-white p-4 rounded-xl border shadow-sm space-y-3">
                       <div className="flex justify-between items-center">
-                        <span className="font-bold flex items-center gap-2 text-blue-700"><CreditCard className="w-5 h-5"/> Cartão</span>
+                        <span className="font-bold flex items-center gap-2 text-blue-700"><CreditCard className="w-5 h-5"/> Cartão (PagBank)</span>
                         <span className="font-black text-lg text-blue-700">R$ {(cardFeeDetails?.final || valorCheio).toFixed(2).replace('.', ',')}</span>
                       </div>
                       {cardFeeDetails && <p className="text-[10px] text-muted-foreground bg-muted/50 p-2 rounded">Inclui taxa de R$ {cardFeeDetails.fee.toFixed(2)}. Liberação imediata.</p>}
-                      <Button className="w-full bg-blue-600 hover:bg-blue-700" onClick={() => handlePagbankPayment('CREDIT_CARD')} disabled={isStripeLoading || valorCheio <= 0}>
+                      <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold" onClick={() => handlePagbankPayment('CREDIT_CARD')} disabled={isStripeLoading || valorCheio <= 0}>
                          {isStripeLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null} Pagar no Cartão
                       </Button>
                    </div>
@@ -213,7 +219,7 @@ export default function PagarCartela() {
                       {!pagbankData ? (
                         <>
                           {pixFeeDetails && <p className="text-[10px] text-muted-foreground bg-muted/50 p-2 rounded">Inclui taxa bancária de R$ {pixFeeDetails.fee.toFixed(2)}.</p>}
-                          <Button className="w-full bg-green-600 hover:bg-green-700" onClick={() => handlePagbankPayment('pix')} disabled={isPagbankLoading || valorCheio <= 0}>
+                          <Button className="w-full bg-green-600 hover:bg-green-700 text-white font-bold shadow-button" onClick={() => handlePagbankPayment('pix')} disabled={isPagbankLoading || valorCheio <= 0}>
                              {isPagbankLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null} Gerar QR Code PIX
                           </Button>
                         </>
