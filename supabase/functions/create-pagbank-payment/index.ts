@@ -17,7 +17,7 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    let configQuery = supabaseAdmin.from('configuracoes').select('admin_id, pagbank_env, pagbank_token_sandbox, pagbank_token_producao, pagbank_pass_fees_to_customer, pagbank_pix_fee_percentage, pagbank_card_fee_percentage, pagbank_pix_fee_fixed, pagbank_card_fee_fixed');
+    let configQuery = supabaseAdmin.from('configuracoes').select('*');
     if (admin_id) {
         configQuery = configQuery.eq('admin_id', admin_id);
     }
@@ -40,20 +40,16 @@ serve(async (req) => {
     let phoneNumber = "999999999";
     let redirectUrl = metadata?.origin || 'http://localhost:5173';
 
-    // PARSER SEGURO DE TELEFONE (O PagBank quebra se for maior que 9 digitos ou tiver DDI 55)
     const applyPhone = (rawPhone: string) => {
         if (!rawPhone) return;
         let clean = rawPhone.replace(/\D/g, '');
-        if (clean.startsWith('55') && clean.length > 12) {
-            clean = clean.substring(2);
-        }
+        if (clean.startsWith('55') && clean.length > 12) clean = clean.substring(2);
         if (clean.length >= 10 && clean.length <= 11) {
             phoneArea = clean.substring(0, 2);
             phoneNumber = clean.substring(2);
         }
     };
 
-    // Se estiver logado, busca os dados
     if (authHeader && authHeader !== 'Bearer null' && authHeader !== 'null') {
         const userClient = createClient(Deno.env.get('SUPABASE_URL') ?? '', Deno.env.get('SUPABASE_ANON_KEY') ?? '', { global: { headers: { Authorization: authHeader } } });
         const { data: { user } } = await userClient.auth.getUser();
@@ -76,11 +72,8 @@ serve(async (req) => {
             supabaseAdmin.from('perfis').update({ cpf: customerTaxId }).eq('id', user_id).then(({error}) => { if(error) console.error("Erro update CPF:", error) });
         }
     }
-    if (metadata?.cliente_telefone) {
-        applyPhone(metadata.cliente_telefone);
-    }
+    if (metadata?.cliente_telefone) applyPhone(metadata.cliente_telefone);
 
-    // VALIDAÇÃO ESTRITA DE SEGURANÇA (Prevenção de erro 400 da API do PagBank)
     if (!customerTaxId || (customerTaxId.length !== 11 && customerTaxId.length !== 14)) {
         throw new Error("CPF_REQUIRED: O Banco exige um CPF ou CNPJ válido matematicamente.");
     }
@@ -88,12 +81,10 @@ serve(async (req) => {
     let finalName = customerName.trim();
     if (!finalName.includes(' ')) finalName = `${finalName} Cliente`;
 
-    // CÁLCULO DE TAXAS SEGURO (BACKEND)
     let finalAmount = Number(amount);
     if (config.pagbank_pass_fees_to_customer) {
         const feePerc = payment_method === 'pix' ? Number(config.pagbank_pix_fee_percentage || 0) : Number(config.pagbank_card_fee_percentage || 0);
         const feeFixed = payment_method === 'pix' ? Number(config.pagbank_pix_fee_fixed || 0) : Number(config.pagbank_card_fee_fixed || 0);
-        
         finalAmount = (finalAmount + feeFixed) / (1 - (feePerc / 100));
         finalAmount = Math.ceil(finalAmount * 100) / 100;
     }
@@ -102,7 +93,6 @@ serve(async (req) => {
     const reference_id = `${type.toUpperCase()}_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
     const itemName = type === 'credits' ? 'Créditos Bingo Show' : 'Bilhete Bingo Show';
 
-    // REGISTRO DE COMPRADOR (Venda Física)
     try {
       if (type === 'venda_bingo' && metadata?.venda_id) {
           await supabaseAdmin.from('vendas_bingo_fisico').update({ nome_comprador: finalName, telefone_comprador: metadata?.cliente_telefone || null }).eq('id', metadata.venda_id);
@@ -110,7 +100,7 @@ serve(async (req) => {
           const { data: cartela } = await supabaseAdmin.from('cartelas_rifa').select('numero_rifa_id').eq('compra_id', metadata.venda_id).maybeSingle();
           if (cartela?.numero_rifa_id) await supabaseAdmin.from('numeros_rifa').update({ nome_comprador: finalName, telefone_comprador: metadata?.cliente_telefone || null }).eq('id', cartela.numero_rifa_id);
       }
-    } catch (err) { console.error("Erro pre-salvar comprador:", err); }
+    } catch (err) {}
 
     let responseData;
     let pagbank_order_id = '';
@@ -121,33 +111,30 @@ serve(async (req) => {
     // FLUXO CARTÃO (CHECKOUT)
     if (payment_method === 'CREDIT_CARD') {
         let success_url = `${redirectUrl}/?payment=success`;
-        let cancel_url = `${redirectUrl}/?payment=cancel`;
         if ((type === 'venda_bingo' || type === 'venda_rifa') && metadata?.codigo) {
             success_url = `${redirectUrl}/validar-cartela?${type === 'venda_rifa' ? 'codigo' : 'bingo'}=${metadata.codigo}`;
-            cancel_url = `${redirectUrl}/pagar-cartela?codigo=${metadata.codigo}`;
         }
 
-        // SEGURANÇA E HIGIENIZAÇÃO: O PagBank NÃO aceita localhost ou HTTP no redirect_url.
-        // Se estivermos testando localmente, injetamos uma URL falsa mas válida HTTPS para não quebrar a API.
-        let final_redirect_url = success_url;
-        if (final_redirect_url.includes('localhost') || final_redirect_url.includes('127.0.0.1') || final_redirect_url.startsWith('http://')) {
-            final_redirect_url = 'https://bingoshow-app.vercel.app'; 
-        }
+        // SEGURANÇA CONTRA ERRO 400 DE REDIRECT URL DO PAGBANK
+        // Se a origem for localhost, NÃO enviamos a URL de redirecionamento, pois a API bloqueia
+        const isLocalhost = redirectUrl.includes('localhost') || redirectUrl.includes('127.0.0.1');
 
-        const checkoutPayload = {
+        const checkoutPayload: any = {
             reference_id: reference_id,
             expiration_date: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
             customer: { 
-                name: finalName, 
-                email: customerEmail, 
-                tax_id: customerTaxId,
+                name: finalName, email: customerEmail, tax_id: customerTaxId,
                 phones: [{ country: "55", area: phoneArea, number: phoneNumber, type: "MOBILE" }]
             },
             items: [{ reference_id: `ITEM_${reference_id}`, name: itemName, quantity: 1, unit_amount: valorEmCentavos }],
             payment_methods: [{"type": "CREDIT_CARD"}],
             notification_urls: [`${Deno.env.get('SUPABASE_URL')}/functions/v1/pagbank-webhook`],
-            redirect_url: final_redirect_url
         };
+
+        // Adiciona a URL de retorno apenas se estiver em produção (Domínio Real)
+        if (!isLocalhost) {
+            checkoutPayload.redirect_url = success_url;
+        }
 
         console.log(`[create-pagbank-payment] Payload Checkout enviado:`, JSON.stringify(checkoutPayload));
 
@@ -160,7 +147,6 @@ serve(async (req) => {
         responseData = await response.json();
 
         if (!response.ok) {
-            console.error("[create-pagbank-payment] Erro PagBank Checkout:", JSON.stringify(responseData));
             const errDesc = responseData.error_messages?.[0]?.description || "";
             const errParam = responseData.error_messages?.[0]?.parameter_name || "Desconhecido";
             throw new Error(`O Banco recusou a transação. Campo [${errParam}]: ${errDesc}`);
@@ -192,7 +178,7 @@ serve(async (req) => {
         if (!response.ok) {
             const errDesc = responseData.error_messages?.[0]?.description || "";
             if (errDesc.includes("CPF") || errDesc.includes("CNPJ") || responseData.error_messages?.[0]?.code === "40002") {
-                throw new Error("CPF Inválido. Digite um CPF com 11 números sem pontos.");
+                throw new Error("CPF_REQUIRED: O CPF informado é inválido matematicamente.");
             }
             throw new Error(`Erro API PagBank: ${errDesc}`);
         }
@@ -216,15 +202,8 @@ serve(async (req) => {
     });
 
     return new Response(JSON.stringify({ 
-      success: true, 
-      qr_code, 
-      qr_code_text, 
-      checkout_link,
-      order_id: pagbank_order_id 
-    }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 200
-    });
+      success: true, qr_code, qr_code_text, checkout_link, order_id: pagbank_order_id 
+    }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
 
   } catch (error: any) {
     console.error("[create-pagbank-payment] Controlled Error:", error.message);
