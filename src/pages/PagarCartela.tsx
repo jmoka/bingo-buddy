@@ -24,6 +24,7 @@ export default function PagarCartela() {
   // PagBank States
   const [isPagbankLoading, setIsPagbankLoading] = useState(false);
   const [pagbankData, setPagbankData] = useState<{qr_code: string, qr_code_text: string} | null>(null);
+  const [cpfPagador, setCpfPagador] = useState('');
 
   useEffect(() => {
     async function loadData() {
@@ -154,13 +155,18 @@ export default function PagarCartela() {
   };
 
   const handlePagbankPayment = async () => {
+    if (!cpfPagador.trim()) {
+      toast.error("Por favor, preencha o seu CPF.");
+      return;
+    }
+
     setIsPagbankLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke('create-pagbank-payment', {
         body: { 
           amount: valorCheio,
           type: tipoVenda === 'bingo' ? 'venda_bingo' : 'venda_rifa',
-          metadata: { venda_id: venda.id, codigo: venda.codigo_validacao },
+          metadata: { venda_id: venda.id, codigo: venda.codigo_validacao, customer_cpf: cpfPagador },
           admin_id: venda.admin_id || gameSettings?.admin_id
         }
       });
@@ -173,8 +179,9 @@ export default function PagarCartela() {
         throw new Error(data?.error || "Erro desconhecido ao gerar PIX.");
       }
     } catch (e: any) {
-      // Correção e Segurança para Erro 401
-      if (e.message.includes('401') || e.message.includes('FetchError') || e.message.includes('Failed to load resource')) {
+      if (e.message.includes('CPF_REQUIRED')) {
+        toast.error("CPF Inválido. Digite um CPF correto com 11 números para gerar o pagamento.");
+      } else if (e.message.includes('401') || e.message.includes('FetchError') || e.message.includes('Failed to load resource')) {
          toast.error("Sua conexão caiu. Por favor, atualize a página (F5) e tente novamente.");
       } else {
          toast.error("Erro ao gerar PIX PagBank: " + e.message);
@@ -275,14 +282,25 @@ export default function PagarCartela() {
                 <h4 className="font-bold text-green-800 flex justify-center items-center gap-2"><SmartphoneNfc className="w-5 h-5" /> PIX Automático</h4>
                 
                 {!pagbankData ? (
-                  <Button
-                    className="w-full h-12 bg-green-600 hover:bg-green-700 text-white font-bold shadow-button"
-                    onClick={handlePagbankPayment}
-                    disabled={isPagbankLoading}
-                  >
-                    {isPagbankLoading ? <Loader2 className="w-5 h-5 mr-2 animate-spin" /> : null}
-                    Gerar PIX de R$ {valorCheio.toFixed(2).replace('.', ',')}
-                  </Button>
+                  <>
+                    <div className="space-y-2 mb-3 text-left">
+                      <Label className="text-xs text-green-800 uppercase font-bold">Seu CPF (Obrigatório para o PIX)</Label>
+                      <Input
+                        value={cpfPagador}
+                        onChange={e => setCpfPagador(e.target.value)}
+                        placeholder="000.000.000-00"
+                        className="border-green-300 focus-visible:ring-green-500"
+                      />
+                    </div>
+                    <Button
+                      className="w-full h-12 bg-green-600 hover:bg-green-700 text-white font-bold shadow-button"
+                      onClick={handlePagbankPayment}
+                      disabled={isPagbankLoading}
+                    >
+                      {isPagbankLoading ? <Loader2 className="w-5 h-5 mr-2 animate-spin" /> : null}
+                      Gerar PIX de R$ {valorCheio.toFixed(2).replace('.', ',')}
+                    </Button>
+                  </>
                 ) : (
                   <div className="space-y-3 animate-in fade-in zoom-in duration-300">
                     <div className="bg-white p-3 rounded-lg inline-block shadow-sm border border-gray-200">

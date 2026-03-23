@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useGame } from '@/contexts/GameContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -18,6 +19,7 @@ interface CreditRequestDialogProps {
 }
 
 export const CreditRequestDialog = ({ gameSettings, children }: CreditRequestDialogProps) => {
+  const navigate = useNavigate();
   const { requestCredits } = useGame();
   const { profile, user } = useAuth();
   const [file, setFile] = useState<File | null>(null);
@@ -114,8 +116,19 @@ export const CreditRequestDialog = ({ gameSettings, children }: CreditRequestDia
         throw new Error(data?.error || "Erro desconhecido ao gerar PIX.");
       }
     } catch (e: any) {
-      // Correção e Segurança para Erro 401
-      if (e.message.includes('401') || e.message.includes('FetchError') || e.message.includes('Failed to load resource')) {
+      if (e.message.includes('CPF_REQUIRED')) {
+        toast.error("Cadastro Incompleto", {
+          description: "O PagBank exige um CPF válido. Atualize seu perfil.",
+          action: {
+            label: "Atualizar Perfil",
+            onClick: () => {
+              setIsOpen(false);
+              navigate('/account');
+            }
+          },
+          duration: 8000,
+        });
+      } else if (e.message.includes('401') || e.message.includes('FetchError') || e.message.includes('Failed to load resource')) {
          toast.error("Sua sessão expirou ou o servidor foi atualizado. Por favor, recarregue a página (F5) e tente novamente.");
       } else {
          toast.error("Erro ao gerar PIX PagBank: " + e.message);

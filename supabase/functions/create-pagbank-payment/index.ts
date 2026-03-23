@@ -36,7 +36,7 @@ serve(async (req) => {
     let user_id = null;
     let customerName = 'Cliente Bingo Show';
     let customerEmail = 'cliente@bingoshow.com';
-    let customerTaxId = '00000000000'; // Fallback para PIX
+    let customerTaxId = ''; // Será preenchido rigorosamente
 
     // Se estiver logado, busca os dados reais do jogador
     if (authHeader && authHeader !== 'Bearer null' && authHeader !== 'null') {
@@ -48,13 +48,23 @@ serve(async (req) => {
             const { data: profile } = await supabaseAdmin.from('perfis').select('full_name, cpf').eq('id', user.id).single();
             if (profile) {
                 customerName = profile.full_name || customerName;
-                if (profile.cpf) customerTaxId = profile.cpf.replace(/\D/g, '');
+                if (profile.cpf) {
+                  customerTaxId = profile.cpf.replace(/\D/g, '');
+                }
             }
         }
     }
 
-    // Sobrescreve com metadados da venda física (se houver)
+    // Sobrescreve com metadados do frontend (venda física anônima)
     if (metadata?.cliente_nome) customerName = metadata.cliente_nome;
+    if (metadata?.customer_cpf) {
+        customerTaxId = metadata.customer_cpf.replace(/\D/g, '');
+    }
+
+    // VALIDAÇÃO ESTRITA DE SEGURANÇA (Prevenção de erro 400 da API do PagBank)
+    if (!customerTaxId || (customerTaxId.length !== 11 && customerTaxId.length !== 14)) {
+        throw new Error("CPF_REQUIRED: É obrigatório informar um CPF ou CNPJ válido para gerar o pagamento via PagBank.");
+    }
 
     // Criar o Payload para o PagBank (Orders API)
     const reference_id = `${type.toUpperCase()}_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
@@ -65,7 +75,7 @@ serve(async (req) => {
       customer: {
         name: customerName,
         email: customerEmail,
-        tax_id: customerTaxId.length === 11 || customerTaxId.length === 14 ? customerTaxId : '00000000000',
+        tax_id: customerTaxId,
       },
       items: [{
         name: type === 'credits' ? 'Créditos Bingo Show' : 'Bilhete Bingo Show',
