@@ -64,6 +64,11 @@ const SettingsManager = () => {
     pagbank_env: 'sandbox' as 'sandbox' | 'producao',
     pagbank_token_sandbox: '',
     pagbank_token_producao: '',
+    pagbank_pass_fees_to_customer: false,
+    pagbank_pix_fee_fixed: 0.99,
+    pagbank_pix_fee_percentage: 0,
+    pagbank_card_fee_fixed: 0.39,
+    pagbank_card_fee_percentage: 4.99,
   });
   const [isSaving, setIsSaving] = useState(false);
   const [justSaved, setJustSaved] = useState(false);
@@ -75,6 +80,7 @@ const SettingsManager = () => {
   useEffect(() => {
     if (gameSettings) {
       setCurrentSettings({
+        ...currentSettings,
         custo_nova_cartela: gameSettings.custo_nova_cartela,
         custo_recarga_cartela: gameSettings.custo_recarga_cartela,
         usos_por_recarga: gameSettings.usos_por_recarga,
@@ -112,6 +118,11 @@ const SettingsManager = () => {
         pagbank_env: gameSettings.pagbank_env || 'sandbox',
         pagbank_token_sandbox: gameSettings.pagbank_token_sandbox || '',
         pagbank_token_producao: gameSettings.pagbank_token_producao || '',
+        pagbank_pass_fees_to_customer: gameSettings.pagbank_pass_fees_to_customer === true,
+        pagbank_pix_fee_fixed: gameSettings.pagbank_pix_fee_fixed ?? 0.99,
+        pagbank_pix_fee_percentage: gameSettings.pagbank_pix_fee_percentage ?? 0,
+        pagbank_card_fee_fixed: gameSettings.pagbank_card_fee_fixed ?? 0.39,
+        pagbank_card_fee_percentage: gameSettings.pagbank_card_fee_percentage ?? 4.99,
       });
     }
   }, [gameSettings]);
@@ -177,6 +188,10 @@ const SettingsManager = () => {
       cartelas_por_folha_bingo: parseInt(currentSettings.cartelas_por_folha_bingo as any, 10),
       stripe_fee_percentage: Number(currentSettings.stripe_fee_percentage),
       stripe_fee_fixed: Number(currentSettings.stripe_fee_fixed),
+      pagbank_pix_fee_fixed: Number(currentSettings.pagbank_pix_fee_fixed),
+      pagbank_pix_fee_percentage: Number(currentSettings.pagbank_pix_fee_percentage),
+      pagbank_card_fee_fixed: Number(currentSettings.pagbank_card_fee_fixed),
+      pagbank_card_fee_percentage: Number(currentSettings.pagbank_card_fee_percentage),
     });
     
     setIsSaving(false);
@@ -270,8 +285,8 @@ const SettingsManager = () => {
           <div className="space-y-4">
             <div className="flex items-center justify-between p-3 bg-background rounded-xl border border-border/50">
               <div className="space-y-0.5">
-                <Label className="text-sm font-bold">Ativar PagBank (PIX Automático)</Label>
-                <p className="text-[10px] text-muted-foreground">Substitui o envio manual de comprovante PIX.</p>
+                <Label className="text-sm font-bold">Ativar PagBank</Label>
+                <p className="text-[10px] text-muted-foreground">Checkout Transparente: PIX e Cartão</p>
               </div>
               <Switch checked={currentSettings.pagbank_enabled} onCheckedChange={(checked) => handleToggleChange('pagbank_enabled', checked)} />
             </div>
@@ -293,10 +308,49 @@ const SettingsManager = () => {
               <Input name="pagbank_token_sandbox" type="password" value={currentSettings.pagbank_token_sandbox} onChange={handleSettingsChange} className="text-xs" placeholder="••••••••••••••••••••••••" />
             </div>
 
-            <div className="p-3 bg-muted/50 rounded-lg text-[10px] text-muted-foreground leading-relaxed border border-dashed">
-              <p className="font-bold mb-1">Como funciona o Webhook do PagBank?</p>
-              <p>Não é necessário colar a URL aqui. O próprio aplicativo Bingo envia a URL <code className="bg-background px-1 py-0.5 rounded text-primary">/functions/v1/pagbank-webhook</code> automaticamente para o PagBank em cada cobrança gerada, garantindo que o sistema seja notificado assim que o cliente pagar.</p>
+            {/* Taxas do PagBank */}
+            <div className="space-y-3 p-3 bg-green-500/10 border border-green-500/30 rounded-xl">
+               <div className="flex items-center justify-between mb-2 border-b border-green-500/20 pb-2">
+                 <div className="space-y-0.5">
+                   <Label className="text-sm font-bold text-green-900 dark:text-green-500">Repassar Taxas ao Cliente?</Label>
+                   <p className="text-[10px] text-green-800/80">Calcula e soma as taxas bancárias no valor final pago pelo usuário.</p>
+                 </div>
+                 <Switch checked={currentSettings.pagbank_pass_fees_to_customer} onCheckedChange={(checked) => handleToggleChange('pagbank_pass_fees_to_customer', checked)} />
+               </div>
+               
+               {currentSettings.pagbank_pass_fees_to_customer && (
+                 <div className="space-y-4">
+                     <div className="grid grid-cols-2 gap-4">
+                       <div className="col-span-2">
+                          <p className="text-xs font-bold text-green-900 mb-1">Taxas para PIX</p>
+                       </div>
+                       <div className="space-y-1.5">
+                         <Label className="text-[10px] text-green-800">Taxa Fixa PIX (R$)</Label>
+                         <Input name="pagbank_pix_fee_fixed" type="number" step="0.01" value={currentSettings.pagbank_pix_fee_fixed} onChange={handleSettingsChange} className="text-xs h-8 border-green-300" />
+                       </div>
+                       <div className="space-y-1.5">
+                         <Label className="text-[10px] text-green-800">Taxa Percentual PIX (%)</Label>
+                         <Input name="pagbank_pix_fee_percentage" type="number" step="0.01" value={currentSettings.pagbank_pix_fee_percentage} onChange={handleSettingsChange} className="text-xs h-8 border-green-300" />
+                       </div>
+                     </div>
+
+                     <div className="grid grid-cols-2 gap-4 border-t border-green-500/20 pt-3">
+                       <div className="col-span-2">
+                          <p className="text-xs font-bold text-green-900 mb-1">Taxas para Cartão de Crédito</p>
+                       </div>
+                       <div className="space-y-1.5">
+                         <Label className="text-[10px] text-green-800">Taxa Fixa Cartão (R$)</Label>
+                         <Input name="pagbank_card_fee_fixed" type="number" step="0.01" value={currentSettings.pagbank_card_fee_fixed} onChange={handleSettingsChange} className="text-xs h-8 border-green-300" />
+                       </div>
+                       <div className="space-y-1.5">
+                         <Label className="text-[10px] text-green-800">Taxa Percentual Cartão (%)</Label>
+                         <Input name="pagbank_card_fee_percentage" type="number" step="0.01" value={currentSettings.pagbank_card_fee_percentage} onChange={handleSettingsChange} className="text-xs h-8 border-green-300" />
+                       </div>
+                     </div>
+                 </div>
+               )}
             </div>
+
           </div>
         </div>
 
@@ -307,7 +361,7 @@ const SettingsManager = () => {
             <div className="flex items-center justify-between p-3 bg-background rounded-xl border border-border/50">
               <div className="space-y-0.5">
                 <Label className="text-sm font-bold">Ativar Stripe</Label>
-                <p className="text-[10px] text-muted-foreground">Habilita pagamentos via cartão.</p>
+                <p className="text-[10px] text-muted-foreground">Habilita pagamentos via cartão (Standby).</p>
               </div>
               <Switch checked={currentSettings.stripe_enabled} onCheckedChange={(checked) => handleToggleChange('stripe_enabled', checked)} />
             </div>
@@ -418,7 +472,7 @@ const SettingsManager = () => {
           <h3 className="font-heading font-bold text-primary flex items-center gap-2"><Banknote className="w-4 h-4" /> PIX Manual (Comprovante)</h3>
           <div className="space-y-4">
             <div className="p-3 bg-muted/50 rounded-lg text-xs text-muted-foreground border border-dashed">
-                O PIX Manual é exibido para o cliente se o PagBank/Stripe estiverem desativados, exigindo o envio da foto do comprovante para o administrador aprovar.
+                A opção de PIX Manual ficará visível como alternativa gratuita (sem taxas) ou caso as automações falhem.
             </div>
             <div className="space-y-1.5"><Label className="text-xs">Chave PIX (Admin)</Label><Input name="pix_key" value={currentSettings.pix_key} onChange={handleSettingsChange} /></div>
             <div className="grid grid-cols-2 gap-4">

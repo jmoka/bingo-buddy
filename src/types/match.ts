@@ -119,6 +119,11 @@ export interface GameSettings {
   pagbank_env?: 'sandbox' | 'producao';
   pagbank_token_sandbox?: string;
   pagbank_token_producao?: string;
+  pagbank_pass_fees_to_customer?: boolean;
+  pagbank_pix_fee_fixed?: number;
+  pagbank_pix_fee_percentage?: number;
+  pagbank_card_fee_fixed?: number;
+  pagbank_card_fee_percentage?: number;
 }
 
 export interface FolhaBingoFisico {

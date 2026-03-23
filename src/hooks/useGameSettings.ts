@@ -26,7 +26,12 @@ export const useGameSettings = () => {
         pagbank_enabled: false,
         pagbank_env: 'sandbox',
         pagbank_token_sandbox: '',
-        pagbank_token_producao: ''
+        pagbank_token_producao: '',
+        pagbank_pass_fees_to_customer: false,
+        pagbank_pix_fee_fixed: 0.99,
+        pagbank_pix_fee_percentage: 0,
+        pagbank_card_fee_fixed: 0.39,
+        pagbank_card_fee_percentage: 4.99
       } as GameSettings;
       return data as GameSettings;
     }
