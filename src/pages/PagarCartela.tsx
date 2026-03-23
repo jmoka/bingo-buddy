@@ -4,7 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2, ArrowLeft, Copy, CheckCircle2, AlertTriangle, ShieldCheck, Camera, CreditCard, SmartphoneNfc } from 'lucide-react';
+import { Loader2, ArrowLeft, Copy, CheckCircle2, AlertTriangle, ShieldCheck, Camera, CreditCard, SmartphoneNfc, User } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { QrCodePix } from 'qrcode-pix';
 import { toast } from 'sonner';
@@ -21,9 +21,11 @@ export default function PagarCartela() {
   const [loading, setLoading] = useState(true);
   const [isStripeLoading, setIsStripeLoading] = useState(false);
   
-  // PagBank States
+  // PagBank States & User Identification
   const [isPagbankLoading, setIsPagbankLoading] = useState(false);
   const [pagbankData, setPagbankData] = useState<{qr_code: string, qr_code_text: string} | null>(null);
+  const [nomePagador, setNomePagador] = useState('');
+  const [telefonePagador, setTelefonePagador] = useState('');
   const [cpfPagador, setCpfPagador] = useState('');
 
   useEffect(() => {
@@ -47,6 +49,8 @@ export default function PagarCartela() {
       if (resBingo) {
         setVenda(resBingo);
         setTipoVenda('bingo');
+        if (resBingo.nome_comprador) setNomePagador(resBingo.nome_comprador);
+        if (resBingo.telefone_comprador) setTelefonePagador(resBingo.telefone_comprador);
         setLoading(false);
         return;
       }
@@ -54,7 +58,7 @@ export default function PagarCartela() {
       // 3. Se não achou no bingo, tenta buscar na Rifa
       const { data: resRifa, error: errRifa } = await supabase
         .from('cartelas_rifa')
-        .select('*, compras_rifa(*, rifas(nome))')
+        .select('*, compras_rifa(*, rifas(nome)), numeros_rifa(nome_comprador, telefone_comprador)')
         .eq('codigo_validacao', codigo.toUpperCase().trim())
         .maybeSingle();
 
@@ -70,6 +74,11 @@ export default function PagarCartela() {
             admin_id: resRifa.admin_id
         });
         setTipoVenda('rifa');
+        
+        // Se a rifa já tiver os dados do comprador (vendedor preencheu na hora), puxa aqui
+        const info = Array.isArray(resRifa.numeros_rifa) ? resRifa.numeros_rifa[0] : resRifa.numeros_rifa;
+        if (info?.nome_comprador) setNomePagador(info.nome_comprador);
+        if (info?.telefone_comprador) setTelefonePagador(info.telefone_comprador);
       }
 
       setLoading(false);
@@ -155,8 +164,8 @@ export default function PagarCartela() {
   };
 
   const handlePagbankPayment = async () => {
-    if (!cpfPagador.trim()) {
-      toast.error("Por favor, preencha o seu CPF.");
+    if (!nomePagador.trim() || !telefonePagador.trim() || !cpfPagador.trim()) {
+      toast.error("Por favor, preencha Nome, WhatsApp e CPF para garantir sua cartela.");
       return;
     }
 
@@ -166,7 +175,13 @@ export default function PagarCartela() {
         body: { 
           amount: valorCheio,
           type: tipoVenda === 'bingo' ? 'venda_bingo' : 'venda_rifa',
-          metadata: { venda_id: venda.id, codigo: venda.codigo_validacao, customer_cpf: cpfPagador },
+          metadata: { 
+            venda_id: venda.id, 
+            codigo: venda.codigo_validacao, 
+            customer_cpf: cpfPagador,
+            cliente_nome: nomePagador.trim(),
+            cliente_telefone: telefonePagador.trim()
+          },
           admin_id: venda.admin_id || gameSettings?.admin_id
         }
       });
@@ -174,7 +189,7 @@ export default function PagarCartela() {
       if (error) throw error;
       if (data?.success && data?.qr_code) {
         setPagbankData({ qr_code: data.qr_code, qr_code_text: data.qr_code_text });
-        toast.success("PIX Gerado! O sistema ativará seu bilhete automaticamente após o pagamento.");
+        toast.success("PIX Gerado! Como você já preencheu seus dados, seu bilhete será ativado automaticamente após o pagamento.");
       } else {
         throw new Error(data?.error || "Erro desconhecido ao gerar PIX.");
       }
@@ -237,7 +252,7 @@ export default function PagarCartela() {
       <div className="text-center space-y-2">
         <h1 className="font-heading text-2xl font-black text-foreground">Pagamento do Bilhete</h1>
         <p className="text-muted-foreground text-sm">
-          Siga as instruções abaixo para pagar e liberar sua cartela.
+          Siga as instruções abaixo para pagar e ativar sua cartela oficial.
         </p>
       </div>
 
@@ -283,17 +298,34 @@ export default function PagarCartela() {
                 
                 {!pagbankData ? (
                   <>
-                    <div className="space-y-2 mb-3 text-left">
-                      <Label className="text-xs text-green-800 uppercase font-bold">Seu CPF (Obrigatório para o PIX)</Label>
-                      <Input
-                        value={cpfPagador}
-                        onChange={e => setCpfPagador(e.target.value)}
-                        placeholder="000.000.000-00"
-                        className="border-green-300 focus-visible:ring-green-500"
-                      />
+                    <div className="p-3 bg-white/60 border border-green-500/20 rounded-lg text-left space-y-3 mb-3">
+                      <p className="text-[10px] uppercase font-bold text-green-800 flex items-center gap-1.5 border-b border-green-200 pb-1.5">
+                        <User className="w-3.5 h-3.5" /> Identificação Obrigatória
+                      </p>
+
+                      <div className="space-y-1">
+                        <Label className="text-xs font-bold text-gray-700">Nome Completo *</Label>
+                        <Input value={nomePagador} onChange={e => setNomePagador(e.target.value)} placeholder="Seu nome" className="h-9 text-xs bg-white border-green-200" />
+                      </div>
+
+                      <div className="space-y-1">
+                        <Label className="text-xs font-bold text-gray-700">WhatsApp *</Label>
+                        <Input value={telefonePagador} onChange={e => setTelefonePagador(e.target.value)} placeholder="(00) 00000-0000" className="h-9 text-xs bg-white border-green-200" />
+                      </div>
+
+                      <div className="space-y-1">
+                        <Label className="text-xs font-bold text-green-800">CPF (Exigido pelo Banco) *</Label>
+                        <Input
+                          value={cpfPagador}
+                          onChange={e => setCpfPagador(e.target.value)}
+                          placeholder="000.000.000-00"
+                          className="h-9 text-xs bg-white border-green-400 focus-visible:ring-green-500"
+                        />
+                      </div>
                     </div>
+
                     <Button
-                      className="w-full h-12 bg-green-600 hover:bg-green-700 text-white font-bold shadow-button"
+                      className="w-full h-14 text-lg bg-green-600 hover:bg-green-700 text-white font-bold shadow-button"
                       onClick={handlePagbankPayment}
                       disabled={isPagbankLoading}
                     >
@@ -315,9 +347,10 @@ export default function PagarCartela() {
                         </Button>
                       </div>
                     </div>
-                    <p className="text-[10px] text-green-700 font-bold bg-green-500/20 p-2 rounded">
-                      Seu bilhete será validado automaticamente após o pagamento. Não é necessário enviar comprovante!
-                    </p>
+                    <div className="text-[10px] text-green-800 font-bold bg-green-500/20 p-3 rounded text-left border border-green-500/30">
+                      <p className="flex items-center gap-1.5 mb-1"><CheckCircle2 className="w-3.5 h-3.5" /> Cartela cadastrada para <strong>{nomePagador}</strong>!</p>
+                      <p className="opacity-90 leading-tight">Você não precisará enviar comprovante. O seu bilhete oficial será ativado automaticamente após você concluir o pagamento do PIX acima.</p>
+                    </div>
                   </div>
                 )}
               </div>
