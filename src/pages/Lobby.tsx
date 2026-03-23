@@ -12,7 +12,7 @@ import { Match, MatchStatus, PlayerCard } from '@/types/match';
 import { gameTypeLabels } from '@/utils/bingoUtils';
 import {
   Coins, Plus, Trophy, Users, Settings,
-  Timer, DoorOpen, Ticket, Zap, ZapOff, Tv, Archive, Trash2, RotateCcw, Star, Loader2, CalendarDays, Clock, Crown, ChevronDown, ChevronUp, Gift, BellRing, Search, SmartphoneNfc, UserPlus, ShieldCheck
+  Timer, DoorOpen, Ticket, Zap, ZapOff, Tv, Archive, Trash2, RotateCcw, Star, Loader2, CalendarDays, Clock, Crown, ChevronDown, ChevronUp, Gift, BellRing, Search, SmartphoneNfc, UserPlus, ShieldCheck, AlertTriangle
 } from 'lucide-react';
 import PlayerAvatar from '@/components/PlayerAvatar';
 import { 
@@ -88,7 +88,13 @@ const Lobby = () => {
   // Lógica de Notificações do Usuário (Pendências próprias)
   const myPendingCreditsCount = creditRequests?.filter(r => r.status === 'pending').length || 0;
   const myPendingRedeemsCount = redeemRequests?.filter(r => r.status === 'pending').length || 0;
+  
+  // NOVA VALIDAÇÃO: Contabilizar itens que precisam da atenção do usuário (Rejeitados/Com mensagens)
+  const myRejectedCreditsCount = creditRequests?.filter(r => r.status === 'rejected').length || 0;
+  const myRejectedRedeemsCount = redeemRequests?.filter(r => r.status === 'rejected').length || 0;
+
   const hasMyPendingActions = myPendingCreditsCount > 0 || myPendingRedeemsCount > 0;
+  const hasMyAttentionRequired = myRejectedCreditsCount > 0 || myRejectedRedeemsCount > 0;
 
   // Captura o link de indicação da URL se existir (mesmo sem estar logado)
   useEffect(() => {
@@ -514,8 +520,28 @@ const Lobby = () => {
          </div>
       )}
 
-      {/* Banner Usuário Comum */}
-      {!isAdmin && hasMyPendingActions && (
+      {/* NOVO: Banner Usuário Comum (MENSAGENS DO ADMIN / REJEIÇÕES) */}
+      {!isAdmin && hasMyAttentionRequired && (
+         <div className="bg-destructive/10 border-2 border-destructive/50 rounded-xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm relative overflow-hidden mb-6">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-destructive/10 rounded-full blur-3xl -z-10" />
+            <div className="flex items-start gap-3 z-10">
+              <div className="bg-destructive p-2 rounded-full text-white animate-pulse shrink-0 shadow-md">
+                <AlertTriangle className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="font-heading font-bold text-lg text-destructive leading-tight">Atenção Necessária</h3>
+                <div className="flex flex-col mt-1 text-xs font-semibold text-destructive/80">
+                   {myRejectedCreditsCount > 0 && <span>• Você tem {myRejectedCreditsCount} compra(s) de crédito aguardando resposta.</span>}
+                   {myRejectedRedeemsCount > 0 && <span>• O Admin enviou uma mensagem sobre seu resgate ({myRejectedRedeemsCount}).</span>}
+                   <span className="mt-1 font-bold text-destructive">Abra o menu no canto superior direito e clique em "Histórico" para responder.</span>
+                </div>
+              </div>
+            </div>
+         </div>
+      )}
+
+      {/* Banner Usuário Comum (Pendências) */}
+      {!isAdmin && hasMyPendingActions && !hasMyAttentionRequired && (
          <div className="bg-amber-500/10 border-2 border-amber-500/50 rounded-xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm relative overflow-hidden mb-6">
             <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/10 rounded-full blur-3xl -z-10" />
             <div className="flex items-start gap-3 z-10">
@@ -523,9 +549,9 @@ const Lobby = () => {
                 <Clock className="w-5 h-5" />
               </div>
               <div>
-                <h3 className="font-heading font-bold text-lg text-amber-800 dark:text-amber-500 leading-tight">Solicitação em Pendente</h3>
+                <h3 className="font-heading font-bold text-lg text-amber-800 dark:text-amber-500 leading-tight">Solicitação em Análise</h3>
                 <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1 text-xs font-semibold text-amber-700/80 dark:text-amber-400/80">
-                   {myPendingCreditsCount > 0 && <span className="flex items-center gap-1">• {myPendingCreditsCount} solicitação(ões) de crédito em análise</span>}
+                   {myPendingCreditsCount > 0 && <span className="flex items-center gap-1">• {myPendingCreditsCount} solicitação(ões) de crédito pendentes</span>}
                    {myPendingRedeemsCount > 0 && <span className="flex items-center gap-1">• {myPendingRedeemsCount} resgate(s) em andamento</span>}
                 </div>
               </div>
