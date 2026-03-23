@@ -70,7 +70,6 @@ export default function PagarCartela() {
     return Number(venda.valor_pago) / (1 - (desc / 100));
   }, [venda]);
 
-  // === CÁLCULO DE TAXAS (STRIPE) ===
   const stripeFeeDetails = useMemo(() => {
     if (!gameSettings?.stripe_pass_fees_to_customer) return null;
     const perc = gameSettings.stripe_fee_percentage || 0;
@@ -83,7 +82,6 @@ export default function PagarCartela() {
 
   const finalStripeAmount = stripeFeeDetails ? stripeFeeDetails.final : valorCheio;
 
-  // === CÁLCULO DE TAXAS (PAGBANK) ===
   const calcFee = (method: 'pix' | 'card') => {
       if (!gameSettings?.pagbank_pass_fees_to_customer) return null;
       const perc = method === 'pix' ? (gameSettings.pagbank_pix_fee_percentage || 0) : (gameSettings.pagbank_card_fee_percentage || 0);
@@ -109,7 +107,7 @@ export default function PagarCartela() {
   const handleCopiarPix = (textToCopy: string) => {
     if (textToCopy) {
       navigator.clipboard.writeText(textToCopy);
-      toast.success('Código copiado!');
+      toast.success('Código PIX Copia e Cola copiado com sucesso!');
     }
   };
 
@@ -132,13 +130,8 @@ export default function PagarCartela() {
       if (error) throw error;
       if (data?.success) {
         if (method === 'CREDIT_CARD' && data.checkout_link) {
-           const a = document.createElement('a');
-           a.href = data.checkout_link;
-           a.target = '_blank';
-           a.rel = 'noreferrer noopener';
-           document.body.appendChild(a);
-           a.click();
-           document.body.removeChild(a);
+           // SOLUÇÃO SEGURA: Usa window.open com noreferrer para evitar erro de removeChild e bypassar WAF
+           window.open(data.checkout_link, '_blank', 'noreferrer,noopener');
            toast.info("A página de pagamento foi aberta em uma nova aba.");
         } else if (method === 'pix' && data.qr_code) { 
            setPagbankData({ qr_code: data.qr_code, qr_code_text: data.qr_code_text }); 
