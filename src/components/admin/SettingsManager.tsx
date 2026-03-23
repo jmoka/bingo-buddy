@@ -308,47 +308,45 @@ const SettingsManager = () => {
               <Input name="pagbank_token_sandbox" type="password" value={currentSettings.pagbank_token_sandbox} onChange={handleSettingsChange} className="text-xs" placeholder="••••••••••••••••••••••••" />
             </div>
 
-            {/* Taxas do PagBank */}
-            <div className="space-y-3 p-3 bg-green-500/10 border border-green-500/30 rounded-xl">
-               <div className="flex items-center justify-between mb-2 border-b border-green-500/20 pb-2">
+            {/* Taxas do PagBank - SEMPRE VISÍVEIS */}
+            <div className="space-y-3 p-4 bg-green-500/10 border border-green-500/30 rounded-xl mt-4">
+               <div className="flex items-center justify-between mb-4 border-b border-green-500/20 pb-3">
                  <div className="space-y-0.5">
-                   <Label className="text-sm font-bold text-green-900 dark:text-green-500">Repassar Taxas ao Cliente?</Label>
-                   <p className="text-[10px] text-green-800/80">Calcula e soma as taxas bancárias no valor final pago pelo usuário.</p>
+                   <Label className="text-sm font-bold text-green-900 dark:text-green-500">Repassar Taxas PagBank?</Label>
+                   <p className="text-[10px] text-green-800/80">O cliente pagará a taxa do banco junto com o valor da cartela.</p>
                  </div>
                  <Switch checked={currentSettings.pagbank_pass_fees_to_customer} onCheckedChange={(checked) => handleToggleChange('pagbank_pass_fees_to_customer', checked)} />
                </div>
                
-               {currentSettings.pagbank_pass_fees_to_customer && (
-                 <div className="space-y-4">
-                     <div className="grid grid-cols-2 gap-4">
-                       <div className="col-span-2">
-                          <p className="text-xs font-bold text-green-900 mb-1">Taxas para PIX</p>
-                       </div>
-                       <div className="space-y-1.5">
-                         <Label className="text-[10px] text-green-800">Taxa Fixa PIX (R$)</Label>
-                         <Input name="pagbank_pix_fee_fixed" type="number" step="0.01" value={currentSettings.pagbank_pix_fee_fixed} onChange={handleSettingsChange} className="text-xs h-8 border-green-300" />
-                       </div>
-                       <div className="space-y-1.5">
-                         <Label className="text-[10px] text-green-800">Taxa Percentual PIX (%)</Label>
-                         <Input name="pagbank_pix_fee_percentage" type="number" step="0.01" value={currentSettings.pagbank_pix_fee_percentage} onChange={handleSettingsChange} className="text-xs h-8 border-green-300" />
-                       </div>
+               <div className={cn("space-y-4 transition-opacity", !currentSettings.pagbank_pass_fees_to_customer && "opacity-50 pointer-events-none")}>
+                   <div className="grid grid-cols-2 gap-4">
+                     <div className="col-span-2">
+                        <p className="text-xs font-bold text-green-900 mb-1">Custo do PIX (PagBank)</p>
                      </div>
+                     <div className="space-y-1.5">
+                       <Label className="text-[10px] text-green-800">Taxa Fixa (R$)</Label>
+                       <Input name="pagbank_pix_fee_fixed" type="number" step="0.01" value={currentSettings.pagbank_pix_fee_fixed} onChange={handleSettingsChange} className="text-xs h-8 border-green-300" />
+                     </div>
+                     <div className="space-y-1.5">
+                       <Label className="text-[10px] text-green-800">Taxa Percentual (%)</Label>
+                       <Input name="pagbank_pix_fee_percentage" type="number" step="0.01" value={currentSettings.pagbank_pix_fee_percentage} onChange={handleSettingsChange} className="text-xs h-8 border-green-300" />
+                     </div>
+                   </div>
 
-                     <div className="grid grid-cols-2 gap-4 border-t border-green-500/20 pt-3">
-                       <div className="col-span-2">
-                          <p className="text-xs font-bold text-green-900 mb-1">Taxas para Cartão de Crédito</p>
-                       </div>
-                       <div className="space-y-1.5">
-                         <Label className="text-[10px] text-green-800">Taxa Fixa Cartão (R$)</Label>
-                         <Input name="pagbank_card_fee_fixed" type="number" step="0.01" value={currentSettings.pagbank_card_fee_fixed} onChange={handleSettingsChange} className="text-xs h-8 border-green-300" />
-                       </div>
-                       <div className="space-y-1.5">
-                         <Label className="text-[10px] text-green-800">Taxa Percentual Cartão (%)</Label>
-                         <Input name="pagbank_card_fee_percentage" type="number" step="0.01" value={currentSettings.pagbank_card_fee_percentage} onChange={handleSettingsChange} className="text-xs h-8 border-green-300" />
-                       </div>
+                   <div className="grid grid-cols-2 gap-4 border-t border-green-500/20 pt-4">
+                     <div className="col-span-2">
+                        <p className="text-xs font-bold text-green-900 mb-1">Custo do Cartão (PagBank Checkout)</p>
                      </div>
-                 </div>
-               )}
+                     <div className="space-y-1.5">
+                       <Label className="text-[10px] text-green-800">Taxa Fixa (R$)</Label>
+                       <Input name="pagbank_card_fee_fixed" type="number" step="0.01" value={currentSettings.pagbank_card_fee_fixed} onChange={handleSettingsChange} className="text-xs h-8 border-green-300" />
+                     </div>
+                     <div className="space-y-1.5">
+                       <Label className="text-[10px] text-green-800">Taxa Percentual (%)</Label>
+                       <Input name="pagbank_card_fee_percentage" type="number" step="0.01" value={currentSettings.pagbank_card_fee_percentage} onChange={handleSettingsChange} className="text-xs h-8 border-green-300" />
+                     </div>
+                   </div>
+               </div>
             </div>
 
           </div>
@@ -361,7 +359,7 @@ const SettingsManager = () => {
             <div className="flex items-center justify-between p-3 bg-background rounded-xl border border-border/50">
               <div className="space-y-0.5">
                 <Label className="text-sm font-bold">Ativar Stripe</Label>
-                <p className="text-[10px] text-muted-foreground">Habilita pagamentos via cartão (Standby).</p>
+                <p className="text-[10px] text-muted-foreground">Habilita pagamentos via cartão.</p>
               </div>
               <Switch checked={currentSettings.stripe_enabled} onCheckedChange={(checked) => handleToggleChange('stripe_enabled', checked)} />
             </div>
@@ -374,26 +372,25 @@ const SettingsManager = () => {
               </RadioGroup>
             </div>
 
-            <div className="space-y-3 p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl">
-               <div className="flex items-center justify-between mb-2">
+            <div className="space-y-3 p-4 bg-amber-500/10 border border-amber-500/30 rounded-xl mt-4">
+               <div className="flex items-center justify-between mb-4 border-b border-amber-500/20 pb-3">
                  <div className="space-y-0.5">
-                   <Label className="text-sm font-bold text-amber-900 dark:text-amber-500">Repassar Taxas ao Cliente?</Label>
-                   <p className="text-[10px] text-amber-700/80">Calcula e embute a taxa no valor final.</p>
+                   <Label className="text-sm font-bold text-amber-900 dark:text-amber-500">Repassar Taxas Stripe?</Label>
+                   <p className="text-[10px] text-amber-800/80">Calcula e embute a taxa no valor final do cliente.</p>
                  </div>
                  <Switch checked={currentSettings.stripe_pass_fees_to_customer} onCheckedChange={(checked) => handleToggleChange('stripe_pass_fees_to_customer', checked)} />
                </div>
-               {currentSettings.stripe_pass_fees_to_customer && (
-                 <div className="grid grid-cols-2 gap-4 border-t border-amber-500/20 pt-3">
-                   <div className="space-y-1.5">
-                     <Label className="text-[10px] text-amber-800">Taxa Percentual (%)</Label>
-                     <Input name="stripe_fee_percentage" type="number" step="0.01" value={currentSettings.stripe_fee_percentage} onChange={handleSettingsChange} className="text-xs h-8 border-amber-300" />
-                   </div>
-                   <div className="space-y-1.5">
-                     <Label className="text-[10px] text-amber-800">Taxa Fixa (R$)</Label>
-                     <Input name="stripe_fee_fixed" type="number" step="0.01" value={currentSettings.stripe_fee_fixed} onChange={handleSettingsChange} className="text-xs h-8 border-amber-300" />
-                   </div>
+               
+               <div className={cn("grid grid-cols-2 gap-4 transition-opacity", !currentSettings.stripe_pass_fees_to_customer && "opacity-50 pointer-events-none")}>
+                 <div className="space-y-1.5">
+                   <Label className="text-[10px] text-amber-800">Taxa Percentual (%)</Label>
+                   <Input name="stripe_fee_percentage" type="number" step="0.01" value={currentSettings.stripe_fee_percentage} onChange={handleSettingsChange} className="text-xs h-8 border-amber-300" />
                  </div>
-               )}
+                 <div className="space-y-1.5">
+                   <Label className="text-[10px] text-amber-800">Taxa Fixa (R$)</Label>
+                   <Input name="stripe_fee_fixed" type="number" step="0.01" value={currentSettings.stripe_fee_fixed} onChange={handleSettingsChange} className="text-xs h-8 border-amber-300" />
+                 </div>
+               </div>
             </div>
 
             <div className="space-y-1.5"><Label className="text-xs">Stripe Secret Key (Produção)</Label><Input name="stripe_secret_key" type="password" value={currentSettings.stripe_secret_key} onChange={handleSettingsChange} className="text-xs" /></div>
