@@ -40,7 +40,6 @@ export interface Match {
   min_players: number;
   admin_profit_from_match?: number;
   
-  // Festival (Bingo Comunitário)
   is_festival?: boolean;
   prizes?: Prize[];
   current_round?: number;
@@ -80,6 +79,8 @@ export interface Win {
 }
 
 export interface GameSettings {
+  id?: string;
+  admin_id?: string;
   custo_nova_cartela: number;
   custo_recarga_cartela: number;
   usos_por_recarga: number;
@@ -125,7 +126,7 @@ export interface FolhaBingoFisico {
   match_id: string;
   vendedor_id: string;
   codigo_validacao: string;
-  grids: number[][][]; // Array of 5x5 matrices
+  grids: number[][][]; 
   valor_pago: number;
   status: 'pago' | 'pendente' | 'em_analise';
   created_at: string;

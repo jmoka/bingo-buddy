@@ -4,7 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2, ArrowLeft, Copy, CheckCircle2, AlertTriangle, ShieldCheck, Camera, CreditCard } from 'lucide-react';
+import { Loader2, ArrowLeft, Copy, CheckCircle2, AlertTriangle, ShieldCheck, Camera, CreditCard, SmartphoneNfc } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { QrCodePix } from 'qrcode-pix';
 import { toast } from 'sonner';
@@ -20,6 +20,10 @@ export default function PagarCartela() {
   const [gameSettings, setGameSettings] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
   const [isStripeLoading, setIsStripeLoading] = useState(false);
+  
+  // PagBank States
+  const [isPagbankLoading, setIsPagbankLoading] = useState(false);
+  const [pagbankData, setPagbankData] = useState<{qr_code: string, qr_code_text: string} | null>(null);
 
   useEffect(() => {
     async function loadData() {
@@ -61,7 +65,8 @@ export default function PagarCartela() {
             codigo_validacao: resRifa.codigo_validacao,
             valor_pago: resRifa.compras_rifa.valor_total,
             desconto_aplicado: resRifa.compras_rifa.desconto_aplicado,
-            partidas: { name: resRifa.compras_rifa.rifas?.nome }
+            partidas: { name: resRifa.compras_rifa.rifas?.nome },
+            admin_id: resRifa.admin_id
         });
         setTipoVenda('rifa');
       }
@@ -119,9 +124,9 @@ export default function PagarCartela() {
     }
   }, [gameSettings, venda, valorCheio]);
 
-  const handleCopiarPix = () => {
-    if (pixPayload) {
-      navigator.clipboard.writeText(pixPayload);
+  const handleCopiarPix = (textToCopy: string) => {
+    if (textToCopy) {
+      navigator.clipboard.writeText(textToCopy);
       toast.success('Código PIX Copia e Cola copiado com sucesso!');
     }
   };
@@ -145,6 +150,32 @@ export default function PagarCartela() {
       toast.error("Erro ao iniciar pagamento: " + e.message);
     } finally {
       setIsStripeLoading(false);
+    }
+  };
+
+  const handlePagbankPayment = async () => {
+    setIsPagbankLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('create-pagbank-payment', {
+        body: { 
+          amount: valorCheio,
+          type: tipoVenda === 'bingo' ? 'venda_bingo' : 'venda_rifa',
+          metadata: { venda_id: venda.id, codigo: venda.codigo_validacao },
+          admin_id: venda.admin_id || gameSettings?.admin_id
+        }
+      });
+
+      if (error) throw error;
+      if (data?.success && data?.qr_code) {
+        setPagbankData({ qr_code: data.qr_code, qr_code_text: data.qr_code_text });
+        toast.success("PIX Gerado! O sistema ativará seu bilhete automaticamente após o pagamento.");
+      } else {
+        throw new Error(data?.error || "Erro desconhecido ao gerar PIX.");
+      }
+    } catch (e: any) {
+      toast.error("Erro ao gerar PIX PagBank: " + e.message);
+    } finally {
+      setIsPagbankLoading(false);
     }
   };
 
@@ -234,61 +265,100 @@ export default function PagarCartela() {
               </div>
             )}
 
-            <div className="relative py-4">
-              <div className="absolute inset-0 flex items-center"><span className="w-full border-t" /></div>
-              <div className="relative flex justify-center text-xs uppercase"><span className="bg-background px-2 text-muted-foreground">Ou PIX Manual (Sem taxas extras)</span></div>
-            </div>
-
-            <div className="bg-muted/40 p-4 rounded-xl border border-border/50 text-center space-y-4">
-              <p className="text-2xl font-black font-heading text-primary">R$ {valorCheio.toFixed(2).replace('.', ',')}</p>
-              
-              {pixPayload ? (
-                <div className="bg-white p-3 rounded-lg inline-block shadow-sm border border-gray-200">
-                  <QRCodeSVG value={pixPayload} size={160} />
-                </div>
-              ) : (
-                <div className="p-8 text-destructive flex flex-col items-center gap-2">
-                  <AlertTriangle className="w-8 h-8" />
-                  <p className="text-xs font-bold">Erro ao gerar QR Code PIX.</p>
-                </div>
-              )}
-              
-              <div className="space-y-2">
-                <Label className="text-xs text-muted-foreground uppercase font-bold">PIX Copia e Cola</Label>
-                <div className="relative">
-                  <Input value={pixPayload} readOnly className="pr-24 font-mono text-xs bg-white" />
-                  <Button 
-                    size="sm" 
-                    className="absolute right-1 top-1 h-8"
-                    onClick={handleCopiarPix}
-                    disabled={!pixPayload}
+            {gameSettings?.pagbank_enabled ? (
+              <div className="bg-green-500/10 p-4 rounded-xl border border-green-500/20 space-y-3 mt-4 text-center">
+                <h4 className="font-bold text-green-800 flex justify-center items-center gap-2"><SmartphoneNfc className="w-5 h-5" /> PIX Automático</h4>
+                
+                {!pagbankData ? (
+                  <Button
+                    className="w-full h-12 bg-green-600 hover:bg-green-700 text-white font-bold shadow-button"
+                    onClick={handlePagbankPayment}
+                    disabled={isPagbankLoading}
                   >
-                    <Copy className="w-3 h-3 mr-1" /> Copiar
+                    {isPagbankLoading ? <Loader2 className="w-5 h-5 mr-2 animate-spin" /> : null}
+                    Gerar PIX de R$ {valorCheio.toFixed(2).replace('.', ',')}
                   </Button>
+                ) : (
+                  <div className="space-y-3 animate-in fade-in zoom-in duration-300">
+                    <div className="bg-white p-3 rounded-lg inline-block shadow-sm border border-gray-200">
+                      <img src={pagbankData.qr_code} alt="QR Code PagBank" className="w-[160px] h-[160px]" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-xs text-muted-foreground uppercase font-bold text-left block">PIX Copia e Cola</Label>
+                      <div className="relative">
+                        <Input value={pagbankData.qr_code_text} readOnly className="pr-20 font-mono text-xs bg-white text-black" />
+                        <Button size="sm" className="absolute right-1 top-1 h-8 bg-green-600 hover:bg-green-700" onClick={() => handleCopiarPix(pagbankData.qr_code_text)}>
+                          <Copy className="w-3 h-3 mr-1" /> Copiar
+                        </Button>
+                      </div>
+                    </div>
+                    <p className="text-[10px] text-green-700 font-bold bg-green-500/20 p-2 rounded">
+                      Seu bilhete será validado automaticamente após o pagamento. Não é necessário enviar comprovante!
+                    </p>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="pt-4">
+                <div className="relative py-4">
+                  <div className="absolute inset-0 flex items-center"><span className="w-full border-t" /></div>
+                  <div className="relative flex justify-center text-xs uppercase"><span className="bg-background px-2 text-muted-foreground">Ou PIX Manual (Sem taxas extras)</span></div>
+                </div>
+
+                <div className="bg-muted/40 p-4 rounded-xl border border-border/50 text-center space-y-4">
+                  <p className="text-2xl font-black font-heading text-primary">R$ {valorCheio.toFixed(2).replace('.', ',')}</p>
+                  
+                  {pixPayload ? (
+                    <div className="bg-white p-3 rounded-lg inline-block shadow-sm border border-gray-200">
+                      <QRCodeSVG value={pixPayload} size={160} />
+                    </div>
+                  ) : (
+                    <div className="p-8 text-destructive flex flex-col items-center gap-2">
+                      <AlertTriangle className="w-8 h-8" />
+                      <p className="text-xs font-bold">Erro ao gerar QR Code PIX.</p>
+                    </div>
+                  )}
+                  
+                  <div className="space-y-2 text-left">
+                    <Label className="text-xs text-muted-foreground uppercase font-bold">PIX Copia e Cola</Label>
+                    <div className="relative">
+                      <Input value={pixPayload} readOnly className="pr-24 font-mono text-xs bg-white" />
+                      <Button 
+                        size="sm" 
+                        className="absolute right-1 top-1 h-8"
+                        onClick={() => handleCopiarPix(pixPayload)}
+                        disabled={!pixPayload}
+                      >
+                        <Copy className="w-3 h-3 mr-1" /> Copiar
+                      </Button>
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
           </div>
 
-          <div className="space-y-3 pt-4 border-t">
-            <h3 className="font-bold flex items-center gap-2 text-foreground">
-              <span className="bg-primary text-white w-6 h-6 rounded-full flex items-center justify-center text-xs shrink-0">2</span>
-              Envio de Comprovante e Validação
-            </h3>
-            <p className="text-sm text-muted-foreground leading-relaxed">
-              Você já fez o pagamento do PIX Manual no seu banco? Avance para enviar o comprovante e se identificar!
-            </p>
+          {!gameSettings?.pagbank_enabled && (
+            <div className="space-y-3 pt-4 border-t">
+              <h3 className="font-bold flex items-center gap-2 text-foreground">
+                <span className="bg-primary text-white w-6 h-6 rounded-full flex items-center justify-center text-xs shrink-0">2</span>
+                Envio de Comprovante e Validação
+              </h3>
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                Você já fez o pagamento do PIX Manual no seu banco? Avance para enviar o comprovante e se identificar!
+              </p>
 
-            <div className="text-center pt-2">
-              <Button 
-                className="w-full h-14 text-xl font-bold bg-green-600 hover:bg-green-700 text-white shadow-button animate-pulse"
-                onClick={() => navigate(`/validar-cartela?${tipoVenda === 'rifa' ? 'codigo' : 'bingo'}=${venda.codigo_validacao}`)}
-              >
-                <Camera className="w-5 h-5 mr-2" />
-                Continuar p/ Validar
-              </Button>
+              <div className="text-center pt-2">
+                <Button 
+                  className="w-full h-14 text-xl font-bold bg-green-600 hover:bg-green-700 text-white shadow-button animate-pulse"
+                  onClick={() => navigate(`/validar-cartela?${tipoVenda === 'rifa' ? 'codigo' : 'bingo'}=${venda.codigo_validacao}`)}
+                >
+                  <Camera className="w-5 h-5 mr-2" />
+                  Continuar p/ Validar
+                </Button>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
     </div>
