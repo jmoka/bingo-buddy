@@ -1,6 +1,6 @@
 # 🎱 Bingo Show de Prêmios - Documentação Técnica completa
 
-# LTS 8.0
+# LTS 8.1
 
 Bem-vindo à documentação técnica completa do **Bingo Show de Prêmios**, uma plataforma web _real-time_ e multi-tenant para gerenciamento e execução de jogos de bingo e rifas online.
 
