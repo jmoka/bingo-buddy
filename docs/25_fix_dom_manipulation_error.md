@@ -1,33 +1,19 @@
 # Correção de Estabilidade - Erro de Manipulação de DOM (removeChild)
 
 ## Descrição
-Documentação da correção do erro fatal `Failed to execute 'removeChild' on 'Node'`. O erro ocorria durante o processo de redirecionamento para o Checkout do PagBank, onde o sistema tentava criar e remover um link temporário para burlar restrições de segurança do banco em ambiente local.
+Documentação da correção do erro fatal `Failed to execute 'removeChild' on 'Node'`. O erro ocorria por dois motivos principais:
+1. Manipulação manual de elementos `<a>` fora do ciclo de vida do React.
+2. Uso de `index` como `key` em listas dinâmicas de fotos, causando inconsistência na árvore de elementos durante atualizações.
 
-## Entradas
-- `checkout_link` (String): URL gerada pela API do PagBank.
-- `rel="noreferrer noopener"` (Atributos): Utilizados para garantir privacidade e segurança no redirecionamento.
+## Mitigações Implementadas
+1. **Redirecionamento Seguro:** Substituição de `document.createElement('a')` por `window.open(url, '_blank', 'noreferrer,noopener')`.
+2. **Keys Únicas:** Atualização de todos os componentes de lista (especialmente em `RifasAdmin.tsx` e `RifaDetalheAdmin.tsx`) para utilizar identificadores únicos (ex: `url-index`) em vez de apenas o índice numérico.
 
-## Saídas
-- Abertura de uma nova aba no navegador com a página de pagamento oficial.
-
-## Fluxo de Execução
-1. O frontend recebe o link de pagamento da Edge Function.
-2. O sistema utiliza o método `window.open(url, '_blank', 'noreferrer,noopener')`.
-3. O navegador processa a abertura da nova aba sem enviar o cabeçalho `Referer` (escondendo o localhost).
-4. O React continua sua execução normal sem interrupções ou erros de sincronia de elementos.
-
-## Dependências
-- Objeto global `window` do navegador.
-
-## Chamado por
-- `handlePagbankPayment` em `CreditRequestDialog.tsx`.
-- `handlePagbankPayment` em `PagarCartela.tsx`.
-
-## Riscos / Observações
-- **Risco Mitigado:** Crash da aplicação (Tela Branca) por conflito de manipulação de DOM.
-- **Observação:** O uso de `window.open` é a prática recomendada para redirecionamentos externos em SPAs (Single Page Applications) para evitar que o estado da aplicação principal seja perdido ou corrompido.
+## Riscos Mitigados
+- **Crash da aplicação (Tela Branca):** Eliminação de conflitos entre o motor de renderização do React e scripts de terceiros ou manipulações manuais.
+- **Inconsistência de Dados na UI:** Garante que a remoção de um item de uma lista não afete a renderização dos itens vizinhos.
 
 ## Histórico de Alterações
 - **Data:** Atual
-- **Alteração:** Substituição de `document.createElement('a')` por `window.open`.
-- **Motivo:** Erro de execução `removeChild` que impedia o funcionamento do checkout em diversos cenários.
+- **Alteração:** Refatoração de keys em listas e remoção de manipulação manual de DOM.
+- **Motivo:** Erro de execução `removeChild` reportado em ambiente de produção.

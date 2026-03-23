@@ -260,7 +260,7 @@ const RifasAdmin = () => {
                 {novaRifaForm.premio_fotos.length > 0 && (
                   <div className="grid grid-cols-3 gap-2">
                     {novaRifaForm.premio_fotos.map((url, idx) => (
-                      <div key={idx} className="relative group">
+                      <div key={`${url}-${idx}`} className="relative group">
                         <img src={url} alt="" className="h-20 w-full object-cover rounded border" onError={e => (e.currentTarget.style.display = 'none')} />
                         <button
                           type="button"
@@ -396,7 +396,7 @@ const RifasAdmin = () => {
             {([
               { key: 'todas', label: 'Total', icon: Ticket, value: todasRifas.length, color: 'text-foreground', bg: 'bg-primary/10 border-primary/30' },
               { key: 'ativa', label: 'Ativas', icon: Users, value: ativas, color: 'text-green-600', bg: 'bg-green-50 border-green-200 dark:bg-green-900/10 dark:border-green-700/30' },
-              { key: 'finalizada', label: 'Finalizadas', icon: DollarSign, value: finalizadas, color: 'text-blue-600', bg: 'bg-blue-50 border-blue-200 dark:bg-blue-900/10 dark:border-blue-700/30' },
+              { key: 'finalizada', label: 'Finalizadas', icon: DollarSign, value: finalizadas, color: 'text-blue-600', bg: 'bg-blue-50 border-blue-200 dark:bg-blue-900/10 dark:border-green-700/30' },
             ] as const).map(({ key, label, icon: Icon, value, color, bg }) => (
               <button
                 key={key}
