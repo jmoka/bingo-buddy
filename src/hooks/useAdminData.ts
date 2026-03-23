@@ -11,7 +11,6 @@ export const useAdminData = () => {
   const queryClient = useQueryClient();
   const isAdmin = profile?.role === 'admin';
 
-  // Listeners for admin-specific, non-rifa data
   useEffect(() => {
     if (!isAdmin) return;
 
@@ -209,17 +208,14 @@ export const useAdminData = () => {
     const request = allCreditRequests.find(r => r.id === requestId);
     if (!request) return false;
 
-    // 1. Desconta o Caixa do Admin se o repasse havia sido concluído
     if (request.repasse_concluido && Number(request.amount_paid) > 0) {
       await supabase.rpc('increment_admin_profit', { amount: -Number(request.amount_paid) });
     }
 
-    // 2. Retira os créditos que tinham sido liberados para o jogador
     if (Number(request.credits_granted) > 0) {
       await supabase.rpc('admin_adjust_credits', { p_player_id: request.player_id, p_delta: -Number(request.credits_granted) });
     }
 
-    // 3. Volta o status para pending
     const { error } = await supabase.from('solicitacoes_credito').update({
       status: 'pending',
       repasse_concluido: false,
@@ -258,22 +254,41 @@ export const useAdminData = () => {
     if (!profile || profile.role !== 'admin' || !user) return false;
     const request = allRedeemRequests.find(r => r.id === requestId);
     if (!request) return false;
+    
     let receiptPath = null;
-    if (status === 'approved' && receiptFile) {
-        const fileName = `redeems/${requestId}/${Date.now()}.${receiptFile.name.split('.').pop()}`;
-        await supabase.storage.from('receipts').upload(fileName, receiptFile);
-        receiptPath = fileName;
+
+    if (status === 'approved') {
+        // 1. Upload do comprovante
+        if (receiptFile) {
+            const fileName = `redeems/${requestId}/${Date.now()}.${receiptFile.name.split('.').pop()}`;
+            await supabase.storage.from('receipts').upload(fileName, receiptFile);
+            receiptPath = fileName;
+        }
+        
+        // 2. Subtrai do lucro do Admin (Saída de Caixa)
+        await supabase.rpc('increment_admin_profit', { amount: -Number(request.credits_requested) });
+        queryClient.invalidateQueries({ queryKey: ['gameSettings'] });
     }
-    if (status === 'rejected') {
-        await updatePlayerCredits(request.player_id, request.credits_requested);
-        toast.info(`${request.credits_requested} créditos foram estornados.`);
-    }
+
+    // 3. Atualiza o status da solicitação
+    // NOTA: Removido o estorno automático de créditos ao jogador no status 'rejected'
     await supabase.from('solicitacoes_resgate').update({
-        status, receipt_url: receiptPath, notes: notes || null, resolved_at: new Date().toISOString(), resolved_by: user.id
+        status, 
+        receipt_url: receiptPath, 
+        notes: notes || null, 
+        resolved_at: new Date().toISOString(), 
+        resolved_by: user.id
     }).eq('id', requestId);
+
     if (notes) {
-        await supabase.from('mensagens_resgate').insert({ redeem_request_id: requestId, sender_id: user.id, message: notes });
+        await supabase.from('mensagens_resgate').insert({ 
+            redeem_request_id: requestId, 
+            sender_id: user.id, 
+            message: notes,
+            admin_id: profile.id // Garante a FK do tenant
+        });
     }
+
     await queryClient.refetchQueries({ queryKey: ['rawRedeemRequests'] });
     return true;
   };
@@ -281,18 +296,27 @@ export const useAdminData = () => {
   const unblockRedeemRequest = async (requestId: string) => {
     const request = allRedeemRequests.find(r => r.id === requestId);
     if (!request) return;
-    await updatePlayerCredits(request.player_id, -request.credits_requested);
+    
+    // Se o admin reabrir uma solicitação que estava rejeitada, 
+    // os créditos continuam com o sistema até que ele aprove ou cancele manualmente.
     await supabase.from('solicitacoes_resgate').update({
         status: 'pending',
         notes: 'Solicitação reaberta pelo administrador.',
         resolved_at: null,
         resolved_by: null,
     }).eq('id', requestId);
+    
     toast.success('Solicitação de resgate reaberta.');
     await queryClient.refetchQueries({ queryKey: ['rawRedeemRequests'] });
   };
 
   const deleteRedeemRequest = async (requestId: string) => {
+    const request = allRedeemRequests.find(r => r.id === requestId);
+    if (request && request.status !== 'approved') {
+        // Ao deletar uma solicitação não paga, devolvemos os créditos ao jogador
+        await updatePlayerCredits(request.player_id, request.credits_requested);
+        toast.info("Solicitação excluída e créditos devolvidos ao jogador.");
+    }
     await supabase.from('solicitacoes_resgate').delete().eq('id', requestId);
     await queryClient.refetchQueries({ queryKey: ['rawRedeemRequests'] });
   };
