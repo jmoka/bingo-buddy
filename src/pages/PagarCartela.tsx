@@ -70,18 +70,6 @@ export default function PagarCartela() {
     return Number(venda.valor_pago) / (1 - (desc / 100));
   }, [venda]);
 
-  const stripeFeeDetails = useMemo(() => {
-    if (!gameSettings?.stripe_pass_fees_to_customer) return null;
-    const perc = gameSettings.stripe_fee_percentage || 0;
-    const fix = gameSettings.stripe_fee_fixed || 0;
-    const final = (valorCheio + fix) / (1 - (perc / 100));
-    const finalRounded = Math.ceil(final * 100) / 100;
-    const fee = finalRounded - valorCheio;
-    return { final: finalRounded, fee };
-  }, [valorCheio, gameSettings]);
-
-  const finalStripeAmount = stripeFeeDetails ? stripeFeeDetails.final : valorCheio;
-
   const calcFee = (method: 'pix' | 'card') => {
       if (!gameSettings?.pagbank_pass_fees_to_customer) return null;
       const perc = method === 'pix' ? (gameSettings.pagbank_pix_fee_percentage || 0) : (gameSettings.pagbank_card_fee_percentage || 0);
@@ -93,6 +81,14 @@ export default function PagarCartela() {
 
   const pixFeeDetails = calcFee('pix');
   const cardFeeDetails = calcFee('card');
+
+  const finalStripeAmount = useMemo(() => {
+    if (!gameSettings?.stripe_pass_fees_to_customer) return valorCheio;
+    const perc = gameSettings.stripe_fee_percentage || 0;
+    const fix = gameSettings.stripe_fee_fixed || 0;
+    const f = (valorCheio + fix) / (1 - (perc / 100));
+    return Math.ceil(f * 100) / 100;
+  }, [valorCheio, gameSettings]);
 
   const pixPayload = useMemo(() => {
     if (!gameSettings?.pix_key || !venda) return '';
@@ -107,7 +103,7 @@ export default function PagarCartela() {
   const handleCopiarPix = (textToCopy: string) => {
     if (textToCopy) {
       navigator.clipboard.writeText(textToCopy);
-      toast.success('Código PIX Copia e Cola copiado com sucesso!');
+      toast.success('Código copiado!');
     }
   };
 
@@ -130,7 +126,7 @@ export default function PagarCartela() {
       if (error) throw error;
       if (data?.success) {
         if (method === 'CREDIT_CARD' && data.checkout_link) {
-           // SOLUÇÃO SEGURA: Usa window.open com noreferrer para evitar erro de removeChild e bypassar WAF
+           // CORREÇÃO CRÍTICA: Uso seguro de window.open para prevenir crash de DOM (removeChild) no React
            window.open(data.checkout_link, '_blank', 'noreferrer,noopener');
            toast.info("A página de pagamento foi aberta em uma nova aba.");
         } else if (method === 'pix' && data.qr_code) { 
@@ -194,11 +190,11 @@ export default function PagarCartela() {
                    {/* Cartão Checkout */}
                    <div className="bg-white p-4 rounded-xl border shadow-sm space-y-3">
                       <div className="flex justify-between items-center">
-                        <span className="font-bold flex items-center gap-2 text-blue-700"><CreditCard className="w-5 h-5"/> Cartão (PagBank)</span>
+                        <span className="font-bold flex items-center gap-2 text-blue-700"><CreditCard className="w-5 h-5"/> Cartão</span>
                         <span className="font-black text-lg text-blue-700">R$ {(cardFeeDetails?.final || valorCheio).toFixed(2).replace('.', ',')}</span>
                       </div>
                       {cardFeeDetails && <p className="text-[10px] text-muted-foreground bg-muted/50 p-2 rounded">Inclui taxa de R$ {cardFeeDetails.fee.toFixed(2)}. Liberação imediata.</p>}
-                      <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold" onClick={() => handlePagbankPayment('CREDIT_CARD')} disabled={isStripeLoading || valorCheio <= 0}>
+                      <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-button" onClick={() => handlePagbankPayment('CREDIT_CARD')} disabled={isStripeLoading || valorCheio <= 0}>
                          {isStripeLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null} Pagar no Cartão
                       </Button>
                    </div>
@@ -242,7 +238,7 @@ export default function PagarCartela() {
                </div>
                {stripeFeeDetails && <p className="text-[10px] text-muted-foreground bg-white/50 p-2 rounded-lg border border-dashed">Acréscimo de <strong>R$ {stripeFeeDetails.fee.toFixed(2)}</strong> ref. a taxa internacional.</p>}
                <Button className="w-full h-12 bg-indigo-600 hover:bg-indigo-700 text-white font-bold" onClick={handleStripePayment} disabled={isStripeLoading || valorCheio <= 0}>
-                  {isStripeLoading ? <Loader2 className="w-5 h-5 mr-2 animate-spin" /> : null} Pagar via Stripe
+                  {isStripeLoading ? <Loader2 className="w-5 h-5 mr-2 animate-spin shrink-0" /> : <CreditCard className="w-5 h-5 mr-2 shrink-0" />} PAGAR R$ {finalStripeAmount.toFixed(2).replace('.', ',')} VIA STRIPE
                </Button>
             </div>
           )}
