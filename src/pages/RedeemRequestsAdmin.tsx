@@ -43,6 +43,7 @@ const RedeemRequestsAdmin = () => {
   const [isResolveDialogOpen, setIsResolveDialogOpen] = useState(false);
   const [actionType, setActionType] = useState<'approve' | 'reject' | 'delete' | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isResolving, setIsResolving] = useState(false); // NOVO: Estado para prevenir duplo-clique
 
   useEffect(() => {
     if (!profile || profile.role !== 'admin') {
@@ -80,18 +81,25 @@ const RedeemRequestsAdmin = () => {
   const handleResolve = async () => {
     if (!selectedRequest || !actionType) return;
     
-    if (actionType === 'delete') {
-      await deleteRedeemRequest(selectedRequest.id);
-    } else if (actionType === 'approve') {
-        if (!receiptFile) {
-            toast.error('Anexe o comprovante da transferência!');
-            return;
-        }
-      await resolveRedeemRequest(selectedRequest.id, 'approved', receiptFile, notes);
-    } else {
-      await resolveRedeemRequest(selectedRequest.id, 'rejected', undefined, notes);
+    setIsResolving(true); // Bloqueia o botão
+
+    try {
+      if (actionType === 'delete') {
+        await deleteRedeemRequest(selectedRequest.id);
+      } else if (actionType === 'approve') {
+          if (!receiptFile) {
+              toast.error('Anexe o comprovante da transferência!');
+              setIsResolving(false);
+              return;
+          }
+        await resolveRedeemRequest(selectedRequest.id, 'approved', receiptFile, notes);
+      } else {
+        await resolveRedeemRequest(selectedRequest.id, 'rejected', undefined, notes);
+      }
+      setIsResolveDialogOpen(false);
+    } finally {
+      setIsResolving(false); // Libera o botão
     }
-    setIsResolveDialogOpen(false);
   };
 
   const pendingRequests = allRedeemRequests.filter(r => r.status === 'pending');
@@ -308,8 +316,9 @@ const RedeemRequestsAdmin = () => {
           )}
 
           <DialogFooter>
-            <DialogClose asChild><Button variant="ghost">Cancelar</Button></DialogClose>
-            <Button variant={actionType === 'approve' ? 'default' : 'destructive'} onClick={handleResolve}>
+            <DialogClose asChild><Button variant="ghost" disabled={isResolving}>Cancelar</Button></DialogClose>
+            <Button variant={actionType === 'approve' ? 'default' : 'destructive'} onClick={handleResolve} disabled={isResolving}>
+                {isResolving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
                 {actionType === 'approve' ? 'Confirmar Pagamento' : 'Confirmar'}
             </Button>
           </DialogFooter>

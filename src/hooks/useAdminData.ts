@@ -265,13 +265,12 @@ export const useAdminData = () => {
             receiptPath = fileName;
         }
         
-        // 2. Subtrai do lucro do Admin (Saída de Caixa)
-        await supabase.rpc('increment_admin_profit', { amount: -Number(request.credits_requested) });
+        // 2. Subtrai do lucro do Admin (Saída de Caixa) - USANDO O VALOR REAL EM DINHEIRO
+        await supabase.rpc('increment_admin_profit', { amount: -Number(request.amount_to_receive) });
         queryClient.invalidateQueries({ queryKey: ['gameSettings'] });
     }
 
     // 3. Atualiza o status da solicitação
-    // NOTA: Removido o estorno automático de créditos ao jogador no status 'rejected'
     await supabase.from('solicitacoes_resgate').update({
         status, 
         receipt_url: receiptPath, 
@@ -297,8 +296,6 @@ export const useAdminData = () => {
     const request = allRedeemRequests.find(r => r.id === requestId);
     if (!request) return;
     
-    // Se o admin reabrir uma solicitação que estava rejeitada, 
-    // os créditos continuam com o sistema até que ele aprove ou cancele manualmente.
     await supabase.from('solicitacoes_resgate').update({
         status: 'pending',
         notes: 'Solicitação reaberta pelo administrador.',
