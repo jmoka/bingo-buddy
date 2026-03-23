@@ -35,6 +35,10 @@ export default function PagarCartela() {
         return;
       }
 
+      // 0. DESMEMBRA O BILHETE SE ELE FIZER PARTE DE UM CARRINHO GRANDE!
+      // Isso garante que o valor_pago que vamos buscar no passo 3 seja exato ao bilhete único.
+      await supabase.rpc('preparar_cartela_para_pagamento', { p_codigo: codigo.toUpperCase().trim() });
+
       // 1. Busca Configurações
       const { data: resConfig } = await supabase.from('configuracoes').select('*').single();
       if (resConfig) setGameSettings(resConfig);
@@ -252,7 +256,7 @@ export default function PagarCartela() {
       <div className="text-center space-y-2">
         <h1 className="font-heading text-2xl font-black text-foreground">Pagamento do Bilhete</h1>
         <p className="text-muted-foreground text-sm">
-          Siga as instruções abaixo para pagar e ativar sua cartela oficial.
+          Siga as instruções abaixo para pagar e liberar sua cartela.
         </p>
       </div>
 
