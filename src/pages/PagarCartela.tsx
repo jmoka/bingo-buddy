@@ -21,6 +21,7 @@ export default function PagarCartela() {
   const [loading, setLoading] = useState(true);
   const [isStripeLoading, setIsStripeLoading] = useState(false);
   
+  // PagBank States & User Identification
   const [isPagbankLoading, setIsPagbankLoading] = useState(false);
   const [pagbankData, setPagbankData] = useState<{qr_code: string, qr_code_text: string} | null>(null);
   const [nomePagador, setNomePagador] = useState('');
@@ -102,7 +103,7 @@ export default function PagarCartela() {
   const handleCopiarPix = (textToCopy: string) => {
     if (textToCopy) {
       navigator.clipboard.writeText(textToCopy);
-      toast.success('Código PIX Copia e Cola copiado com sucesso!');
+      toast.success('Código copiado!');
     }
   };
 
@@ -128,21 +129,22 @@ export default function PagarCartela() {
            const a = document.createElement('a');
            a.href = data.checkout_link;
            a.target = '_blank';
-           a.rel = 'noreferrer noopener'; // A mágica contra o WAF 403 Localhost
+           a.rel = 'noreferrer noopener';
            document.body.appendChild(a);
            a.click();
            document.body.removeChild(a);
            toast.info("A página de pagamento foi aberta em uma nova aba.");
         } else if (method === 'pix' && data.qr_code) { 
-            setPagbankData({ qr_code: data.qr_code, qr_code_text: data.qr_code_text }); 
-            toast.success("PIX Gerado! Realize o pagamento."); 
+           setPagbankData({ qr_code: data.qr_code, qr_code_text: data.qr_code_text }); 
+           toast.success("PIX Gerado! Realize o pagamento."); 
         }
       } else {
         if (data?.error?.includes('CPF_REQUIRED')) toast.error("CPF Inválido. Digite um CPF correto com 11 números.");
         else throw new Error(data?.error || "Erro na geração.");
       }
     } catch (e: any) {
-      toast.error("Erro do Banco: " + e.message);
+      if (e.message === 'Failed to fetch' || e.message.includes('NetworkError')) toast.error("Sua conexão de internet falhou. Verifique seu sinal e tente novamente.");
+      else toast.error("Erro do Banco: " + e.message);
     } finally {
       setIsPagbankLoading(false); setIsStripeLoading(false);
     }
@@ -190,7 +192,7 @@ export default function PagarCartela() {
                 <div className="space-y-3">
                    <p className="text-[10px] uppercase font-bold text-muted-foreground text-center">Opções de Pagamento</p>
 
-                   {/* Cartão Checkout */}
+                   {/* Cartão Checkout PAGBANK */}
                    <div className="bg-white p-4 rounded-xl border shadow-sm space-y-3">
                       <div className="flex justify-between items-center">
                         <span className="font-bold flex items-center gap-2 text-blue-700"><CreditCard className="w-5 h-5"/> Cartão</span>
@@ -232,6 +234,20 @@ export default function PagarCartela() {
              </div>
           ) : null}
 
+          {/* STRIPE CARTÃO (Se ativo, funciona concorrentemente com PagBank) */}
+          {gameSettings?.stripe_enabled && (
+            <div className="bg-indigo-50 dark:bg-indigo-900/10 p-4 rounded-xl border border-indigo-200 dark:border-indigo-800 shadow-sm space-y-3 mt-4">
+               <div className="flex items-center justify-between">
+                 <h3 className="font-bold flex items-center gap-2 text-indigo-700 dark:text-indigo-400"><CreditCard className="w-5 h-5" /> Cartão (Stripe)</h3>
+                 <span className="text-lg font-black text-indigo-700 dark:text-indigo-400">R$ {finalStripeAmount.toFixed(2).replace('.', ',')}</span>
+               </div>
+               {stripeFeeDetails && <p className="text-[10px] text-muted-foreground bg-white/50 p-2 rounded-lg border border-dashed">Acréscimo de <strong>R$ {stripeFeeDetails.fee.toFixed(2)}</strong> ref. a taxa internacional.</p>}
+               <Button className="w-full h-12 bg-indigo-600 hover:bg-indigo-700 text-white font-bold" onClick={handleStripePayment} disabled={isStripeLoading || valorCheio <= 0}>
+                  {isStripeLoading ? <Loader2 className="w-5 h-5 mr-2 animate-spin" /> : null} Pagar via Stripe
+               </Button>
+            </div>
+          )}
+
           {/* PIX MANUAL FALLBACK */}
           {gameSettings?.pix_key && (
              <div className="bg-amber-50/50 p-4 rounded-xl border border-amber-200 mt-4 space-y-4">
@@ -242,7 +258,7 @@ export default function PagarCartela() {
                 <p className="text-[10px] text-amber-700">Sem taxas bancárias, porém exige envio de comprovante e a liberação pode demorar.</p>
                 
                 <div className="flex flex-col items-center bg-white p-3 rounded-lg border border-amber-200">
-                   {pixPayload && <QRCode value={pixPayload} size={130} className="mb-3" />}
+                   {pixPayload && <QRCodeSVG value={pixPayload} size={130} className="mb-3" />}
                    <div className="w-full flex gap-2">
                      <Input value={pixPayload} readOnly className="font-mono text-[10px]" />
                      <Button size="icon" variant="outline" className="text-amber-700" onClick={() => handleCopiarPix(pixPayload)}><Copy className="w-4 h-4" /></Button>

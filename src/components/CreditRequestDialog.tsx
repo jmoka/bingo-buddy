@@ -53,17 +53,25 @@ export const CreditRequestDialog = ({ gameSettings, children }: CreditRequestDia
     return { final: finalRounded, fee };
   }, [amount, gameSettings]);
 
-  const calcPagbankFee = (method: 'pix' | 'card') => {
-      if (!gameSettings?.pagbank_pass_fees_to_customer) return null;
-      const perc = method === 'pix' ? (gameSettings.pagbank_pix_fee_percentage || 0) : (gameSettings.pagbank_card_fee_percentage || 0);
-      const fix = method === 'pix' ? (gameSettings.pagbank_pix_fee_fixed || 0) : (gameSettings.pagbank_card_fee_fixed || 0);
-      const final = (amount + fix) / (1 - (perc / 100));
-      const finalRounded = Math.ceil(final * 100) / 100;
-      return { final: finalRounded, fee: finalRounded - amount };
-  };
+  const pixFeeDetails = useMemo(() => {
+    if (!gameSettings?.pagbank_pass_fees_to_customer) return null;
+    const perc = gameSettings.pagbank_pix_fee_percentage || 0;
+    const fix = gameSettings.pagbank_pix_fee_fixed || 0;
+    const final = (amount + fix) / (1 - (perc / 100));
+    const finalRounded = Math.ceil(final * 100) / 100;
+    const fee = finalRounded - amount;
+    return { final: finalRounded, fee };
+  }, [amount, gameSettings]);
 
-  const pixFeeDetails = calcPagbankFee('pix');
-  const cardFeeDetails = calcPagbankFee('card');
+  const cardFeeDetails = useMemo(() => {
+    if (!gameSettings?.pagbank_pass_fees_to_customer) return null;
+    const perc = gameSettings.pagbank_card_fee_percentage || 0;
+    const fix = gameSettings.pagbank_card_fee_fixed || 0;
+    const final = (amount + fix) / (1 - (perc / 100));
+    const finalRounded = Math.ceil(final * 100) / 100;
+    const fee = finalRounded - amount;
+    return { final: finalRounded, fee };
+  }, [amount, gameSettings]);
 
   const finalStripeAmount = stripeFeeDetails ? stripeFeeDetails.final : amount;
   const finalPixAmount = pixFeeDetails ? pixFeeDetails.final : amount;
@@ -96,6 +104,66 @@ export const CreditRequestDialog = ({ gameSettings, children }: CreditRequestDia
     }
   };
 
+  const handlePagbankPayment = async (method: 'pix' | 'CREDIT_CARD') => {
+    if (!cpfPagador.trim() || cpfPagador.replace(/\D/g, '').length < 11) {
+       toast.error("Por favor, preencha um CPF válido no quadro de Identificação para prosseguir.");
+       return;
+    }
+
+    if (method === 'pix') setIsPagbankLoading(true);
+    else setIsStripeLoading(true); // Reusa o loading pro botão do cartão
+
+    try {
+      const { data, error } = await supabase.functions.invoke('create-pagbank-payment', {
+        body: { 
+          amount, 
+          type: 'credits',
+          metadata: { credits_requested: credits, customer_cpf: cpfPagador, origin: window.location.origin },
+          admin_id: gameSettings?.admin_id,
+          payment_method: method
+        }
+      });
+
+      if (error) throw error;
+      
+      if (data?.success) {
+        if (method === 'CREDIT_CARD' && data.checkout_link) {
+           const a = document.createElement('a');
+           a.href = data.checkout_link;
+           a.target = '_blank';
+           a.rel = 'noreferrer noopener';
+           document.body.appendChild(a);
+           a.click();
+           document.body.removeChild(a);
+           toast.info("A página de pagamento foi aberta em uma nova guia.");
+        } else if (method === 'pix' && data.qr_code) {
+           setPagbankData({ qr_code: data.qr_code, qr_code_text: data.qr_code_text });
+           toast.success("PIX Gerado! Realize o pagamento para liberar os créditos automaticamente.");
+        }
+      } else {
+        if (data?.error?.includes('CPF_REQUIRED')) {
+           toast.error("CPF Inválido! Corrija no campo acima.", {
+             description: "O Banco exige um CPF/CNPJ matematicamente correto.",
+             duration: 6000
+           });
+        } else {
+           throw new Error(data?.error || "Erro desconhecido na geração.");
+        }
+      }
+    } catch (e: any) {
+      if (e.message === 'Failed to fetch' || e.message.includes('NetworkError')) {
+         toast.error("Sua conexão de internet falhou. Verifique seu sinal e tente novamente.");
+      } else if (e.message.includes('401') || e.message.includes('FetchError') || e.message.includes('Failed to load resource')) {
+         toast.error("Sua sessão expirou. Por favor, recarregue a página (F5) e tente novamente.");
+      } else {
+         toast.error(e.message);
+      }
+    } finally {
+      setIsPagbankLoading(false);
+      setIsStripeLoading(false);
+    }
+  };
+
   const handleStripePayment = async () => {
     setIsStripeLoading(true);
     try {
@@ -107,57 +175,27 @@ export const CreditRequestDialog = ({ gameSettings, children }: CreditRequestDia
     } catch (e: any) { toast.error("Erro ao iniciar pagamento no Cartão: " + e.message); } finally { setIsStripeLoading(false); }
   };
 
-  const handlePagbankPayment = async (method: 'pix' | 'CREDIT_CARD') => {
-    if (!cpfPagador.trim() || cpfPagador.replace(/\D/g, '').length < 11) {
-       toast.error("Por favor, preencha um CPF válido no quadro de Identificação para prosseguir.");
-       return;
-    }
-    if (method === 'pix') setIsPagbankLoading(true);
-    else setIsStripeLoading(true);
-
-    try {
-      const { data, error } = await supabase.functions.invoke('create-pagbank-payment', {
-        body: { 
-          amount, type: 'credits', admin_id: gameSettings?.admin_id, payment_method: method,
-          metadata: { credits_requested: credits, customer_cpf: cpfPagador, origin: window.location.origin }
-        }
-      });
-      if (error) throw error;
-      if (data?.success) {
-        if (method === 'CREDIT_CARD' && data.checkout_link) {
-           // SEGURANÇA UX: Cria link "fantasma" sem Referer para burlar o firewall 403 do PagBank no Localhost
-           const a = document.createElement('a');
-           a.href = data.checkout_link;
-           a.target = '_blank';
-           a.rel = 'noreferrer noopener'; // A mágica acontece aqui
-           document.body.appendChild(a);
-           a.click();
-           document.body.removeChild(a);
-           toast.info("A página de pagamento foi aberta em uma nova guia.");
-        } else if (method === 'pix' && data.qr_code) { 
-           setPagbankData({ qr_code: data.qr_code, qr_code_text: data.qr_code_text }); 
-           toast.success("PIX Gerado!"); 
-        }
-      } else {
-        if (data?.error?.includes('CPF_REQUIRED')) toast.error("CPF Inválido! Corrija no campo acima.");
-        else throw new Error(data?.error || "Erro desconhecido.");
-      }
-    } catch (e: any) {
-      toast.error("Sua sessão expirou ou o servidor falhou. Atualize a página (F5). " + e.message);
-    } finally {
-      setIsPagbankLoading(false); setIsStripeLoading(false);
-    }
-  };
-
   const handleSubmitManual = async () => {
-    if (!file) { toast.error('Anexe o comprovante.'); return; }
+    if (!file) {
+      toast.error('Por favor, anexe o comprovante de pagamento.');
+      return;
+    }
     setIsLoading(true);
     try {
       const success = await requestCredits(file, credits, amount);
-      if (success) { toast.success('Solicitação enviada!'); setFile(null); setIsOpen(false); }
-    } finally { setIsLoading(false); }
+      if (success) {
+        toast.success('Solicitação enviada!', {
+          description: 'O administrador foi notificado. Aguarde a liberação dos seus créditos.',
+        });
+        setFile(null);
+        setIsOpen(false);
+      }
+    } finally {
+      setIsLoading(false);
+    }
   };
 
+  // Zera o PIX dinâmico se o usuário alterar o valor
   const handleCreditsChange = (newCredits: number) => {
     setCredits(newCredits);
     setPagbankData(null);
@@ -169,21 +207,35 @@ export const CreditRequestDialog = ({ gameSettings, children }: CreditRequestDia
       <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto bg-muted/10">
         <DialogHeader>
           <DialogTitle className="font-heading text-center text-xl">Comprar Créditos</DialogTitle>
-          <DialogDescription className="text-center">{gameSettings?.credit_request_text || 'Escolha a quantidade de créditos e a forma de pagamento.'}</DialogDescription>
+          <DialogDescription className="text-center">
+            {gameSettings?.credit_request_text || 'Escolha a quantidade de créditos e a forma de pagamento.'}
+          </DialogDescription>
         </DialogHeader>
         
         <div className="space-y-4 pt-4 text-center">
-          <div className="p-4 bg-white dark:bg-card rounded-xl border shadow-sm flex flex-col items-center gap-3">
-            <div className="flex items-center gap-2">
-              <Button size="icon" variant="outline" className="rounded-full" onClick={() => handleCreditsChange(Math.max(0.01, Number((credits - 10).toFixed(2))))}><Minus className="w-4 h-4" /></Button>
-              <Input type="number" step="0.01" className="w-24 text-center text-lg font-bold bg-muted/50 border-0 h-12" value={credits} onChange={(e) => handleCreditsChange(Number(e.target.value) || 0)} />
-              <Button size="icon" variant="outline" className="rounded-full" onClick={() => handleCreditsChange(Number((credits + 10).toFixed(2)))}><Plus className="w-4 h-4" /></Button>
+          <div className="p-4 bg-white dark:bg-card rounded-xl border border-border shadow-sm flex flex-col items-center gap-3">
+            <div className="flex items-center justify-center gap-2">
+              <Button size="icon" variant="outline" className="rounded-full" onClick={() => handleCreditsChange(Math.max(0.01, Number((credits - 10).toFixed(2))))}>
+                <Minus className="w-4 h-4" />
+              </Button>
+              <Input
+                id="credits-input"
+                type="number"
+                step="0.01"
+                className="w-24 text-center text-lg font-bold bg-muted/50 border-0 h-12"
+                value={credits}
+                onChange={(e) => handleCreditsChange(Number(e.target.value) || 0)}
+              />
+              <Button size="icon" variant="outline" className="rounded-full" onClick={() => handleCreditsChange(Number((credits + 10).toFixed(2)))}>
+                <Plus className="w-4 h-4" />
+              </Button>
             </div>
             <p className="text-[10px] uppercase font-bold text-muted-foreground">Valor em Créditos</p>
           </div>
 
           <p className="text-xl font-heading font-black text-primary">Total: R$ {amount.toFixed(2).replace('.', ',')}</p>
 
+          {/* DADOS CADASTRAIS */}
           {gameSettings?.pagbank_enabled && (
              <div className="bg-muted/30 p-3 rounded-xl border border-border/50 text-left space-y-2">
                 <Label className="text-xs uppercase font-bold text-primary flex items-center gap-1.5 border-b pb-1.5"><User className="w-3.5 h-3.5" /> Identificação Obrigatória (PagBank)</Label>
@@ -208,6 +260,20 @@ export const CreditRequestDialog = ({ gameSettings, children }: CreditRequestDia
                 </div>
              )}
 
+             {/* STRIPE CARTÃO (Standby ou Alternativo) */}
+             {gameSettings?.stripe_enabled && (
+                <div className="bg-indigo-50 dark:bg-indigo-900/10 p-4 rounded-xl border border-indigo-200 dark:border-indigo-800 shadow-sm space-y-3">
+                   <div className="flex items-center justify-between">
+                     <h3 className="font-bold flex items-center gap-2 text-indigo-700 dark:text-indigo-400"><CreditCard className="w-5 h-5" /> Cartão (Stripe)</h3>
+                     <span className="text-lg font-black text-indigo-700 dark:text-indigo-400">R$ {finalStripeAmount.toFixed(2).replace('.', ',')}</span>
+                   </div>
+                   {stripeFeeDetails && <p className="text-[10px] text-muted-foreground bg-white/50 p-2 rounded-lg border border-dashed">Acréscimo de <strong>R$ {stripeFeeDetails.fee.toFixed(2)}</strong> ref. a taxa internacional.</p>}
+                   <Button className="w-full h-12 bg-indigo-600 hover:bg-indigo-700 text-white font-bold" onClick={handleStripePayment} disabled={isStripeLoading || amount <= 0}>
+                      {isStripeLoading ? <Loader2 className="w-5 h-5 mr-2 animate-spin" /> : null} Pagar via Stripe
+                   </Button>
+                </div>
+             )}
+
              {/* PIX AUTOMÁTICO PAGBANK */}
              {gameSettings?.pagbank_enabled && (
                 <div className="bg-white dark:bg-card p-4 rounded-xl border border-border shadow-sm space-y-3">
@@ -224,13 +290,17 @@ export const CreditRequestDialog = ({ gameSettings, children }: CreditRequestDia
                         </Button>
                      </>
                    ) : (
-                     <div className="space-y-3 animate-in fade-in zoom-in flex flex-col items-center border-t pt-3 mt-3">
-                        <div className="bg-white p-3 rounded-lg shadow-sm border"><img src={pagbankData.qr_code} className="w-[160px] h-[160px]" /></div>
+                     <div className="space-y-3 animate-in fade-in zoom-in flex flex-col items-center border-t border-green-500/20 pt-3 mt-3">
+                        <div className="bg-white p-3 rounded-lg shadow-sm border border-gray-200">
+                          <img src={pagbankData.qr_code} alt="QR Code PagBank" className="w-[160px] h-[160px]" />
+                        </div>
                         <div className="w-full text-left">
                           <Label className="text-xs uppercase font-bold text-muted-foreground mb-1 block">PIX Copia e Cola</Label>
                           <div className="relative">
                             <Input value={pagbankData.qr_code_text} readOnly className="pr-20 font-mono text-xs bg-white text-black" />
-                            <Button size="sm" className="absolute right-1 top-1 h-8 bg-green-600 hover:bg-green-700" onClick={() => handleCopyToClipboard(pagbankData.qr_code_text)}><Copy className="w-3 h-3 mr-1" /> Copiar</Button>
+                            <Button size="sm" className="absolute right-1 top-1 h-8 bg-green-600 hover:bg-green-700" onClick={() => handleCopyToClipboard(pagbankData.qr_code_text)}>
+                              <Copy className="w-3 h-3 mr-1" /> Copiar
+                            </Button>
                           </div>
                         </div>
                         <p className="text-[10px] text-green-700 font-bold bg-green-500/20 p-2 rounded text-center">Seus créditos cairão na conta em até 1 minuto automaticamente.</p>
@@ -246,7 +316,7 @@ export const CreditRequestDialog = ({ gameSettings, children }: CreditRequestDia
                     <h3 className="font-bold flex items-center gap-2 text-amber-700 dark:text-amber-500"><FileWarning className="w-5 h-5" /> PIX Manual</h3>
                     <span className="text-lg font-black text-amber-700 dark:text-amber-400">R$ {amount.toFixed(2).replace('.', ',')}</span>
                   </div>
-                  <p className="text-[10px] text-muted-foreground bg-muted/50 p-2 rounded-lg border border-dashed">Sem taxas extras. A liberação exige envio de comprovante.</p>
+                  <p className="text-[10px] text-muted-foreground bg-muted/50 p-2 rounded-lg border border-dashed">Sem taxas extras. A liberação não é imediata e exige envio de comprovante.</p>
                   
                   <div className="bg-muted/40 p-3 rounded-lg border border-dashed flex flex-col items-center">
                       {pixPayload && <QRCode value={pixPayload} size={130} className="mb-3 bg-white p-2 rounded" />}
@@ -265,18 +335,12 @@ export const CreditRequestDialog = ({ gameSettings, children }: CreditRequestDia
                   </div>
               </div>
              )}
-
-             {/* STRIPE CARTÃO (Se ativo e Pagbank Desativo) */}
-             {gameSettings?.stripe_enabled && !gameSettings?.pagbank_enabled && (
-                <div className="space-y-2 mt-4 pt-4 border-t">
-                  <Button className="w-full h-12 bg-primary text-white shadow-button font-bold text-sm" onClick={handleStripePayment} disabled={isStripeLoading}>
-                    {isStripeLoading ? <Loader2 className="w-5 h-5 mr-2 animate-spin shrink-0" /> : <CreditCard className="w-5 h-5 mr-2 shrink-0" />} PAGAR R$ {finalStripeAmount.toFixed(2).replace('.', ',')} VIA STRIPE
-                  </Button>
-                </div>
-             )}
           </div>
         </div>
-        <DialogFooter><DialogClose asChild><Button variant="ghost">Fechar</Button></DialogClose></DialogFooter>
+
+        <DialogFooter className="mt-2">
+          <DialogClose asChild><Button variant="ghost" className="w-full">Cancelar</Button></DialogClose>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
