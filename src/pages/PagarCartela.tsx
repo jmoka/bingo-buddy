@@ -192,14 +192,14 @@ export default function PagarCartela() {
                 <div className="space-y-3">
                    <p className="text-[10px] uppercase font-bold text-muted-foreground text-center">Opções de Pagamento</p>
 
-                   {/* Cartão Checkout PAGBANK */}
+                   {/* Cartão Checkout */}
                    <div className="bg-white p-4 rounded-xl border shadow-sm space-y-3">
                       <div className="flex justify-between items-center">
                         <span className="font-bold flex items-center gap-2 text-blue-700"><CreditCard className="w-5 h-5"/> Cartão</span>
                         <span className="font-black text-lg text-blue-700">R$ {(cardFeeDetails?.final || valorCheio).toFixed(2).replace('.', ',')}</span>
                       </div>
                       {cardFeeDetails && <p className="text-[10px] text-muted-foreground bg-muted/50 p-2 rounded">Inclui taxa de R$ {cardFeeDetails.fee.toFixed(2)}. Liberação imediata.</p>}
-                      <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold" onClick={() => handlePagbankPayment('CREDIT_CARD')} disabled={isStripeLoading || valorCheio <= 0}>
+                      <Button className="w-full bg-blue-600 hover:bg-blue-700" onClick={() => handlePagbankPayment('CREDIT_CARD')} disabled={isStripeLoading || valorCheio <= 0}>
                          {isStripeLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null} Pagar no Cartão
                       </Button>
                    </div>
@@ -213,7 +213,7 @@ export default function PagarCartela() {
                       {!pagbankData ? (
                         <>
                           {pixFeeDetails && <p className="text-[10px] text-muted-foreground bg-muted/50 p-2 rounded">Inclui taxa bancária de R$ {pixFeeDetails.fee.toFixed(2)}.</p>}
-                          <Button className="w-full bg-green-600 hover:bg-green-700 text-white font-bold shadow-button" onClick={() => handlePagbankPayment('pix')} disabled={isPagbankLoading || valorCheio <= 0}>
+                          <Button className="w-full bg-green-600 hover:bg-green-700" onClick={() => handlePagbankPayment('pix')} disabled={isPagbankLoading || valorCheio <= 0}>
                              {isPagbankLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null} Gerar QR Code PIX
                           </Button>
                         </>
@@ -258,7 +258,7 @@ export default function PagarCartela() {
                 <p className="text-[10px] text-amber-700">Sem taxas bancárias, porém exige envio de comprovante e a liberação pode demorar.</p>
                 
                 <div className="flex flex-col items-center bg-white p-3 rounded-lg border border-amber-200">
-                   {pixPayload && <QRCodeSVG value={pixPayload} size={130} className="mb-3" />}
+                   {pixPayload && <QRCodeSVG value={pixPayload} size={130} className="mb-3 bg-white p-2 rounded" />}
                    <div className="w-full flex gap-2">
                      <Input value={pixPayload} readOnly className="font-mono text-[10px]" />
                      <Button size="icon" variant="outline" className="text-amber-700" onClick={() => handleCopiarPix(pixPayload)}><Copy className="w-4 h-4" /></Button>
