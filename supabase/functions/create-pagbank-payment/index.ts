@@ -38,7 +38,7 @@ serve(async (req) => {
     let customerEmail = 'cliente@bingoshow.com';
     let customerTaxId = ''; 
 
-    // Se logado (Compra de Créditos), pega dados do perfil
+    // Se estiver logado, busca os dados reais do jogador
     if (authHeader && authHeader !== 'Bearer null' && authHeader !== 'null') {
         const userClient = createClient(Deno.env.get('SUPABASE_URL') ?? '', Deno.env.get('SUPABASE_ANON_KEY') ?? '', { global: { headers: { Authorization: authHeader } } });
         const { data: { user } } = await userClient.auth.getUser();
@@ -49,28 +49,31 @@ serve(async (req) => {
             if (profile) {
                 customerName = profile.full_name || customerName;
                 if (profile.cpf) {
-                  const cleanCpf = profile.cpf.replace(/\D/g, '');
-                  if (cleanCpf.length === 11 || cleanCpf.length === 14) {
-                    customerTaxId = cleanCpf;
-                  }
+                  customerTaxId = profile.cpf.replace(/\D/g, '');
                 }
             }
         }
     }
 
-    // Se for Venda Avulsa (PagarCartela - Anônimo)
+    // Sobrescreve com metadados do frontend (Venda Avulsa OU Usuário Logado corrigindo o CPF na hora)
     if (metadata?.cliente_nome) customerName = metadata.cliente_nome;
     if (metadata?.customer_cpf) {
         customerTaxId = metadata.customer_cpf.replace(/\D/g, '');
+        
+        // HIGIENIZAÇÃO: Se o usuário logado enviou um CPF válido novo na compra, salva no perfil dele automaticamente
+        if (user_id && (customerTaxId.length === 11 || customerTaxId.length === 14)) {
+            // Evita bloquear a transação se der erro ao atualizar o perfil
+            supabaseAdmin.from('perfis').update({ cpf: customerTaxId }).eq('id', user_id)
+              .then(({error}) => { if(error) console.error("Erro ao atualizar CPF no perfil:", error) });
+        }
     }
 
-    // VALIDAÇÃO ESTRITA DE SEGURANÇA - CPF OBRIGATÓRIO NO PAGBANK
+    // VALIDAÇÃO ESTRITA DE SEGURANÇA (Prevenção de erro 400 da API do PagBank)
     if (!customerTaxId || (customerTaxId.length !== 11 && customerTaxId.length !== 14)) {
-        throw new Error("CPF_REQUIRED: É obrigatório informar um CPF ou CNPJ válido para gerar o pagamento via PagBank.");
+        throw new Error("CPF_REQUIRED: É obrigatório informar um CPF ou CNPJ com 11 ou 14 dígitos.");
     }
 
     // SALVAR DADOS DO COMPRADOR NA CARTELA ANTES DE GERAR O PIX
-    // Assim, quando o webhook aprovar, a cartela já terá nome e telefone vinculados!
     try {
       if (type === 'venda_bingo' && metadata?.venda_id) {
           await supabaseAdmin.from('vendas_bingo_fisico').update({
@@ -78,7 +81,6 @@ serve(async (req) => {
               telefone_comprador: metadata?.cliente_telefone || null
           }).eq('id', metadata.venda_id);
       } else if (type === 'venda_rifa' && metadata?.venda_id) {
-          // Na rifa, o nome fica armazenado na tabela numeros_rifa
           const { data: cartela } = await supabaseAdmin.from('cartelas_rifa').select('numero_rifa_id').eq('compra_id', metadata.venda_id).maybeSingle();
           if (cartela?.numero_rifa_id) {
               await supabaseAdmin.from('numeros_rifa').update({
@@ -89,10 +91,9 @@ serve(async (req) => {
       }
     } catch (err) {
        console.error("[create-pagbank-payment] Erro ao pre-salvar comprador:", err);
-       // Não bloqueia a transação se der erro aqui
     }
 
-    // Criar o Payload para o PagBank
+    // Criar o Payload para o PagBank (Orders API)
     const reference_id = `${type.toUpperCase()}_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
     const valorEmCentavos = Math.round(Number(amount) * 100);
 
@@ -131,7 +132,14 @@ serve(async (req) => {
 
     if (!response.ok) {
       console.error("[create-pagbank-payment] Erro PagBank:", responseData);
-      throw new Error(responseData.error_messages?.[0]?.description || "Erro ao gerar PIX no PagBank.");
+      const errorDesc = responseData.error_messages?.[0]?.description || "";
+      
+      // FAIL SAFE: Intercepta o erro de validação matemática do PagBank e devolve de forma legível
+      if (errorDesc.includes("CPF") || errorDesc.includes("CNPJ") || responseData.error_messages?.[0]?.code === "40002") {
+          throw new Error("CPF_REQUIRED: O CPF informado é inválido matematicamente.");
+      }
+      
+      throw new Error(errorDesc || "Erro ao gerar PIX no PagBank.");
     }
 
     const qrCodeImage = responseData.qr_codes?.[0]?.links?.find((l: any) => l.media === 'image/png')?.href;
@@ -141,7 +149,7 @@ serve(async (req) => {
         throw new Error("PagBank não retornou os dados do QR Code.");
     }
 
-    // Salva a intenção de pagamento no nosso banco
+    // Salva a intenção de pagamento no nosso banco para validação futura no webhook
     await supabaseAdmin.from('pagbank_payments').insert({
         user_id: user_id,
         reference_id: reference_id,

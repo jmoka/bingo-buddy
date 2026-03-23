@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useGame } from '@/contexts/GameContext';
 import { Button } from '@/components/ui/button';
@@ -29,9 +29,17 @@ export const CreditRequestDialog = ({ gameSettings, children }: CreditRequestDia
   // PagBank States
   const [isPagbankLoading, setIsPagbankLoading] = useState(false);
   const [pagbankData, setPagbankData] = useState<{qr_code: string, qr_code_text: string} | null>(null);
+  const [cpfPagador, setCpfPagador] = useState('');
 
   const [isOpen, setIsOpen] = useState(false);
   const [credits, setCredits] = useState<number>(10);
+
+  // Sincroniza o CPF do perfil quando carrega
+  useEffect(() => {
+    if (profile?.cpf && !cpfPagador) {
+        setCpfPagador(profile.cpf);
+    }
+  }, [profile]);
 
   const amount = credits * (gameSettings?.valor_por_credito || 1);
 
@@ -97,13 +105,18 @@ export const CreditRequestDialog = ({ gameSettings, children }: CreditRequestDia
   };
 
   const handlePagbankPayment = async () => {
+    if (!cpfPagador.trim()) {
+       toast.error("Por favor, informe seu CPF para gerar a cobrança.");
+       return;
+    }
+
     setIsPagbankLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke('create-pagbank-payment', {
         body: { 
           amount, 
           type: 'credits',
-          metadata: { credits_requested: credits },
+          metadata: { credits_requested: credits, customer_cpf: cpfPagador },
           admin_id: gameSettings?.admin_id
         }
       });
@@ -117,15 +130,8 @@ export const CreditRequestDialog = ({ gameSettings, children }: CreditRequestDia
       }
     } catch (e: any) {
       if (e.message.includes('CPF_REQUIRED')) {
-        toast.error("Cadastro Incompleto", {
-          description: "O PagBank exige um CPF válido. Atualize seu perfil.",
-          action: {
-            label: "Atualizar Perfil",
-            onClick: () => {
-              setIsOpen(false);
-              navigate('/account');
-            }
-          },
+        toast.error("CPF Inválido ou Incompleto", {
+          description: "O PagBank exige um CPF real. Digite um CPF matematicamente válido com 11 dígitos.",
           duration: 8000,
         });
       } else if (e.message.includes('401') || e.message.includes('FetchError') || e.message.includes('Failed to load resource')) {
@@ -206,14 +212,25 @@ export const CreditRequestDialog = ({ gameSettings, children }: CreditRequestDia
                 </h3>
                 
                 {!pagbankData ? (
-                  <Button
-                    className="w-full h-12 bg-green-600 hover:bg-green-700 text-white font-bold shadow-button"
-                    onClick={handlePagbankPayment}
-                    disabled={isPagbankLoading || amount <= 0}
-                  >
-                    {isPagbankLoading ? <Loader2 className="w-5 h-5 mr-2 animate-spin" /> : null}
-                    Gerar PIX de R$ {amount.toFixed(2).replace('.', ',')}
-                  </Button>
+                  <>
+                    <div className="space-y-2 mb-3 text-left">
+                      <Label className="text-xs text-green-800 uppercase font-bold">Seu CPF (Exigido pelo Banco)</Label>
+                      <Input
+                        value={cpfPagador}
+                        onChange={e => setCpfPagador(e.target.value)}
+                        placeholder="000.000.000-00"
+                        className="border-green-300 focus-visible:ring-green-500 bg-white"
+                      />
+                    </div>
+                    <Button
+                      className="w-full h-12 bg-green-600 hover:bg-green-700 text-white font-bold shadow-button"
+                      onClick={handlePagbankPayment}
+                      disabled={isPagbankLoading || amount <= 0}
+                    >
+                      {isPagbankLoading ? <Loader2 className="w-5 h-5 mr-2 animate-spin" /> : null}
+                      Gerar PIX de R$ {amount.toFixed(2).replace('.', ',')}
+                    </Button>
+                  </>
                 ) : (
                   <div className="space-y-3 animate-in fade-in zoom-in duration-300">
                     <div className="bg-white p-3 rounded-lg inline-block shadow-sm border border-gray-200">
