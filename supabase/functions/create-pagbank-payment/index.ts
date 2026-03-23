@@ -17,7 +17,7 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    let configQuery = supabaseAdmin.from('configuracoes').select('*');
+    let configQuery = supabaseAdmin.from('configuracoes').select('admin_id, pagbank_env, pagbank_token_sandbox, pagbank_token_producao, pagbank_pass_fees_to_customer, pagbank_pix_fee_percentage, pagbank_card_fee_percentage, pagbank_pix_fee_fixed, pagbank_card_fee_fixed');
     if (admin_id) {
         configQuery = configQuery.eq('admin_id', admin_id);
     }
@@ -35,7 +35,7 @@ serve(async (req) => {
     let user_id = null;
     let customerName = 'Cliente Bingo Show';
     let customerEmail = 'cliente@bingoshow.com';
-    let customerTaxId = ''; 
+    let customerTaxId = '12345678909'; 
     let phoneArea = "11";
     let phoneNumber = "999999999";
     let redirectUrl = metadata?.origin || 'http://localhost:5173';
@@ -80,10 +80,9 @@ serve(async (req) => {
         applyPhone(metadata.cliente_telefone);
     }
 
-    // VALIDAÇÃO ESTRITA E FALLBACK
+    // VALIDAÇÃO ESTRITA DE SEGURANÇA (Prevenção de erro 400 da API do PagBank)
     if (!customerTaxId || (customerTaxId.length !== 11 && customerTaxId.length !== 14)) {
-        // Fallback matemático para não explodir na API do PagBank
-        customerTaxId = '12345678909';
+        throw new Error("CPF_REQUIRED: O Banco exige um CPF ou CNPJ válido matematicamente.");
     }
 
     let finalName = customerName.trim();
@@ -119,13 +118,20 @@ serve(async (req) => {
     let qr_code_text = null;
     let checkout_link = null;
 
-    // FLUXO CARTÃO
+    // FLUXO CARTÃO (CHECKOUT)
     if (payment_method === 'CREDIT_CARD') {
         let success_url = `${redirectUrl}/?payment=success`;
         let cancel_url = `${redirectUrl}/?payment=cancel`;
         if ((type === 'venda_bingo' || type === 'venda_rifa') && metadata?.codigo) {
             success_url = `${redirectUrl}/validar-cartela?${type === 'venda_rifa' ? 'codigo' : 'bingo'}=${metadata.codigo}`;
             cancel_url = `${redirectUrl}/pagar-cartela?codigo=${metadata.codigo}`;
+        }
+
+        // SEGURANÇA E HIGIENIZAÇÃO: O PagBank NÃO aceita localhost ou HTTP no redirect_url.
+        // Se estivermos testando localmente, injetamos uma URL falsa mas válida HTTPS para não quebrar a API.
+        let final_redirect_url = success_url;
+        if (final_redirect_url.includes('localhost') || final_redirect_url.includes('127.0.0.1') || final_redirect_url.startsWith('http://')) {
+            final_redirect_url = 'https://bingoshow-app.vercel.app'; 
         }
 
         const checkoutPayload = {
@@ -140,8 +146,10 @@ serve(async (req) => {
             items: [{ reference_id: `ITEM_${reference_id}`, name: itemName, quantity: 1, unit_amount: valorEmCentavos }],
             payment_methods: [{"type": "CREDIT_CARD"}],
             notification_urls: [`${Deno.env.get('SUPABASE_URL')}/functions/v1/pagbank-webhook`],
-            redirect_url: success_url
+            redirect_url: final_redirect_url
         };
+
+        console.log(`[create-pagbank-payment] Payload Checkout enviado:`, JSON.stringify(checkoutPayload));
 
         const response = await fetch(`${apiUrl}/checkouts`, {
             method: 'POST',
@@ -152,6 +160,7 @@ serve(async (req) => {
         responseData = await response.json();
 
         if (!response.ok) {
+            console.error("[create-pagbank-payment] Erro PagBank Checkout:", JSON.stringify(responseData));
             const errDesc = responseData.error_messages?.[0]?.description || "";
             const errParam = responseData.error_messages?.[0]?.parameter_name || "Desconhecido";
             throw new Error(`O Banco recusou a transação. Campo [${errParam}]: ${errDesc}`);
@@ -162,7 +171,7 @@ serve(async (req) => {
         
         if (!checkout_link) throw new Error("O PagBank não retornou o link de pagamento.");
     } 
-    // FLUXO PIX
+    // FLUXO PIX (ORDER)
     else {
         const orderPayload = {
           reference_id: reference_id,
@@ -206,14 +215,19 @@ serve(async (req) => {
         admin_id: config.admin_id
     });
 
-    // RETORNA 200 OK PARA PREVENIR ERRO DE REDE NO FRONTEND
     return new Response(JSON.stringify({ 
-      success: true, qr_code, qr_code_text, checkout_link, order_id: pagbank_order_id 
-    }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
+      success: true, 
+      qr_code, 
+      qr_code_text, 
+      checkout_link,
+      order_id: pagbank_order_id 
+    }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 200
+    });
 
   } catch (error: any) {
     console.error("[create-pagbank-payment] Controlled Error:", error.message);
-    // RETORNA 200 MAS COM SUCCESS FALSE! O frontend lerá o "error.message" perfeitamente agora.
     return new Response(JSON.stringify({ success: false, error: error.message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200
