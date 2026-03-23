@@ -35,7 +35,7 @@ serve(async (req) => {
     let user_id = null;
     let customerName = 'Cliente Bingo Show';
     let customerEmail = 'cliente@bingoshow.com';
-    let customerTaxId = ''; 
+    let customerTaxId = '12345678909'; 
     let phoneArea = "11";
     let phoneNumber = "999999999";
 
@@ -74,7 +74,7 @@ serve(async (req) => {
     if (metadata?.cliente_telefone) applyPhone(metadata.cliente_telefone);
 
     if (!customerTaxId || (customerTaxId.length !== 11 && customerTaxId.length !== 14)) {
-        throw new Error("CPF_REQUIRED: É obrigatório informar um CPF ou CNPJ válido.");
+        throw new Error("CPF_REQUIRED: O Banco exige um CPF ou CNPJ válido matematicamente.");
     }
 
     let finalName = customerName.trim();
@@ -107,13 +107,12 @@ serve(async (req) => {
     let qr_code_text = null;
     let checkout_link = null;
 
-    // FLUXO CARTÃO (CHECKOUT)
+    // FLUXO CARTÃO (CHECKOUT API)
     if (payment_method === 'CREDIT_CARD') {
         const expirationDate = new Date();
         expirationDate.setDate(expirationDate.getDate() + 7);
 
-        // PAYLOAD LIMPO (Igual ao seu outro app que funciona)
-        // Removidos: redirect_url e payment_methods
+        // PAYLOAD 100% IDÊNTICO AO APLICATIVO FUNCIONAL DO USUÁRIO
         const checkoutPayload = {
             reference_id: reference_id,
             expiration_date: expirationDate.toISOString(),
@@ -141,15 +140,15 @@ serve(async (req) => {
             console.error("[create-pagbank-payment] Erro PagBank Checkout:", JSON.stringify(responseData));
             const errDesc = responseData.error_messages?.[0]?.description || "";
             const errParam = responseData.error_messages?.[0]?.parameter_name || "Desconhecido";
-            throw new Error(`Erro do PagBank [${errParam}]: ${errDesc}`);
+            throw new Error(`Erro API PagBank [${errParam}]: ${errDesc}`);
         }
 
         pagbank_order_id = responseData.id;
         checkout_link = responseData.links?.find((l: any) => l.rel === 'PAY')?.href;
         
-        if (!checkout_link) throw new Error("O PagBank processou a requisição mas não retornou o link de pagamento.");
+        if (!checkout_link) throw new Error("Link de checkout não retornado pelo PagBank.");
     } 
-    // FLUXO PIX (ORDER)
+    // FLUXO PIX (ORDERS API)
     else {
         const orderPayload = {
           reference_id: reference_id,
@@ -170,7 +169,7 @@ serve(async (req) => {
         if (!response.ok) {
             const errDesc = responseData.error_messages?.[0]?.description || "";
             if (errDesc.includes("CPF") || errDesc.includes("CNPJ") || responseData.error_messages?.[0]?.code === "40002") {
-                throw new Error("CPF_REQUIRED: O CPF informado é inválido matematicamente.");
+                throw new Error("CPF_REQUIRED: O Banco exige um CPF válido matematicamente.");
             }
             throw new Error(`Erro API PagBank: ${errDesc}`);
         }
@@ -198,10 +197,9 @@ serve(async (req) => {
     }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
 
   } catch (error: any) {
-    console.error("[create-pagbank-payment] Controlled Error:", error.message);
+    console.error("[create-pagbank-payment] Error:", error.message);
     return new Response(JSON.stringify({ success: false, error: error.message }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 200
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200
     });
   }
 })

@@ -21,7 +21,6 @@ export default function PagarCartela() {
   const [loading, setLoading] = useState(true);
   const [isStripeLoading, setIsStripeLoading] = useState(false);
   
-  // PagBank States
   const [isPagbankLoading, setIsPagbankLoading] = useState(false);
   const [pagbankData, setPagbankData] = useState<{qr_code: string, qr_code_text: string} | null>(null);
   const [nomePagador, setNomePagador] = useState('');
@@ -103,7 +102,7 @@ export default function PagarCartela() {
   const handleCopiarPix = (textToCopy: string) => {
     if (textToCopy) {
       navigator.clipboard.writeText(textToCopy);
-      toast.success('Código copiado!');
+      toast.success('Código PIX Copia e Cola copiado com sucesso!');
     }
   };
 
@@ -125,15 +124,25 @@ export default function PagarCartela() {
       });
       if (error) throw error;
       if (data?.success) {
-        if (method === 'CREDIT_CARD' && data.checkout_link) window.location.href = data.checkout_link;
-        else if (method === 'pix' && data.qr_code) { setPagbankData({ qr_code: data.qr_code, qr_code_text: data.qr_code_text }); toast.success("PIX Gerado! Realize o pagamento."); }
+        if (method === 'CREDIT_CARD' && data.checkout_link) {
+           const a = document.createElement('a');
+           a.href = data.checkout_link;
+           a.target = '_blank';
+           a.rel = 'noreferrer noopener'; // A mágica contra o WAF 403 Localhost
+           document.body.appendChild(a);
+           a.click();
+           document.body.removeChild(a);
+           toast.info("A página de pagamento foi aberta em uma nova aba.");
+        } else if (method === 'pix' && data.qr_code) { 
+            setPagbankData({ qr_code: data.qr_code, qr_code_text: data.qr_code_text }); 
+            toast.success("PIX Gerado! Realize o pagamento."); 
+        }
       } else {
         if (data?.error?.includes('CPF_REQUIRED')) toast.error("CPF Inválido. Digite um CPF correto com 11 números.");
         else throw new Error(data?.error || "Erro na geração.");
       }
     } catch (e: any) {
-      if (e.message === 'Failed to fetch' || e.message.includes('NetworkError')) toast.error("Sua conexão de internet falhou. Verifique seu sinal e tente novamente.");
-      else toast.error("Erro do Banco: " + e.message);
+      toast.error("Erro do Banco: " + e.message);
     } finally {
       setIsPagbankLoading(false); setIsStripeLoading(false);
     }
@@ -188,7 +197,7 @@ export default function PagarCartela() {
                         <span className="font-black text-lg text-blue-700">R$ {(cardFeeDetails?.final || valorCheio).toFixed(2).replace('.', ',')}</span>
                       </div>
                       {cardFeeDetails && <p className="text-[10px] text-muted-foreground bg-muted/50 p-2 rounded">Inclui taxa de R$ {cardFeeDetails.fee.toFixed(2)}. Liberação imediata.</p>}
-                      <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-button" onClick={() => handlePagbankPayment('CREDIT_CARD')} disabled={isStripeLoading || valorCheio <= 0}>
+                      <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold" onClick={() => handlePagbankPayment('CREDIT_CARD')} disabled={isStripeLoading || valorCheio <= 0}>
                          {isStripeLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null} Pagar no Cartão
                       </Button>
                    </div>
@@ -233,7 +242,7 @@ export default function PagarCartela() {
                 <p className="text-[10px] text-amber-700">Sem taxas bancárias, porém exige envio de comprovante e a liberação pode demorar.</p>
                 
                 <div className="flex flex-col items-center bg-white p-3 rounded-lg border border-amber-200">
-                   {pixPayload && <QRCodeSVG value={pixPayload} size={120} className="mb-3" />}
+                   {pixPayload && <QRCode value={pixPayload} size={130} className="mb-3" />}
                    <div className="w-full flex gap-2">
                      <Input value={pixPayload} readOnly className="font-mono text-[10px]" />
                      <Button size="icon" variant="outline" className="text-amber-700" onClick={() => handleCopiarPix(pixPayload)}><Copy className="w-4 h-4" /></Button>
@@ -244,15 +253,6 @@ export default function PagarCartela() {
                   <Camera className="w-5 h-5 mr-2" /> Enviar Comprovante
                 </Button>
              </div>
-          )}
-
-          {/* STRIPE CARTÃO (Standby) */}
-          {gameSettings?.stripe_enabled && !gameSettings?.pagbank_enabled && (
-            <div className="space-y-2 mt-4 pt-4 border-t">
-              <Button className="w-full h-12 bg-primary text-white shadow-button font-bold text-sm" onClick={handleStripePayment} disabled={isStripeLoading}>
-                {isStripeLoading ? <Loader2 className="w-5 h-5 mr-2 animate-spin shrink-0" /> : <CreditCard className="w-5 h-5 mr-2 shrink-0" />} PAGAR R$ {finalStripeAmount.toFixed(2).replace('.', ',')} VIA STRIPE
-              </Button>
-            </div>
           )}
         </div>
       </div>
