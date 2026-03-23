@@ -114,7 +114,12 @@ export const CreditRequestDialog = ({ gameSettings, children }: CreditRequestDia
         throw new Error(data?.error || "Erro desconhecido ao gerar PIX.");
       }
     } catch (e: any) {
-      toast.error("Erro ao gerar PIX PagBank: " + e.message);
+      // Correção e Segurança para Erro 401
+      if (e.message.includes('401') || e.message.includes('FetchError') || e.message.includes('Failed to load resource')) {
+         toast.error("Sua sessão expirou ou o servidor foi atualizado. Por favor, recarregue a página (F5) e tente novamente.");
+      } else {
+         toast.error("Erro ao gerar PIX PagBank: " + e.message);
+      }
     } finally {
       setIsPagbankLoading(false);
     }
