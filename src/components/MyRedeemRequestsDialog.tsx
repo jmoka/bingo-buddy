@@ -1,4 +1,6 @@
+import { useState, useEffect } from 'react';
 import { useGame } from '@/contexts/GameContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose, DialogDescription } from '@/components/ui/dialog';
 import { Badge } from "@/components/ui/badge";
@@ -6,8 +8,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { ScrollArea } from './ui/scroll-area';
-import { Coins, Calendar, Info, CheckCircle2, AlertCircle, Clock, Banknote, Download, RefreshCw, ExternalLink } from 'lucide-react';
-import { RedeemRequest } from '@/types/match';
+import { Coins, Calendar, Info, CheckCircle2, AlertCircle, Clock, Banknote, RefreshCw, ExternalLink, MessageSquare, ShieldCheck, User, Loader2 } from 'lucide-react';
+import { RedeemRequest, RedeemRequestMessage } from '@/types/match';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { RedeemResubmissionDialog } from './RedeemResubmissionDialog';
@@ -23,12 +25,32 @@ const statusConfig = {
 };
 
 export const MyRedeemRequestsDialog = ({ children }: MyRedeemRequestsDialogProps) => {
-  const { redeemRequests = [] } = useGame();
+  const { profile } = useAuth();
+  const { redeemRequests = [], fetchRedeemMessages } = useGame();
+
+  const [conversationRequest, setConversationRequest] = useState<RedeemRequest | null>(null);
+  const [messages, setMessages] = useState<RedeemRequestMessage[]>([]);
+  const [isLoadingMessages, setIsLoadingMessages] = useState(false);
 
   const safeRequests = Array.isArray(redeemRequests) ? redeemRequests : [];
   const pending = safeRequests.filter(r => r.status === 'pending');
   const approved = safeRequests.filter(r => r.status === 'approved');
   const rejected = safeRequests.filter(r => r.status === 'rejected');
+
+  useEffect(() => {
+    if (conversationRequest) {
+      loadMessages(conversationRequest.id);
+    } else {
+      setMessages([]);
+    }
+  }, [conversationRequest]);
+
+  const loadMessages = async (requestId: string) => {
+    setIsLoadingMessages(true);
+    const data = await fetchRedeemMessages(requestId);
+    setMessages(data);
+    setIsLoadingMessages(false);
+  };
 
   const handleDownloadReceipt = async (path: string) => {
     try {
@@ -86,19 +108,25 @@ export const MyRedeemRequestsDialog = ({ children }: MyRedeemRequestsDialogProps
                 </Button>
               )}
 
-              {req.notes && (
-                <div className={`p-3 rounded-lg text-xs flex gap-2 border ${req.status === 'rejected' ? 'bg-destructive/5 text-destructive border-destructive/10' : 'bg-success/5 text-success border-success/10'}`}>
-                  <Info className="w-4 h-4 shrink-0" />
-                  <span><strong>Nota do Admin:</strong> {req.notes}</span>
+              <button 
+                onClick={() => setConversationRequest(req)}
+                className="mt-2 flex items-start gap-2 p-2 rounded-lg bg-primary/10 border border-primary/20 text-left hover:bg-primary/20 transition-colors w-full shadow-sm group"
+              >
+                <MessageSquare className="w-4 h-4 text-primary shrink-0 mt-0.5 group-hover:scale-110 transition-transform" />
+                <div className="flex flex-col overflow-hidden">
+                  <span className="text-[10px] font-bold text-primary uppercase tracking-wider mb-0.5">Acessar Chat da Solicitação</span>
+                  <span className="text-xs text-foreground font-medium leading-normal line-clamp-2">
+                    Clique para ver a chave PIX enviada ou os avisos do Admin.
+                  </span>
                 </div>
-              )}
+              </button>
 
               {req.status === 'rejected' && (
                 <div className="mt-3 border-t pt-3">
                   <RedeemResubmissionDialog request={req}>
                     <Button variant="outline" size="sm" className="w-full">
                       <RefreshCw className="w-4 h-4 mr-2" />
-                      Responder / Pedir Nova Revisão
+                      Responder Admin / Pedir Revisão
                     </Button>
                   </RedeemResubmissionDialog>
                 </div>
@@ -167,8 +195,51 @@ export const MyRedeemRequestsDialog = ({ children }: MyRedeemRequestsDialogProps
           </div>
         </Tabs>
 
+        {/* DIALOG NESTED PARA O CHAT */}
+        <Dialog open={!!conversationRequest} onOpenChange={(open) => !open && setConversationRequest(null)}>
+          <DialogContent className="max-w-md h-[70vh] flex flex-col p-0">
+            <DialogHeader className="p-6 pb-2 border-b">
+              <DialogTitle className="flex items-center gap-2 font-heading">
+                <MessageSquare className="w-5 h-5 text-primary" /> Chat de Pagamento
+              </DialogTitle>
+            </DialogHeader>
+
+            <ScrollArea className="flex-grow p-4">
+              {isLoadingMessages ? (
+                  <div className="flex justify-center py-10"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>
+              ) : (
+                  <div className="space-y-4">
+                      {messages.map(msg => {
+                          const isMe = msg.sender_id === profile?.id;
+                          return (
+                              <div key={msg.id} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'} space-y-1`}>
+                                  <div className={`flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-widest ${isMe ? 'text-primary ml-2' : 'text-muted-foreground mr-2'}`}>
+                                      {isMe ? <User className="w-3 h-3" /> : <ShieldCheck className="w-3 h-3 text-success" />}
+                                      {isMe ? 'Você' : 'Admin'} • {format(new Date(msg.created_at), "HH:mm")}
+                                  </div>
+                                  <div className={`p-3 rounded-2xl shadow-sm max-w-[85%] text-sm border ${
+                                      isMe ? 'bg-primary/10 border-primary/20 rounded-tr-none' : 'bg-muted border-border rounded-tl-none'
+                                  }`}>
+                                      {msg.message}
+                                  </div>
+                              </div>
+                          );
+                      })}
+                      {messages.length === 0 && (
+                          <p className="text-center text-muted-foreground text-sm py-10">Nenhuma mensagem neste histórico.</p>
+                      )}
+                  </div>
+              )}
+            </ScrollArea>
+
+            <DialogFooter className="p-4 border-t bg-muted/20">
+              <Button variant="outline" className="w-full" onClick={() => setConversationRequest(null)}>Voltar para Solicitações</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
         <DialogFooter className="p-4 border-t bg-card">
-          <DialogClose asChild><Button variant="outline" className="w-full sm:w-auto">Fechar</Button></DialogClose>
+          <DialogClose asChild><Button variant="outline" className="w-full sm:w-auto">Fechar Histórico</Button></DialogClose>
         </DialogFooter>
       </DialogContent>
     </Dialog>

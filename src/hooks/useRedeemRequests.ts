@@ -57,15 +57,29 @@ export const useRedeemRequests = () => {
         toast.error('Falha ao reenviar solicitação.', { description: error.message });
         return false;
     }
+    
+    // Agora isso não falhará no banco, graças ao novo Trigger
     await supabase.from('mensagens_resgate').insert({ redeem_request_id: requestId, sender_id: user.id, message });
+    
     await supabase.functions.invoke('notify-n8n', { body: { event: 'REDEEM_RESUBMISSION', data: { requestId, userEmail: user.email, message } } });
     queryClient.invalidateQueries({ queryKey: ['redeemRequests', user.id] });
     return true;
+  };
+
+  const fetchRedeemMessages = async (requestId: string) => {
+    const { data, error } = await supabase
+        .from('mensagens_resgate')
+        .select('*')
+        .eq('redeem_request_id', requestId)
+        .order('created_at', { ascending: true });
+    if (error) return [];
+    return data;
   };
 
   return {
     redeemRequests,
     requestRedeem,
     resubmitRedeemRequest,
+    fetchRedeemMessages,
   };
 };
