@@ -22,18 +22,29 @@ export const useRedeemRequests = () => {
   const requestRedeem = async (credits: number, amount: number, message?: string): Promise<boolean> => {
     if (!user || !profile) return false;
 
-    const { data, error } = await supabase.functions.invoke('request-redeem', {
-      body: { credits, amount, message },
+    // Chamando a nova função SQL diretamente no banco
+    const { data, error } = await supabase.rpc('request_redeem', {
+      p_credits: credits,
+      p_amount: amount,
+      p_message: message || null
     });
 
     if (error || !data?.success) {
-      const msg = data?.error;
+      const msg = data?.error || error?.message;
       if (msg === 'insufficient_credits') toast.error('Créditos insuficientes!');
       else toast.error('Erro ao criar solicitação de resgate.');
+      console.error(msg);
       return false;
     }
 
+    // Tenta notificar o N8N de forma silenciosa (sem travar a interface se falhar)
+    supabase.functions.invoke('notify-n8n', { 
+      body: { event: 'REDEEM_REQUEST', data: { requestId: data.request_id, credits, amount, userEmail: user.email } } 
+    }).catch(() => {});
+
+    // Atualiza a interface
     queryClient.invalidateQueries({ queryKey: ['redeemRequests', user.id] });
+    queryClient.invalidateQueries({ queryKey: ['profile', user.id] });
     return true;
   };
 
