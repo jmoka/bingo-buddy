@@ -284,7 +284,7 @@ export default function ValidarCartela() {
                     <div className="card-container p-6 border-amber-400 bg-amber-50 shadow-md">
                       <div className="flex items-start gap-4 mb-4">
                         <AlertTriangle className="h-10 w-10 text-amber-600 shrink-0 mt-1" />
-                        <div>
+                        <div className="space-y-1">
                           {needsValidation ? (
                             <>
                               <h2 className="font-bold text-xl text-amber-800">Pagamento Confirmado!</h2>
@@ -467,7 +467,7 @@ export default function ValidarCartela() {
                     <div className="card-container p-6 border-amber-400 bg-amber-50 shadow-md">
                       <div className="flex items-start gap-4 mb-4">
                         <AlertTriangle className="h-10 w-10 text-amber-600 shrink-0 mt-1" />
-                        <div>
+                        <div className="space-y-1">
                           {needsValidation ? (
                             <>
                               <h2 className="font-bold text-xl text-amber-800">Pagamento Confirmado!</h2>

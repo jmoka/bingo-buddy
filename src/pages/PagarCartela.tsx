@@ -126,7 +126,6 @@ export default function PagarCartela() {
       if (error) throw error;
       if (data?.success) {
         if (method === 'CREDIT_CARD' && data.checkout_link) {
-           // CORREÇÃO CRÍTICA: Uso seguro de window.open para prevenir crash de DOM (removeChild) no React
            window.open(data.checkout_link, '_blank', 'noreferrer,noopener');
            toast.info("A página de pagamento foi aberta em uma nova aba.");
         } else if (method === 'pix' && data.qr_code) { 
@@ -188,40 +187,40 @@ export default function PagarCartela() {
                    <p className="text-[10px] uppercase font-bold text-muted-foreground text-center">Opções de Pagamento</p>
 
                    {/* Cartão Checkout */}
-                   <div className="bg-white p-4 rounded-xl border shadow-sm space-y-3">
+                   <div className="bg-white dark:bg-card p-4 rounded-xl border shadow-sm space-y-3">
                       <div className="flex justify-between items-center">
-                        <span className="font-bold flex items-center gap-2 text-blue-700"><CreditCard className="w-5 h-5"/> Cartão</span>
-                        <span className="font-black text-lg text-blue-700">R$ {(cardFeeDetails?.final || valorCheio).toFixed(2).replace('.', ',')}</span>
+                        <span className="font-bold flex items-center gap-2 text-blue-700 dark:text-blue-500"><CreditCard className="w-5 h-5"/> Cartão</span>
+                        <span className="font-black text-lg text-blue-700 dark:text-blue-400">R$ {(cardFeeDetails?.final || valorCheio).toFixed(2).replace('.', ',')}</span>
                       </div>
-                      {cardFeeDetails && <p className="text-[10px] text-muted-foreground bg-muted/50 p-2 rounded">Inclui taxa de R$ {cardFeeDetails.fee.toFixed(2)}. Liberação imediata.</p>}
-                      <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-button" onClick={() => handlePagbankPayment('CREDIT_CARD')} disabled={isStripeLoading || valorCheio <= 0}>
-                         {isStripeLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null} Pagar no Cartão
+                      {cardFeeDetails && <p className="text-[10px] text-muted-foreground bg-muted/50 p-2 rounded-lg border border-dashed">Acréscimo de <strong>R$ {cardFeeDetails.fee.toFixed(2)}</strong> ref. a taxa de serviço do cartão.</p>}
+                      <Button className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-button" onClick={() => handlePagbankPayment('CREDIT_CARD')} disabled={isStripeLoading || valorCheio <= 0}>
+                         {isStripeLoading ? <Loader2 className="w-5 h-5 mr-2 animate-spin" /> : null} Pagar no Cartão Seguramente
                       </Button>
                    </div>
 
                    {/* PIX PagBank */}
-                   <div className="bg-white p-4 rounded-xl border shadow-sm space-y-3">
+                   <div className="bg-white dark:bg-card p-4 rounded-xl border shadow-sm space-y-3">
                       <div className="flex justify-between items-center">
-                        <span className="font-bold flex items-center gap-2 text-green-700"><SmartphoneNfc className="w-5 h-5"/> PIX Rápido</span>
-                        <span className="font-black text-lg text-green-700">R$ {(pixFeeDetails?.final || valorCheio).toFixed(2).replace('.', ',')}</span>
+                        <span className="font-bold flex items-center gap-2 text-green-700 dark:text-green-500"><SmartphoneNfc className="w-5 h-5"/> PIX Rápido</span>
+                        <span className="font-black text-lg text-green-700 dark:text-green-400">R$ {(pixFeeDetails?.final || valorCheio).toFixed(2).replace('.', ',')}</span>
                       </div>
                       {!pagbankData ? (
-                        <>
-                          {pixFeeDetails && <p className="text-[10px] text-muted-foreground bg-muted/50 p-2 rounded">Inclui taxa bancária de R$ {pixFeeDetails.fee.toFixed(2)}.</p>}
-                          <Button className="w-full bg-green-600 hover:bg-green-700 text-white font-bold shadow-button" onClick={() => handlePagbankPayment('pix')} disabled={isPagbankLoading || valorCheio <= 0}>
-                             {isPagbankLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null} Gerar QR Code PIX
+                        <div className="space-y-3 w-full">
+                          {pixFeeDetails && <p className="text-[10px] text-muted-foreground bg-muted/50 p-2 rounded-lg border border-dashed">Inclui taxa bancária de R$ {pixFeeDetails.fee.toFixed(2)}.</p>}
+                          <Button className="w-full h-12 bg-green-600 hover:bg-green-700 text-white font-bold shadow-button" onClick={() => handlePagbankPayment('pix')} disabled={isPagbankLoading || valorCheio <= 0}>
+                              {isPagbankLoading ? <Loader2 className="w-5 h-5 mr-2 animate-spin" /> : null} Gerar QR Code PIX
                           </Button>
-                        </>
+                        </div>
                       ) : (
-                        <div className="space-y-3 flex flex-col items-center bg-green-50/50 p-3 rounded-lg border border-green-100">
-                          <div className="bg-white p-2 rounded shadow-sm"><img src={pagbankData.qr_code} className="w-[140px] h-[140px]" /></div>
-                          <div className="w-full">
-                            <Label className="text-xs mb-1 block">PIX Copia e Cola</Label>
-                            <div className="flex gap-2">
-                              <Input value={pagbankData.qr_code_text} readOnly className="font-mono text-[10px] bg-white" />
-                              <Button size="icon" onClick={() => handleCopiarPix(pagbankData.qr_code_text)}><Copy className="w-4 h-4" /></Button>
-                            </div>
-                          </div>
+                        <div className="space-y-3 animate-in fade-in zoom-in flex flex-col items-center border-t pt-3 mt-3">
+                           <div className="bg-white p-3 rounded-lg shadow-sm border"><img src={pagbankData.qr_code} className="w-[160px] h-[160px]" /></div>
+                           <div className="w-full text-left">
+                             <Label className="text-xs mb-1 block">PIX Copia e Cola</Label>
+                             <div className="flex gap-2">
+                               <Input value={pagbankData.qr_code_text} readOnly className="font-mono text-[10px] bg-white text-black" />
+                               <Button size="sm" className="h-9 bg-green-600 hover:bg-green-700 text-white" onClick={() => handleCopiarPix(pagbankData.qr_code_text)}><Copy className="w-3 h-3 mr-1" /> Copiar</Button>
+                             </div>
+                           </div>
                         </div>
                       )}
                    </div>
@@ -236,7 +235,7 @@ export default function PagarCartela() {
                  <h3 className="font-bold flex items-center gap-2 text-indigo-700 dark:text-indigo-400"><CreditCard className="w-5 h-5" /> Cartão (Stripe)</h3>
                  <span className="text-lg font-black text-indigo-700 dark:text-indigo-400">R$ {finalStripeAmount.toFixed(2).replace('.', ',')}</span>
                </div>
-               {stripeFeeDetails && <p className="text-[10px] text-muted-foreground bg-white/50 p-2 rounded-lg border border-dashed">Acréscimo de <strong>R$ {stripeFeeDetails.fee.toFixed(2)}</strong> ref. a taxa internacional.</p>}
+               {cardFeeDetails && <p className="text-[10px] text-muted-foreground bg-white/50 p-2 rounded-lg border border-dashed">Acréscimo de <strong>R$ {cardFeeDetails.fee.toFixed(2)}</strong> ref. a taxa internacional.</p>}
                <Button className="w-full h-12 bg-indigo-600 hover:bg-indigo-700 text-white font-bold" onClick={handleStripePayment} disabled={isStripeLoading || valorCheio <= 0}>
                   {isStripeLoading ? <Loader2 className="w-5 h-5 mr-2 animate-spin shrink-0" /> : <CreditCard className="w-5 h-5 mr-2 shrink-0" />} PAGAR R$ {finalStripeAmount.toFixed(2).replace('.', ',')} VIA STRIPE
                </Button>

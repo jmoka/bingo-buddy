@@ -34,7 +34,6 @@ export const CreditRequestDialog = ({ gameSettings, children }: CreditRequestDia
   const [isOpen, setIsOpen] = useState(false);
   const [credits, setCredits] = useState<number>(10);
 
-  // Sincroniza o CPF do perfil quando carrega
   useEffect(() => {
     if (profile?.cpf && !cpfPagador) {
         setCpfPagador(profile.cpf);
@@ -126,7 +125,6 @@ export const CreditRequestDialog = ({ gameSettings, children }: CreditRequestDia
       if (error) throw error;
       if (data?.success) {
         if (method === 'CREDIT_CARD' && data.checkout_link) {
-           // SOLUÇÃO SEGURA: Usa window.open com noreferrer para evitar erro de removeChild e bypassar WAF
            window.open(data.checkout_link, '_blank', 'noreferrer,noopener');
            toast.info("A página de pagamento foi aberta em uma nova guia.");
         } else if (method === 'pix' && data.qr_code) { 
@@ -212,12 +210,12 @@ export const CreditRequestDialog = ({ gameSettings, children }: CreditRequestDia
                    </div>
                    
                    {!pagbankData ? (
-                     <>
+                     <div className="space-y-3 w-full">
                         {pixFeeDetails && <p className="text-[10px] text-muted-foreground bg-muted/50 p-2 rounded-lg border border-dashed">Inclui taxa bancária de R$ {pixFeeDetails.fee.toFixed(2)}.</p>}
                         <Button className="w-full h-12 bg-green-600 hover:bg-green-700 text-white font-bold shadow-button" onClick={() => handlePagbankPayment('pix')} disabled={isPagbankLoading || amount <= 0}>
                             {isPagbankLoading ? <Loader2 className="w-5 h-5 mr-2 animate-spin" /> : null} Gerar QR Code PIX
                         </Button>
-                     </>
+                     </div>
                    ) : (
                      <div className="space-y-3 animate-in fade-in zoom-in flex flex-col items-center border-t pt-3 mt-3">
                         <div className="bg-white p-3 rounded-lg shadow-sm border"><img src={pagbankData.qr_code} className="w-[160px] h-[160px]" /></div>

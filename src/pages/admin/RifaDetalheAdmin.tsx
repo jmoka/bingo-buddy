@@ -924,7 +924,7 @@ const RifaDetalheAdmin = () => {
               {editForm.premio_fotos.length > 0 && (
                 <div className="grid grid-cols-3 gap-2">
                   {editForm.premio_fotos.map((url, idx) => (
-                    <div key={idx} className="relative group">
+                    <div key={`${url}-${idx}`} className="relative group">
                       <img src={url} alt="" className="h-20 w-full object-cover rounded border" onError={e => (e.currentTarget.style.display = 'none')} />
                       <button
                         type="button"
@@ -970,7 +970,7 @@ const RifaDetalheAdmin = () => {
             </div>
 
             <ImageUploadField
-              label="Foto de Capa"
+              label="Foto de Capa Principal"
               value={editForm.foto_capa}
               onChange={v => setEditForm(p => ({ ...p, foto_capa: v }))}
               onUpload={async (file) => {
