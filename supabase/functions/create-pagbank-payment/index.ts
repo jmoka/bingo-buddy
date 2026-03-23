@@ -17,7 +17,7 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    let configQuery = supabaseAdmin.from('configuracoes').select('*');
+    let configQuery = supabaseAdmin.from('configuracoes').select('admin_id, pagbank_env, pagbank_token_sandbox, pagbank_token_producao, pagbank_pass_fees_to_customer, pagbank_pix_fee_percentage, pagbank_card_fee_percentage, pagbank_pix_fee_fixed, pagbank_card_fee_fixed');
     if (admin_id) {
         configQuery = configQuery.eq('admin_id', admin_id);
     }
@@ -35,10 +35,9 @@ serve(async (req) => {
     let user_id = null;
     let customerName = 'Cliente Bingo Show';
     let customerEmail = 'cliente@bingoshow.com';
-    let customerTaxId = '12345678909'; 
+    let customerTaxId = ''; 
     let phoneArea = "11";
     let phoneNumber = "999999999";
-    let redirectUrl = metadata?.origin || 'http://localhost:5173';
 
     const applyPhone = (rawPhone: string) => {
         if (!rawPhone) return;
@@ -75,7 +74,7 @@ serve(async (req) => {
     if (metadata?.cliente_telefone) applyPhone(metadata.cliente_telefone);
 
     if (!customerTaxId || (customerTaxId.length !== 11 && customerTaxId.length !== 14)) {
-        throw new Error("CPF_REQUIRED: O Banco exige um CPF ou CNPJ válido matematicamente.");
+        throw new Error("CPF_REQUIRED: É obrigatório informar um CPF ou CNPJ válido.");
     }
 
     let finalName = customerName.trim();
@@ -110,31 +109,23 @@ serve(async (req) => {
 
     // FLUXO CARTÃO (CHECKOUT)
     if (payment_method === 'CREDIT_CARD') {
-        let success_url = `${redirectUrl}/?payment=success`;
-        if ((type === 'venda_bingo' || type === 'venda_rifa') && metadata?.codigo) {
-            success_url = `${redirectUrl}/validar-cartela?${type === 'venda_rifa' ? 'codigo' : 'bingo'}=${metadata.codigo}`;
-        }
+        const expirationDate = new Date();
+        expirationDate.setDate(expirationDate.getDate() + 7);
 
-        // SEGURANÇA CONTRA ERRO 400 DE REDIRECT URL DO PAGBANK
-        // Se a origem for localhost, NÃO enviamos a URL de redirecionamento, pois a API bloqueia
-        const isLocalhost = redirectUrl.includes('localhost') || redirectUrl.includes('127.0.0.1');
-
-        const checkoutPayload: any = {
+        // PAYLOAD LIMPO (Igual ao seu outro app que funciona)
+        // Removidos: redirect_url e payment_methods
+        const checkoutPayload = {
             reference_id: reference_id,
-            expiration_date: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+            expiration_date: expirationDate.toISOString(),
             customer: { 
-                name: finalName, email: customerEmail, tax_id: customerTaxId,
+                name: finalName, 
+                email: customerEmail, 
+                tax_id: customerTaxId,
                 phones: [{ country: "55", area: phoneArea, number: phoneNumber, type: "MOBILE" }]
             },
             items: [{ reference_id: `ITEM_${reference_id}`, name: itemName, quantity: 1, unit_amount: valorEmCentavos }],
-            payment_methods: [{"type": "CREDIT_CARD"}],
-            notification_urls: [`${Deno.env.get('SUPABASE_URL')}/functions/v1/pagbank-webhook`],
+            notification_urls: [`${Deno.env.get('SUPABASE_URL')}/functions/v1/pagbank-webhook`]
         };
-
-        // Adiciona a URL de retorno apenas se estiver em produção (Domínio Real)
-        if (!isLocalhost) {
-            checkoutPayload.redirect_url = success_url;
-        }
 
         console.log(`[create-pagbank-payment] Payload Checkout enviado:`, JSON.stringify(checkoutPayload));
 
@@ -147,15 +138,16 @@ serve(async (req) => {
         responseData = await response.json();
 
         if (!response.ok) {
+            console.error("[create-pagbank-payment] Erro PagBank Checkout:", JSON.stringify(responseData));
             const errDesc = responseData.error_messages?.[0]?.description || "";
             const errParam = responseData.error_messages?.[0]?.parameter_name || "Desconhecido";
-            throw new Error(`O Banco recusou a transação. Campo [${errParam}]: ${errDesc}`);
+            throw new Error(`Erro do PagBank [${errParam}]: ${errDesc}`);
         }
 
         pagbank_order_id = responseData.id;
         checkout_link = responseData.links?.find((l: any) => l.rel === 'PAY')?.href;
         
-        if (!checkout_link) throw new Error("O PagBank não retornou o link de pagamento.");
+        if (!checkout_link) throw new Error("O PagBank processou a requisição mas não retornou o link de pagamento.");
     } 
     // FLUXO PIX (ORDER)
     else {
@@ -187,7 +179,7 @@ serve(async (req) => {
         qr_code = responseData.qr_codes?.[0]?.links?.find((l: any) => l.media === 'image/png')?.href;
         qr_code_text = responseData.qr_codes?.[0]?.text;
 
-        if (!qr_code || !qr_code_text) throw new Error("Dados do QR Code não retornados pelo banco.");
+        if (!qr_code || !qr_code_text) throw new Error("PagBank não retornou os dados do QR Code.");
     }
 
     await supabaseAdmin.from('pagbank_payments').insert({

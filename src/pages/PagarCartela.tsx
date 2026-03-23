@@ -58,12 +58,12 @@ export default function PagarCartela() {
 
   useEffect(() => {
     if (paymentStatus === 'success' && codigo && tipoVenda) {
-      toast.success("Pagamento confirmado! Cartela validada com sucesso.");
+      toast.success("Pagamento confirmado via Cartão! Agora só falta preencher seus dados.");
       navigate(`/validar-cartela?${tipoVenda === 'rifa' ? 'codigo' : 'bingo'}=${codigo}`, { replace: true });
     }
   }, [paymentStatus, codigo, tipoVenda, navigate]);
 
-  const valorBase = useMemo(() => {
+  const valorCheio = useMemo(() => {
     if (!venda) return 0;
     const desc = Number(venda.desconto_aplicado || 0);
     if (desc >= 100) return Number(venda.valor_pago);
@@ -74,21 +74,21 @@ export default function PagarCartela() {
       if (!gameSettings?.pagbank_pass_fees_to_customer) return null;
       const perc = method === 'pix' ? (gameSettings.pagbank_pix_fee_percentage || 0) : (gameSettings.pagbank_card_fee_percentage || 0);
       const fix = method === 'pix' ? (gameSettings.pagbank_pix_fee_fixed || 0) : (gameSettings.pagbank_card_fee_fixed || 0);
-      const final = (valorBase + fix) / (1 - (perc / 100));
+      const final = (valorCheio + fix) / (1 - (perc / 100));
       const finalRounded = Math.ceil(final * 100) / 100;
-      return { final: finalRounded, fee: finalRounded - valorBase };
+      return { final: finalRounded, fee: finalRounded - valorCheio };
   };
 
   const pixFeeDetails = calcFee('pix');
   const cardFeeDetails = calcFee('card');
 
   const finalStripeAmount = useMemo(() => {
-    if (!gameSettings?.stripe_pass_fees_to_customer) return valorBase;
+    if (!gameSettings?.stripe_pass_fees_to_customer) return valorCheio;
     const perc = gameSettings.stripe_fee_percentage || 0;
     const fix = gameSettings.stripe_fee_fixed || 0;
-    const f = (valorBase + fix) / (1 - (perc / 100));
+    const f = (valorCheio + fix) / (1 - (perc / 100));
     return Math.ceil(f * 100) / 100;
-  }, [valorBase, gameSettings]);
+  }, [valorCheio, gameSettings]);
 
   const pixPayload = useMemo(() => {
     if (!gameSettings?.pix_key || !venda) return '';
@@ -96,9 +96,9 @@ export default function PagarCartela() {
       const cleanKey = gameSettings.pix_key.replace(/\s/g, '');
       const cleanName = (gameSettings.pix_name || 'BINGOSHOW').normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s/g, '').toUpperCase();
       const cleanCity = (gameSettings.pix_city || 'SAOPAULO').normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s/g, '').toUpperCase();
-      return QrCodePix({ version: '01', key: cleanKey, name: cleanName, city: cleanCity, value: parseFloat(valorBase.toFixed(2)) }).payload();
+      return QrCodePix({ version: '01', key: cleanKey, name: cleanName, city: cleanCity, value: parseFloat(valorCheio.toFixed(2)) }).payload();
     } catch (e) { return ''; }
-  }, [gameSettings, venda, valorBase]);
+  }, [gameSettings, venda, valorCheio]);
 
   const handleCopiarPix = (textToCopy: string) => {
     if (textToCopy) {
@@ -118,7 +118,7 @@ export default function PagarCartela() {
     try {
       const { data, error } = await supabase.functions.invoke('create-pagbank-payment', {
         body: { 
-          amount: valorBase, type: tipoVenda === 'bingo' ? 'venda_bingo' : 'venda_rifa',
+          amount: valorCheio, type: tipoVenda === 'bingo' ? 'venda_bingo' : 'venda_rifa',
           metadata: { venda_id: venda.id, codigo: venda.codigo_validacao, customer_cpf: cpfPagador, cliente_nome: nomePagador.trim(), cliente_telefone: telefonePagador.trim(), origin: window.location.origin },
           admin_id: venda.admin_id || gameSettings?.admin_id, payment_method: method
         }
@@ -132,7 +132,8 @@ export default function PagarCartela() {
         else throw new Error(data?.error || "Erro na geração.");
       }
     } catch (e: any) {
-      toast.error("Erro do Banco: " + e.message);
+      if (e.message === 'Failed to fetch' || e.message.includes('NetworkError')) toast.error("Sua conexão de internet falhou. Verifique seu sinal e tente novamente.");
+      else toast.error("Erro do Banco: " + e.message);
     } finally {
       setIsPagbankLoading(false); setIsStripeLoading(false);
     }
@@ -180,26 +181,28 @@ export default function PagarCartela() {
                 <div className="space-y-3">
                    <p className="text-[10px] uppercase font-bold text-muted-foreground text-center">Opções de Pagamento</p>
 
-                   <div className="bg-white dark:bg-card p-4 rounded-xl border shadow-sm space-y-3">
+                   {/* Cartão Checkout */}
+                   <div className="bg-white p-4 rounded-xl border shadow-sm space-y-3">
                       <div className="flex justify-between items-center">
                         <span className="font-bold flex items-center gap-2 text-blue-700"><CreditCard className="w-5 h-5"/> Cartão</span>
-                        <span className="font-black text-lg text-blue-700">R$ {(cardFeeDetails?.final || valorBase).toFixed(2).replace('.', ',')}</span>
+                        <span className="font-black text-lg text-blue-700">R$ {(cardFeeDetails?.final || valorCheio).toFixed(2).replace('.', ',')}</span>
                       </div>
                       {cardFeeDetails && <p className="text-[10px] text-muted-foreground bg-muted/50 p-2 rounded">Inclui taxa de R$ {cardFeeDetails.fee.toFixed(2)}. Liberação imediata.</p>}
-                      <Button className="w-full bg-blue-600 hover:bg-blue-700" onClick={() => handlePagbankPayment('CREDIT_CARD')} disabled={isStripeLoading || valorBase <= 0}>
+                      <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-button" onClick={() => handlePagbankPayment('CREDIT_CARD')} disabled={isStripeLoading || valorCheio <= 0}>
                          {isStripeLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null} Pagar no Cartão
                       </Button>
                    </div>
 
+                   {/* PIX PagBank */}
                    <div className="bg-white p-4 rounded-xl border shadow-sm space-y-3">
                       <div className="flex justify-between items-center">
                         <span className="font-bold flex items-center gap-2 text-green-700"><SmartphoneNfc className="w-5 h-5"/> PIX Rápido</span>
-                        <span className="font-black text-lg text-green-700">R$ {(pixFeeDetails?.final || valorBase).toFixed(2).replace('.', ',')}</span>
+                        <span className="font-black text-lg text-green-700">R$ {(pixFeeDetails?.final || valorCheio).toFixed(2).replace('.', ',')}</span>
                       </div>
                       {!pagbankData ? (
                         <>
                           {pixFeeDetails && <p className="text-[10px] text-muted-foreground bg-muted/50 p-2 rounded">Inclui taxa bancária de R$ {pixFeeDetails.fee.toFixed(2)}.</p>}
-                          <Button className="w-full bg-green-600 hover:bg-green-700" onClick={() => handlePagbankPayment('pix')} disabled={isPagbankLoading || valorBase <= 0}>
+                          <Button className="w-full bg-green-600 hover:bg-green-700 text-white font-bold shadow-button" onClick={() => handlePagbankPayment('pix')} disabled={isPagbankLoading || valorCheio <= 0}>
                              {isPagbankLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null} Gerar QR Code PIX
                           </Button>
                         </>
@@ -220,11 +223,12 @@ export default function PagarCartela() {
              </div>
           ) : null}
 
+          {/* PIX MANUAL FALLBACK */}
           {gameSettings?.pix_key && (
              <div className="bg-amber-50/50 p-4 rounded-xl border border-amber-200 mt-4 space-y-4">
                 <div className="flex justify-between items-center">
                   <span className="font-bold flex items-center gap-2 text-amber-800"><FileWarning className="w-5 h-5"/> PIX Manual</span>
-                  <span className="font-black text-lg text-amber-800">R$ {valorBase.toFixed(2).replace('.', ',')}</span>
+                  <span className="font-black text-lg text-amber-800">R$ {valorCheio.toFixed(2).replace('.', ',')}</span>
                 </div>
                 <p className="text-[10px] text-amber-700">Sem taxas bancárias, porém exige envio de comprovante e a liberação pode demorar.</p>
                 
@@ -240,6 +244,15 @@ export default function PagarCartela() {
                   <Camera className="w-5 h-5 mr-2" /> Enviar Comprovante
                 </Button>
              </div>
+          )}
+
+          {/* STRIPE CARTÃO (Standby) */}
+          {gameSettings?.stripe_enabled && !gameSettings?.pagbank_enabled && (
+            <div className="space-y-2 mt-4 pt-4 border-t">
+              <Button className="w-full h-12 bg-primary text-white shadow-button font-bold text-sm" onClick={handleStripePayment} disabled={isStripeLoading}>
+                {isStripeLoading ? <Loader2 className="w-5 h-5 mr-2 animate-spin shrink-0" /> : <CreditCard className="w-5 h-5 mr-2 shrink-0" />} PAGAR R$ {finalStripeAmount.toFixed(2).replace('.', ',')} VIA STRIPE
+              </Button>
+            </div>
           )}
         </div>
       </div>
