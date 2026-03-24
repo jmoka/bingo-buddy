@@ -155,70 +155,74 @@ export default function PagarCartela() {
     } catch (e: any) { toast.error("Erro ao iniciar pagamento: " + e.message); } finally { setIsStripeLoading(false); }
   };
 
-  if (loading) return <div className="min-h-[70vh] flex items-center justify-center"><Loader2 className="w-10 h-10 animate-spin text-primary" /></div>;
-  if (!venda) return <div className="card-container text-center py-20 max-w-md mx-auto mt-10"><AlertTriangle className="w-12 h-12 text-destructive mx-auto mb-4 opacity-50" /><h2 className="text-xl font-bold mb-2">Código não encontrado</h2><Button onClick={() => navigate('/')}>Início</Button></div>;
-  if (venda.status === 'pago') return <div className="card-container text-center py-16 max-w-md mx-auto mt-10 border-success/30 bg-success/5"><CheckCircle2 className="w-16 h-16 text-success mx-auto mb-4" /><h2 className="text-2xl font-bold text-success mb-2">Pagamento Confirmado!</h2><Button className="w-full bg-success" onClick={() => navigate(`/validar-cartela?${tipoVenda === 'rifa' ? 'codigo' : 'bingo'}=${venda.codigo_validacao}`)}>Conferir Cartela</Button></div>;
-  if (venda.status === 'em_analise') return <div className="card-container text-center py-16 max-w-md mx-auto mt-10 border-blue-300 bg-blue-50"><ShieldCheck className="w-16 h-16 text-blue-500 mx-auto mb-4" /><h2 className="text-2xl font-bold text-blue-700 mb-2">Em Análise</h2><Button variant="outline" className="w-full border-blue-300 text-blue-700" onClick={() => navigate('/')}>Início</Button></div>;
+  if (loading) return <div className="min-h-[70vh] flex items-center justify-center"><Loader2 className="w-12 h-12 animate-spin text-primary" /></div>;
+  if (!venda) return <div className="card-container border-2 text-center py-20 max-w-lg mx-auto mt-10 bg-white shadow-xl"><AlertTriangle className="w-16 h-16 text-destructive mx-auto mb-4 opacity-70" /><h2 className="text-3xl font-black mb-2">Código Inválido</h2><p className="text-lg text-gray-600 mb-8">Não encontramos este bilhete.</p><Button className="h-14 px-8 text-lg font-bold" onClick={() => navigate('/')}>Voltar ao Início</Button></div>;
+  if (venda.status === 'pago') return <div className="card-container border-2 text-center py-20 max-w-lg mx-auto mt-10 border-success bg-success/10 shadow-xl"><CheckCircle2 className="w-20 h-20 text-success mx-auto mb-4" /><h2 className="text-3xl font-black text-success mb-4">Pagamento Confirmado!</h2><Button className="w-full h-14 text-lg font-black bg-success hover:bg-success/90" onClick={() => navigate(`/validar-cartela?${tipoVenda === 'rifa' ? 'codigo' : 'bingo'}=${venda.codigo_validacao}`)}>Conferir Minha Cartela</Button></div>;
+  if (venda.status === 'em_analise') return <div className="card-container border-2 text-center py-20 max-w-lg mx-auto mt-10 border-blue-400 bg-blue-50 shadow-xl"><ShieldCheck className="w-20 h-20 text-blue-600 mx-auto mb-4" /><h2 className="text-3xl font-black text-blue-800 mb-4">Em Análise</h2><p className="text-lg text-blue-700 mb-8 font-medium">Seu pagamento está sendo verificado.</p><Button variant="outline" className="w-full h-14 text-lg font-bold border-2 border-blue-400 text-blue-800" onClick={() => navigate('/')}>Voltar ao Início</Button></div>;
 
   return (
-    <div className="max-w-md mx-auto space-y-6 pt-4 pb-20 px-2">
-      <div className="text-center space-y-2">
-        <h1 className="font-heading text-2xl font-black text-foreground">Pagamento do Bilhete</h1>
-        <p className="text-muted-foreground text-sm">Siga as instruções para ativar sua cartela.</p>
+    <div className="max-w-lg mx-auto space-y-6 pt-6 pb-20 px-4">
+      <div className="text-center space-y-3">
+        <h1 className="font-heading text-3xl md:text-4xl font-black text-foreground">Pagamento do Bilhete</h1>
+        <p className="text-gray-600 dark:text-gray-300 text-base font-medium">Siga as instruções abaixo para ativar sua cartela e concorrer.</p>
       </div>
 
-      <div className="card-container border-2 border-primary/20 shadow-lg p-0 overflow-hidden">
-        <div className="bg-primary/5 p-4 text-center border-b border-primary/20">
-           <p className="text-sm font-bold text-primary uppercase tracking-wider mb-1">{venda.partidas?.name}</p>
-           <p className="text-xs font-mono bg-white inline-block px-3 py-1 rounded border font-bold">Cód: {venda.codigo_validacao}</p>
+      <div className="card-container border-2 border-primary/30 shadow-2xl p-0 overflow-hidden bg-white dark:bg-card rounded-2xl">
+        <div className="bg-primary/10 p-5 text-center border-b-2 border-primary/20">
+           <p className="text-lg font-black text-primary uppercase tracking-wider mb-2">{venda.partidas?.name}</p>
+           <p className="text-sm font-mono bg-white dark:bg-background inline-block px-4 py-2 rounded-lg border-2 font-black shadow-sm text-gray-800 dark:text-gray-200">CÓDIGO: {venda.codigo_validacao}</p>
         </div>
 
-        <div className="p-4 space-y-6">
+        <div className="p-5 space-y-8">
           {gameSettings?.pagbank_enabled ? (
-             <div className="space-y-4">
-                <div className="bg-muted/30 p-4 border rounded-xl space-y-3">
-                  <p className="text-[10px] uppercase font-bold text-primary flex items-center gap-1.5 border-b pb-2"><User className="w-4 h-4" /> Identificação (Obrigatório)</p>
-                  <div className="space-y-1"><Label className="text-xs">Nome Completo</Label><Input value={nomePagador} onChange={e => setNomePagador(e.target.value)} className="h-9 text-xs bg-white" /></div>
-                  <div className="space-y-1"><Label className="text-xs">WhatsApp</Label><Input value={telefonePagador} onChange={e => setTelefonePagador(e.target.value)} className="h-9 text-xs bg-white" /></div>
-                  <div className="space-y-1"><Label className="text-xs">CPF</Label><Input value={cpfPagador} onChange={e => setCpfPagador(e.target.value)} placeholder="000.000.000-00" className="h-9 text-xs bg-white" /></div>
+             <div className="space-y-6">
+                <div className="bg-blue-50 dark:bg-blue-950/20 p-5 border-2 border-blue-200 dark:border-blue-800 rounded-2xl space-y-4 shadow-sm">
+                  <p className="text-base uppercase font-black text-blue-800 dark:text-blue-400 flex items-center gap-2 border-b-2 border-blue-200 dark:border-blue-800/50 pb-2">
+                    <User className="w-5 h-5" /> Identificação Obrigatória
+                  </p>
+                  <div className="space-y-2"><Label className="text-sm font-bold text-gray-800 dark:text-gray-200">Seu Nome Completo</Label><Input value={nomePagador} onChange={e => setNomePagador(e.target.value)} className="h-12 text-base font-medium bg-white dark:bg-background border-2 border-blue-200 dark:border-blue-800" /></div>
+                  <div className="space-y-2"><Label className="text-sm font-bold text-gray-800 dark:text-gray-200">Seu WhatsApp</Label><Input value={telefonePagador} onChange={e => setTelefonePagador(e.target.value)} type="tel" className="h-12 text-base font-medium bg-white dark:bg-background border-2 border-blue-200 dark:border-blue-800" /></div>
+                  <div className="space-y-2"><Label className="text-sm font-bold text-gray-800 dark:text-gray-200">Seu CPF *</Label><Input value={cpfPagador} onChange={e => setCpfPagador(e.target.value)} placeholder="Apenas números" className="h-14 text-lg font-bold bg-white dark:bg-background border-2 border-blue-400 dark:border-blue-600 shadow-inner" /></div>
                 </div>
 
-                <div className="space-y-3">
-                   <p className="text-[10px] uppercase font-bold text-muted-foreground text-center">Opções de Pagamento</p>
+                <div className="space-y-5 pt-2">
+                   <div className="flex items-center gap-3 text-base font-black text-gray-600 dark:text-gray-400 uppercase tracking-widest before:flex-1 before:border-t-2 after:flex-1 after:border-t-2">
+                     Opções de Pagamento
+                   </div>
 
                    {/* Cartão Checkout */}
-                   <div className="bg-white dark:bg-card p-4 rounded-xl border shadow-sm space-y-3">
+                   <div className="bg-white dark:bg-card p-5 rounded-2xl border-2 border-gray-200 shadow-md space-y-4">
                       <div className="flex justify-between items-center">
-                        <span className="font-bold flex items-center gap-2 text-blue-700 dark:text-blue-500"><CreditCard className="w-5 h-5"/> Cartão</span>
-                        <span className="font-black text-lg text-blue-700 dark:text-blue-400">R$ {(cardFeeDetails?.final || valorCheio).toFixed(2).replace('.', ',')}</span>
+                        <span className="font-black text-xl flex items-center gap-2 text-blue-700 dark:text-blue-500"><CreditCard className="w-6 h-6"/> Cartão</span>
+                        <span className="font-black text-2xl text-blue-700 dark:text-blue-400">R$ {(cardFeeDetails?.final || valorCheio).toFixed(2).replace('.', ',')}</span>
                       </div>
-                      {cardFeeDetails && <p className="text-[10px] text-muted-foreground bg-muted/50 p-2 rounded-lg border border-dashed">Acréscimo de <strong>R$ {cardFeeDetails.fee.toFixed(2)}</strong> ref. a taxa de serviço do cartão.</p>}
-                      <Button className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-button" onClick={() => handlePagbankPayment('CREDIT_CARD')} disabled={isStripeLoading || valorCheio <= 0}>
-                         {isStripeLoading ? <Loader2 className="w-5 h-5 mr-2 animate-spin" /> : null} Pagar no Cartão Seguramente
+                      {cardFeeDetails && <p className="text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-muted/50 p-3 rounded-lg border border-dashed">Acréscimo de <strong>R$ {cardFeeDetails.fee.toFixed(2)}</strong> ref. a taxa de serviço do cartão.</p>}
+                      <Button className="w-full h-14 text-lg bg-blue-600 hover:bg-blue-700 text-white font-black shadow-lg hover:scale-[1.02] transition-transform" onClick={() => handlePagbankPayment('CREDIT_CARD')} disabled={isStripeLoading || valorCheio <= 0}>
+                         {isStripeLoading ? <Loader2 className="w-6 h-6 mr-2 animate-spin" /> : null} Pagar no Cartão Seguro
                       </Button>
                    </div>
 
                    {/* PIX PagBank */}
-                   <div className="bg-white dark:bg-card p-4 rounded-xl border shadow-sm space-y-3">
+                   <div className="bg-white dark:bg-card p-5 rounded-2xl border-2 border-gray-200 shadow-md space-y-4">
                       <div className="flex justify-between items-center">
-                        <span className="font-bold flex items-center gap-2 text-green-700 dark:text-green-500"><SmartphoneNfc className="w-5 h-5"/> PIX Rápido</span>
-                        <span className="font-black text-lg text-green-700 dark:text-green-400">R$ {(pixFeeDetails?.final || valorCheio).toFixed(2).replace('.', ',')}</span>
+                        <span className="font-black text-xl flex items-center gap-2 text-green-700 dark:text-green-500"><SmartphoneNfc className="w-6 h-6"/> PIX Rápido</span>
+                        <span className="font-black text-2xl text-green-700 dark:text-green-400">R$ {(pixFeeDetails?.final || valorCheio).toFixed(2).replace('.', ',')}</span>
                       </div>
                       {!pagbankData ? (
-                        <div className="space-y-3 w-full">
-                          {pixFeeDetails && <p className="text-[10px] text-muted-foreground bg-muted/50 p-2 rounded-lg border border-dashed">Inclui taxa bancária de R$ {pixFeeDetails.fee.toFixed(2)}.</p>}
-                          <Button className="w-full h-12 bg-green-600 hover:bg-green-700 text-white font-bold shadow-button" onClick={() => handlePagbankPayment('pix')} disabled={isPagbankLoading || valorCheio <= 0}>
-                              {isPagbankLoading ? <Loader2 className="w-5 h-5 mr-2 animate-spin" /> : null} Gerar QR Code PIX
+                        <div className="space-y-4 w-full">
+                          {pixFeeDetails && <p className="text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-muted/50 p-3 rounded-lg border border-dashed">Inclui taxa bancária de R$ {pixFeeDetails.fee.toFixed(2)}.</p>}
+                          <Button className="w-full h-14 text-lg bg-green-600 hover:bg-green-700 text-white font-black shadow-lg hover:scale-[1.02] transition-transform" onClick={() => handlePagbankPayment('pix')} disabled={isPagbankLoading || valorCheio <= 0}>
+                              {isPagbankLoading ? <Loader2 className="w-6 h-6 mr-2 animate-spin" /> : null} Gerar QR Code PIX
                           </Button>
                         </div>
                       ) : (
-                        <div className="space-y-3 animate-in fade-in zoom-in flex flex-col items-center border-t pt-3 mt-3">
-                           <div className="bg-white p-3 rounded-lg shadow-sm border"><img src={pagbankData.qr_code} className="w-[160px] h-[160px]" /></div>
-                           <div className="w-full text-left">
-                             <Label className="text-xs mb-1 block">PIX Copia e Cola</Label>
-                             <div className="flex gap-2">
-                               <Input value={pagbankData.qr_code_text} readOnly className="font-mono text-[10px] bg-white text-black" />
-                               <Button size="sm" className="h-9 bg-green-600 hover:bg-green-700 text-white" onClick={() => handleCopiarPix(pagbankData.qr_code_text)}><Copy className="w-3 h-3 mr-1" /> Copiar</Button>
+                        <div className="space-y-4 animate-in fade-in zoom-in flex flex-col items-center border-t-2 pt-5 mt-5">
+                           <div className="bg-white p-4 rounded-xl shadow-md border-2 border-gray-200"><img src={pagbankData.qr_code} className="w-[200px] h-[200px]" alt="QR Code PIX" /></div>
+                           <div className="w-full text-left space-y-2">
+                             <Label className="text-sm uppercase font-black text-gray-700 dark:text-gray-300 block">PIX Copia e Cola</Label>
+                             <div className="flex flex-col sm:flex-row gap-3">
+                               <Input value={pagbankData.qr_code_text} readOnly className="font-mono text-sm bg-gray-50 dark:bg-background text-black dark:text-white border-2 h-14 font-bold flex-1" />
+                               <Button className="h-14 px-6 bg-green-600 hover:bg-green-700 text-white font-bold text-base" onClick={() => handleCopiarPix(pagbankData.qr_code_text)}><Copy className="w-5 h-5 mr-2" /> Copiar</Button>
                              </div>
                            </div>
                         </div>
@@ -228,40 +232,48 @@ export default function PagarCartela() {
              </div>
           ) : null}
 
-          {/* STRIPE CARTÃO (Se ativo, funciona concorrentemente com PagBank) */}
-          {gameSettings?.stripe_enabled && (
-            <div className="bg-indigo-50 dark:bg-indigo-900/10 p-4 rounded-xl border border-indigo-200 dark:border-indigo-800 shadow-sm space-y-3 mt-4">
+          {/* STRIPE CARTÃO (Se ativo e Pagbank Desativo) */}
+          {gameSettings?.stripe_enabled && !gameSettings?.pagbank_enabled && (
+            <div className="bg-indigo-50 dark:bg-indigo-900/10 p-5 rounded-2xl border-2 border-indigo-200 dark:border-indigo-800 shadow-md space-y-4 mt-6">
                <div className="flex items-center justify-between">
-                 <h3 className="font-bold flex items-center gap-2 text-indigo-700 dark:text-indigo-400"><CreditCard className="w-5 h-5" /> Cartão (Stripe)</h3>
-                 <span className="text-lg font-black text-indigo-700 dark:text-indigo-400">R$ {finalStripeAmount.toFixed(2).replace('.', ',')}</span>
+                 <h3 className="font-black text-xl flex items-center gap-2 text-indigo-700 dark:text-indigo-400"><CreditCard className="w-6 h-6" /> Cartão (Stripe)</h3>
+                 <span className="text-2xl font-black text-indigo-700 dark:text-indigo-400">R$ {finalStripeAmount.toFixed(2).replace('.', ',')}</span>
                </div>
-               {cardFeeDetails && <p className="text-[10px] text-muted-foreground bg-white/50 p-2 rounded-lg border border-dashed">Acréscimo de <strong>R$ {cardFeeDetails.fee.toFixed(2)}</strong> ref. a taxa internacional.</p>}
-               <Button className="w-full h-12 bg-indigo-600 hover:bg-indigo-700 text-white font-bold" onClick={handleStripePayment} disabled={isStripeLoading || valorCheio <= 0}>
-                  {isStripeLoading ? <Loader2 className="w-5 h-5 mr-2 animate-spin shrink-0" /> : <CreditCard className="w-5 h-5 mr-2 shrink-0" />} PAGAR R$ {finalStripeAmount.toFixed(2).replace('.', ',')} VIA STRIPE
+               {cardFeeDetails && <p className="text-sm font-medium text-gray-700 dark:text-gray-300 bg-white/50 dark:bg-muted/50 p-3 rounded-lg border border-dashed">Acréscimo de <strong>R$ {cardFeeDetails.fee.toFixed(2)}</strong> ref. a taxa internacional.</p>}
+               <Button className="w-full h-14 text-lg bg-indigo-600 hover:bg-indigo-700 text-white font-black shadow-lg hover:scale-[1.02] transition-transform" onClick={handleStripePayment} disabled={isStripeLoading || valorCheio <= 0}>
+                  {isStripeLoading ? <Loader2 className="w-6 h-6 mr-2 animate-spin shrink-0" /> : <CreditCard className="w-6 h-6 mr-2 shrink-0" />} PAGAR VIA STRIPE
                </Button>
             </div>
           )}
 
           {/* PIX MANUAL FALLBACK */}
           {gameSettings?.pix_key && (
-             <div className="bg-amber-50/50 p-4 rounded-xl border border-amber-200 mt-4 space-y-4">
+             <div className="bg-amber-50 dark:bg-amber-900/10 p-5 rounded-2xl border-2 border-amber-200 dark:border-amber-800 mt-6 space-y-5 shadow-md">
                 <div className="flex justify-between items-center">
-                  <span className="font-bold flex items-center gap-2 text-amber-800"><FileWarning className="w-5 h-5"/> PIX Manual</span>
-                  <span className="font-black text-lg text-amber-800">R$ {valorCheio.toFixed(2).replace('.', ',')}</span>
+                  <span className="font-black text-xl flex items-center gap-2 text-amber-800 dark:text-amber-500"><FileWarning className="w-6 h-6"/> PIX Manual</span>
+                  <span className="font-black text-2xl text-amber-800 dark:text-amber-400">R$ {valorCheio.toFixed(2).replace('.', ',')}</span>
                 </div>
-                <p className="text-[10px] text-amber-700">Sem taxas bancárias, porém exige envio de comprovante e a liberação pode demorar.</p>
+                <p className="text-sm font-medium text-gray-700 dark:text-gray-300 bg-white/50 dark:bg-muted/30 p-3 rounded-lg border border-dashed border-amber-200 dark:border-amber-700">
+                  Sem taxas bancárias extras, porém a liberação não é imediata e exige o envio do comprovante.
+                </p>
                 
-                <div className="flex flex-col items-center bg-white p-3 rounded-lg border border-amber-200">
-                   {pixPayload && <QRCodeSVG value={pixPayload} size={130} className="mb-3 bg-white p-2 rounded" />}
-                   <div className="w-full flex gap-2">
-                     <Input value={pixPayload} readOnly className="font-mono text-[10px]" />
-                     <Button size="icon" variant="outline" className="text-amber-700" onClick={() => handleCopiarPix(pixPayload)}><Copy className="w-4 h-4" /></Button>
+                <div className="flex flex-col items-center bg-white dark:bg-card p-4 rounded-xl border-2 border-amber-200 dark:border-amber-700 shadow-sm">
+                   {pixPayload && <QRCodeSVG value={pixPayload} size={180} className="mb-4 bg-white p-3 rounded-xl border shadow-sm" />}
+                   <div className="w-full space-y-2 text-left">
+                     <Label className="text-sm uppercase font-black text-gray-700 dark:text-gray-300 block">PIX Copia e Cola</Label>
+                     <div className="flex flex-col sm:flex-row gap-3">
+                       <Input value={pixPayload || "Erro ao gerar chave"} readOnly className="font-mono text-sm bg-gray-50 dark:bg-background text-black dark:text-white border-2 h-14 font-bold flex-1" />
+                       <Button className="h-14 px-6 bg-amber-600 hover:bg-amber-700 text-white font-bold text-base" onClick={() => handleCopiarPix(pixPayload)} disabled={!pixPayload}><Copy className="w-5 h-5 mr-2" /> Copiar</Button>
+                     </div>
                    </div>
                 </div>
 
-                <Button className="w-full bg-amber-600 hover:bg-amber-700 text-white font-bold h-12" onClick={() => navigate(`/validar-cartela?${tipoVenda === 'rifa' ? 'codigo' : 'bingo'}=${venda.codigo_validacao}`)}>
-                  <Camera className="w-5 h-5 mr-2" /> Enviar Comprovante
-                </Button>
+                <div className="space-y-3 pt-3 border-t-2 border-amber-200 dark:border-amber-800/50">
+                  <Label className="text-base font-black text-amber-900 dark:text-amber-400">Já pagou? Anexe o Comprovante:</Label>
+                  <Button className="w-full h-14 text-lg bg-amber-600 hover:bg-amber-700 text-white font-black shadow-lg hover:scale-[1.02] transition-transform" onClick={() => navigate(`/validar-cartela?${tipoVenda === 'rifa' ? 'codigo' : 'bingo'}=${venda.codigo_validacao}`)}>
+                    <Camera className="w-6 h-6 mr-2" /> Enviar Comprovante
+                  </Button>
+                </div>
              </div>
           )}
         </div>
