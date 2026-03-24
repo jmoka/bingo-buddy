@@ -90,10 +90,14 @@ const VendedorPainel = () => {
   const numerosDisponiveis = useMemo(() => getNumerosRifa(reservarRifaId), [reservarRifaId, getNumerosRifa]);
   const rifasAtivas = useMemo(() => rifas.filter(r => r.status === 'ativa'), [rifas]);
 
-  // Usa Comissão ao invés de desconto
   const comissaoAtiva = useMemo(() => {
-    const vCom = meuVendedor?.comissao_percentual || 0;
-    return vCom > 0 ? vCom : (gameSettings?.comissao_vendedor_global || 0);
+    const vCom = Number(meuVendedor?.comissao_percentual || 0);
+    return vCom > 0 ? vCom : Number(gameSettings?.comissao_vendedor_global || 0);
+  }, [meuVendedor, gameSettings]);
+
+  const descontoAtivo = useMemo(() => {
+    const vDesc = Number(meuVendedor?.percentual_desconto || 0);
+    return vDesc > 0 ? vDesc : Number(gameSettings?.desconto_vendedor_global || 0);
   }, [meuVendedor, gameSettings]);
 
   const pendingFolhas = useMemo(() => folhasEmitidas.filter(f => f.status === 'pendente'), [folhasEmitidas]);
@@ -145,10 +149,9 @@ const VendedorPainel = () => {
     return folhasEmitidas.filter(f => f.match_id === bingoFilterMatchId);
   }, [folhasEmitidas, bingoFilterMatchId]);
 
-  // Contadores dos Cards
   const reservasFiltradasStats = useMemo(() => {
     return minhasReservas.filter(r => {
-      if (r.rifas?.status !== 'ativa') return false; // Exclui rifas finalizadas/canceladas
+      if (r.rifas?.status !== 'ativa') return false; 
       if (rifaFilterId !== 'todas' && r.rifa_id !== rifaFilterId) return false;
       return true;
     });
@@ -762,13 +765,13 @@ const VendedorPainel = () => {
 
         <TabsContent value="acertos" className="space-y-4 mt-0">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-6">
-            <div className="card-container p-4 bg-amber-50 dark:bg-amber-900/10 border-amber-200 dark:border-amber-800">
-               <div className="flex items-center gap-2 text-amber-700 dark:text-amber-400 mb-1">
+            <div className="card-container p-4 bg-green-50 dark:bg-green-900/10 border-green-200 dark:border-green-800">
+               <div className="flex items-center gap-2 text-green-700 dark:text-green-400 mb-1">
                   <HeartHandshake className="w-4 h-4" />
                   <p className="text-[10px] font-bold uppercase tracking-wider">Comissões Recebidas</p>
                </div>
-               <p className="text-2xl font-black font-heading text-amber-800 dark:text-amber-300">R$ {comissoesGanhas.toFixed(2).replace('.', ',')}</p>
-               <p className="text-[9px] text-amber-700/70 leading-tight mt-1">Acertos fechados e validados pelo Admin.</p>
+               <p className="text-2xl font-black font-heading text-green-800 dark:text-green-300">R$ {comissoesGanhas.toFixed(2).replace('.', ',')}</p>
+               <p className="text-[9px] text-green-700/70 leading-tight mt-1">Acertos fechados e validados pelo Admin.</p>
             </div>
             <div className="card-container p-4 bg-destructive/5 border-destructive/20">
                <div className="flex items-center gap-2 text-destructive mb-1">
@@ -1151,16 +1154,28 @@ const VendedorPainel = () => {
             {selectedBingoMatch && qtdFolhasBingo > 0 && (() => {
               const match = manualMatches.find(m => m.id === selectedBingoMatch);
               const precoBase = (match?.card_price || 0) * qtdFolhasBingo;
+              const precoComDesconto = precoBase * (1 - (descontoAtivo / 100));
 
               return (
                 <>
                   <div className="p-3 bg-purple-50 border border-purple-200 rounded-lg space-y-1">
-                    <div className="flex justify-between font-bold text-lg text-purple-900">
+                    <div className="flex justify-between items-center font-bold text-lg text-purple-900">
                       <span>Valor da Compra:</span>
-                      <span>R$ {precoBase.toFixed(2)}</span>
+                      {bingoFiado ? (
+                        <span>R$ {precoBase.toFixed(2)}</span>
+                      ) : (
+                        <div className="text-right flex flex-col items-end">
+                           <span className="line-through text-[10px] text-muted-foreground mr-1 font-normal leading-none">R$ {precoBase.toFixed(2)}</span>
+                           <span className="leading-tight">R$ {precoComDesconto.toFixed(2)}</span>
+                        </div>
+                      )}
                     </div>
-                    <div className="pt-2 text-xs text-purple-700">
-                      * Você receberá <strong>{comissaoAtiva}%</strong> de comissão na sua conta após realizar o acerto financeiro (PIX).
+                    <div className="pt-2 text-xs text-purple-700 font-medium">
+                      {bingoFiado ? (
+                        `* Você receberá ${comissaoAtiva}% de comissão na sua conta após realizar o acerto financeiro (PIX).`
+                      ) : (
+                        `* Você está recebendo ${descontoAtivo}% de desconto na compra à vista com seu saldo.`
+                      )}
                     </div>
                   </div>
                   
@@ -1223,14 +1238,26 @@ const VendedorPainel = () => {
                       {(() => { 
                         const rifa = rifasAtivas.find(r => r.id === reservarRifaId); 
                         const bruto = rifa ? reservarSelecionados.length * rifa.custo_por_numero : 0;
+                        const precoComDesconto = bruto * (1 - (descontoAtivo / 100));
                         return (
                           <>
-                            <div className="flex justify-between font-bold text-lg text-primary mb-1">
+                            <div className="flex justify-between items-center font-bold text-lg text-primary mb-1">
                               <span>Valor da Compra:</span>
-                              <span>R$ {bruto.toFixed(2)}</span>
+                              {reservarFiado ? (
+                                <span>R$ {bruto.toFixed(2)}</span>
+                              ) : (
+                                <div className="text-right flex flex-col items-end">
+                                   <span className="line-through text-[10px] text-muted-foreground mr-1 font-normal leading-none">R$ {bruto.toFixed(2)}</span>
+                                   <span className="leading-tight">R$ {precoComDesconto.toFixed(2)}</span>
+                                </div>
+                              )}
                             </div>
                             <div className="pt-2 border-t border-primary/20 text-xs text-primary/80 font-medium">
-                              * Você receberá <strong>{comissaoAtiva}%</strong> de comissão na sua conta do App assim que o pagamento for concluído.
+                              {reservarFiado ? (
+                                `* Você receberá ${comissaoAtiva}% de comissão na sua conta do App assim que o pagamento desta dívida for concluído.`
+                              ) : (
+                                `* Você está recebendo ${descontoAtivo}% de desconto nesta compra à vista com seu saldo.`
+                              )}
                             </div>
                           </>
                         );
