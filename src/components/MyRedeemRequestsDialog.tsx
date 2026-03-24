@@ -67,65 +67,65 @@ export const MyRedeemRequestsDialog = ({ children }: MyRedeemRequestsDialogProps
       return (
         <div className="text-center py-12">
           <Info className="w-12 h-12 text-muted-foreground mx-auto mb-3 opacity-20" />
-          <p className="text-muted-foreground">Nenhum resgate encontrado.</p>
+          <p className="text-muted-foreground text-lg">Nenhum resgate encontrado.</p>
         </div>
       );
     }
 
     return (
-      <div className="space-y-3 py-2">
+      <div className="space-y-4 py-2 pb-6">
         {requests.map(req => {
           const config = statusConfig[req.status] || statusConfig.pending;
           const StatusIcon = config.icon;
 
           return (
-            <div key={req.id} className="p-4 rounded-xl bg-card border border-border shadow-sm space-y-3">
+            <div key={req.id} className="p-5 rounded-2xl bg-card border-2 border-border shadow-sm space-y-4">
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <Calendar className="w-3.5 h-3.5" />
+                <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                  <Calendar className="w-4 h-4" />
                   <span>{format(new Date(req.requested_at), "dd/MM/yy 'às' HH:mm", { locale: ptBR })}</span>
                 </div>
-                <Badge className={`${config.color} border-none`}>
-                  <StatusIcon className="w-3 h-3 mr-1" />
+                <Badge className={`${config.color} border-none px-3 py-1 text-xs uppercase font-bold tracking-wider`}>
+                  <StatusIcon className="w-4 h-4 mr-1.5" />
                   {config.label}
                 </Badge>
               </div>
               
-              <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+              <div className="flex items-center justify-between p-4 rounded-xl bg-muted/50 border border-border/50">
                   <div>
-                      <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Resgatado</p>
-                      <p className="text-lg font-bold font-heading">{req.credits_requested} créditos</p>
+                      <p className="text-xs uppercase font-black text-muted-foreground tracking-widest mb-1">Resgatado</p>
+                      <p className="text-xl font-black font-heading">{req.credits_requested} créditos</p>
                   </div>
                   <div className="text-right">
-                      <p className="text-[10px] uppercase font-bold text-primary tracking-wider">A Receber</p>
-                      <p className="text-lg font-bold text-primary font-heading">R$ {Number(req.amount_to_receive).toFixed(2).replace('.', ',')}</p>
+                      <p className="text-xs uppercase font-black text-primary tracking-widest mb-1">A Receber</p>
+                      <p className="text-2xl font-black text-primary font-heading">R$ {Number(req.amount_to_receive).toFixed(2).replace('.', ',')}</p>
                   </div>
               </div>
               
               {req.receipt_url && (
-                <Button variant="outline" size="sm" className="w-full" onClick={() => handleDownloadReceipt(req.receipt_url!)}>
-                    <ExternalLink className="w-4 h-4 mr-2" /> Ver Comprovante de Transferência
+                <Button variant="outline" className="w-full h-12 text-sm font-bold border-2" onClick={() => handleDownloadReceipt(req.receipt_url!)}>
+                    <ExternalLink className="w-5 h-5 mr-2 text-primary" /> Ver Comprovante do PIX
                 </Button>
               )}
 
               <button 
                 onClick={() => setConversationRequest(req)}
-                className="mt-2 flex items-start gap-2 p-2 rounded-lg bg-primary/10 border border-primary/20 text-left hover:bg-primary/20 transition-colors w-full shadow-sm group"
+                className="mt-2 flex items-start gap-3 p-3 rounded-xl bg-primary/10 border-2 border-primary/20 text-left hover:bg-primary/20 transition-colors w-full shadow-sm group"
               >
-                <MessageSquare className="w-4 h-4 text-primary shrink-0 mt-0.5 group-hover:scale-110 transition-transform" />
+                <MessageSquare className="w-6 h-6 text-primary shrink-0 mt-0.5 group-hover:scale-110 transition-transform" />
                 <div className="flex flex-col overflow-hidden">
-                  <span className="text-[10px] font-bold text-primary uppercase tracking-wider mb-0.5">Acessar Chat da Solicitação</span>
-                  <span className="text-xs text-foreground font-medium leading-normal line-clamp-2">
-                    Clique para ver a chave PIX enviada ou os avisos do Admin.
+                  <span className="text-xs font-black text-primary uppercase tracking-widest mb-1">Abrir Chat da Solicitação</span>
+                  <span className="text-sm text-foreground font-medium leading-snug line-clamp-2">
+                    Clique para ler as mensagens enviadas pelo Administrador.
                   </span>
                 </div>
               </button>
 
               {req.status === 'rejected' && (
-                <div className="mt-3 border-t pt-3">
+                <div className="mt-4 border-t-2 pt-4">
                   <RedeemResubmissionDialog request={req}>
-                    <Button variant="outline" size="sm" className="w-full">
-                      <RefreshCw className="w-4 h-4 mr-2" />
+                    <Button variant="outline" className="w-full h-12 text-sm font-bold border-2 border-destructive/30 text-destructive hover:bg-destructive/10">
+                      <RefreshCw className="w-5 h-5 mr-2" />
                       Responder Admin / Pedir Revisão
                     </Button>
                   </RedeemResubmissionDialog>
@@ -141,38 +141,38 @@ export const MyRedeemRequestsDialog = ({ children }: MyRedeemRequestsDialogProps
   return (
     <Dialog>
       <DialogTrigger asChild>{children}</DialogTrigger>
-      <DialogContent className="max-w-2xl h-[80vh] flex flex-col p-0 overflow-hidden">
-        <DialogHeader className="p-6 pb-2">
-          <DialogTitle className="font-heading text-2xl flex items-center gap-2">
-            <Banknote className="w-6 h-6 text-primary" />
+      <DialogContent className="max-w-2xl w-full h-[100dvh] sm:h-[85vh] max-h-[100dvh] flex flex-col p-0 overflow-hidden !rounded-none sm:!rounded-2xl border-0 sm:border">
+        <DialogHeader className="p-6 pb-4 bg-background z-10 border-b shadow-sm">
+          <DialogTitle className="font-heading text-3xl flex items-center gap-2">
+            <Banknote className="w-8 h-8 text-primary" />
             Meus Resgates
           </DialogTitle>
-          <DialogDescription>Acompanhe o pagamento dos seus créditos resgatados.</DialogDescription>
+          <DialogDescription className="text-base mt-1">Acompanhe o pagamento dos seus créditos resgatados.</DialogDescription>
         </DialogHeader>
 
-        <Tabs defaultValue="pending" className="flex-grow flex flex-col overflow-hidden">
-          <div className="px-6">
-            <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="pending" className="flex items-center gap-2">
-                Em Análise
+        <Tabs defaultValue="pending" className="flex-grow flex flex-col overflow-hidden bg-muted/10">
+          <div className="px-4 sm:px-6 pt-4 pb-2 bg-background">
+            <TabsList className="grid w-full grid-cols-3 h-14">
+              <TabsTrigger value="pending" className="flex items-center gap-2 text-sm font-bold">
+                Análise
                 {pending.length > 0 && (
-                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-amber-500 text-[10px] font-bold text-white">
+                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-amber-500 text-xs font-black text-white">
                     {pending.length}
                   </span>
                 )}
               </TabsTrigger>
-              <TabsTrigger value="approved" className="flex items-center gap-2">
+              <TabsTrigger value="approved" className="flex items-center gap-2 text-sm font-bold">
                 Pagos
                 {approved.length > 0 && (
-                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-success text-[10px] font-bold text-white">
+                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-success text-xs font-black text-white">
                     {approved.length}
                   </span>
                 )}
               </TabsTrigger>
-              <TabsTrigger value="rejected" className="flex items-center gap-2">
+              <TabsTrigger value="rejected" className="flex items-center gap-2 text-sm font-bold">
                 Problemas
                 {rejected.length > 0 && (
-                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-[10px] font-bold text-white">
+                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-destructive text-xs font-black text-white">
                     {rejected.length}
                   </span>
                 )}
@@ -180,15 +180,15 @@ export const MyRedeemRequestsDialog = ({ children }: MyRedeemRequestsDialogProps
             </TabsList>
           </div>
 
-          <div className="flex-grow overflow-hidden mt-4 bg-muted/30">
-            <ScrollArea className="h-full px-6">
-              <TabsContent value="pending" className="mt-0 focus-visible:ring-0">
+          <div className="flex-grow overflow-hidden">
+            <ScrollArea className="h-full px-4 sm:px-6">
+              <TabsContent value="pending" className="mt-2 focus-visible:ring-0">
                 {renderList(pending)}
               </TabsContent>
-              <TabsContent value="approved" className="mt-0 focus-visible:ring-0">
+              <TabsContent value="approved" className="mt-2 focus-visible:ring-0">
                 {renderList(approved)}
               </TabsContent>
-              <TabsContent value="rejected" className="mt-0 focus-visible:ring-0">
+              <TabsContent value="rejected" className="mt-2 focus-visible:ring-0">
                 {renderList(rejected)}
               </TabsContent>
             </ScrollArea>
@@ -197,28 +197,28 @@ export const MyRedeemRequestsDialog = ({ children }: MyRedeemRequestsDialogProps
 
         {/* DIALOG NESTED PARA O CHAT */}
         <Dialog open={!!conversationRequest} onOpenChange={(open) => !open && setConversationRequest(null)}>
-          <DialogContent className="max-w-md h-[70vh] flex flex-col p-0">
-            <DialogHeader className="p-6 pb-2 border-b">
-              <DialogTitle className="flex items-center gap-2 font-heading">
-                <MessageSquare className="w-5 h-5 text-primary" /> Chat de Pagamento
+          <DialogContent className="max-w-md w-full h-[100dvh] sm:h-[80vh] max-h-[100dvh] flex flex-col p-0 !rounded-none sm:!rounded-2xl border-0 sm:border">
+            <DialogHeader className="p-6 pb-4 border-b bg-background shadow-sm">
+              <DialogTitle className="flex items-center gap-2 font-heading text-2xl">
+                <MessageSquare className="w-6 h-6 text-primary" /> Chat de Pagamento
               </DialogTitle>
             </DialogHeader>
 
-            <ScrollArea className="flex-grow p-4">
+            <ScrollArea className="flex-grow p-6 bg-muted/10">
               {isLoadingMessages ? (
-                  <div className="flex justify-center py-10"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>
+                  <div className="flex justify-center py-10"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>
               ) : (
-                  <div className="space-y-4">
+                  <div className="space-y-6 pb-6">
                       {messages.map(msg => {
                           const isMe = msg.sender_id === profile?.id;
                           return (
-                              <div key={msg.id} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'} space-y-1`}>
-                                  <div className={`flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-widest ${isMe ? 'text-primary ml-2' : 'text-muted-foreground mr-2'}`}>
-                                      {isMe ? <User className="w-3 h-3" /> : <ShieldCheck className="w-3 h-3 text-success" />}
+                              <div key={msg.id} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'} space-y-1.5`}>
+                                  <div className={`flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest ${isMe ? 'text-primary ml-2' : 'text-muted-foreground mr-2'}`}>
+                                      {isMe ? <User className="w-4 h-4" /> : <ShieldCheck className="w-4 h-4 text-success" />}
                                       {isMe ? 'Você' : 'Admin'} • {format(new Date(msg.created_at), "HH:mm")}
                                   </div>
-                                  <div className={`p-3 rounded-2xl shadow-sm max-w-[85%] text-sm border ${
-                                      isMe ? 'bg-primary/10 border-primary/20 rounded-tr-none' : 'bg-muted border-border rounded-tl-none'
+                                  <div className={`p-4 rounded-2xl shadow-sm max-w-[85%] text-base font-medium border-2 ${
+                                      isMe ? 'bg-primary/10 border-primary/20 rounded-tr-none' : 'bg-white dark:bg-card border-border rounded-tl-none'
                                   }`}>
                                       {msg.message}
                                   </div>
@@ -226,20 +226,20 @@ export const MyRedeemRequestsDialog = ({ children }: MyRedeemRequestsDialogProps
                           );
                       })}
                       {messages.length === 0 && (
-                          <p className="text-center text-muted-foreground text-sm py-10">Nenhuma mensagem neste histórico.</p>
+                          <p className="text-center text-muted-foreground text-lg py-10 font-medium">Nenhuma mensagem neste histórico.</p>
                       )}
                   </div>
               )}
             </ScrollArea>
 
-            <DialogFooter className="p-4 border-t bg-muted/20">
-              <Button variant="outline" className="w-full" onClick={() => setConversationRequest(null)}>Voltar para Solicitações</Button>
+            <DialogFooter className="p-4 border-t bg-background">
+              <Button variant="outline" className="w-full h-14 text-lg font-bold border-2" onClick={() => setConversationRequest(null)}>Voltar para Solicitações</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
 
-        <DialogFooter className="p-4 border-t bg-card">
-          <DialogClose asChild><Button variant="outline" className="w-full sm:w-auto">Fechar Histórico</Button></DialogClose>
+        <DialogFooter className="p-4 border-t bg-background shadow-[0_-4px_10px_rgba(0,0,0,0.05)]">
+          <DialogClose asChild><Button variant="outline" className="w-full sm:w-auto h-14 text-lg font-bold border-2">Fechar Histórico</Button></DialogClose>
         </DialogFooter>
       </DialogContent>
     </Dialog>

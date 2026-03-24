@@ -37,58 +37,58 @@ export const MyCreditRequestsDialog = ({ children }: MyCreditRequestsDialogProps
     if (requests.length === 0) {
       return (
         <div className="text-center py-12">
-          <Info className="w-12 h-12 text-muted-foreground mx-auto mb-3 opacity-20" />
-          <p className="text-muted-foreground">Nenhuma solicitação nesta categoria.</p>
+          <Info className="w-16 h-16 text-muted-foreground mx-auto mb-4 opacity-20" />
+          <p className="text-muted-foreground text-lg">Nenhuma solicitação nesta categoria.</p>
         </div>
       );
     }
 
     return (
-      <div className="space-y-3 py-2">
+      <div className="space-y-4 py-2 pb-6">
         {requests.map(req => {
           const config = statusConfig[req.status];
           const StatusIcon = config.icon;
 
           return (
-            <div key={req.id} className="p-4 rounded-xl bg-card border border-border shadow-sm space-y-3">
+            <div key={req.id} className="p-5 rounded-2xl bg-card border-2 border-border shadow-sm space-y-4">
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <Calendar className="w-3.5 h-3.5" />
+                <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                  <Calendar className="w-4 h-4" />
                   <span>{format(new Date(req.requested_at), "dd/MM/yy 'às' HH:mm", { locale: ptBR })}</span>
                 </div>
-                <Badge className={`${config.color} border-none`}>
-                  <StatusIcon className="w-3 h-3 mr-1" />
+                <Badge className={`${config.color} border-none px-3 py-1 text-xs uppercase font-bold tracking-wider`}>
+                  <StatusIcon className="w-4 h-4 mr-1.5" />
                   {config.label}
                 </Badge>
               </div>
               
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="p-3 rounded-lg bg-muted/50 border border-border/50">
-                  <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider mb-2">Solicitado</p>
+                <div className="p-4 rounded-xl bg-muted/50 border border-border/50">
+                  <p className="text-xs uppercase font-black text-muted-foreground tracking-widest mb-2">Solicitado</p>
                   <div className="flex flex-col gap-1">
                     <div className="flex items-center gap-2">
-                      <Coins className="w-4 h-4 text-primary" />
-                      <span className="text-lg font-bold font-heading">
+                      <Coins className="w-5 h-5 text-primary" />
+                      <span className="text-2xl font-black font-heading">
                         {(Number(req.credits_requested) || 0)} cr.
                       </span>
                     </div>
-                    <span className="text-xs font-medium text-muted-foreground">
+                    <span className="text-sm font-bold text-muted-foreground mt-1">
                       Valor: R$ {formatCurrency(req.amount_paid)}
                     </span>
                   </div>
                 </div>
 
                 {req.status === 'approved' && (
-                  <div className="p-3 rounded-lg bg-success/5 border border-success/20">
-                    <p className="text-[10px] uppercase font-bold text-success tracking-wider mb-2">Aprovado</p>
+                  <div className="p-4 rounded-xl bg-success/5 border-2 border-success/20">
+                    <p className="text-xs uppercase font-black text-success tracking-widest mb-2">Aprovado</p>
                     <div className="flex flex-col gap-1">
                       <div className="flex items-center gap-2">
-                        <CheckCircle2 className="w-4 h-4 text-success" />
-                        <span className="text-lg font-bold text-success font-heading">
+                        <CheckCircle2 className="w-5 h-5 text-success" />
+                        <span className="text-2xl font-black text-success font-heading">
                           {(Number(req.credits_granted) || 0)} cr.
                         </span>
                       </div>
-                      <span className="text-xs font-medium text-success/70">
+                      <span className="text-sm font-bold text-success/80 mt-1">
                         Liberado pelo Admin
                       </span>
                     </div>
@@ -97,17 +97,17 @@ export const MyCreditRequestsDialog = ({ children }: MyCreditRequestsDialogProps
               </div>
               
               {req.notes && req.status === 'rejected' && (
-                <div className="mt-2 p-3 rounded-lg bg-destructive/5 text-xs text-destructive flex gap-2 border border-destructive/10">
-                  <AlertCircle className="w-4 h-4 shrink-0" />
-                  <span><strong>Motivo do Admin:</strong> {req.notes}</span>
+                <div className="mt-3 p-4 rounded-xl bg-destructive/5 text-sm text-destructive font-medium flex gap-3 border-2 border-destructive/20 leading-relaxed">
+                  <AlertCircle className="w-6 h-6 shrink-0" />
+                  <span><strong className="font-black uppercase tracking-wider block mb-1 text-xs">Motivo da Rejeição:</strong> {req.notes}</span>
                 </div>
               )}
 
               {req.status === 'rejected' && (
-                <div className="mt-3 border-t pt-3">
+                <div className="mt-4 border-t-2 pt-4">
                   <ResubmissionDialog request={req}>
-                    <Button variant="outline" size="sm" className="w-full">
-                      <RefreshCw className="w-4 h-4 mr-2" />
+                    <Button variant="outline" className="w-full h-12 text-sm font-bold border-2 border-destructive/30 text-destructive hover:bg-destructive/10">
+                      <RefreshCw className="w-5 h-5 mr-2" />
                       Pedir Nova Revisão
                     </Button>
                   </ResubmissionDialog>
@@ -123,38 +123,38 @@ export const MyCreditRequestsDialog = ({ children }: MyCreditRequestsDialogProps
   return (
     <Dialog>
       <DialogTrigger asChild>{children}</DialogTrigger>
-      <DialogContent className="max-w-2xl h-[85vh] flex flex-col p-0 overflow-hidden">
-        <DialogHeader className="p-6 pb-2">
-          <DialogTitle className="font-heading text-2xl flex items-center gap-2">
-            <Coins className="w-6 h-6 text-primary" />
+      <DialogContent className="max-w-2xl w-full h-[100dvh] sm:h-[85vh] max-h-[100dvh] flex flex-col p-0 overflow-hidden !rounded-none sm:!rounded-2xl border-0 sm:border">
+        <DialogHeader className="p-6 pb-4 bg-background z-10 border-b shadow-sm">
+          <DialogTitle className="font-heading text-3xl flex items-center gap-2">
+            <Coins className="w-8 h-8 text-primary" />
             Histórico de Créditos
           </DialogTitle>
-          <DialogDescription>Acompanhe o status de todas as suas solicitações de crédito.</DialogDescription>
+          <DialogDescription className="text-base mt-1">Acompanhe o status de todas as suas solicitações.</DialogDescription>
         </DialogHeader>
 
-        <Tabs defaultValue="pending" className="flex-grow flex flex-col overflow-hidden">
-          <div className="px-6">
-            <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="pending" className="flex items-center gap-2">
+        <Tabs defaultValue="pending" className="flex-grow flex flex-col overflow-hidden bg-muted/10">
+          <div className="px-4 sm:px-6 pt-4 pb-2 bg-background">
+            <TabsList className="grid w-full grid-cols-3 h-14">
+              <TabsTrigger value="pending" className="flex items-center gap-2 text-sm font-bold">
                 Pendentes
                 {pending.length > 0 && (
-                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-amber-500 text-[10px] font-bold text-white">
+                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-amber-500 text-xs font-black text-white">
                     {pending.length}
                   </span>
                 )}
               </TabsTrigger>
-              <TabsTrigger value="approved" className="flex items-center gap-2">
+              <TabsTrigger value="approved" className="flex items-center gap-2 text-sm font-bold">
                 Aprovadas
                 {approved.length > 0 && (
-                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-success text-[10px] font-bold text-white">
+                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-success text-xs font-black text-white">
                     {approved.length}
                   </span>
                 )}
               </TabsTrigger>
-              <TabsTrigger value="rejected" className="flex items-center gap-2">
+              <TabsTrigger value="rejected" className="flex items-center gap-2 text-sm font-bold">
                 Rejeitadas
                 {rejected.length > 0 && (
-                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-[10px] font-bold text-white">
+                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-destructive text-xs font-black text-white">
                     {rejected.length}
                   </span>
                 )}
@@ -162,24 +162,24 @@ export const MyCreditRequestsDialog = ({ children }: MyCreditRequestsDialogProps
             </TabsList>
           </div>
 
-          <div className="flex-grow overflow-hidden mt-4 bg-muted/30">
-            <ScrollArea className="h-full px-6">
-              <TabsContent value="pending" className="mt-0 focus-visible:ring-0">
+          <div className="flex-grow overflow-hidden">
+            <ScrollArea className="h-full px-4 sm:px-6">
+              <TabsContent value="pending" className="mt-2 focus-visible:ring-0">
                 {renderRequestList(pending)}
               </TabsContent>
-              <TabsContent value="approved" className="mt-0 focus-visible:ring-0">
+              <TabsContent value="approved" className="mt-2 focus-visible:ring-0">
                 {renderRequestList(approved)}
               </TabsContent>
-              <TabsContent value="rejected" className="mt-0 focus-visible:ring-0">
+              <TabsContent value="rejected" className="mt-2 focus-visible:ring-0">
                 {renderRequestList(rejected)}
               </TabsContent>
             </ScrollArea>
           </div>
         </Tabs>
 
-        <DialogFooter className="p-4 border-t bg-card">
+        <DialogFooter className="p-4 border-t bg-background shadow-[0_-4px_10px_rgba(0,0,0,0.05)]">
           <DialogClose asChild>
-            <Button variant="outline" className="w-full sm:w-auto">Fechar Histórico</Button>
+            <Button variant="outline" className="w-full sm:w-auto h-14 text-lg font-bold border-2">Fechar Histórico</Button>
           </DialogClose>
         </DialogFooter>
       </DialogContent>

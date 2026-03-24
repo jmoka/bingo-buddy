@@ -55,62 +55,62 @@ export const RedeemRequestDialog = ({ children }: RedeemRequestDialogProps) => {
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>{children}</DialogTrigger>
-      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="font-heading flex items-center gap-2">
-            <Banknote className="w-5 h-5 text-primary" />
+      <DialogContent className="max-w-md w-full h-[100dvh] sm:h-auto max-h-[100dvh] sm:max-h-[90vh] overflow-y-auto !rounded-none sm:!rounded-2xl border-0 sm:border bg-background">
+        <DialogHeader className="pt-6 px-6">
+          <DialogTitle className="font-heading flex items-center justify-center sm:justify-start gap-2 text-3xl">
+            <Banknote className="w-8 h-8 text-primary" />
             Resgatar Créditos
           </DialogTitle>
-          <DialogDescription>
-            Converta seus créditos em dinheiro. O valor será enviado para sua conta cadastrada.
+          <DialogDescription className="text-center sm:text-left text-base mt-2 font-medium">
+            Converta seus créditos em dinheiro. O valor será enviado para sua conta.
           </DialogDescription>
         </DialogHeader>
         
-        <div className="space-y-6 pt-4">
+        <div className="space-y-6 px-6 pt-4 pb-8">
           {/* Card de Saldo Atual */}
-          <div className="flex items-center justify-between p-4 bg-primary/5 border border-primary/20 rounded-xl">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-primary/10 rounded-full">
-                <Wallet className="w-5 h-5 text-primary" />
+          <div className="flex items-center justify-between p-5 bg-primary/5 border-2 border-primary/20 rounded-2xl shadow-sm">
+            <div className="flex items-center gap-4">
+              <div className="p-3 bg-primary/10 rounded-full">
+                <Wallet className="w-6 h-6 text-primary" />
               </div>
               <div>
-                <p className="text-[10px] uppercase font-bold text-muted-foreground leading-none">Saldo Disponível</p>
-                <p className="text-lg font-black font-heading text-foreground">{currentBalance.toFixed(2)} cr.</p>
+                <p className="text-xs uppercase font-black text-muted-foreground leading-none mb-1">Saldo Disponível</p>
+                <p className="text-2xl font-black font-heading text-foreground">{currentBalance.toFixed(2)} cr.</p>
               </div>
             </div>
-            <Badge variant="outline" className="bg-background text-[10px] font-bold">CARTEIRA</Badge>
+            <Badge variant="outline" className="bg-background text-[10px] font-black border-2">CARTEIRA</Badge>
           </div>
 
-          <div className="p-4 bg-muted/50 rounded-xl space-y-4 text-center border border-border/50">
-            <Label className="text-xs font-bold uppercase text-muted-foreground">Quantidade para Resgate</Label>
-            <div className="flex items-center justify-center gap-3">
-              <Button size="icon" variant="outline" className="h-10 w-10 rounded-full" onClick={() => setCredits(c => Math.max(0.01, Number((c - 10).toFixed(2))))}>
-                <Minus className="w-4 h-4" />
+          <div className="p-6 bg-muted/30 rounded-2xl space-y-6 text-center border-2 border-border shadow-sm">
+            <Label className="text-sm font-black uppercase tracking-widest text-gray-700 dark:text-gray-300">Quantidade para Resgate</Label>
+            <div className="flex items-center justify-center gap-4">
+              <Button size="icon" variant="outline" className="h-14 w-14 rounded-full border-2 shadow-sm" onClick={() => setCredits(c => Math.max(0.01, Number((c - 10).toFixed(2))))}>
+                <Minus className="w-6 h-6" />
               </Button>
               <Input
                 type="number"
                 step="0.01"
-                className="w-32 text-center text-2xl font-black bg-background h-12 border-2 focus-visible:ring-primary"
+                className="w-32 text-center text-3xl font-black bg-white dark:bg-card h-14 border-2 focus-visible:ring-primary shadow-inner"
                 value={credits}
                 onChange={(e) => setCredits(Number(e.target.value) || 0)}
               />
-              <Button size="icon" variant="outline" className="h-10 w-10 rounded-full" onClick={() => setCredits(c => Number((c + 10).toFixed(2)))}>
-                <Plus className="w-4 h-4" />
+              <Button size="icon" variant="outline" className="h-14 w-14 rounded-full border-2 shadow-sm" onClick={() => setCredits(c => Number((c + 10).toFixed(2)))}>
+                <Plus className="w-6 h-6" />
               </Button>
             </div>
             
-            <div className="grid grid-cols-2 gap-3 mt-2">
-                <div className="flex flex-col p-3 bg-success/5 rounded-lg border border-success/20">
-                    <span className="text-[9px] uppercase font-bold text-success/70 mb-1">Você Recebe</span>
-                    <span className="text-lg font-black text-success font-heading">R$ {amount.toFixed(2).replace('.', ',')}</span>
+            <div className="grid grid-cols-2 gap-4 mt-4">
+                <div className="flex flex-col p-4 bg-success/10 rounded-xl border-2 border-success/30 shadow-sm">
+                    <span className="text-[10px] uppercase font-black tracking-widest text-success/80 mb-2">Você Recebe</span>
+                    <span className="text-2xl font-black text-success font-heading">R$ {amount.toFixed(2).replace('.', ',')}</span>
                 </div>
                 <div className={cn(
-                  "flex flex-col p-3 rounded-lg border transition-colors",
-                  remainingCredits < 0 ? "bg-destructive/5 border-destructive/20" : "bg-muted rounded-lg border-border"
+                  "flex flex-col p-4 rounded-xl border-2 shadow-sm transition-colors",
+                  remainingCredits < 0 ? "bg-destructive/10 border-destructive/30" : "bg-white dark:bg-card border-border"
                 )}>
-                    <span className="text-[9px] uppercase font-bold text-muted-foreground mb-1">Saldo Restante</span>
+                    <span className="text-[10px] uppercase font-black tracking-widest text-muted-foreground mb-2">Saldo Restante</span>
                     <span className={cn(
-                      "text-lg font-black font-heading",
+                      "text-xl font-black font-heading mt-1",
                       remainingCredits < 0 ? 'text-destructive' : 'text-foreground'
                     )}>
                         {remainingCredits.toFixed(2)} cr.
@@ -119,26 +119,26 @@ export const RedeemRequestDialog = ({ children }: RedeemRequestDialogProps) => {
             </div>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="redeem-msg" className="text-xs font-bold">Mensagem / Chave PIX (Opcional)</Label>
+          <div className="space-y-3 pt-2">
+            <Label htmlFor="redeem-msg" className="text-sm font-black uppercase text-gray-800 dark:text-gray-200">Chave PIX / Mensagem (Obrigatório)</Label>
             <Textarea
               id="redeem-msg"
-              placeholder="Ex: Minha chave PIX é o meu CPF..."
+              placeholder="Digite sua CHAVE PIX aqui para receber o pagamento..."
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               rows={3}
-              className="resize-none"
+              className="resize-none text-base p-4 border-2 shadow-inner h-24"
             />
-            <p className="text-[10px] text-muted-foreground italic text-center">
-                * Seus créditos serão subtraídos do saldo imediatamente ao solicitar.
+            <p className="text-xs text-muted-foreground font-medium text-center bg-amber-50 dark:bg-amber-900/10 p-3 rounded-lg border border-amber-200 dark:border-amber-800">
+                Seus créditos serão subtraídos do saldo imediatamente ao solicitar.
             </p>
           </div>
         </div>
 
-        <DialogFooter className="gap-2 sm:gap-0">
-          <DialogClose asChild><Button variant="ghost" className="font-bold">Cancelar</Button></DialogClose>
-          <Button onClick={handleSubmit} disabled={isLoading || remainingCredits < 0 || credits <= 0} className="gradient-primary font-bold h-12 px-8 shadow-button">
-            {isLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Banknote className="w-4 h-4 mr-2" />}
+        <DialogFooter className="p-6 pt-2 pb-8 sm:pb-6 gap-3 sm:gap-0 mt-auto bg-background">
+          <DialogClose asChild><Button variant="outline" className="w-full sm:w-auto h-14 text-lg font-bold border-2">Cancelar</Button></DialogClose>
+          <Button onClick={handleSubmit} disabled={isLoading || remainingCredits < 0 || credits <= 0 || !message.trim()} className="w-full gradient-primary font-black h-14 text-lg shadow-button">
+            {isLoading ? <Loader2 className="w-6 h-6 mr-2 animate-spin" /> : <Banknote className="w-6 h-6 mr-2" />}
             Solicitar Resgate
           </Button>
         </DialogFooter>
