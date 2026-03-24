@@ -199,21 +199,26 @@ export const CreditRequestDialog = ({ gameSettings, children }: CreditRequestDia
           <div className="space-y-5 pt-4 border-t-2">
              <div className="flex items-center gap-3 text-base font-black text-gray-600 dark:text-gray-400 uppercase tracking-widest before:flex-1 before:border-t-2 after:flex-1 after:border-t-2">
                Escolha como Pagar
+                 </div>
+             <div className="flex items-center gap-3 text-sm font-black text-red-600 dark:text-gray-400 ">
+               Verifique seu Perfil, se está cadastrado seu CPF, TELEFONE e ENDEREÇO para evitar erros no pagamento. Em caso de dúvidas, contate o suporte.
              </div>
 
              {/* CARTÃO DE CRÉDITO PAGBANK */}
              {gameSettings?.pagbank_enabled && (
                 <div className="bg-white dark:bg-card p-5 rounded-2xl border-2 border-gray-200 shadow-md space-y-4">
                    <div className="flex items-center justify-between">
-                     <h3 className="font-black text-xl flex items-center gap-2 text-blue-700 dark:text-blue-500"><CreditCard className="w-6 h-6" /> Cartão de Crédito</h3>
-                     <span className="text-2xl font-black text-blue-700 dark:text-blue-400">R$ {finalPagbankCardAmount.toFixed(2).replace('.', ',')}</span>
-                   </div>
+                     <h3 className="font-black text-xl flex items-center gap-2 text-blue-700 dark:text-blue-500"><CreditCard className="w-6 h-6" /> Cartão PagBank</h3>
+    < span className = "text-2xl font-black text-blue-700 dark:text-blue-400" > R$ { finalPagbankCardAmount.toFixed(2).replace('.', ',') } </span>
+                  </div>
                    {cardFeeDetails && <p className="text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-muted/50 p-3 rounded-lg border border-dashed">Acréscimo de <strong>R$ {cardFeeDetails.fee.toFixed(2)}</strong> ref. a taxa de serviço do cartão.</p>}
                    <Button className="w-full h-14 text-lg bg-blue-600 hover:bg-blue-700 text-white font-black shadow-lg hover:scale-[1.02] transition-transform" onClick={() => handlePagbankPayment('CREDIT_CARD')} disabled={isStripeLoading || amount <= 0}>
-                      {isStripeLoading ? <Loader2 className="w-6 h-6 mr-2 animate-spin" /> : null} Pagar no Cartão Agora
-                   </Button>
-                </div>
-             )}
+  { isStripeLoading?<Loader2 className = "w-6 h-6 mr-2 animate-spin" /> : null} Pagar Agora
+    </Button>     
+       <div className="text-sm font-black text-blue-700 dark:text-blue-400">Liberação em até 1 Hora - PagBank</div>
+    </div>
+       
+               )}
 
              {/* STRIPE CARTÃO (Agora renderiza independente do PagBank) */}
              {gameSettings?.stripe_enabled && (
@@ -224,8 +229,9 @@ export const CreditRequestDialog = ({ gameSettings, children }: CreditRequestDia
                    </div>
                    {stripeFeeDetails && <p className="text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-muted/50 p-3 rounded-lg border border-dashed">Acréscimo de <strong>R$ {stripeFeeDetails.fee.toFixed(2)}</strong> ref. a taxa internacional.</p>}
                    <Button className="w-full h-14 text-lg bg-indigo-600 hover:bg-indigo-700 text-white font-black shadow-lg hover:scale-[1.02] transition-transform" onClick={handleStripePayment} disabled={isStripeLoading || amount <= 0}>
-                      {isStripeLoading ? <Loader2 className="w-6 h-6 mr-2 animate-spin shrink-0" /> : null} PAGAR VIA STRIPE
-                   </Button>
+                      {isStripeLoading ? <Loader2 className="w-6 h-6 mr-2 animate-spin shrink-0" /> : null} Pagar Agora 
+                        </Button>
+                        <div className="text-sm font-black text-blue-700 dark:text-blue-400">Liberação em até 1 Hora - Stripe</div>
                 </div>
              )}
 
@@ -242,7 +248,8 @@ export const CreditRequestDialog = ({ gameSettings, children }: CreditRequestDia
                         {pixFeeDetails && <p className="text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-muted/50 p-3 rounded-lg border border-dashed">Inclui taxa bancária de R$ {pixFeeDetails.fee.toFixed(2)}.</p>}
                         <Button className="w-full h-14 text-lg bg-green-600 hover:bg-green-700 text-white font-black shadow-lg hover:scale-[1.02] transition-transform" onClick={() => handlePagbankPayment('pix')} disabled={isPagbankLoading || amount <= 0}>
                             {isPagbankLoading ? <Loader2 className="w-6 h-6 mr-2 animate-spin" /> : null} Gerar QR Code PIX
-                        </Button>
+                              </Button>
+                               <div className="text-sm font-black text-blue-700 dark:text-blue-400">Liberação Na mesma hora</div>
                      </div>
                    ) : (
                      <div className="space-y-4 animate-in fade-in zoom-in flex flex-col items-center border-t-2 pt-4 mt-4">
@@ -269,7 +276,7 @@ export const CreditRequestDialog = ({ gameSettings, children }: CreditRequestDia
                     <span className="text-2xl font-black text-amber-700 dark:text-amber-400">R$ {amount.toFixed(2).replace('.', ',')}</span>
                   </div>
                   <p className="text-sm font-medium text-gray-700 dark:text-gray-300 bg-amber-50 dark:bg-amber-900/20 p-3 rounded-lg border border-dashed border-amber-200 dark:border-amber-800">
-                    Sem taxas extras. A liberação não é imediata e exige envio de comprovante.
+                    Sem taxas extras. A liberação não é imediata e exige envio de comprovante e pode levar até 72 horas.
                   </p>
                   
                   <div className="bg-gray-50 dark:bg-muted/30 p-4 rounded-xl border-2 border-dashed flex flex-col items-center">
