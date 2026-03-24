@@ -151,7 +151,7 @@ export default function PagarCartela() {
         body: { amount: finalStripeAmount, type: tipoVenda === 'bingo' ? 'venda_bingo' : 'venda_rifa', metadata: { venda_id: venda.id, codigo: venda.codigo_validacao, origin: window.location.origin } }
       });
       if (error) throw error;
-      if (data?.url) window.location.href = data.url;
+      if (data?.url) window.open(data.url, '_blank', 'noreferrer,noopener');
     } catch (e: any) { toast.error("Erro ao iniciar pagamento: " + e.message); } finally { setIsStripeLoading(false); }
   };
 
@@ -232,47 +232,45 @@ export default function PagarCartela() {
              </div>
           ) : null}
 
-          {/* STRIPE CARTÃO (Se ativo e Pagbank Desativo) */}
-          {gameSettings?.stripe_enabled && !gameSettings?.pagbank_enabled && (
-            <div className="bg-indigo-50 dark:bg-indigo-900/10 p-5 rounded-2xl border-2 border-indigo-200 dark:border-indigo-800 shadow-md space-y-4 mt-6">
+          {/* STRIPE CARTÃO (Agora renderiza independente do PagBank) */}
+          {gameSettings?.stripe_enabled && (
+            <div className="bg-white dark:bg-card p-5 rounded-2xl border-2 border-gray-200 shadow-md space-y-4 mt-6">
                <div className="flex items-center justify-between">
-                 <h3 className="font-black text-xl flex items-center gap-2 text-indigo-700 dark:text-indigo-400"><CreditCard className="w-6 h-6" /> Cartão (Stripe)</h3>
+                 <h3 className="font-black text-xl flex items-center gap-2 text-indigo-700 dark:text-indigo-500"><CreditCard className="w-6 h-6" /> Cartão (Stripe)</h3>
                  <span className="text-2xl font-black text-indigo-700 dark:text-indigo-400">R$ {finalStripeAmount.toFixed(2).replace('.', ',')}</span>
                </div>
-               {cardFeeDetails && <p className="text-sm font-medium text-gray-700 dark:text-gray-300 bg-white/50 dark:bg-muted/50 p-3 rounded-lg border border-dashed">Acréscimo de <strong>R$ {cardFeeDetails.fee.toFixed(2)}</strong> ref. a taxa internacional.</p>}
+               {stripeFeeDetails && <p className="text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-muted/50 p-3 rounded-lg border border-dashed">Acréscimo de <strong>R$ {stripeFeeDetails.fee.toFixed(2)}</strong> ref. a taxa internacional.</p>}
                <Button className="w-full h-14 text-lg bg-indigo-600 hover:bg-indigo-700 text-white font-black shadow-lg hover:scale-[1.02] transition-transform" onClick={handleStripePayment} disabled={isStripeLoading || valorCheio <= 0}>
-                  {isStripeLoading ? <Loader2 className="w-6 h-6 mr-2 animate-spin shrink-0" /> : <CreditCard className="w-6 h-6 mr-2 shrink-0" />} PAGAR VIA STRIPE
+                  {isStripeLoading ? <Loader2 className="w-6 h-6 mr-2 animate-spin shrink-0" /> : null} PAGAR VIA STRIPE
                </Button>
             </div>
           )}
 
           {/* PIX MANUAL FALLBACK */}
           {gameSettings?.pix_key && (
-             <div className="bg-amber-50 dark:bg-amber-900/10 p-5 rounded-2xl border-2 border-amber-200 dark:border-amber-800 mt-6 space-y-5 shadow-md">
-                <div className="flex justify-between items-center">
-                  <span className="font-black text-xl flex items-center gap-2 text-amber-800 dark:text-amber-500"><FileWarning className="w-6 h-6"/> PIX Manual</span>
-                  <span className="font-black text-2xl text-amber-800 dark:text-amber-400">R$ {valorCheio.toFixed(2).replace('.', ',')}</span>
+             <div className="bg-white dark:bg-card p-5 rounded-2xl border-2 border-gray-200 shadow-md space-y-5 mt-6">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-black text-xl flex items-center gap-2 text-amber-700 dark:text-amber-500"><FileWarning className="w-6 h-6" /> PIX Manual</h3>
+                  <span className="text-2xl font-black text-amber-700 dark:text-amber-400">R$ {valorCheio.toFixed(2).replace('.', ',')}</span>
                 </div>
-                <p className="text-sm font-medium text-gray-700 dark:text-gray-300 bg-white/50 dark:bg-muted/30 p-3 rounded-lg border border-dashed border-amber-200 dark:border-amber-700">
-                  Sem taxas bancárias extras, porém a liberação não é imediata e exige o envio do comprovante.
+                <p className="text-sm font-medium text-gray-700 dark:text-gray-300 bg-amber-50 dark:bg-amber-900/20 p-3 rounded-lg border border-dashed border-amber-200 dark:border-amber-800">
+                  Sem taxas extras. A liberação não é imediata e exige envio de comprovante.
                 </p>
                 
-                <div className="flex flex-col items-center bg-white dark:bg-card p-4 rounded-xl border-2 border-amber-200 dark:border-amber-700 shadow-sm">
-                   {pixPayload && <QRCodeSVG value={pixPayload} size={180} className="mb-4 bg-white p-3 rounded-xl border shadow-sm" />}
-                   <div className="w-full space-y-2 text-left">
-                     <Label className="text-sm uppercase font-black text-gray-700 dark:text-gray-300 block">PIX Copia e Cola</Label>
-                     <div className="flex flex-col sm:flex-row gap-3">
-                       <Input value={pixPayload || "Erro ao gerar chave"} readOnly className="font-mono text-sm bg-gray-50 dark:bg-background text-black dark:text-white border-2 h-14 font-bold flex-1" />
-                       <Button className="h-14 px-6 bg-amber-600 hover:bg-amber-700 text-white font-bold text-base" onClick={() => handleCopiarPix(pixPayload)} disabled={!pixPayload}><Copy className="w-5 h-5 mr-2" /> Copiar</Button>
-                     </div>
-                   </div>
+                <div className="bg-gray-50 dark:bg-muted/30 p-4 rounded-xl border-2 border-dashed flex flex-col items-center">
+                    {pixPayload && <QRCodeSVG value={pixPayload} size={160} className="mb-4 bg-white p-3 rounded-xl shadow-sm border" />}
+                    <div className="relative w-full">
+                        <Input value={pixPayload ? "Clique para copiar chave PIX" : "Erro"} readOnly className="pr-12 text-center cursor-pointer text-sm font-bold h-12" onClick={() => handleCopiarPix(pixPayload)} />
+                        <Button size="icon" variant="ghost" className="absolute right-1.5 top-1/2 -translate-y-1/2 h-9 w-9 text-gray-700" onClick={() => handleCopiarPix(pixPayload)} disabled={!pixPayload}><Copy className="w-5 h-5" /></Button>
+                    </div>
                 </div>
 
-                <div className="space-y-3 pt-3 border-t-2 border-amber-200 dark:border-amber-800/50">
-                  <Label className="text-base font-black text-amber-900 dark:text-amber-400">Já pagou? Anexe o Comprovante:</Label>
-                  <Button className="w-full h-14 text-lg bg-amber-600 hover:bg-amber-700 text-white font-black shadow-lg hover:scale-[1.02] transition-transform" onClick={() => navigate(`/validar-cartela?${tipoVenda === 'rifa' ? 'codigo' : 'bingo'}=${venda.codigo_validacao}`)}>
-                    <Camera className="w-6 h-6 mr-2" /> Enviar Comprovante
-                  </Button>
+                <div className="space-y-3 text-left pt-3">
+                    <Label htmlFor="receipt" className="text-sm font-black text-gray-800 dark:text-gray-200">Anexe o Comprovante do PIX:</Label>
+                    <Input type="file" accept="image/*,application/pdf" className="h-12 file:mr-4 file:py-2 file:px-6 file:rounded-full file:border-0 file:text-sm file:font-black file:bg-amber-100 file:text-amber-800 cursor-pointer" />
+                    <Button className="w-full h-14 text-lg bg-amber-600 hover:bg-amber-700 text-white font-black shadow-lg hover:scale-[1.02] transition-transform" onClick={() => navigate(`/validar-cartela?${tipoVenda === 'rifa' ? 'codigo' : 'bingo'}=${venda.codigo_validacao}`)}>
+                      <Camera className="w-6 h-6 mr-2" /> Enviar Comprovante
+                    </Button>
                 </div>
              </div>
           )}

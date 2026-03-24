@@ -1,15 +1,14 @@
 # Log de Alterações (Changelog)
 
-## [2026-03-23] - Estabilização de Pagamentos e Governança
+## [Atual] - Coexistência de Gateways e Estabilidade
 
 ### Alterações
-- **Módulo de Pagamento:** Substituída a lógica de redirecionamento manual por `window.open` com política de `noreferrer`.
-- **Documentação:** Criado o arquivo `docs/25_fix_dom_manipulation_error.md`.
-- **Infraestrutura:** Realizado o Rebuild completo do ambiente para sincronização de arquivos.
+- **Gateways Simultâneos:** Removida a restrição que ocultava a opção Stripe quando o PagBank estava ativo nas telas `CreditRequestDialog` e `PagarCartela`.
+- **UI/UX:** Adicionada identidade visual em roxo/índigo para o Stripe a fim de diferenciá-lo claramente do PagBank perante os usuários.
+- **Documentação:** Criado o arquivo `docs/27_enable_concurrent_gateways.md` abordando as implicações da mudança.
 
 ### Motivo
-- Correção do erro `Failed to execute 'removeChild' on 'Node'` que causava o travamento total da interface ao tentar processar pagamentos via Cartão de Crédito.
+- Solicitação para permitir contingência de opções de pagamento (Cartão Nacional x Cartão Internacional) de forma simultânea.
 
 ### Impactos
-- **Esperados:** Estabilidade total na abertura do checkout e conformidade com as regras de segurança do PagBank.
-- **Riscos:** Bloqueadores de Pop-up podem interferir na abertura da nova aba (tratado via feedback visual na UI).
+- **Esperados:** Aumento da taxa de conversão em pagamentos por cartão, pois usuários que por ventura forem rejeitados pelo antifraude do PagSeguro podem imediatamente tentar pagar via Stripe na mesma tela.

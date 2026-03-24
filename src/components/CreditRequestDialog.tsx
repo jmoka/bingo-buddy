@@ -44,9 +44,9 @@ export const CreditRequestDialog = ({ gameSettings, children }: CreditRequestDia
 
   // === CÁLCULO DE TAXAS (STRIPE) ===
   const stripeFeeDetails = useMemo(() => {
-    if (!gameSettings?.pagbank_pass_fees_to_customer) return null;
-    const perc = gameSettings.pagbank_card_fee_percentage || 0;
-    const fix = gameSettings.pagbank_card_fee_fixed || 0;
+    if (!gameSettings?.stripe_pass_fees_to_customer) return null;
+    const perc = gameSettings.stripe_fee_percentage || 0;
+    const fix = gameSettings.stripe_fee_fixed || 0;
     const final = (amount + fix) / (1 - (perc / 100));
     const finalRounded = Math.ceil(final * 100) / 100;
     const fee = finalRounded - amount;
@@ -100,10 +100,10 @@ export const CreditRequestDialog = ({ gameSettings, children }: CreditRequestDia
     setIsStripeLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke('create-stripe-session', {
-        body: { amount, type: 'credits', metadata: { credits_requested: credits } }
+        body: { amount: finalStripeAmount, type: 'credits', metadata: { credits_requested: credits } }
       });
       if (error) throw error;
-      if (data?.url) window.location.href = data.url;
+      if (data?.url) window.open(data.url, '_blank', 'noreferrer,noopener');
     } catch (e: any) { toast.error("Erro: " + e.message); } finally { setIsStripeLoading(false); }
   };
 
@@ -215,6 +215,20 @@ export const CreditRequestDialog = ({ gameSettings, children }: CreditRequestDia
                 </div>
              )}
 
+             {/* STRIPE CARTÃO (Agora renderiza independente do PagBank) */}
+             {gameSettings?.stripe_enabled && (
+                <div className="bg-white dark:bg-card p-5 rounded-2xl border-2 border-gray-200 shadow-md space-y-4">
+                   <div className="flex items-center justify-between">
+                     <h3 className="font-black text-xl flex items-center gap-2 text-indigo-700 dark:text-indigo-500"><CreditCard className="w-6 h-6" /> Cartão (Stripe)</h3>
+                     <span className="text-2xl font-black text-indigo-700 dark:text-indigo-400">R$ {finalStripeAmount.toFixed(2).replace('.', ',')}</span>
+                   </div>
+                   {stripeFeeDetails && <p className="text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-muted/50 p-3 rounded-lg border border-dashed">Acréscimo de <strong>R$ {stripeFeeDetails.fee.toFixed(2)}</strong> ref. a taxa internacional.</p>}
+                   <Button className="w-full h-14 text-lg bg-indigo-600 hover:bg-indigo-700 text-white font-black shadow-lg hover:scale-[1.02] transition-transform" onClick={handleStripePayment} disabled={isStripeLoading || amount <= 0}>
+                      {isStripeLoading ? <Loader2 className="w-6 h-6 mr-2 animate-spin shrink-0" /> : null} PAGAR VIA STRIPE
+                   </Button>
+                </div>
+             )}
+
              {/* PIX AUTOMÁTICO PAGBANK */}
              {gameSettings?.pagbank_enabled && (
                 <div className="bg-white dark:bg-card p-5 rounded-2xl border-2 border-gray-200 shadow-md space-y-4">
@@ -276,14 +290,6 @@ export const CreditRequestDialog = ({ gameSettings, children }: CreditRequestDia
               </div>
              )}
 
-             {/* STRIPE CARTÃO (Se ativo e Pagbank Desativo) */}
-             {gameSettings?.stripe_enabled && !gameSettings?.pagbank_enabled && (
-                <div className="space-y-2 mt-6 pt-6 border-t-2">
-                  <Button className="w-full h-14 text-lg bg-indigo-600 hover:bg-indigo-700 text-white font-black shadow-lg hover:scale-[1.02] transition-transform" onClick={handleStripePayment} disabled={isStripeLoading}>
-                    {isStripeLoading ? <Loader2 className="w-6 h-6 mr-2 animate-spin shrink-0" /> : <CreditCard className="w-6 h-6 mr-2 shrink-0" />} PAGAR R$ {finalStripeAmount.toFixed(2).replace('.', ',')} VIA CARTÃO
-                  </Button>
-                </div>
-             )}
           </div>
         </div>
         <DialogFooter className="pt-4 pb-2 border-t mt-4">
