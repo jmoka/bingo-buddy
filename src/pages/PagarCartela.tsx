@@ -90,6 +90,13 @@ export default function PagarCartela() {
     return Math.ceil(f * 100) / 100;
   }, [valorCheio, gameSettings]);
 
+  const stripeFeeDetails = useMemo(() => {
+    if (!gameSettings?.stripe_pass_fees_to_customer) return null;
+    const fee = finalStripeAmount - valorCheio;
+    if (fee <= 0) return null;
+    return { final: finalStripeAmount, fee };
+  }, [finalStripeAmount, valorCheio, gameSettings]);
+
   const pixPayload = useMemo(() => {
     if (!gameSettings?.pix_key || !venda) return '';
     try {

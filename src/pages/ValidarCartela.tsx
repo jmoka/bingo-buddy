@@ -11,6 +11,7 @@ import { ArrowLeft, Search, CheckCircle, XCircle, Ticket, Loader2, Hash, AlertTr
 import { toast } from 'sonner';
 import { checkWin } from '@/utils/bingoUtils';
 import { BingoCard } from '@/types/bingo';
+import { CartPaymentDialog } from '@/components/CartPaymentDialog';
 
 export default function ValidarCartela() {
   const navigate = useNavigate();
@@ -20,6 +21,8 @@ export default function ValidarCartela() {
   const urlPayment = searchParams.get('payment');
 
   const [rifasAbertas, setRifasAbertas] = useState<{ id: string; nome: string }[]>([]);
+
+  const [paymentDialogCodigo, setPaymentDialogCodigo] = useState<string | null>(null);
 
   // Bingo States
   const [codigoBingo, setCodigoBingo] = useState(urlCodigoBingo || '');
@@ -409,7 +412,7 @@ export default function ValidarCartela() {
                                    <Button
                                      size="sm"
                                      className="h-6 text-[10px] bg-amber-600 hover:bg-amber-700 text-white shadow-sm"
-                                     onClick={() => navigate(`/pagar-cartela?codigo=${num.cartelas_rifa[0].codigo_validacao}`)}
+                                     onClick={() => setPaymentDialogCodigo(num.cartelas_rifa[0].codigo_validacao)}
                                    >
                                      Deseja pagar?
                                    </Button>
@@ -530,6 +533,12 @@ export default function ValidarCartela() {
           </TabsContent>
         </Tabs>
       </div>
+
+      <CartPaymentDialog
+        codigoValidacao={paymentDialogCodigo || ''}
+        open={!!paymentDialogCodigo}
+        onOpenChange={(open) => { if (!open) setPaymentDialogCodigo(null); }}
+      />
     </div>
   );
 }
