@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ArrowLeft, Search, CheckCircle, XCircle, Ticket, Loader2, Hash, AlertTriangle, Grid3X3, Trophy, ShieldCheck, UploadCloud, Clock, UserPlus, Info, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, Search, CheckCircle, XCircle, Ticket, Loader2, Hash, AlertTriangle, Grid3X3, Trophy, ShieldCheck, UploadCloud, Clock, UserPlus, Info, CheckCircle2, Check } from 'lucide-react';
 import { toast } from 'sonner';
 import { checkWin } from '@/utils/bingoUtils';
 import { BingoCard } from '@/types/bingo';
@@ -379,7 +379,17 @@ export default function ValidarCartela() {
                </div>
              </div>
              {buscadoRifa && (!resultadoRifa || resultadoRifa.length === 0) && (
-               <div className="card-container p-6 border-muted bg-muted/20 text-center"><Hash className="h-12 w-12 text-muted-foreground/30 mx-auto mb-3" /><p className="font-bold text-lg text-muted-foreground">Número não encontrado ou ainda está disponível.</p></div>
+              <div className="card-container p-6 border-muted bg-muted/20 text-center" >
+                    <Check className="h-12 w-12 text-green-700 mx-auto mb-3" />
+                    <p className="font-bold text-lg text-muted-foreground" > Número <span className="text-success">LIBERADO</span> ainda não foi comprado e nem reservado, se desejar adquiri - lo, retorne para a página de rifas.</p>
+             <button className="mt-4 bg-green-600 hover:bg-green-700 text-white h-12 px-6" onClick={() => navigate('/rifas')}>
+               COMPRAR NÚMERO
+             </button>
+              </div >
+  
+              
+                      
+               
              )}
              {buscadoRifa && resultadoRifa && resultadoRifa.length > 0 && (
                <div className="space-y-4">

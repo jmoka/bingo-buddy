@@ -38,6 +38,7 @@ import VendedorImprimirRifa from "./pages/VendedorImprimirRifa";
 import PagarCartela from "./pages/PagarCartela";
 import LandingPage from "./pages/Landing";
 import { Loader2 } from "lucide-react";
+import ConviteBingoPage from "./pages/pageConvite";
 
 const queryClient = new QueryClient();
 
@@ -109,6 +110,7 @@ const App = () => (
               <Route path="/vendedor/perfil/:codigo" element={<VendedorPerfilPublico />} />
               <Route path="/validar-cartela" element={<Layout><ValidarCartela /></Layout>} />
               <Route path="/pagar-cartela" element={<Layout><PagarCartela /></Layout>} />
+              <Route path="/convite-bingo" element={<Layout><ConviteBingoPage /></Layout>} />
               
               {/* Rotas Privadas */}
               <Route path="/account" element={<ProtectedRoute><Account /></ProtectedRoute>} />

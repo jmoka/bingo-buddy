@@ -12,7 +12,9 @@ import { Match, MatchStatus, PlayerCard } from '@/types/match';
 import { gameTypeLabels } from '@/utils/bingoUtils';
 import {
   Coins, Plus, Trophy, Users, Settings,
-  Timer, DoorOpen, Ticket, Zap, ZapOff, Tv, Archive, Trash2, RotateCcw, Star, Loader2, CalendarDays, Clock, Crown, ChevronDown, ChevronUp, Gift, BellRing, Search, SmartphoneNfc, UserPlus, ShieldCheck, AlertTriangle
+  Timer, DoorOpen, Ticket, Zap, ZapOff, Tv, Archive, Trash2, RotateCcw, Star, Loader2, CalendarDays, Clock, Crown, ChevronDown, ChevronUp, Gift, BellRing, Search, SmartphoneNfc, UserPlus, ShieldCheck, AlertTriangle,
+  VideoOff,
+  Video
 } from 'lucide-react';
 import PlayerAvatar from '@/components/PlayerAvatar';
 import { 
@@ -566,7 +568,7 @@ const Lobby = () => {
       )}
 
       {/* DASHBOARD PRINCIPAL */}
-      <div className="grid grid-cols-3 md:grid-cols-6 gap-2 sm:gap-4">
+      <div className="grid grid-cols-4 md:grid-cols-6 gap-2 sm:gap-4">
         <div className="card-container p-2 sm:p-4 bg-primary text-white border-none flex flex-col items-center text-center justify-center">
           <Coins className="w-4 h-4 sm:w-6 sm:h-6 mb-1 opacity-80" />
           <p className="text-[9px] sm:text-xs font-bold uppercase opacity-70 leading-tight">Pote</p>
@@ -613,9 +615,22 @@ const Lobby = () => {
           <p className="text-[9px] sm:text-xs font-bold uppercase opacity-70 leading-tight">Validar</p>
           <p className="text-xs sm:text-xl font-bold font-heading truncate w-full">Bilhete</p>
         </div>
-      </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+ 
+      <div 
+          className="card-container p-2 sm:p-4 bg-blue-700 hover:bg-slate-800 text-white border-none flex flex-col items-center text-center justify-center cursor-pointer transition-opacity shadow-sm"
+          onClick={() => navigate('/convite-bingo')}
+        >
+          <Video className="w-4 h-4 sm:w-6 sm:h-6 mb-1 opacity-80" />
+          <p className="text-[9px] sm:text-xs font-bold uppercase opacity-70 leading-tight">Videos</p>
+          <p className="text-xs sm:text-xl font-bold font-heading truncate w-full">Aulas</p>
+        </div>
+
+
+      </div>
+      
+
+       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         <div className="lg:col-span-3 order-2 lg:order-1 space-y-6">
           {gameSettings?.auto_engine_enabled && (
             <div className="card-container p-0 border-2 border-primary/20 overflow-hidden">
@@ -712,7 +727,7 @@ const Lobby = () => {
                 <Dialog open={isCreateCardOpen} onOpenChange={setCreateCardOpen}>
                   <DialogTrigger asChild>
                     <Button size="sm" className="gradient-primary font-bold h-8 text-[11px] px-3">
-                      <Plus className="w-3.5 h-3.5 mr-1" /> NOVA
+                      <Plus className="w-3.5 h-3.5 mr-1" /> NOVA CARTELA
                     </Button>
                   </DialogTrigger>
                   <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
