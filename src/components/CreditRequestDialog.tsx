@@ -161,7 +161,7 @@ export const CreditRequestDialog = ({ gameSettings, children }: CreditRequestDia
       <DialogTrigger asChild>{children}</DialogTrigger>
       <DialogContent className="w-full max-w-lg max-h-[90vh] overflow-y-auto bg-white dark:bg-card shadow-2xl sm:rounded-2xl border-2">
         <DialogHeader className="pt-2">
-          <DialogTitle className="font-heading text-center text-3xl font-black text-foreground">Comprar Créditos</DialogTitle>
+          <DialogTitle className="font-heading text-center text-3xl font-black text-foreground">Comprar Créditos v</DialogTitle>
           <DialogDescription className="text-center text-base font-medium text-gray-700 dark:text-gray-300 mt-2">
             {gameSettings?.credit_request_text || 'Escolha a quantidade de créditos e a forma de pagamento.'}
           </DialogDescription>

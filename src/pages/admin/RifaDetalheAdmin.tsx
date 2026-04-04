@@ -379,6 +379,8 @@ const RifaDetalheAdmin = () => {
     if (ok) setEditarOpen(false);
   };
 
+  const luceobruto = receitaTotalPrevista - custoPremio;
+
   return (
     <>
       <div className="flex items-center justify-between mb-6 gap-3 flex-wrap">
@@ -421,15 +423,19 @@ const RifaDetalheAdmin = () => {
           <DollarSign className="w-5 h-5 text-primary"/> Resumo Financeiro
         </h2>
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 lg:gap-4">
-          <div className="p-3 bg-muted rounded-lg border border-border/50">
+          <div className="p-3 bg-red-200 rounded-lg border border-border/50">
              <p className="text-[10px] uppercase font-bold text-muted-foreground flex items-center gap-1"><AlertCircle className="w-3 h-3 text-destructive" /> Custo do Prêmio</p>
              <p className="text-sm font-bold text-destructive">R$ {custoPremio.toFixed(2)}</p>
           </div>
-          <div className="p-3 bg-muted rounded-lg border border-border/50">
+          <div className="p-3 bg-blue-200 rounded-lg border border-border/50">
              <p className="text-[10px] uppercase font-bold text-muted-foreground">Potencial (100%)</p>
              <p className="text-sm font-bold text-foreground">R$ {receitaTotalPrevista.toFixed(2)}</p>
+               </div>
+            <div className="p-3 bg-green-200  rounded-lg border border-border/50">
+             <p className="text-[10px] uppercase font-bold text-muted-foreground">Lucro Bruto Esperado</p>
+             <p className="text-sm font-bold text-foreground">R$ {luceobruto.toFixed(2)}</p>
           </div>
-          <div className="p-3 bg-muted rounded-lg border border-border/50">
+          <div className="p-3 bg-purple-200 rounded-lg border border-border/50">
              <p className="text-[10px] uppercase font-bold text-muted-foreground" title="Se todos pagassem valor cheio sem desconto">Vendido (Bruto)</p>
              <p className="text-sm font-bold text-primary">R$ {receitaBrutaVendida.toFixed(2)}</p>
           </div>
@@ -437,11 +443,11 @@ const RifaDetalheAdmin = () => {
              <p className="text-[10px] uppercase font-bold text-amber-700 flex items-center gap-1" title="Soma de descontos físicos e comissões online"><BadgePercent className="w-3 h-3"/> Custo Vendedores</p>
              <p className="text-sm font-bold text-amber-600">R$ {custoVendedores.toFixed(2)}</p>
           </div>
-          <div className="p-3 bg-primary/10 rounded-lg border border-primary/20">
+          <div className="p-3 bg-orange-200 rounded-lg border border-primary/20">
              <p className="text-[10px] uppercase font-bold text-primary" title="Dinheiro que realmente entrou">Receita Líquida</p>
              <p className="text-sm font-bold text-primary">R$ {receitaLiquidaCaixa.toFixed(2)}</p>
           </div>
-          <div className={`p-3 rounded-lg border ${saldoAtualLucro >= 0 ? 'bg-success/10 border-success/30' : 'bg-destructive/10 border-destructive/30'}`}>
+          <div className={`p-3 rounded-lg border ${saldoAtualLucro >= 0 ? 'bg-yellow-200 border-success/30' : 'bg-destructive/10 border-destructive/30'}`}>
              <p className="text-[10px] uppercase font-bold text-muted-foreground" title="Receita Líquida - Custo do Prêmio">Saldo / Lucro</p>
              <p className={`text-sm font-bold ${saldoAtualLucro >= 0 ? 'text-success' : 'text-destructive'}`}>R$ {saldoAtualLucro.toFixed(2)}</p>
           </div>

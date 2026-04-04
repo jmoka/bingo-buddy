@@ -4,10 +4,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose, DialogDescription } from '@/components/ui/dialog';
-import { Loader2, Copy, CreditCard, SmartphoneNfc, FileWarning, User } from 'lucide-react';
+import { Loader2, Copy, CreditCard, SmartphoneNfc, FileWarning, User, Upload } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { QrCodePix } from 'qrcode-pix';
 import { toast } from 'sonner';
+import { useGame } from '@/contexts/GameContext';
+import { log } from 'console';
 
 interface CartPaymentDialogProps {
   codigoValidacao: string;
@@ -20,6 +22,7 @@ export const CartPaymentDialog = ({ codigoValidacao, open, onOpenChange }: CartP
   const [tipoVenda, setTipoVenda] = useState<'bingo' | 'rifa' | null>(null);
   const [gameSettings, setGameSettings] = useState<any | null>(null);
   const [loading, setLoading] = useState(false);
+  const [file, setFile] = useState<File | null>(null);
 
   const [isPagbankLoading, setIsPagbankLoading] = useState(false);
   const [isStripeLoading, setIsStripeLoading] = useState(false);
@@ -27,6 +30,12 @@ export const CartPaymentDialog = ({ codigoValidacao, open, onOpenChange }: CartP
   const [nomePagador, setNomePagador] = useState('');
   const [telefonePagador, setTelefonePagador] = useState('');
   const [cpfPagador, setCpfPagador] = useState('');
+  const { requestCredits } = useGame();
+  const [isLoading, setIsLoading] = useState(false);
+  const [isOpen, setIsOpen] = useState(false);
+  const [credits, setCredits] = useState<number>(10);  
+  const amount = credits * (gameSettings?.valor_por_credito || 1);
+  
 
   useEffect(() => {
     if (!open || !codigoValidacao) return;
@@ -60,6 +69,8 @@ export const CartPaymentDialog = ({ codigoValidacao, open, onOpenChange }: CartP
     }
     loadData();
   }, [open, codigoValidacao]);
+
+  
 
   const valorCheio = useMemo(() => {
     if (!venda) return 0;
@@ -144,6 +155,17 @@ export const CartPaymentDialog = ({ codigoValidacao, open, onOpenChange }: CartP
       setIsPagbankLoading(false); setIsStripeLoading(false);
     }
   };
+  const handleSubmitManual = async () => {
+    if (!file) { toast.error('Anexe o comprovante.'); return; }
+    setIsLoading(true);
+      setCredits(credits);
+    setPagbankData(null);
+    try {
+      const success = await requestCredits(file, credits, amount);
+      if (success) { toast.success('Solicitação enviada!'); setFile(null); setIsOpen(false); }
+    } finally { setIsLoading(false); }
+  };
+
 
   const handleStripePayment = async () => {
     setIsStripeLoading(true);
@@ -156,6 +178,7 @@ export const CartPaymentDialog = ({ codigoValidacao, open, onOpenChange }: CartP
     } catch (e: any) { toast.error('Erro ao iniciar pagamento: ' + e.message); } finally { setIsStripeLoading(false); }
   };
 
+ 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="w-full max-w-lg max-h-[90vh] overflow-y-auto bg-white dark:bg-card shadow-2xl sm:rounded-2xl border-2">
@@ -273,7 +296,16 @@ export const CartPaymentDialog = ({ codigoValidacao, open, onOpenChange }: CartP
                     <div className="relative w-full">
                       <Input value={pixPayload ? 'Clique para copiar chave PIX' : 'Erro'} readOnly className="pr-12 text-center cursor-pointer text-sm font-bold h-12" onClick={() => handleCopiarPix(pixPayload)} />
                       <Button size="icon" variant="ghost" className="absolute right-1.5 top-1/2 -translate-y-1/2 h-9 w-9 text-gray-700" onClick={() => handleCopiarPix(pixPayload)} disabled={!pixPayload}><Copy className="w-5 h-5" /></Button>
-                    </div>
+                        </div>
+                        
+
+                         <div className="space-y-3 text-left pt-3">
+                      <Label htmlFor="receipt" className="text-sm font-black text-gray-800 dark:text-gray-200">Anexe o Comprovante do PIX:</Label>
+                      <Input type="file" accept="image/*,application/pdf" onChange={(e) => setFile(e.target.files ? e.target.files[0] : null)} className="h-12 file:mr-4 file:py-2 file:px-6 file:rounded-full file:border-0 file:text-sm file:font-black file:bg-amber-100 file:text-amber-800 cursor-pointer" />
+                      <Button className="w-full h-14 text-lg bg-amber-600 hover:bg-amber-700 text-white font-black shadow-lg hover:scale-[1.02] transition-transform" onClick={handleSubmitManual} disabled={!file || isLoading}>
+                         {isLoading ? <Loader2 className="w-5 h-5 mr-2 animate-spin" /> : <Upload className="w-5 h-5 mr-2" />} Enviar para Avaliação
+                      </Button>
+                  </div>
                   </div>
                 </div>
               )}
