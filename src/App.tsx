@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate, useNavigate } from "react-router-dom";
 import { GameProvider } from "@/contexts/GameContext";
+import { RealtimeProvider } from "@/contexts/RealtimeContext";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { Layout } from "@/components/Layout";
 import { useEffect } from "react";
@@ -91,13 +92,14 @@ const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <BrowserRouter>
-        <AuthProvider>
-          <GameProvider>
-            <AuthEventsHandler />
-            <Toaster />
-            <Sonner />
-            <Routes>
-              <Route path="/login" element={<Login />} />
+        <RealtimeProvider>
+          <AuthProvider>
+            <GameProvider>
+              <AuthEventsHandler />
+              <Toaster />
+              <Sonner />
+              <Routes>
+                <Route path="/login" element={<Login />} />
               <Route path="/update-password" element={<UpdatePassword />} />
               
               {/* Rotas Públicas */ }
@@ -135,9 +137,10 @@ const App = () => (
             </Routes>
           </GameProvider>
         </AuthProvider>
-      </BrowserRouter>
-    </TooltipProvider>
-  </QueryClientProvider>
+      </RealtimeProvider>
+    </BrowserRouter>
+  </TooltipProvider>
+</QueryClientProvider>
 );
 
 export default App;

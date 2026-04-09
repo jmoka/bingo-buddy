@@ -6,20 +6,23 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
-import { Menu, Wallet, Plus, Banknote, History, Printer, LogOut, Star, Crown, Ticket, Search, UserCheck, ShieldCheck, User, AlertTriangle } from 'lucide-react';
+import { Menu, Wallet, Plus, Banknote, History, Printer, LogOut, Star, Crown, Ticket, Search, UserCheck, ShieldCheck, User, AlertTriangle, RefreshCw } from 'lucide-react';
 import { CreditRequestDialog } from './CreditRequestDialog';
 import { MyCreditRequestsDialog } from './MyCreditRequestsDialog';
 import { RedeemRequestDialog } from './RedeemRequestDialog';
 import { MyRedeemRequestsDialog } from './MyRedeemRequestsDialog';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { useQueryClient } from '@tanstack/react-query';
 
 export const AppHeader = () => {
   const navigate = useNavigate();
   const { profile, signOut } = useAuth();
   const { gameSettings, playerCards, rechargeFakeCredits, players } = useGame();
+  const queryClient = useQueryClient();
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [isRecharging, setIsRecharging] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [avatarSrc, setAvatarSrc] = useState<string | null>(null);
 
   useEffect(() => {
@@ -60,6 +63,19 @@ export const AppHeader = () => {
       toast.success('Você recebeu +1000 créditos de brincar!');
     }
     setIsRecharging(false);
+  };
+
+  const handleRefreshData = async () => {
+    setIsRefreshing(true);
+    try {
+      // Invalidar todas as queries para forçar recarregamento dos dados
+      await queryClient.invalidateQueries();
+      toast.success('Dados atualizados com sucesso!');
+    } catch (error) {
+      toast.error('Erro ao atualizar dados');
+    } finally {
+      setIsRefreshing(false);
+    }
   };
 
   const isAdmin = profile.role === 'admin';
@@ -177,6 +193,18 @@ export const AppHeader = () => {
               </Button>
             </div>
           )}
+
+          {/* Botão de Refresh */}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 rounded-full hover:bg-muted"
+            onClick={handleRefreshData}
+            disabled={isRefreshing}
+            title="Atualizar dados"
+          >
+            <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+          </Button>
 
           <button
             onClick={() => navigate('/account')}
