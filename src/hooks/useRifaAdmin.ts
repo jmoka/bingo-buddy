@@ -45,7 +45,7 @@ export const useRifaAdmin = () => {
       return data as Rifa[];
     },
     enabled: isAdmin,
-    refetchInterval: 5000,
+    refetchOnWindowFocus: false,
   });
 
   const { data: vendedores = [], isLoading: isLoadingVendedores } = useQuery({
@@ -89,7 +89,7 @@ export const useRifaAdmin = () => {
       return data as any[];
     },
     enabled: isAdmin,
-    refetchInterval: 5000,
+    refetchOnWindowFocus: false,
   });
 
   const { data: todasFolhasBingo = [] } = useQuery({
@@ -102,7 +102,7 @@ export const useRifaAdmin = () => {
       return data as any[];
     },
     enabled: isAdmin,
-    refetchInterval: 5000,
+    refetchOnWindowFocus: false,
   });
 
   const { data: solicitacoesVendedor = [], isLoading: isLoadingSolicitacoes } = useQuery({
@@ -133,7 +133,7 @@ export const useRifaAdmin = () => {
       })) as SolicitacaoVendedor[];
     },
     enabled: isAdmin,
-    refetchInterval: 5000,
+    refetchOnWindowFocus: false,
   });
 
   const { data: acertosPendentes = [] } = useQuery({
@@ -147,7 +147,7 @@ export const useRifaAdmin = () => {
       return data as AcertoVendedor[];
     },
     enabled: isAdmin,
-    refetchInterval: 5000,
+    refetchOnWindowFocus: false,
   });
 
   const { data: vendedoresComStats = [] } = useQuery({
@@ -183,7 +183,7 @@ export const useRifaAdmin = () => {
       }));
     },
     enabled: isAdmin,
-    refetchInterval: 5000,
+    refetchOnWindowFocus: false,
   });
 
   const criarRifa = async (payload: Partial<Rifa>): Promise<string | null> => {

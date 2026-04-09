@@ -38,7 +38,7 @@ export const useVendedorBingo = () => {
       return data as FolhaBingoFisico[];
     },
     enabled: !!meuVendedor,
-    refetchInterval: 5000,
+    refetchOnWindowFocus: false,
   });
 
   const comprarFolhasBingo = async (matchId: string, quantidade: number, gridsPorFolha: number, pagarDepois: boolean = false): Promise<boolean> => {

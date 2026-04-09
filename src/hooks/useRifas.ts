@@ -18,7 +18,7 @@ export const useRifas = () => {
       if (error) throw error;
       return data as Rifa[];
     },
-    refetchInterval: 5000,
+    refetchOnWindowFocus: false,
   });
 
   const getRifa = (rifaId: string): Rifa | undefined => rifas.find(r => r.id === rifaId);
@@ -36,7 +36,7 @@ export const useRifas = () => {
       }
       return map;
     },
-    refetchInterval: 3000,
+    refetchOnWindowFocus: false,
   });
 
   const getNumerosRifa = (rifaId: string): NumeroRifa[] => numerosCache[rifaId] || [];
@@ -54,7 +54,7 @@ export const useRifas = () => {
       return data as CompraRifa[];
     },
     enabled: !!user,
-    refetchInterval: 5000,
+    refetchOnWindowFocus: false,
   });
 
   const { data: minhasCartelas = [] } = useQuery({
@@ -75,7 +75,7 @@ export const useRifas = () => {
       return data as CartelaRifa[];
     },
     enabled: !!user,
-    refetchInterval: 5000,
+    refetchOnWindowFocus: false,
   });
 
   const comprarNumeros = async (rifaId: string, numeros: number[], refCodigo?: string): Promise<boolean> => {

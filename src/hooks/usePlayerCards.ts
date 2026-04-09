@@ -19,7 +19,7 @@ export const usePlayerCards = () => {
       return data as PlayerCard[];
     },
     enabled: !!user,
-    refetchInterval: 5000, 
+    refetchOnWindowFocus: false,
   });
 
   const createPlayerCard = async (options: { name: string; numbers: number[][]; creditType: 'real' | 'fake' }) => {

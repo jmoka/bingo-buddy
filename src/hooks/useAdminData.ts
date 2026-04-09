@@ -40,7 +40,7 @@ export const useAdminData = () => {
       return data as Profile[];
     },
     enabled: isAdmin,
-    refetchInterval: 3000,
+    refetchOnWindowFocus: false,
   });
 
   const { data: allPlayerCards = [] } = useQuery({
@@ -51,7 +51,7 @@ export const useAdminData = () => {
       return data as PlayerCard[];
     },
     enabled: isAdmin,
-    refetchInterval: 5000,
+    refetchOnWindowFocus: false,
   });
 
   const { data: allWins = [] } = useQuery({
@@ -62,7 +62,7 @@ export const useAdminData = () => {
       return data as Win[];
     },
     enabled: isAdmin,
-    refetchInterval: 5000,
+    refetchOnWindowFocus: false,
   });
 
   const { data: rawCreditRequests = [], isLoading: isLoadingRequests } = useQuery({
@@ -73,7 +73,7 @@ export const useAdminData = () => {
       return data;
     },
     enabled: isAdmin,
-    refetchInterval: 3000,
+    refetchOnWindowFocus: false,
   });
 
   const allCreditRequests = useMemo(() => {
@@ -93,7 +93,7 @@ export const useAdminData = () => {
       return data;
     },
     enabled: isAdmin,
-    refetchInterval: 3000,
+    refetchOnWindowFocus: false,
   });
 
   const allRedeemRequests = useMemo(() => {

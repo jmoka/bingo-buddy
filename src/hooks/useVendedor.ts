@@ -48,7 +48,7 @@ export const useVendedor = () => {
       return data as NumeroRifaVendedor[];
     },
     enabled: !!meuVendedor,
-    refetchInterval: 5000,
+    refetchOnWindowFocus: false,
   });
 
   const { data: minhasVendas = [], isLoading: isLoadingVendas } = useQuery({
@@ -64,7 +64,7 @@ export const useVendedor = () => {
       return data as any[];
     },
     enabled: !!meuVendedor,
-    refetchInterval: 5000,
+    refetchOnWindowFocus: false,
   });
 
   const { data: meusAcertos = [], isLoading: isLoadingAcertos } = useQuery({
@@ -80,7 +80,7 @@ export const useVendedor = () => {
       return data as AcertoVendedor[];
     },
     enabled: !!meuVendedor,
-    refetchInterval: 5000,
+    refetchOnWindowFocus: false,
   });
 
   const reservarNumeros = async (rifaId: string, numeros: number[], pagarDepois: boolean = false): Promise<boolean> => {

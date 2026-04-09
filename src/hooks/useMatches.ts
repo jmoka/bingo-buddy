@@ -43,7 +43,7 @@ export const useMatches = () => {
       if (error) throw error;
       return (data as Match[]).filter(m => m.status !== 'finished' || new Date(m.created_at) >= today);
     },
-    refetchInterval: 500,
+    refetchOnWindowFocus: false,
   });
 
   const { data: matchCards = [], isLoading: isLoadingCards } = useQuery({
@@ -53,7 +53,7 @@ export const useMatches = () => {
       if (error) throw error;
       return data.map(c => ({ ...c, marked_numbers: new Set(c.marked_numbers || []) })) as MatchCard[];
     },
-    refetchInterval: 1000,
+    refetchOnWindowFocus: false,
   });
 
   const createMatch = async (data: any) => {
