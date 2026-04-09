@@ -9,6 +9,7 @@ import { usePlayerCards } from '@/hooks/usePlayerCards';
 import { useCreditRequests } from '@/hooks/useCreditRequests';
 import { useRedeemRequests } from '@/hooks/useRedeemRequests';
 import { useAdminData } from '@/hooks/useAdminData';
+import { useRealtimeNotifications } from '@/hooks/useRealtimeNotifications';
 
 type GameContextType = 
   ReturnType<typeof useGameSettings> &
@@ -28,6 +29,9 @@ const GameContext = createContext<GameContextType | null>(null);
 export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+
+  // Ativar notificações realtime
+  useRealtimeNotifications();
 
   const gameSettingsHook = useGameSettings();
   const matchesHook = useMatches();
@@ -51,32 +55,6 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     },
     enabled: !!user,
   });
-
-  useEffect(() => {
-    const channel = supabase
-      .channel('db-changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'partidas' }, () => {
-        queryClient.invalidateQueries({ queryKey: ['matches'] });
-        queryClient.refetchQueries({ queryKey: ['matches'] });
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'cartelas_partida' }, () => {
-        queryClient.invalidateQueries({ queryKey: ['matchCards'] });
-        queryClient.refetchQueries({ queryKey: ['matchCards'] });
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'perfis' }, () => {
-        queryClient.invalidateQueries({ queryKey: ['profile'] });
-        queryClient.invalidateQueries({ queryKey: ['players'] });
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'vitorias' }, () => {
-        queryClient.invalidateQueries({ queryKey: ['wins'] });
-        queryClient.invalidateQueries({ queryKey: ['allWins'] });
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'configuracoes' }, () => {
-        queryClient.invalidateQueries({ queryKey: ['gameSettings'] });
-      })
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, [queryClient]);
 
   // Buscar Vendedores Públicos (Ativos)
   const { data: publicSellers = [] } = useQuery({
