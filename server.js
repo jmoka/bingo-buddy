@@ -19,6 +19,15 @@ const io = new Server(server, {
 app.use(cors());
 app.use(express.json());
 
+// Block access to sensitive paths
+app.use((req, res, next) => {
+  const blocked = /^\/(\.git|\.env|\.ssh|\.npmrc|node_modules)(\/|$)/i;
+  if (blocked.test(req.path)) {
+    return res.status(404).end();
+  }
+  next();
+});
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const distPath = path.join(__dirname, "dist");
