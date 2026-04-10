@@ -1,132 +1,226 @@
-import express from 'express';
-import http from 'http';
-import { Server } from 'socket.io';
-import cors from 'cors';
+const express = require("express");
+const http = require("http");
+const socketIo = require("socket.io");
+const cors = require("cors");
+const path = require("path");
 
 const app = express();
-app.use(cors());
-app.use(express.json());
-
 const server = http.createServer(app);
-
-const io = new Server(server, {
+const io = socketIo(server, {
   cors: {
     origin: "*",
     methods: ["GET", "POST"]
   }
 });
 
-// Estado das lives por partida
-const liveStreams = new Map(); // partidaId => { broadcaster: socketId, viewers: Set<socketId> }
+// Middleware
+app.use(cors());
+app.use(express.json());
+app.use(express.static(path.join(__dirname, "public")));
 
+// Estado do jogo
+let gameState = {
+  numerosSorteados: [],
+  cronometro: 0,
+  jogoAtivo: false,
+  tempoRestante: 0,
+  ultimoNumero: null
+};
+
+// Configurações do jogo
+const CONFIG = {
+  tempoPorRodada: 10, // segundos
+  totalNumeros: 75
+};
+
+// Motor de sorteio
+class MotorSorteio {
+  constructor() {
+    this.numerosDisponiveis = Array.from(
+      { length: CONFIG.totalNumeros },
+      (_, i) => i + 1
+    );
+    this.embaralhar();
+  }
+
+  embaralhar() {
+    for (let i = this.numerosDisponiveis.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [this.numerosDisponiveis[i], this.numerosDisponiveis[j]] = [
+        this.numerosDisponiveis[j],
+        this.numerosDisponiveis[i]
+      ];
+    }
+  }
+
+  sortearNumero() {
+    if (this.numerosDisponiveis.length === 0) {
+      return null;
+    }
+    return this.numerosDisponiveis.pop();
+  }
+
+  resetar() {
+    this.numerosDisponiveis = Array.from(
+      { length: CONFIG.totalNumeros },
+      (_, i) => i + 1
+    );
+    this.embaralhar();
+  }
+}
+
+const motorSorteio = new MotorSorteio();
+
+// Eventos Socket.IO
 io.on("connection", (socket) => {
-  console.log("Usuário conectado:", socket.id);
+  console.log("Cliente conectado:", socket.id);
 
-  // Entrar em uma partida específica
-  socket.on("join-match", (matchId) => {
-    socket.join(matchId);
-    console.log(`Usuário ${socket.id} entrou na partida ${matchId}`);
-  });
-
-  // Admin inicia transmissão
-  socket.on("start-live", (matchId) => {
-    console.log(`Admin iniciou live para partida ${matchId}`);
-
-    liveStreams.set(matchId, {
-      broadcaster: socket.id,
-      viewers: liveStreams.get(matchId)?.viewers ?? new Set(),
-      isLive: true
-    });
-
-    // Notificar todos na partida que a live começou
-    io.to(matchId).emit("live-started", { matchId, broadcaster: socket.id });
-  });
-
-  // Admin para transmissão
-  socket.on("stop-live", (matchId) => {
-    console.log(`Admin parou live para partida ${matchId}`);
-
-    if (liveStreams.has(matchId)) {
-      const stream = liveStreams.get(matchId);
-      stream.isLive = false;
-
-      // Notificar desconexão para viewers
-      io.to(matchId).emit("live-stopped", { matchId });
-    }
-  });
-
-  // Viewer solicita assistir
-  socket.on("watch-live", (matchId) => {
-    const stream = liveStreams.get(matchId);
-    if (stream && stream.isLive) {
-      stream.viewers.add(socket.id);
-      socket.emit("can-watch", { matchId, broadcaster: stream.broadcaster });
-      console.log(`Viewer ${socket.id} começou a assistir live da partida ${matchId}`);
-    } else {
-      socket.emit("live-not-available", { matchId });
-    }
-  });
-
-  // WebRTC signaling
-  socket.on("broadcaster", (matchId) => {
-    socket.to(matchId).emit("broadcaster");
-  });
-
-  socket.on("watcher", (matchId) => {
-    const stream = liveStreams.get(matchId);
-    if (stream && stream.broadcaster) {
-      socket.to(stream.broadcaster).emit("watcher", socket.id);
-    }
-  });
-
-  socket.on("offer", (id, message) => {
-    socket.to(id).emit("offer", socket.id, message);
-  });
-
-  socket.on("answer", (id, message) => {
-    socket.to(id).emit("answer", socket.id, message);
-  });
-
-  socket.on("candidate", (id, message) => {
-    socket.to(id).emit("candidate", socket.id, message);
-  });
+  // Envia estado atual ao cliente que se conecta
+  socket.emit("estado-inicial", gameState);
 
   socket.on("disconnect", () => {
-    console.log("Usuário desconectado:", socket.id);
+    console.log("Cliente desconectado:", socket.id);
+  });
 
-    // Remover viewer de todas as streams
-    for (const [matchId, stream] of liveStreams.entries()) {
-      if (stream.viewers.has(socket.id)) {
-        stream.viewers.delete(socket.id);
-        io.to(matchId).emit("viewer-disconnected", socket.id);
-      }
+  // Eventos do admin
+  socket.on("iniciar-jogo", () => {
+    if (!gameState.jogoAtivo) {
+      gameState.jogoAtivo = true;
+      gameState.cronometro = CONFIG.tempoPorRodada;
+      gameState.tempoRestante = CONFIG.tempoPorRodada;
 
-      // Se o broadcaster desconectou, parar a live
-      if (stream.broadcaster === socket.id) {
-        stream.isLive = false;
-        io.to(matchId).emit("live-stopped", { matchId, reason: "broadcaster-disconnected" });
-      }
+      io.emit("jogo-iniciado", {
+        tempoRestante: gameState.tempoRestante
+      });
+
+      iniciarCronometro();
+    }
+  });
+
+  socket.on("pausar-jogo", () => {
+    gameState.jogoAtivo = false;
+    io.emit("jogo-pausado");
+  });
+
+  socket.on("continuar-jogo", () => {
+    if (!gameState.jogoAtivo && gameState.numerosSorteados.length > 0) {
+      gameState.jogoAtivo = true;
+      io.emit("jogo-continuado", {
+        tempoRestante: gameState.tempoRestante
+      });
+      iniciarCronometro();
+    }
+  });
+
+  socket.on("resetar-jogo", () => {
+    gameState = {
+      numerosSorteados: [],
+      cronometro: 0,
+      jogoAtivo: false,
+      tempoRestante: 0,
+      ultimoNumero: null
+    };
+    motorSorteio.resetar();
+    io.emit("jogo-resetado");
+  });
+
+  socket.on("sortear-numero-manual", () => {
+    if (gameState.jogoAtivo) {
+      sortearNumero();
     }
   });
 });
 
-// Endpoint para verificar status da live
-app.get("/api/live-status/:matchId", (req, res) => {
-  const { matchId } = req.params;
-  const stream = liveStreams.get(matchId);
+// Função para sortear número
+function sortearNumero() {
+  const numero = motorSorteio.sortearNumero();
 
-  if (stream && stream.isLive) {
-    res.json({
-      isLive: true,
-      viewerCount: stream.viewers.size,
-      broadcaster: stream.broadcaster
+  if (numero !== null) {
+    gameState.numerosSorteados.push(numero);
+    gameState.ultimoNumero = numero;
+
+    // Emite evento para todos os clientes
+    io.emit("numero-sorteado", {
+      numero: numero,
+      numerosSorteados: gameState.numerosSorteados,
+      totalSorteados: gameState.numerosSorteados.length
     });
+
+    // Reset do cronômetro para próxima rodada
+    gameState.cronometro = CONFIG.tempoPorRodada;
+    gameState.tempoRestante = CONFIG.tempoPorRodada;
+
+    // Verifica se acabaram os números
+    if (gameState.numerosSorteados.length >= CONFIG.totalNumeros) {
+      finalizarJogo();
+    }
+  }
+}
+
+// Função do cronômetro
+function iniciarCronometro() {
+  const intervalo = setInterval(() => {
+    if (!gameState.jogoAtivo) {
+      clearInterval(intervalo);
+      return;
+    }
+
+    gameState.cronometro--;
+    gameState.tempoRestante = gameState.cronometro;
+
+    // Emite atualização do cronômetro
+    io.emit("cronometro-atualizado", {
+      tempoRestante: gameState.tempoRestante
+    });
+
+    // Sorteia número automaticamente quando o cronômetro chega a 0
+    if (gameState.cronometro <= 0) {
+      sortearNumero();
+    }
+  }, 1000);
+}
+
+// Finalizar jogo
+function finalizarJogo() {
+  gameState.jogoAtivo = false;
+  io.emit("jogo-finalizado", {
+    numerosSorteados: gameState.numerosSorteados,
+    mensagem: "Todos os números foram sorteados!"
+  });
+}
+
+// Rotas HTTP
+app.get("/api/estado", (req, res) => {
+  res.json(gameState);
+});
+
+app.post("/api/iniciar", (req, res) => {
+  if (!gameState.jogoAtivo) {
+    gameState.jogoAtivo = true;
+    gameState.cronometro = CONFIG.tempoPorRodada;
+    gameState.tempoRestante = CONFIG.tempoPorRodada;
+
+    io.emit("jogo-iniciado", {
+      tempoRestante: gameState.tempoRestante
+    });
+
+    iniciarCronometro();
+    res.json({ sucesso: true, mensagem: "Jogo iniciado" });
   } else {
-    res.json({ isLive: false });
+    res.json({ sucesso: false, mensagem: "Jogo já está em andamento" });
   }
 });
 
-const PORT = process.env.PORT || 3001;
+app.post("/api/sortear", (req, res) => {
+  if (gameState.jogoAtivo) {
+    sortearNumero();
+    res.json({ sucesso: true, mensagem: "Número sorteado" });
+  } else {
+    res.json({ sucesso: false, mensagem: "Jogo não está ativo" });
+  }
+});
+
+const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
-  console.log(`🚀 Servidor Socket.IO rodando na porta ${PORT}`);
+  console.log(`Servidor rodando na porta ${PORT}`);
 });

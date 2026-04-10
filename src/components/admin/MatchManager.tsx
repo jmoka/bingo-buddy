@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { GameType } from '@/types/bingo';
 import { PrizeType, MatchStatus, Match, Prize } from '@/types/match';
 import { gameTypeLabels, calculateNumbersToWin } from '@/utils/bingoUtils';
-import { Plus, Trash2, Trophy, Edit, Shuffle, Clock, Coins, Users, TrendingUp, Ticket, User, Flame, Target, Loader2, ArrowRight, Eye } from 'lucide-react';
+import { Plus, Trash2, Trophy, Edit, Shuffle, Clock, Coins, Users, TrendingUp, Ticket, User, Flame, Target, Loader2, ArrowRight, Eye, RefreshCw } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { useToast } from '@/hooks/use-toast';
@@ -19,6 +19,7 @@ import { format } from 'date-fns';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from '@/lib/utils';
 import { MatchDetailsModal } from './MatchDetailsModal';
+import { useQueryClient } from '@tanstack/react-query';
 
 const statusLabels: Record<MatchStatus, string> = {
   waiting: 'Aguardando',
@@ -36,6 +37,7 @@ const statusColors: Record<MatchStatus, string> = {
 
 const MatchManager = () => {
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const {
     matches, createMatch, updateMatch, matchCards,
     openMatch, startMatch, finishMatch, deleteMatch, callNumber,
@@ -73,11 +75,22 @@ const MatchManager = () => {
   const [isCallingManual, setIsCallingManual] = useState<string | null>(null);
   const [isAdvancingRound, setIsAdvancingRound] = useState<string | null>(null);
   const [expandedNumbers, setExpandedNumbers] = useState<Record<string, boolean>>({});
-
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [matchIdForDialog, setMatchIdForDialog] = useState<string | null>(null);
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(timer);
   }, []);
+
+  useEffect(() => {
+    const channel = supabase
+      .channel('match-manager-realtime')
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'partidas' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['matches'] });
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [queryClient]);
 
   const handleCreateMatch = async () => {
     if (!matchForm.name.trim() || !matchForm.startTime) return;
@@ -217,6 +230,37 @@ const MatchManager = () => {
     setIsAdvancingRound(null);
   };
 
+  const handleRefreshBeforeDialog = async (matchId: string) => {
+    setIsRefreshing(true);
+    try {
+      await queryClient.invalidateQueries();
+      // Dialog abre com dados atualizados
+    } catch (error) {
+      toast({ title: 'Erro ao atualizar dados', variant: 'destructive' });
+    } finally {
+      setIsRefreshing(false);
+      setMatchIdForDialog(matchId);
+    }
+  };
+
+  const handleConfirmStartMatch = async (matchId: string, force: boolean, playersInMatchCount: number) => {
+    setIsRefreshing(true);
+    try {
+      if (playersInMatchCount === 0) {
+        await deleteMatch(matchId);
+        toast({ title: 'Partida vazia excluída!', variant: 'default' });
+      } else {
+        await startMatch(matchId, force);
+        toast({ title: 'Partida iniciada com sucesso!', variant: 'default' });
+      }
+    } catch (error) {
+      toast({ title: 'Erro ao processar ação', variant: 'destructive' });
+    } finally {
+      setIsRefreshing(false);
+      setMatchIdForDialog(null);
+    }
+  };
+
   const matchDialogContent = (
     <div className="space-y-4 py-4">
       <div><Label>Nome</Label><Input value={matchForm.name} onChange={e => setMatchForm(p => ({ ...p, name: e.target.value }))} /></div>
@@ -314,7 +358,6 @@ const MatchManager = () => {
     const s = Math.floor((diff % 60000) / 1000);
     return `${h > 0 ? `${h.toString().padStart(2, '0')}:` : ''}${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
-
   const renderMatchList = (matchesToRender: Match[]) => {
     if (matchesToRender.length === 0) return <div className="card-container text-center py-12"><p className="text-sm text-muted-foreground">Nenhuma partida nesta categoria.</p></div>;
     return (
@@ -365,39 +408,39 @@ const MatchManager = () => {
                   {match.status === 'waiting' && <Button size="sm" className="flex-1 sm:flex-none" onClick={() => openMatch(match.id)}>Abrir</Button>}
                   
                   {match.status === 'open' && (
-                    <AlertDialog>
+                    <AlertDialog open={matchIdForDialog === match.id} onOpenChange={(open) => !open && setMatchIdForDialog(null)}>
                       <AlertDialogTrigger asChild>
-                        <Button size="sm" className="flex-1 sm:flex-none" title={!canStart ? `Requer ${match.min_players} jogadores. Atualmente: ${playersInMatchCount}.` : undefined}>
-                          Iniciar
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>
-                            {playersInMatchCount === 0
-                              ? "Excluir Partida Vazia?"
-                              : (!canStart ? "Forçar início da partida?" : "Iniciar Partida?")}
-                          </AlertDialogTitle>
-                          <AlertDialogDescription>
-                            {playersInMatchCount === 0
-                              ? "Esta partida não possui nenhum jogador. Partidas sem jogadores não podem ser iniciadas e devem ser excluídas."
-                              : (!canStart
-                                ? `Esta partida não atingiu o número mínimo de ${match.min_players} jogadores. Deseja forçar o início mesmo assim?`
-                                : "A partida será movida para 'Ao Vivo' e o sorteio poderá começar. Deseja continuar?")}
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                          <AlertDialogAction
-                            className={playersInMatchCount === 0 ? "bg-destructive text-destructive-foreground hover:bg-destructive/90" : ""}
-                            onClick={() => playersInMatchCount === 0 ? deleteMatch(match.id) : startMatch(match.id, !canStart)}
-                          >
-                            {playersInMatchCount === 0
-                              ? "Excluir Partida"
-                              : (!canStart ? "Forçar Início" : "Sim, Iniciar Partida")}
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
+                            <Button size="sm" className="flex-1 sm:flex-none" disabled={isRefreshing} onClick={() => handleRefreshBeforeDialog(match.id)} title={!canStart ? `Requer ${match.min_players} jogadores. Atualmente: ${playersInMatchCount}.` : undefined}>
+                              {isRefreshing ? <RefreshCw className="w-4 h-4 animate-spin mr-2" /> : <RefreshCw className="w-4 h-4 mr-2" />}
+                              Iniciar                          
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>
+                                {playersInMatchCount === 0
+                                  ? "Excluir Partida Vazia?"
+                                  : (!canStart ? "Forçar início da partida?" : "Iniciar Partida?")}
+                              </AlertDialogTitle>
+                              <AlertDialogDescription>
+                                {playersInMatchCount === 0
+                                  ? "Esta partida não possui nenhum jogador. Partidas sem jogadores não podem ser iniciadas e devem ser excluídas."
+                                  : (!canStart
+                                    ? `Esta partida não atingiu o número mínimo de ${match.min_players} jogadores. Deseja forçar o início mesmo assim?`
+                                    : "A partida será movida para 'Ao Vivo' e o sorteio poderá começar. Deseja continuar?")}
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel disabled={isRefreshing}>Cancelar</AlertDialogCancel>
+                              <AlertDialogAction
+                                className={playersInMatchCount === 0 ? "bg-destructive text-destructive-foreground hover:bg-destructive/90" : ""}
+                                onClick={() => handleConfirmStartMatch(match.id, !canStart, playersInMatchCount)}
+                                disabled={isRefreshing}
+                              >
+                                {isRefreshing ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Processando...</> : (playersInMatchCount === 0 ? "Excluir Partida" : (!canStart ? "Forçar Início" : "Sim, Iniciar Partida"))}
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
                     </AlertDialog>
                   )}
 
