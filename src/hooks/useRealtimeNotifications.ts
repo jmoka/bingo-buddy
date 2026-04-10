@@ -7,8 +7,10 @@ export const useRealtimeNotifications = () => {
   const queryClient = useQueryClient();
 
   useEffect(() => {
+    const channelName = `db-changes-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
     const channel = supabase
-      .channel('db-changes')
+      .channel(channelName)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'partidas' }, (payload: any) => {
         queryClient.invalidateQueries({ queryKey: ['matches'] });
         const matchName = payload.new.name;

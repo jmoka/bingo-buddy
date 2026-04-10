@@ -9,6 +9,14 @@ export function getLiveServerUrl() {
     return normalizeUrl(rawConfiguredUrl.trim());
   }
 
-  const protocol = window.location.protocol === "https:" ? "https:" : "http:";
-  return `${protocol}//${window.location.hostname}:8082`;
+  const { protocol, hostname, origin } = window.location;
+
+  // Local dev: frontend em 8080 e live server em 8082.
+  if (hostname === "localhost" || hostname === "127.0.0.1") {
+    const localProtocol = protocol === "https:" ? "https:" : "http:";
+    return `${localProtocol}//${hostname}:8082`;
+  }
+
+  // Producao em container unico: usa mesma origem (Traefik/EasyPanel faz proxy para a porta interna).
+  return normalizeUrl(origin);
 }

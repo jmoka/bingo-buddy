@@ -2,6 +2,9 @@ import express from "express";
 import http from "http";
 import cors from "cors";
 import { Server } from "socket.io";
+import path from "path";
+import { fileURLToPath } from "url";
+import { existsSync } from "fs";
 
 const app = express();
 const server = http.createServer(app);
@@ -15,6 +18,15 @@ const io = new Server(server, {
 
 app.use(cors());
 app.use(express.json());
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const distPath = path.join(__dirname, "dist");
+const hasBuiltFrontend = existsSync(distPath);
+
+if (hasBuiltFrontend) {
+  app.use(express.static(distPath));
+}
 
 const activeLives = new Map();
 
@@ -156,6 +168,16 @@ app.get("/api/live-status", (req, res) => {
 app.get("/api/live-status/:matchId", (req, res) => {
   res.json(getLiveStatus(req.params.matchId));
 });
+
+if (hasBuiltFrontend) {
+  app.use((req, res, next) => {
+    if (req.path.startsWith("/api") || req.path.startsWith("/socket.io")) {
+      return next();
+    }
+
+    return res.sendFile(path.join(distPath, "index.html"));
+  });
+}
 
 const PORT = Number(process.env.PORT || 8082);
 server.listen(PORT, () => {
