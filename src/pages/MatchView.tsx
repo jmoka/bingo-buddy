@@ -308,8 +308,8 @@ const MatchView = () => {
           )}
         </div>
         <div className="flex flex-wrap gap-1.5">
-          {(showAllNumbers ? (match.called_numbers || []) : (match.called_numbers || []).slice(-10)).map(num => (
-            <span key={num} className="w-8 h-8 rounded-full bg-primary text-primary-foreground text-sm font-medium flex items-center justify-center">
+          {(showAllNumbers ? [...(match.called_numbers || [])].reverse() : [...(match.called_numbers || [])].reverse().slice(0, 10)).map((num, idx) => (
+            <span key={num} className={`w-8 h-8 rounded-full text-sm font-medium flex items-center justify-center transition-all ${idx === 0 ? 'bg-accent text-accent-foreground border-2 border-accent scale-110 animate-pulse shadow-lg' : 'bg-primary text-primary-foreground'}`}>
               {num}
             </span>
           ))}
