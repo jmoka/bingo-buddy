@@ -325,11 +325,6 @@ const MatchView = () => {
         </div>
       </div>
 
-      <MatchCommentsPanel
-        matchId={id || ''}
-        canSend={match.status === 'open' || match.status === 'in_progress'}
-      />
-
       {match.status === 'in_progress' && funWinnersInProgress.length > 0 && (
         <Alert className="mb-6 border-amber-500 bg-amber-500/10 text-amber-700 animate-pulse">
           <Star className="h-4 w-4 text-amber-600" />
@@ -452,6 +447,11 @@ const MatchView = () => {
           );
         })}
       </div>
+
+      <MatchCommentsPanel
+        matchId={id || ''}
+        canSend={match.status === 'open' || match.status === 'in_progress'}
+      />
 
       <AlertDialog open={!!confirmManualCard} onOpenChange={(open) => !open && setConfirmManualCard(null)}>
         <AlertDialogContent>

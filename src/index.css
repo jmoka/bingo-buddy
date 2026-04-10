@@ -233,6 +233,30 @@
   .animate-saved {
     animation: saved-animation 0.3s ease-out;
   }
+
+  @keyframes comment-float-up {
+    0% {
+      opacity: 0;
+      transform: translateY(20px) scale(0.94);
+    }
+    15% {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+    85% {
+      opacity: 1;
+      transform: translateY(-46px) scale(1);
+    }
+    100% {
+      opacity: 0;
+      transform: translateY(-64px) scale(0.96);
+    }
+  }
+
+  .match-comment-float {
+    @apply rounded-xl border border-primary/20 bg-card/95 px-3 py-2 shadow-lg backdrop-blur;
+    animation: comment-float-up 3.2s ease-out forwards;
+  }
 }
 
 @layer utilities {

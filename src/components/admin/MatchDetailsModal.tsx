@@ -97,11 +97,19 @@ export function MatchDetailsModal({ match, onClose }: Props) {
             <div className="flex justify-center py-10"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>
         ) : (
             <Tabs defaultValue="geral" className="mt-2">
-            <TabsList className="grid w-full grid-cols-4">
-                <TabsTrigger value="geral">Visão Geral</TabsTrigger>
-                <TabsTrigger value="vendedores">Vendedores</TabsTrigger>
-                <TabsTrigger value="online">App Online</TabsTrigger>
-                <TabsTrigger value="ganhadores" disabled={match.status !== 'finished'}>Ganhadores</TabsTrigger>
+                        <TabsList className="grid h-auto w-full grid-cols-2 gap-1 bg-muted/50 p-1 sm:grid-cols-4">
+                                <TabsTrigger value="geral" className="h-auto min-h-10 whitespace-normal px-2 py-2 text-center text-xs leading-tight sm:text-sm">
+                                    Visão Geral
+                                </TabsTrigger>
+                                <TabsTrigger value="vendedores" className="h-auto min-h-10 whitespace-normal px-2 py-2 text-center text-xs leading-tight sm:text-sm">
+                                    Vendedores
+                                </TabsTrigger>
+                                <TabsTrigger value="online" className="h-auto min-h-10 whitespace-normal px-2 py-2 text-center text-xs leading-tight sm:text-sm">
+                                    App Online
+                                </TabsTrigger>
+                                <TabsTrigger value="ganhadores" disabled={match.status !== 'finished'} className="h-auto min-h-10 whitespace-normal px-2 py-2 text-center text-xs leading-tight sm:text-sm">
+                                    Ganhadores
+                                </TabsTrigger>
             </TabsList>
 
             <TabsContent value="geral" className="space-y-4 mt-4">
@@ -168,7 +176,42 @@ export function MatchDetailsModal({ match, onClose }: Props) {
             </TabsContent>
 
             <TabsContent value="vendedores" className="mt-4">
-                <div className="card-container p-0 overflow-hidden">
+                <div className="space-y-3 sm:hidden">
+                    {sellersArray.length === 0 ? (
+                        <div className="card-container py-6 text-center text-sm text-muted-foreground">
+                            Nenhuma venda física registrada.
+                        </div>
+                    ) : (
+                        sellersArray.map((s, i) => (
+                            <div key={i} className="card-container space-y-3 p-4">
+                                <div className="min-w-0">
+                                    <p className="truncate font-bold text-foreground">{s.nome}</p>
+                                    <p className="truncate text-[10px] font-mono text-muted-foreground">Ref: {s.ref}</p>
+                                </div>
+                                <div className="grid grid-cols-2 gap-2 text-sm">
+                                    <div className="rounded-lg bg-muted/50 px-3 py-2">
+                                        <p className="text-[10px] font-bold uppercase text-muted-foreground">Impressas</p>
+                                        <p className="font-mono text-base font-bold">{s.impressas}</p>
+                                    </div>
+                                    <div className="rounded-lg bg-green-500/10 px-3 py-2">
+                                        <p className="text-[10px] font-bold uppercase text-green-700">Pagas</p>
+                                        <p className="font-mono text-base font-bold text-green-600">{s.pagas}</p>
+                                    </div>
+                                    <div className="rounded-lg bg-red-500/10 px-3 py-2">
+                                        <p className="text-[10px] font-bold uppercase text-red-700">Fiadas</p>
+                                        <p className="font-mono text-base font-bold text-red-500">{s.fiadas > 0 ? s.fiadas : '-'}</p>
+                                    </div>
+                                    <div className="rounded-lg bg-primary/10 px-3 py-2">
+                                        <p className="text-[10px] font-bold uppercase text-primary/80">Receita</p>
+                                        <p className="font-mono text-base font-bold text-primary">R$ {s.valorPago.toFixed(2)}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        ))
+                    )}
+                </div>
+
+                <div className="hidden overflow-hidden sm:block card-container p-0">
                     <Table>
                         <TableHeader className="bg-muted/50">
                             <TableRow>

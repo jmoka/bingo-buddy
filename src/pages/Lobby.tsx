@@ -14,7 +14,8 @@ import {
   Coins, Plus, Trophy, Users, Settings,
   Timer, DoorOpen, Ticket, Zap, ZapOff, Tv, Archive, Trash2, RotateCcw, Star, Loader2, CalendarDays, Clock, Crown, ChevronDown, ChevronUp, Gift, BellRing, Search, SmartphoneNfc, UserPlus, ShieldCheck, AlertTriangle,
   VideoOff,
-  Video
+  Video,
+  LifeBuoy
 } from 'lucide-react';
 import PlayerAvatar from '@/components/PlayerAvatar';
 import { 
@@ -624,6 +625,15 @@ const Lobby = () => {
           <Video className="w-4 h-4 sm:w-6 sm:h-6 mb-1 opacity-80" />
           <p className="text-[9px] sm:text-xs font-bold uppercase opacity-70 leading-tight">Videos</p>
           <p className="text-xs sm:text-xl font-bold font-heading truncate w-full">Aulas</p>
+        </div>
+
+        <div 
+          className="card-container p-2 sm:p-4 bg-emerald-700 hover:bg-emerald-800 text-white border-none flex flex-col items-center text-center justify-center cursor-pointer transition-opacity shadow-sm"
+          onClick={() => navigate('/suporte')}
+        >
+          <LifeBuoy className="w-4 h-4 sm:w-6 sm:h-6 mb-1 opacity-80" />
+          <p className="text-[9px] sm:text-xs font-bold uppercase opacity-70 leading-tight">Suporte</p>
+          <p className="text-xs sm:text-xl font-bold font-heading truncate w-full">Ajuda</p>
         </div>
 
 

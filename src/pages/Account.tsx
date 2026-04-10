@@ -8,9 +8,11 @@ import Avatar from '@/components/Avatar'
 import { Label } from '@/components/ui/label'
 import { toast } from 'sonner'
 import { Lock, Save, Loader2 } from 'lucide-react'
+import { useQueryClient } from '@tanstack/react-query'
 
 export default function Account() {
   const { session, profile, signOut } = useAuth()
+  const queryClient = useQueryClient()
   const navigate = useNavigate()
   const [loading, setLoading] = useState(true)
   const [fullName, setFullName] = useState<string | null>(null)
@@ -49,20 +51,31 @@ export default function Account() {
     const { user } = session
 
     const updates = {
-      id: user.id,
       full_name: fullName,
       cpf,
       whatsapp,
       address,
       avatar_url: avatarUrl,
-      updated_at: new Date(),
+      updated_at: new Date().toISOString(),
     }
 
-    const { error } = await supabase.from('perfis').upsert(updates)
+    // Admin profile data lives in `admins`; regular users/vendors live in `perfis`.
+    const tableName = profile?.role === 'admin' ? 'admins' : 'perfis'
+    const { data, error } = await supabase
+      .from(tableName)
+      .update(updates)
+      .eq('id', user.id)
+      .select('id')
+      .maybeSingle()
 
     if (error) {
+      console.error('Erro ao atualizar perfil', { tableName, userId: user.id, error })
       toast.error(error.message)
+    } else if (!data?.id) {
+      console.error('Nenhuma linha atualizada no perfil', { tableName, userId: user.id })
+      toast.error('Nenhuma linha foi atualizada. Verifique as permissoes de perfil.')
     } else {
+      await queryClient.invalidateQueries({ queryKey: ['profile', user.id] })
       toast.success('Perfil atualizado com sucesso!')
     }
     setLoading(false)
