@@ -21,12 +21,14 @@ A aplicação agora suporta transmissão ao vivo durante as partidas de bingo! O
 ## 🛠️ Arquitetura Técnica
 
 ### Backend (Socket.IO Server)
-- **Servidor**: `server.js` (porta 3001)
+
+- **Servidor**: `server.js` (porta 8082)
 - **WebRTC**: Transmissão peer-to-peer
 - **Socket.IO**: Sinalização e controle de estado
 - **Estado por partida**: Controle de lives ativas
 
 ### Frontend (React)
+
 - **LiveBroadcaster**: Componente para transmissão (admin)
 - **LiveViewer**: Componente para visualização (usuários)
 - **useLiveStatus**: Hook para gerenciar estado da live
@@ -34,11 +36,13 @@ A aplicação agora suporta transmissão ao vivo durante as partidas de bingo! O
 ## 📋 Pré-requisitos
 
 ### Dependências Instaladas
+
 ```bash
 npm install socket.io socket.io-client
 ```
 
 ### Servidor de Live
+
 ```bash
 # Terminal 1: Iniciar servidor de live
 npm run server
@@ -50,7 +54,8 @@ npm run dev
 ## 🔧 Configuração
 
 ### Servidor Socket.IO
-- **Porta**: 3001
+
+- **Porta**: 8082
 - **CORS**: Habilitado para todas as origens
 - **STUN Servers**: Google STUN para WebRTC
 
@@ -83,7 +88,7 @@ npm run dev
 
 2. **Vídeo não carrega**
    - Verifique se o servidor Socket.IO está rodando
-   - Confirme conexão com `http://localhost:3001`
+   - Confirme conexão com `http://localhost:8082`
 
 3. **Lag/Qualidade ruim**
    - WebRTC depende da conexão de internet

@@ -1,13 +1,15 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { Card, CardContent } from '@/components/ui/card';
 import { Video, Users } from 'lucide-react';
+import { getLiveServerUrl } from '@/lib/liveServer';
 
 interface LiveViewerProps {
   matchId: string;
 }
 
 export const LiveViewer: React.FC<LiveViewerProps> = ({ matchId }) => {
+  const liveServerUrl = getLiveServerUrl();
   const videoRef = useRef<HTMLVideoElement>(null);
   const socketRef = useRef<Socket | null>(null);
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
@@ -16,9 +18,35 @@ export const LiveViewer: React.FC<LiveViewerProps> = ({ matchId }) => {
   const [isLiveAvailable, setIsLiveAvailable] = useState(false);
   const [viewerCount, setViewerCount] = useState(0);
 
+  const createPeerConnection = useCallback((broadcasterId: string) => {
+    const peerConnection = new RTCPeerConnection({
+      iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:stun1.l.google.com:19302' }
+      ]
+    });
+
+    peerConnectionRef.current = peerConnection;
+
+    peerConnection.ontrack = (event) => {
+      if (videoRef.current && event.streams[0]) {
+        videoRef.current.srcObject = event.streams[0];
+        setIsWatching(true);
+      }
+    };
+
+    peerConnection.onicecandidate = (event) => {
+      if (event.candidate) {
+        socketRef.current?.emit('candidate', broadcasterId, event.candidate);
+      }
+    };
+
+    socketRef.current?.emit('watcher', matchId);
+  }, [matchId]);
+
   useEffect(() => {
     // Conectar ao servidor Socket.IO
-    socketRef.current = io('http://localhost:3001');
+    socketRef.current = io(liveServerUrl);
 
     const socket = socketRef.current;
 
@@ -46,6 +74,12 @@ export const LiveViewer: React.FC<LiveViewerProps> = ({ matchId }) => {
       setIsLiveAvailable(true);
       if (socketRef.current) {
         socketRef.current.emit('watch-live', matchId);
+      }
+    });
+
+    socket.on('viewer-count', ({ matchId: liveMatchId, viewerCount: total }) => {
+      if (liveMatchId === matchId) {
+        setViewerCount(total);
       }
     });
 
@@ -93,33 +127,7 @@ export const LiveViewer: React.FC<LiveViewerProps> = ({ matchId }) => {
         peerConnectionRef.current.close();
       }
     };
-  }, [matchId]);
-
-  const createPeerConnection = (broadcasterId: string) => {
-    const peerConnection = new RTCPeerConnection({
-      iceServers: [
-        { urls: 'stun:stun.l.google.com:19302' },
-        { urls: 'stun:stun1.l.google.com:19302' }
-      ]
-    });
-
-    peerConnectionRef.current = peerConnection;
-
-    peerConnection.ontrack = (event) => {
-      if (videoRef.current && event.streams[0]) {
-        videoRef.current.srcObject = event.streams[0];
-        setIsWatching(true);
-      }
-    };
-
-    peerConnection.onicecandidate = (event) => {
-      if (event.candidate) {
-        socketRef.current?.emit('candidate', broadcasterId, event.candidate);
-      }
-    };
-
-    socketRef.current?.emit('watcher', matchId);
-  };
+  }, [createPeerConnection, liveServerUrl, matchId]);
 
   if (!isLiveAvailable) {
     return (

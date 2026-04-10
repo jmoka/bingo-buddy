@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Video, VideoOff, Mic, MicOff } from 'lucide-react';
 import { toast } from 'sonner';
+import { getLiveServerUrl } from '@/lib/liveServer';
 
 interface LiveBroadcasterProps {
   matchId: string;
@@ -11,6 +12,7 @@ interface LiveBroadcasterProps {
 }
 
 export const LiveBroadcaster: React.FC<LiveBroadcasterProps> = ({ matchId, onClose }) => {
+  const liveServerUrl = getLiveServerUrl();
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const socketRef = useRef<Socket | null>(null);
@@ -23,7 +25,7 @@ export const LiveBroadcaster: React.FC<LiveBroadcasterProps> = ({ matchId, onClo
 
   useEffect(() => {
     // Conectar ao servidor Socket.IO
-    socketRef.current = io('http://localhost:3001');
+    socketRef.current = io(liveServerUrl);
 
     const socket = socketRef.current;
 
@@ -53,6 +55,12 @@ export const LiveBroadcaster: React.FC<LiveBroadcasterProps> = ({ matchId, onClo
         .catch(error => console.error('Erro ao adicionar candidate no broadcaster:', error));
     });
 
+    socket.on('viewer-count', ({ matchId: liveMatchId, viewerCount: total }) => {
+      if (liveMatchId === matchId) {
+        setViewerCount(total);
+      }
+    });
+
     socket.on('disconnect', () => {
       console.log('Desconectado do servidor');
       stopStreaming();
@@ -62,7 +70,7 @@ export const LiveBroadcaster: React.FC<LiveBroadcasterProps> = ({ matchId, onClo
       socket.disconnect();
       stopStreaming();
     };
-  }, [matchId]);
+  }, [liveServerUrl, matchId]);
 
   const createPeerConnection = (viewerId: string) => {
     const peerConnection = new RTCPeerConnection({
@@ -133,6 +141,7 @@ export const LiveBroadcaster: React.FC<LiveBroadcasterProps> = ({ matchId, onClo
     }
 
     setIsStreaming(false);
+    setViewerCount(0);
     socketRef.current?.emit('stop-live', matchId);
     toast.info('Transmissão encerrada');
   };

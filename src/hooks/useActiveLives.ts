@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { getLiveServerUrl } from '@/lib/liveServer';
 
 interface LiveStatus {
   isLive: boolean;
@@ -7,17 +8,18 @@ interface LiveStatus {
 }
 
 export const useActiveLives = () => {
+  const liveServerUrl = getLiveServerUrl();
   const [activeLives, setActiveLives] = useState<Record<string, LiveStatus>>({});
 
-  const checkActiveLives = async () => {
+  const checkActiveLives = useCallback(async () => {
     try {
-      const response = await fetch('http://localhost:8085/api/live-status');
+      const response = await fetch(`${liveServerUrl}/api/live-status`);
       const lives = await response.json();
       setActiveLives(lives);
     } catch (error) {
       console.error('Erro ao verificar lives ativas:', error);
     }
-  };
+  }, [liveServerUrl]);
 
   useEffect(() => {
     // Verificar status inicial
@@ -27,7 +29,7 @@ export const useActiveLives = () => {
     const interval = setInterval(checkActiveLives, 5000);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [checkActiveLives]);
 
   return activeLives;
 };

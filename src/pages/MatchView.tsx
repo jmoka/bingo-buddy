@@ -31,6 +31,7 @@ import { BingoCard } from '@/types/bingo';
 import { LiveBroadcaster } from '@/components/LiveBroadcaster';
 import { LiveViewer } from '@/components/LiveViewer';
 import { useLiveStatus } from '@/hooks/useLiveStatus';
+import { MatchCommentsPanel } from '@/components/MatchCommentsPanel';
 
 const MatchView = () => {
   const { id } = useParams<{ id: string }>();
@@ -323,6 +324,11 @@ const MatchView = () => {
           )}
         </div>
       </div>
+
+      <MatchCommentsPanel
+        matchId={id || ''}
+        canSend={match.status === 'open' || match.status === 'in_progress'}
+      />
 
       {match.status === 'in_progress' && funWinnersInProgress.length > 0 && (
         <Alert className="mb-6 border-amber-500 bg-amber-500/10 text-amber-700 animate-pulse">

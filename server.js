@@ -1,226 +1,163 @@
-const express = require("express");
-const http = require("http");
-const socketIo = require("socket.io");
-const cors = require("cors");
-const path = require("path");
+import express from "express";
+import http from "http";
+import cors from "cors";
+import { Server } from "socket.io";
 
 const app = express();
 const server = http.createServer(app);
-const io = socketIo(server, {
+
+const io = new Server(server, {
   cors: {
     origin: "*",
     methods: ["GET", "POST"]
   }
 });
 
-// Middleware
 app.use(cors());
 app.use(express.json());
-app.use(express.static(path.join(__dirname, "public")));
 
-// Estado do jogo
-let gameState = {
-  numerosSorteados: [],
-  cronometro: 0,
-  jogoAtivo: false,
-  tempoRestante: 0,
-  ultimoNumero: null
-};
+const activeLives = new Map();
 
-// Configurações do jogo
-const CONFIG = {
-  tempoPorRodada: 10, // segundos
-  totalNumeros: 75
-};
-
-// Motor de sorteio
-class MotorSorteio {
-  constructor() {
-    this.numerosDisponiveis = Array.from(
-      { length: CONFIG.totalNumeros },
-      (_, i) => i + 1
-    );
-    this.embaralhar();
-  }
-
-  embaralhar() {
-    for (let i = this.numerosDisponiveis.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [this.numerosDisponiveis[i], this.numerosDisponiveis[j]] = [
-        this.numerosDisponiveis[j],
-        this.numerosDisponiveis[i]
-      ];
-    }
-  }
-
-  sortearNumero() {
-    if (this.numerosDisponiveis.length === 0) {
-      return null;
-    }
-    return this.numerosDisponiveis.pop();
-  }
-
-  resetar() {
-    this.numerosDisponiveis = Array.from(
-      { length: CONFIG.totalNumeros },
-      (_, i) => i + 1
-    );
-    this.embaralhar();
-  }
-}
-
-const motorSorteio = new MotorSorteio();
-
-// Eventos Socket.IO
-io.on("connection", (socket) => {
-  console.log("Cliente conectado:", socket.id);
-
-  // Envia estado atual ao cliente que se conecta
-  socket.emit("estado-inicial", gameState);
-
-  socket.on("disconnect", () => {
-    console.log("Cliente desconectado:", socket.id);
-  });
-
-  // Eventos do admin
-  socket.on("iniciar-jogo", () => {
-    if (!gameState.jogoAtivo) {
-      gameState.jogoAtivo = true;
-      gameState.cronometro = CONFIG.tempoPorRodada;
-      gameState.tempoRestante = CONFIG.tempoPorRodada;
-
-      io.emit("jogo-iniciado", {
-        tempoRestante: gameState.tempoRestante
-      });
-
-      iniciarCronometro();
-    }
-  });
-
-  socket.on("pausar-jogo", () => {
-    gameState.jogoAtivo = false;
-    io.emit("jogo-pausado");
-  });
-
-  socket.on("continuar-jogo", () => {
-    if (!gameState.jogoAtivo && gameState.numerosSorteados.length > 0) {
-      gameState.jogoAtivo = true;
-      io.emit("jogo-continuado", {
-        tempoRestante: gameState.tempoRestante
-      });
-      iniciarCronometro();
-    }
-  });
-
-  socket.on("resetar-jogo", () => {
-    gameState = {
-      numerosSorteados: [],
-      cronometro: 0,
-      jogoAtivo: false,
-      tempoRestante: 0,
-      ultimoNumero: null
+function getLiveStatus(matchId) {
+  const live = activeLives.get(matchId);
+  if (!live) {
+    return {
+      isLive: false,
+      viewerCount: 0
     };
-    motorSorteio.resetar();
-    io.emit("jogo-resetado");
-  });
-
-  socket.on("sortear-numero-manual", () => {
-    if (gameState.jogoAtivo) {
-      sortearNumero();
-    }
-  });
-});
-
-// Função para sortear número
-function sortearNumero() {
-  const numero = motorSorteio.sortearNumero();
-
-  if (numero !== null) {
-    gameState.numerosSorteados.push(numero);
-    gameState.ultimoNumero = numero;
-
-    // Emite evento para todos os clientes
-    io.emit("numero-sorteado", {
-      numero: numero,
-      numerosSorteados: gameState.numerosSorteados,
-      totalSorteados: gameState.numerosSorteados.length
-    });
-
-    // Reset do cronômetro para próxima rodada
-    gameState.cronometro = CONFIG.tempoPorRodada;
-    gameState.tempoRestante = CONFIG.tempoPorRodada;
-
-    // Verifica se acabaram os números
-    if (gameState.numerosSorteados.length >= CONFIG.totalNumeros) {
-      finalizarJogo();
-    }
   }
+
+  return {
+    isLive: live.isLive,
+    viewerCount: live.viewers.size,
+    broadcaster: live.broadcaster
+  };
 }
 
-// Função do cronômetro
-function iniciarCronometro() {
-  const intervalo = setInterval(() => {
-    if (!gameState.jogoAtivo) {
-      clearInterval(intervalo);
+function ensureMatch(matchId) {
+  if (!activeLives.has(matchId)) {
+    activeLives.set(matchId, {
+      isLive: false,
+      broadcaster: null,
+      viewers: new Set()
+    });
+  }
+  return activeLives.get(matchId);
+}
+
+function emitViewerCount(matchId) {
+  const live = activeLives.get(matchId);
+  io.to(`match:${matchId}`).emit("viewer-count", {
+    matchId,
+    viewerCount: live ? live.viewers.size : 0
+  });
+}
+
+function stopLive(matchId, broadcasterId = null) {
+  const live = activeLives.get(matchId);
+  if (!live) {
+    return;
+  }
+
+  live.isLive = false;
+  live.broadcaster = null;
+  live.viewers.clear();
+
+  io.to(`match:${matchId}`).emit("live-stopped", {
+    matchId,
+    broadcaster: broadcasterId
+  });
+}
+
+io.on("connection", (socket) => {
+  socket.on("join-match", (matchId) => {
+    socket.join(`match:${matchId}`);
+  });
+
+  socket.on("start-live", (matchId) => {
+    const live = ensureMatch(matchId);
+    live.isLive = true;
+    live.broadcaster = socket.id;
+
+    io.to(`match:${matchId}`).emit("live-started", {
+      matchId,
+      broadcaster: socket.id
+    });
+  });
+
+  socket.on("broadcaster", (matchId) => {
+    const live = ensureMatch(matchId);
+    live.isLive = true;
+    live.broadcaster = socket.id;
+  });
+
+  socket.on("watch-live", (matchId) => {
+    const live = activeLives.get(matchId);
+    if (live && live.isLive && live.broadcaster) {
+      live.viewers.add(socket.id);
+      socket.emit("can-watch", {
+        matchId,
+        broadcaster: live.broadcaster
+      });
+      emitViewerCount(matchId);
       return;
     }
 
-    gameState.cronometro--;
-    gameState.tempoRestante = gameState.cronometro;
-
-    // Emite atualização do cronômetro
-    io.emit("cronometro-atualizado", {
-      tempoRestante: gameState.tempoRestante
-    });
-
-    // Sorteia número automaticamente quando o cronômetro chega a 0
-    if (gameState.cronometro <= 0) {
-      sortearNumero();
-    }
-  }, 1000);
-}
-
-// Finalizar jogo
-function finalizarJogo() {
-  gameState.jogoAtivo = false;
-  io.emit("jogo-finalizado", {
-    numerosSorteados: gameState.numerosSorteados,
-    mensagem: "Todos os números foram sorteados!"
+    socket.emit("live-not-available", { matchId });
   });
-}
 
-// Rotas HTTP
-app.get("/api/estado", (req, res) => {
-  res.json(gameState);
+  socket.on("watcher", (matchId) => {
+    const live = activeLives.get(matchId);
+    if (!live || !live.broadcaster) {
+      return;
+    }
+    io.to(live.broadcaster).emit("watcher", socket.id);
+  });
+
+  socket.on("offer", (targetId, description) => {
+    io.to(targetId).emit("offer", socket.id, description);
+  });
+
+  socket.on("answer", (targetId, description) => {
+    io.to(targetId).emit("answer", socket.id, description);
+  });
+
+  socket.on("candidate", (targetId, candidate) => {
+    io.to(targetId).emit("candidate", socket.id, candidate);
+  });
+
+  socket.on("stop-live", (matchId) => {
+    stopLive(matchId, socket.id);
+  });
+
+  socket.on("disconnect", () => {
+    for (const [matchId, live] of activeLives.entries()) {
+      if (live.broadcaster === socket.id) {
+        stopLive(matchId, socket.id);
+        continue;
+      }
+
+      if (live.viewers.has(socket.id)) {
+        live.viewers.delete(socket.id);
+        emitViewerCount(matchId);
+      }
+    }
+  });
 });
 
-app.post("/api/iniciar", (req, res) => {
-  if (!gameState.jogoAtivo) {
-    gameState.jogoAtivo = true;
-    gameState.cronometro = CONFIG.tempoPorRodada;
-    gameState.tempoRestante = CONFIG.tempoPorRodada;
-
-    io.emit("jogo-iniciado", {
-      tempoRestante: gameState.tempoRestante
-    });
-
-    iniciarCronometro();
-    res.json({ sucesso: true, mensagem: "Jogo iniciado" });
-  } else {
-    res.json({ sucesso: false, mensagem: "Jogo já está em andamento" });
+app.get("/api/live-status", (req, res) => {
+  const allStatuses = {};
+  for (const [matchId] of activeLives.entries()) {
+    allStatuses[matchId] = getLiveStatus(matchId);
   }
+  res.json(allStatuses);
 });
 
-app.post("/api/sortear", (req, res) => {
-  if (gameState.jogoAtivo) {
-    sortearNumero();
-    res.json({ sucesso: true, mensagem: "Número sorteado" });
-  } else {
-    res.json({ sucesso: false, mensagem: "Jogo não está ativo" });
-  }
+app.get("/api/live-status/:matchId", (req, res) => {
+  res.json(getLiveStatus(req.params.matchId));
 });
 
-const PORT = process.env.PORT || 3000;
+const PORT = Number(process.env.PORT || 8082);
 server.listen(PORT, () => {
-  console.log(`Servidor rodando na porta ${PORT}`);
+  console.log(`Servidor de live rodando na porta ${PORT}`);
 });

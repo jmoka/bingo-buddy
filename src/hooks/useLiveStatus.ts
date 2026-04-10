@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { io, Socket } from 'socket.io-client';
+import { getLiveServerUrl } from '@/lib/liveServer';
 
 interface LiveStatus {
   isLive: boolean;
@@ -8,6 +9,7 @@ interface LiveStatus {
 }
 
 export const useLiveStatus = (matchId: string) => {
+  const liveServerUrl = getLiveServerUrl();
   const [liveStatus, setLiveStatus] = useState<LiveStatus>({
     isLive: false,
     viewerCount: 0
@@ -15,7 +17,7 @@ export const useLiveStatus = (matchId: string) => {
   const [socket, setSocket] = useState<Socket | null>(null);
 
   useEffect(() => {
-    const newSocket = io('http://localhost:3001');
+    const newSocket = io(liveServerUrl);
     setSocket(newSocket);
 
     newSocket.on('connect', () => {
@@ -41,10 +43,19 @@ export const useLiveStatus = (matchId: string) => {
       }
     });
 
+    newSocket.on('viewer-count', ({ matchId: liveMatchId, viewerCount }) => {
+      if (liveMatchId === matchId) {
+        setLiveStatus(prev => ({
+          ...prev,
+          viewerCount
+        }));
+      }
+    });
+
     // Verificar status inicial
     const checkStatus = async () => {
       try {
-        const response = await fetch(`http://localhost:3001/api/live-status/${matchId}`);
+        const response = await fetch(`${liveServerUrl}/api/live-status/${matchId}`);
         const status = await response.json();
         setLiveStatus(status);
       } catch (error) {
@@ -57,7 +68,7 @@ export const useLiveStatus = (matchId: string) => {
     return () => {
       newSocket.disconnect();
     };
-  }, [matchId]);
+  }, [liveServerUrl, matchId]);
 
   const startLive = () => {
     socket?.emit('start-live', matchId);
