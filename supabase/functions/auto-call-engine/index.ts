@@ -8,6 +8,114 @@ const corsHeaders = {
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
+const cancelAutomaticMatchForSingleParticipant = async (supabaseAdmin: any, match: any) => {
+  const { data: settings, error: settingsError } = await supabaseAdmin
+    .from('configuracoes')
+    .select('custo_recarga_cartela, usos_por_recarga')
+    .single();
+
+  if (settingsError) {
+    throw new Error(`Erro ao buscar configuracoes para estorno: ${settingsError.message}`);
+  }
+
+  const { data: matchCards, error: matchCardsError } = await supabaseAdmin
+    .from('cartelas_partida')
+    .select('id, player_id, player_card_id, credit_type')
+    .eq('match_id', match.id);
+
+  if (matchCardsError) {
+    throw new Error(`Erro ao buscar cartelas da partida ${match.id}: ${matchCardsError.message}`);
+  }
+
+  const cards = matchCards || [];
+  if (cards.length === 0) {
+    await supabaseAdmin
+      .from('partidas')
+      .update({
+        status: 'finished',
+        is_auto_calling: false,
+        next_auto_call_timestamp: null,
+        pot: 0,
+        prize: { ...(match.prize || {}), returnedReason: 'ONLY_ONE_PLAYER' }
+      })
+      .eq('id', match.id);
+    return;
+  }
+
+  const valorPorUso = Number(settings?.custo_recarga_cartela || 0) / Math.max(1, Number(settings?.usos_por_recarga || 1));
+  const effectivePrice = Number(match.card_price || 0) - valorPorUso;
+
+  const refundByPlayer = new Map<string, { real: number; fake: number }>();
+  for (const card of cards) {
+    const current = refundByPlayer.get(card.player_id) || { real: 0, fake: 0 };
+    if (card.credit_type === 'real') current.real += effectivePrice;
+    else current.fake += effectivePrice;
+    refundByPlayer.set(card.player_id, current);
+  }
+
+  for (const [playerId, refund] of refundByPlayer.entries()) {
+    const { data: profile, error: profileError } = await supabaseAdmin
+      .from('perfis')
+      .select('credits, fake_credits')
+      .eq('id', playerId)
+      .single();
+
+    if (profileError) {
+      throw new Error(`Erro ao buscar perfil ${playerId} para estorno: ${profileError.message}`);
+    }
+
+    const updates: Record<string, number> = {};
+    if (refund.real > 0) updates.credits = Number(profile.credits || 0) + refund.real;
+    if (refund.fake > 0) updates.fake_credits = Number(profile.fake_credits || 0) + refund.fake;
+
+    if (Object.keys(updates).length > 0) {
+      const { error: refundError } = await supabaseAdmin.from('perfis').update(updates).eq('id', playerId);
+      if (refundError) {
+        throw new Error(`Erro ao aplicar estorno para ${playerId}: ${refundError.message}`);
+      }
+    }
+  }
+
+  const playerCardIds = cards.map((card: any) => card.player_card_id).filter(Boolean);
+  if (playerCardIds.length > 0) {
+    const { data: playerCards, error: playerCardsError } = await supabaseAdmin
+      .from('cartelas_jogador')
+      .select('id, uses_left')
+      .in('id', playerCardIds);
+
+    if (playerCardsError) {
+      throw new Error(`Erro ao restaurar usos das cartelas: ${playerCardsError.message}`);
+    }
+
+    await Promise.all((playerCards || []).map((card: any) =>
+      supabaseAdmin.from('cartelas_jogador').update({ uses_left: Number(card.uses_left || 0) + 1 }).eq('id', card.id)
+    ));
+  }
+
+  const matchCardIds = cards.map((card: any) => card.id);
+  if (matchCardIds.length > 0) {
+    const { error: deleteCardsError } = await supabaseAdmin.from('cartelas_partida').delete().in('id', matchCardIds);
+    if (deleteCardsError) {
+      throw new Error(`Erro ao remover cartelas da partida ${match.id}: ${deleteCardsError.message}`);
+    }
+  }
+
+  const { error: finishError } = await supabaseAdmin
+    .from('partidas')
+    .update({
+      status: 'finished',
+      is_auto_calling: false,
+      next_auto_call_timestamp: null,
+      pot: 0,
+      prize: { ...(match.prize || {}), returnedReason: 'ONLY_ONE_PLAYER' }
+    })
+    .eq('id', match.id);
+
+  if (finishError) {
+    throw new Error(`Erro ao finalizar partida ${match.id}: ${finishError.message}`);
+  }
+};
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
@@ -37,21 +145,27 @@ serve(async (req) => {
       }
 
       for (const match of overdueMatches || []) {
-        const { count, error: countError } = await supabaseAdmin
+        const { data: participants, error: participantsError } = await supabaseAdmin
           .from('cartelas_partida')
-          .select('*', { count: 'exact', head: true })
+          .select('player_id')
           .eq('match_id', match.id);
 
-        if (countError) {
-          console.error(`[auto-call-engine] Erro ao contar jogadores para partida ${match.id}:`, countError.message);
+        if (participantsError) {
+          console.error(`[auto-call-engine] Erro ao contar participantes da partida ${match.id}:`, participantsError.message);
           continue;
         }
 
-        if ((count || 0) === 0) {
+        const uniqueParticipants = Array.from(new Set((participants || []).map((item: any) => item.player_id).filter(Boolean)));
+        const participantCount = uniqueParticipants.length;
+
+        if (participantCount === 0) {
           console.log(`[auto-call-engine] Deletando partida automática vazia e atrasada: ${match.name} (ID: ${match.id})`);
           await supabaseAdmin.from('partidas').delete().eq('id', match.id);
+        } else if (participantCount === 1) {
+          console.log(`[auto-call-engine] Encerrando ${match.name} por falta de participantes suficientes. Apenas 1 jogador encontrado.`);
+          await cancelAutomaticMatchForSingleParticipant(supabaseAdmin, match);
         } else {
-          console.log(`[auto-call-engine] Iniciando partida com ${count} jogadores: ${match.name}`);
+          console.log(`[auto-call-engine] Iniciando partida com ${participantCount} participantes: ${match.name}`);
           const { data: cfg } = await supabaseAdmin.from('configuracoes').select('intervalo_sorteio_auto_seg').single();
           const nextCall = new Date(Date.now() + (Number(cfg?.intervalo_sorteio_auto_seg || 10) * 1000)).toISOString();
           
@@ -118,7 +232,7 @@ serve(async (req) => {
                   start_time: nextStart,
                   status: 'open',
                   is_auto_calling: true,
-                  min_players: 1,
+                  min_players: 2,
                   admin_id: settings.admin_id
                 };
                 await supabaseAdmin.from('partidas').insert([newMatch]);

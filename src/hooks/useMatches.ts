@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Match, MatchCard, MatchStatus } from '@/types/match';
@@ -44,6 +45,7 @@ export const useMatches = () => {
       return (data as Match[]).filter(m => m.status !== 'finished' || new Date(m.created_at) >= today);
     },
     refetchOnWindowFocus: false,
+    refetchOnReconnect: true,
   });
 
   const { data: matchCards = [], isLoading: isLoadingCards } = useQuery({
@@ -54,7 +56,48 @@ export const useMatches = () => {
       return data.map(c => ({ ...c, marked_numbers: new Set(c.marked_numbers || []) })) as MatchCard[];
     },
     refetchOnWindowFocus: false,
+    refetchOnReconnect: true,
   });
+
+  useEffect(() => {
+    if (!gameSettings?.auto_engine_enabled) return;
+
+    const now = Date.now();
+    const upcomingTimestamps: number[] = [];
+    let hasOverdueTransition = false;
+
+    for (const match of matches) {
+      if (!match.is_auto_calling) continue;
+
+      if (match.status === 'open' || match.status === 'waiting') {
+        const startTimestamp = new Date(match.start_time).getTime();
+        if (!Number.isFinite(startTimestamp)) continue;
+        if (startTimestamp <= now + 500) hasOverdueTransition = true;
+        else upcomingTimestamps.push(startTimestamp);
+        continue;
+      }
+
+      if (match.status === 'in_progress' && match.next_auto_call_timestamp) {
+        const nextCallTimestamp = new Date(match.next_auto_call_timestamp).getTime();
+        if (!Number.isFinite(nextCallTimestamp)) continue;
+        if (nextCallTimestamp <= now + 500) hasOverdueTransition = true;
+        else upcomingTimestamps.push(nextCallTimestamp);
+      }
+    }
+
+    if (!hasOverdueTransition && upcomingTimestamps.length === 0) return;
+
+    const delay = hasOverdueTransition
+      ? 3000
+      : Math.max(1000, Math.min(...upcomingTimestamps) - now + 1500);
+
+    const timeoutId = window.setTimeout(() => {
+      queryClient.invalidateQueries({ queryKey: ['matches'] });
+      queryClient.invalidateQueries({ queryKey: ['matchCards'] });
+    }, delay);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [matches, gameSettings?.auto_engine_enabled, queryClient]);
 
   const createMatch = async (data: any) => {
     const status = data.is_auto_calling ? 'open' : 'waiting';
@@ -77,9 +120,13 @@ export const useMatches = () => {
     if (!match) return;
 
     if (!force) {
-      // Conta cartelas apenas se não estiver forçando o início
-      const { count } = await supabase.from('cartelas_partida').select('*', { count: 'exact', head: true }).eq('match_id', matchId);
-      const playersInMatch = count || 0;
+      const { data, error } = await supabase.from('cartelas_partida').select('player_id').eq('match_id', matchId);
+      if (error) {
+        toast.error('Não foi possível validar os participantes da partida.');
+        return;
+      }
+
+      const playersInMatch = new Set((data || []).map(card => card.player_id).filter(Boolean)).size;
 
       if (playersInMatch < match.min_players) {
         toast.error(`Mínimo de ${match.min_players} jogadores necessário.`);

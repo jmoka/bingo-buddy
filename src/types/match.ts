@@ -7,7 +7,7 @@ export interface Prize {
   type: PrizeType;
   value: number | null;
   productName?: string;
-  returnedReason?: 'NO_PLAYERS';
+  returnedReason?: 'NO_PLAYERS' | 'ONLY_ONE_PLAYER';
 }
 
 export interface Winner {
