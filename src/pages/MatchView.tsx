@@ -4,7 +4,7 @@ import { BingoCell } from '@/components/BingoCell';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { gameTypeLabels, checkWin } from '@/utils/bingoUtils';
-import { ArrowLeft, Coins, Users, Bot, Loader2, Star, Trophy, AlertTriangle, CheckCircle2, Hand, PartyPopper } from 'lucide-react';
+import { ArrowLeft, Coins, Users, Bot, Loader2, Star, Trophy, AlertTriangle, CheckCircle2, Hand, PartyPopper, Video, VideoOff, ChevronDown, ChevronUp } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { playNotificationSound } from '@/utils/soundUtils';
@@ -28,6 +28,9 @@ import {
 } from "@/components/ui/alert-dialog";
 import { cn } from '@/lib/utils';
 import { BingoCard } from '@/types/bingo';
+import { LiveBroadcaster } from '@/components/LiveBroadcaster';
+import { LiveViewer } from '@/components/LiveViewer';
+import { useLiveStatus } from '@/hooks/useLiveStatus';
 
 const MatchView = () => {
   const { id } = useParams<{ id: string }>();
@@ -39,6 +42,10 @@ const MatchView = () => {
   const [now, setNow] = useState(Date.now());
   
   const [confirmManualCard, setConfirmManualCard] = useState<{cardId: string} | null>(null);
+  const [showLiveControls, setShowLiveControls] = useState(false);
+  const [showAllNumbers, setShowAllNumbers] = useState(false);
+  
+  const { isLive, startLive, stopLive } = useLiveStatus(id || '');
   
   const checkedCardsRef = useRef<Set<string>>(new Set());
   const warnedCardsRef = useRef<Set<string>>(new Set());
@@ -227,6 +234,96 @@ const MatchView = () => {
         </div>
       </div>
 
+      {match.status !== 'finished' && (
+        <MatchStats match={match} allMatchCards={allCardsForThisMatch} />
+      )}
+
+      {/* CONTROLES DE LIVE PARA ADMIN */}
+      {profile?.role === 'admin' && (
+        <div className="card-container mb-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Video className="w-5 h-5 text-red-500" />
+              <span className="font-medium">Transmissão ao Vivo</span>
+              {isLive && (
+                <Badge variant="destructive" className="animate-pulse">
+                  🔴 AO VIVO
+                </Badge>
+              )}
+            </div>
+            <Button
+              onClick={() => setShowLiveControls(!showLiveControls)}
+              variant={isLive ? "destructive" : "default"}
+              size="sm"
+            >
+              {isLive ? <VideoOff className="w-4 h-4 mr-2" /> : <Video className="w-4 h-4 mr-2" />}
+              {isLive ? 'Parar Live' : 'Iniciar Live'}
+            </Button>
+          </div>
+
+          {showLiveControls && (
+            <div className="mt-4">
+              <LiveBroadcaster matchId={id || ''} />
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* VISUALIZAÇÃO DA LIVE PARA USUÁRIOS */}
+      {isLive && profile?.role !== 'admin' && (
+        <div className="card-container mb-6">
+          <div className="flex items-center gap-2 mb-4">
+            <Video className="w-5 h-5 text-red-500" />
+            <span className="font-medium">Transmissão ao Vivo</span>
+            <Badge variant="destructive" className="animate-pulse">
+              🔴 AO VIVO
+            </Badge>
+          </div>
+          <LiveViewer matchId={id || ''} />
+        </div>
+      )}
+
+      <div className="card-container mb-6">
+        <div className="flex items-center justify-between mb-2">
+          <p className="text-sm text-muted-foreground">Números sorteados ({(match.called_numbers || []).length})</p>
+          {(match.called_numbers || []).length > 10 && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowAllNumbers(!showAllNumbers)}
+              className="text-xs h-6 px-2"
+            >
+              {showAllNumbers ? (
+                <>
+                  <ChevronUp className="w-3 h-3 mr-1" />
+                  Mostrar menos
+                </>
+              ) : (
+                <>
+                  <ChevronDown className="w-3 h-3 mr-1" />
+                  Ver todos
+                </>
+              )}
+            </Button>
+          )}
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          {(showAllNumbers ? (match.called_numbers || []) : (match.called_numbers || []).slice(-10)).map(num => (
+            <span key={num} className="w-8 h-8 rounded-full bg-primary text-primary-foreground text-sm font-medium flex items-center justify-center">
+              {num}
+            </span>
+          ))}
+          {(match.called_numbers || []).length === 0 && (
+             <span className="text-xs text-muted-foreground italic py-2">Nenhuma bola sorteada nesta rodada ainda.</span>
+          )}
+          {!showAllNumbers && (match.called_numbers || []).length > 10 && (
+            <span className="text-xs text-muted-foreground italic py-2 flex items-center">
+              ... e mais {(match.called_numbers || []).length - 10} números
+            </span>
+          )}
+        </div>
+      </div>
+
       {match.status === 'in_progress' && funWinnersInProgress.length > 0 && (
         <Alert className="mb-6 border-amber-500 bg-amber-500/10 text-amber-700 animate-pulse">
           <Star className="h-4 w-4 text-amber-600" />
@@ -249,10 +346,6 @@ const MatchView = () => {
 
       <WinnerDisplay match={match} allMatchCards={allCardsForThisMatch} />
 
-      {match.status !== 'finished' && (
-        <MatchStats match={match} allMatchCards={allCardsForThisMatch} />
-      )}
-
       {match.status !== 'finished' && match.is_auto_calling && (
         <div className="card-container mb-6 bg-accent/10 text-accent text-center p-4">
           <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2">
@@ -271,20 +364,6 @@ const MatchView = () => {
           </div>
         </div>
       )}
-
-      <div className="card-container mb-6">
-        <p className="text-sm text-muted-foreground mb-2">Números sorteados ({(match.called_numbers || []).length})</p>
-        <div className="flex flex-wrap gap-1.5">
-          {(match.called_numbers || []).map(num => (
-            <span key={num} className="w-8 h-8 rounded-full bg-primary text-primary-foreground text-sm font-medium flex items-center justify-center">
-              {num}
-            </span>
-          ))}
-          {(match.called_numbers || []).length === 0 && (
-             <span className="text-xs text-muted-foreground italic py-2">Nenhuma bola sorteada nesta rodada ainda.</span>
-          )}
-        </div>
-      </div>
 
       <div className="flex items-center justify-between mb-4">
         <h2 className="font-heading text-lg font-bold text-foreground">

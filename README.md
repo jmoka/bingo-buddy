@@ -34,6 +34,7 @@ O sistema é dividido em três personas principais, cada uma com um conjunto ric
 -   **Sistema de Créditos Decimais:** Suporte a créditos "Reais" (comprados) e "de Brincar" (gratuitos), com precisão de centavos.
 -   **Gameplay Interativo:** Marcação automática ou manual de números e detecção instantânea de "BINGO!".
 -   **Histórico Pessoal:** Área para acompanhar vitórias, solicitações de crédito e resgates.
+- **🎥 Transmissão ao Vivo:** Assistir transmissões ao vivo durante as partidas com vídeo e áudio em tempo real.
 
 ## 🛠️ Arquitetura e Stack Tecnológica
 
@@ -45,6 +46,38 @@ O sistema é dividido em três personas principais, cada uma com um conjunto ric
 | **Roteamento**       | [React Router](https://reactrouter.com/)                                                               |
 | **Formulários**      | [React Hook Form](https://react-hook-form.com/) + [Zod](https://zod.dev/)                                |
 | **Backend**        | [Supabase](https://supabase.com/) (PostgreSQL, Auth, Edge Functions, Realtime, Storage)                |
+| **Live Streaming** | [WebRTC](https://webrtc.org/) + [Socket.IO](https://socket.io/) (Transmissão P2P em tempo real)         |
+
+## 🎥 Funcionalidade de Live Streaming
+
+O sistema inclui transmissão ao vivo durante as partidas, permitindo que administradores transmitam vídeo e áudio em tempo real para todos os jogadores assistirem.
+
+### Como Funciona
+
+- **Administradores** podem iniciar transmissões ao vivo durante partidas em andamento
+- **Jogadores** podem assistir às transmissões em tempo real dentro da tela da partida
+- **Tecnologia**: WebRTC para transmissão peer-to-peer + Socket.IO para sinalização
+
+### Limitações Atuais
+
+- Recomendado para até 10 espectadores simultâneos
+- Para escalabilidade maior, considere migração para LiveKit ou Agora.io
+
+### Como Usar
+
+```bash
+# Desenvolver com live streaming
+npm run dev:live
+
+# Ou executar separadamente:
+# Terminal 1: Servidor Socket.IO
+npm run server
+
+# Terminal 2: Aplicação React
+npm run dev
+```
+
+Para documentação completa, veja [`docs/LIVE_STREAMING.md`](docs/LIVE_STREAMING.md).
 
 ## 🗃️ Modelo de Dados (Schema PostgreSQL)
 
