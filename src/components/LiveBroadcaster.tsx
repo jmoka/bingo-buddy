@@ -22,6 +22,7 @@ export const LiveBroadcaster: React.FC<LiveBroadcasterProps> = ({ matchId, onClo
   const [isAudioEnabled, setIsAudioEnabled] = useState(true);
   const [isVideoEnabled, setIsVideoEnabled] = useState(true);
   const [viewerCount, setViewerCount] = useState(0);
+  const [isStarting, setIsStarting] = useState(false);
 
   useEffect(() => {
     // Conectar ao servidor Socket.IO
@@ -103,12 +104,62 @@ export const LiveBroadcaster: React.FC<LiveBroadcasterProps> = ({ matchId, onClo
       .catch(error => console.error('Erro ao criar oferta:', error));
   };
 
+  const waitForSocketConnection = () => {
+    return new Promise<void>((resolve, reject) => {
+      const socket = socketRef.current;
+
+      if (!socket) {
+        reject(new Error('Socket não inicializado'));
+        return;
+      }
+
+      if (socket.connected) {
+        resolve();
+        return;
+      }
+
+      const timeout = setTimeout(() => {
+        socket.off('connect', onConnect);
+        socket.off('connect_error', onConnectError);
+        reject(new Error('Timeout de conexão com servidor de live'));
+      }, 5000);
+
+      const onConnect = () => {
+        clearTimeout(timeout);
+        socket.off('connect_error', onConnectError);
+        resolve();
+      };
+
+      const onConnectError = () => {
+        clearTimeout(timeout);
+        socket.off('connect', onConnect);
+        reject(new Error('Falha ao conectar no servidor de live'));
+      };
+
+      socket.once('connect', onConnect);
+      socket.once('connect_error', onConnectError);
+      socket.connect();
+    });
+  };
+
   const startStreaming = async () => {
+    if (isStarting || isStreaming) {
+      return;
+    }
+
+    setIsStarting(true);
+
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: true,
         audio: true
       });
+
+      await waitForSocketConnection();
+
+      socketRef.current?.emit('join-match', matchId);
+      socketRef.current?.emit('broadcaster', matchId);
+      socketRef.current?.emit('start-live', matchId);
 
       streamRef.current = stream;
       if (videoRef.current) {
@@ -116,13 +167,13 @@ export const LiveBroadcaster: React.FC<LiveBroadcasterProps> = ({ matchId, onClo
       }
 
       setIsStreaming(true);
-      socketRef.current?.emit('start-live', matchId);
-      socketRef.current?.emit('broadcaster', matchId);
 
       toast.success('Transmissão ao vivo iniciada!');
     } catch (error) {
-      console.error('Erro ao acessar câmera/microfone:', error);
-      toast.error('Erro ao acessar câmera/microfone');
+      console.error('Erro ao iniciar transmissão ao vivo:', error);
+      toast.error('Não foi possível iniciar a live. Verifique câmera, microfone e conexão com o servidor.');
+    } finally {
+      setIsStarting(false);
     }
   };
 
@@ -193,9 +244,9 @@ export const LiveBroadcaster: React.FC<LiveBroadcasterProps> = ({ matchId, onClo
 
         <div className="flex gap-2 justify-center">
           {!isStreaming ? (
-            <Button onClick={startStreaming} className="bg-red-500 hover:bg-red-600">
+            <Button onClick={startStreaming} className="bg-red-500 hover:bg-red-600" disabled={isStarting}>
               <Video className="w-4 h-4 mr-2" />
-              Iniciar Live
+              {isStarting ? 'Iniciando...' : 'Iniciar Live'}
             </Button>
           ) : (
             <>

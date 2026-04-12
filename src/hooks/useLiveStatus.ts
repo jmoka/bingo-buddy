@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { getLiveServerUrl } from '@/lib/liveServer';
 
@@ -15,6 +15,7 @@ export const useLiveStatus = (matchId: string) => {
     viewerCount: 0
   });
   const [socket, setSocket] = useState<Socket | null>(null);
+  const socketRef = useRef<Socket | null>(null);
   const [liveServerAvailable, setLiveServerAvailable] = useState(true);
 
   useEffect(() => {
@@ -27,6 +28,7 @@ export const useLiveStatus = (matchId: string) => {
       reconnectionDelay: 1500,
       timeout: 3000,
     });
+    socketRef.current = newSocket;
     setSocket(newSocket);
 
     newSocket.on('connect_error', () => {
@@ -81,16 +83,64 @@ export const useLiveStatus = (matchId: string) => {
     checkStatus();
 
     return () => {
+      socketRef.current = null;
       newSocket.disconnect();
     };
   }, [liveServerUrl, matchId]);
 
-  const startLive = () => {
-    socket?.emit('start-live', matchId);
+  const ensureSocketConnected = async () => {
+    const currentSocket = socketRef.current;
+
+    if (!currentSocket) {
+      return false;
+    }
+
+    if (currentSocket.connected) {
+      return true;
+    }
+
+    return new Promise<boolean>((resolve) => {
+      const timeout = setTimeout(() => {
+        currentSocket.off('connect', onConnect);
+        currentSocket.off('connect_error', onConnectError);
+        resolve(false);
+      }, 5000);
+
+      const onConnect = () => {
+        clearTimeout(timeout);
+        currentSocket.off('connect_error', onConnectError);
+        resolve(true);
+      };
+
+      const onConnectError = () => {
+        clearTimeout(timeout);
+        currentSocket.off('connect', onConnect);
+        resolve(false);
+      };
+
+      currentSocket.once('connect', onConnect);
+      currentSocket.once('connect_error', onConnectError);
+      currentSocket.connect();
+    });
   };
 
-  const stopLive = () => {
-    socket?.emit('stop-live', matchId);
+  const startLive = async () => {
+    const connected = await ensureSocketConnected();
+    if (!connected) {
+      return;
+    }
+
+    socketRef.current?.emit('join-match', matchId);
+    socketRef.current?.emit('start-live', matchId);
+  };
+
+  const stopLive = async () => {
+    const connected = await ensureSocketConnected();
+    if (!connected) {
+      return;
+    }
+
+    socketRef.current?.emit('stop-live', matchId);
   };
 
   return {
