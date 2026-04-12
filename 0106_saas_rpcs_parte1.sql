@@ -109,7 +109,13 @@ BEGIN
     stripe_secret_key          = CASE WHEN p_settings ? 'stripe_secret_key' THEN p_settings->>'stripe_secret_key' ELSE stripe_secret_key END,
     stripe_webhook_secret      = CASE WHEN p_settings ? 'stripe_webhook_secret' THEN p_settings->>'stripe_webhook_secret' ELSE stripe_webhook_secret END,
     stripe_fee_percentage      = COALESCE((p_settings->>'stripe_fee_percentage')::NUMERIC, stripe_fee_percentage),
-    stripe_fee_fixed           = COALESCE((p_settings->>'stripe_fee_fixed')::NUMERIC, stripe_fee_fixed)
+    stripe_fee_fixed           = COALESCE((p_settings->>'stripe_fee_fixed')::NUMERIC, stripe_fee_fixed),
+    live_external_enabled      = CASE WHEN p_settings ? 'live_external_enabled' THEN (p_settings->>'live_external_enabled')::BOOLEAN ELSE live_external_enabled END,
+    live_external_provider     = COALESCE(p_settings->>'live_external_provider', live_external_provider),
+    live_external_rtmp_url     = COALESCE(p_settings->>'live_external_rtmp_url', live_external_rtmp_url),
+    live_external_stream_key   = COALESCE(p_settings->>'live_external_stream_key', live_external_stream_key),
+    live_external_youtube_url  = COALESCE(p_settings->>'live_external_youtube_url', live_external_youtube_url),
+    live_external_facebook_url = COALESCE(p_settings->>'live_external_facebook_url', live_external_facebook_url)
   WHERE admin_id = auth.uid();
 
   RETURN jsonb_build_object('success', true);

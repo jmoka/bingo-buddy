@@ -31,7 +31,13 @@ export const useGameSettings = () => {
         pagbank_pix_fee_fixed: 0.99,
         pagbank_pix_fee_percentage: 0,
         pagbank_card_fee_fixed: 0.39,
-        pagbank_card_fee_percentage: 4.99
+        pagbank_card_fee_percentage: 4.99,
+        live_external_enabled: false,
+        live_external_provider: 'manual',
+        live_external_rtmp_url: '',
+        live_external_stream_key: '',
+        live_external_youtube_url: '',
+        live_external_facebook_url: ''
       } as GameSettings;
       return data as GameSettings;
     }
