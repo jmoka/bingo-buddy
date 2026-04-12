@@ -4,7 +4,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { Save, Settings, Check, Loader2, Bot, Link as LinkIcon, DollarSign, Banknote, Play, CalendarDays, Clock, Ticket, CreditCard, SmartphoneNfc } from 'lucide-react';
+import { Save, Settings, Check, Loader2, Bot, Link as LinkIcon, DollarSign, Banknote, Play, CalendarDays, Clock, Ticket, CreditCard, SmartphoneNfc, RadioTower } from 'lucide-react';
+import { LiveTransmissionSettings } from './LiveTransmissionSettings';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { supabase } from '@/integrations/supabase/client';
@@ -69,6 +70,12 @@ const SettingsManager = () => {
     pagbank_pix_fee_percentage: 0,
     pagbank_card_fee_fixed: 0.39,
     pagbank_card_fee_percentage: 4.99,
+    live_external_enabled: false,
+    live_external_provider: 'manual' as 'manual' | 'restream',
+    live_external_rtmp_url: '',
+    live_external_stream_key: '',
+    live_external_youtube_url: '',
+    live_external_facebook_url: '',
   });
   const [isSaving, setIsSaving] = useState(false);
   const [justSaved, setJustSaved] = useState(false);
@@ -122,8 +129,12 @@ const SettingsManager = () => {
         pagbank_pix_fee_fixed: gameSettings.pagbank_pix_fee_fixed ?? 0.99,
         pagbank_pix_fee_percentage: gameSettings.pagbank_pix_fee_percentage ?? 0,
         pagbank_card_fee_fixed: gameSettings.pagbank_card_fee_fixed ?? 0.39,
-        pagbank_card_fee_percentage: gameSettings.pagbank_card_fee_percentage ?? 4.99,
-      });
+        pagbank_card_fee_percentage: gameSettings.pagbank_card_fee_percentage ?? 4.99,        live_external_enabled: gameSettings.live_external_enabled === true,
+        live_external_provider: (gameSettings.live_external_provider as 'manual' | 'restream') || 'manual',
+        live_external_rtmp_url: gameSettings.live_external_rtmp_url || '',
+        live_external_stream_key: gameSettings.live_external_stream_key || '',
+        live_external_youtube_url: gameSettings.live_external_youtube_url || '',
+        live_external_facebook_url: gameSettings.live_external_facebook_url || '',      });
     }
   }, [gameSettings]);
 
@@ -192,6 +203,12 @@ const SettingsManager = () => {
       pagbank_pix_fee_percentage: Number(currentSettings.pagbank_pix_fee_percentage),
       pagbank_card_fee_fixed: Number(currentSettings.pagbank_card_fee_fixed),
       pagbank_card_fee_percentage: Number(currentSettings.pagbank_card_fee_percentage),
+      live_external_enabled: currentSettings.live_external_enabled,
+      live_external_provider: currentSettings.live_external_provider,
+      live_external_rtmp_url: currentSettings.live_external_rtmp_url,
+      live_external_stream_key: currentSettings.live_external_stream_key,
+      live_external_youtube_url: currentSettings.live_external_youtube_url,
+      live_external_facebook_url: currentSettings.live_external_facebook_url,
     });
     
     setIsSaving(false);
@@ -495,6 +512,31 @@ const SettingsManager = () => {
             </div>
           </div>
         </div>
+
+        {/* LIVE EXTERNA */}
+        <LiveTransmissionSettings 
+          currentSettings={currentSettings}
+          setCurrentSettings={setCurrentSettings}
+          handleSettingsChange={handleSettingsChange}
+          handleSelectChange={handleSelectChange}
+          externalLiveStatus={useMemo(() => {
+            if (!currentSettings.live_external_enabled) {
+              return { label: 'Desativada', color: 'bg-muted text-muted-foreground' };
+            }
+            if (currentSettings.live_external_rtmp_url && currentSettings.live_external_stream_key) {
+              return { label: 'Conectada', color: 'bg-green-500/20 text-green-700' };
+            }
+            return { label: 'Incompleta', color: 'bg-amber-500/20 text-amber-700' };
+          }, [currentSettings.live_external_enabled, currentSettings.live_external_rtmp_url, currentSettings.live_external_stream_key])}
+          missingExternalFields={useMemo(() => {
+            const missing = [];
+            if (currentSettings.live_external_enabled) {
+              if (!currentSettings.live_external_rtmp_url) missing.push('RTMP URL');
+              if (!currentSettings.live_external_stream_key) missing.push('Stream Key');
+            }
+            return missing;
+          }, [currentSettings.live_external_enabled, currentSettings.live_external_rtmp_url, currentSettings.live_external_stream_key])}
+        />
 
         {/* CAIXA ADMIN */}
         <div className="space-y-6 p-4 bg-primary/5 rounded-2xl border-2 border-primary/20 md:col-span-2">

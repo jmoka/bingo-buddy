@@ -194,7 +194,6 @@ export const LiveBroadcaster: React.FC<LiveBroadcasterProps> = ({ matchId, onClo
     setIsStreaming(false);
     setViewerCount(0);
     socketRef.current?.emit('stop-live', matchId);
-    toast.info('Transmissão encerrada');
   };
 
   const toggleAudio = () => {
