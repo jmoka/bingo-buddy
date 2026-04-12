@@ -9,6 +9,7 @@ import { useRifaAdmin } from '@/hooks/useRifaAdmin';
 import MatchManager from '@/components/admin/MatchManager';
 import SettingsManager from '@/components/admin/SettingsManager';
 import VendedoresAdmin from './admin/VendedoresAdmin';
+import FinanceiroAdmin from './admin/FinanceiroAdmin';
 import { cn } from '@/lib/utils';
 
 const Admin = () => {
@@ -119,6 +120,7 @@ const Admin = () => {
               </span>
             )}
           </TabsTrigger>
+          <TabsTrigger value="financeiro" className="flex-1 py-3 min-w-[80px]">Financeiro</TabsTrigger>
           <TabsTrigger value="settings" className="flex-1 py-3 min-w-[80px]">Ajustes</TabsTrigger>
         </TabsList>
 
@@ -160,6 +162,10 @@ const Admin = () => {
 
         <TabsContent value="vendedores">
           <VendedoresAdmin />
+        </TabsContent>
+
+        <TabsContent value="financeiro">
+          <FinanceiroAdmin />
         </TabsContent>
 
         <TabsContent value="settings">
