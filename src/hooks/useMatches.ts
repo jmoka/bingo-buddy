@@ -60,6 +60,19 @@ export const useMatches = () => {
   });
 
   useEffect(() => {
+    const channel = supabase
+      .channel('matches-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'partidas' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['matches'] });
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient]);
+
+  useEffect(() => {
     if (!gameSettings?.auto_engine_enabled) return;
 
     const now = Date.now();
@@ -214,11 +227,18 @@ export const useMatches = () => {
     if (data?.newWinners && data.newWinners.length > 0) {
       const realWinners = data.newWinners.filter((w: any) => w.creditType === 'real');
       if (realWinners.length > 0) {
-        const winnerNames = realWinners.map((w: any) => w.playerName).join(', ');
-        toast.success('BINGO! Partida/Rodada finalizada!', {
-          description: `Vencedor(es): ${winnerNames}.`,
-          duration: 10000,
-        });
+        if (data?.tieBreak?.required) {
+          toast.info('Empate detectado!', {
+            description: 'O jogo foi pausado para o desempate entre os vencedores.',
+            duration: 10000,
+          });
+        } else {
+          const winnerNames = realWinners.map((w: any) => w.playerName).join(', ');
+          toast.success('BINGO! Partida/Rodada finalizada!', {
+            description: `Vencedor(es): ${winnerNames}.`,
+            duration: 10000,
+          });
+        }
       } else {
         const fakeWinnerNames = data.newWinners.map((w: any) => w.playerName).join(', ');
         toast.info('Bingo de Brincar!', {

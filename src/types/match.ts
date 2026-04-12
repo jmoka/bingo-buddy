@@ -40,6 +40,10 @@ export interface Match {
   min_players: number;
   admin_profit_from_match?: number;
   
+  // Desempate
+  tie_break_status?: 'none' | 'pending' | 'resolved';
+  tie_break_session_id?: string | null;
+
   is_festival?: boolean;
   prizes?: Prize[];
   current_round?: number;

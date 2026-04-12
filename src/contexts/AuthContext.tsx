@@ -74,7 +74,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     const fetchSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
+      const { data: { session }, error } = await supabase.auth.getSession();
+      if (error) {
+        console.warn('Erro ao recuperar sessao. Limpando autenticacao local.', error.message);
+        await supabase.auth.signOut({ scope: 'local' });
+        setSession(null);
+        setUser(null);
+        setLoadingInitial(false);
+        return;
+      }
       setSession(session);
       setUser(session?.user ?? null);
       setLoadingInitial(false);

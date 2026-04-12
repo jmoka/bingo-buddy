@@ -156,13 +156,14 @@ serve(async (req) => {
       }
     }
 
-    // 6. Registrar Vitórias e Processar Prêmios
+    // 6. Registrar Vitorias e processar premios
     const updatedWinners = [...(match.winners || []), ...newWinnersFound];
+    let tieBreakInfo: any = null;
 
     if (newWinnersFound.length > 0) {
       console.log(`[call-number] ${newWinnersFound.length} novos vencedores encontrados!`);
 
-      // 6.1. REGISTRO IMEDIATO NA TABELA DE VITÓRIAS (HISTÓRICO/TROFÉUS)
+      // 6.1. Registro imediato na tabela de vitorias (historico/trofeus)
       for (const w of newWinnersFound) {
         const { error: winInsertErr } = await supabaseAdmin.from('vitorias').insert({
           match_id: matchId,
@@ -175,65 +176,108 @@ serve(async (req) => {
       }
 
       const realWinners = newWinnersFound.filter(w => w.creditType === 'real');
-      
-      if (realWinners.length > 0) {
-        // Encerra a partida (ou a rodada)
-        await supabaseAdmin.from('partidas').update({ 
-          status: 'finished', 
-          winners: updatedWinners, 
-          is_auto_calling: false, 
-          next_auto_call_timestamp: null
+      const uniqueRealWinnerPlayerIds = Array.from(new Set(realWinners.map((w: any) => w.playerId)));
+
+      if (uniqueRealWinnerPlayerIds.length === 1) {
+        // Fluxo normal: apenas um vencedor real
+        await supabaseAdmin.from('partidas').update({
+          status: 'finished',
+          winners: updatedWinners,
+          is_auto_calling: false,
+          next_auto_call_timestamp: null,
+          tie_break_status: 'none',
+          tie_break_session_id: null
         }).eq('id', matchId);
 
-        // LÓGICA DE DISTRIBUIÇÃO FINANCEIRA
         const safePot = Number(match.pot) || 0;
         const prizeValConf = Number(match.prize?.value) || 0;
         const totalPrizePool = match.prize?.type === 'fixed' ? prizeValConf : (match.prize?.type === 'percentage' ? (safePot * prizeValConf) / 100 : 0);
-        const prizePerWinner = totalPrizePool / realWinners.length;
 
-        // SE FOR FESTIVAL, CALCULA O LUCRO DO ADMIN APENAS NA ÚLTIMA RODADA
         const isFestival = match.is_festival;
         const isLastRound = !isFestival || (match.current_round >= (match.prizes?.length || 0) - 1);
 
         if (isLastRound) {
-            let totalSpentAllRounds = totalPrizePool;
-            if (isFestival && match.completed_rounds) {
-                for (const cr of match.completed_rounds) {
-                    const cp = cr.prize;
-                    const cpVal = Number(cp?.value) || 0;
-                    if (cp?.type === 'fixed') totalSpentAllRounds += cpVal;
-                    else if (cp?.type === 'percentage') totalSpentAllRounds += (safePot * cpVal) / 100;
-                }
+          let totalSpentAllRounds = totalPrizePool;
+          if (isFestival && match.completed_rounds) {
+            for (const cr of match.completed_rounds) {
+              const cp = cr.prize;
+              const cpVal = Number(cp?.value) || 0;
+              if (cp?.type === 'fixed') totalSpentAllRounds += cpVal;
+              else if (cp?.type === 'percentage') totalSpentAllRounds += (safePot * cpVal) / 100;
             }
-            const adminProfit = Math.max(0, safePot - totalSpentAllRounds);
-            if (adminProfit > 0) {
-              await supabaseAdmin.rpc('increment_admin_profit', { amount: adminProfit });
-            }
-        }
-
-        // Pagar aos vencedores desta rodada
-        for (const rw of realWinners) {
-          if (prizePerWinner > 0) {
-            await supabaseAdmin.rpc('increment_player_credits', { p_player_id: rw.playerId, p_amount: prizePerWinner });
+          }
+          const adminProfit = Math.max(0, safePot - totalSpentAllRounds);
+          if (adminProfit > 0) {
+            await supabaseAdmin.rpc('increment_admin_profit', { amount: adminProfit });
           }
         }
 
+        const winner = realWinners[0];
+        if (totalPrizePool > 0) {
+          await supabaseAdmin.rpc('increment_player_credits', { p_player_id: winner.playerId, p_amount: totalPrizePool });
+        }
+      } else if (uniqueRealWinnerPlayerIds.length > 1) {
+        // Novo fluxo: empate entre vencedores reais. Pausa e abre sessao de desempate.
+        const tiedPlayerIds = uniqueRealWinnerPlayerIds;
+
+        const { data: tieSessionData, error: tieSessionError } = await supabaseAdmin.rpc('create_tie_break_session', {
+          p_match_id: matchId,
+          p_player_ids: tiedPlayerIds
+        });
+
+        if (tieSessionError || !tieSessionData?.success) {
+          console.error('[call-number] Falha ao criar sessao de desempate:', tieSessionError?.message || tieSessionData?.error);
+
+          // Nunca perder registro de ganhadores: salva no match mesmo se o desempate falhar.
+          await supabaseAdmin.from('partidas').update({
+            winners: updatedWinners,
+            is_auto_calling: false,
+            next_auto_call_timestamp: null
+          }).eq('id', matchId);
+
+          tieBreakInfo = {
+            required: true,
+            failedToCreateSession: true,
+            tiedPlayerIds
+          };
+        } else {
+          await supabaseAdmin.from('partidas').update({
+            winners: updatedWinners,
+            is_auto_calling: false,
+            next_auto_call_timestamp: null,
+            tie_break_status: 'pending',
+            tie_break_session_id: tieSessionData.sessionId
+          }).eq('id', matchId);
+
+          tieBreakInfo = {
+            required: true,
+            sessionId: tieSessionData.sessionId,
+            allowedOptions: tieSessionData.allowedOptions || null,
+            splitAllowed: tieSessionData.splitAllowed,
+            tiedPlayerIds
+          };
+        }
       } else {
-        // Apenas vencedores de "Brincar"
+        // Apenas vencedores de brincar
         const hasRemainingReal = (matchCards || []).some(c => c.credit_type === 'real' && !updatedWinners.some(w => w.cardId === c.id));
-        
+
         if (hasRemainingReal) {
-          // O jogo continua para os outros que jogam com créditos reais
           if (!checkOnly) {
-              const { data: cfg } = await supabaseAdmin.from('configuracoes').select('intervalo_sorteio_auto_seg').single();
-              const next = new Date(Date.now() + (Number(cfg?.intervalo_sorteio_auto_seg || 120) * 1000)).toISOString();
-              await supabaseAdmin.from('partidas').update({ winners: updatedWinners, next_auto_call_timestamp: next }).eq('id', matchId);
+            const { data: cfg } = await supabaseAdmin.from('configuracoes').select('intervalo_sorteio_auto_seg').single();
+            const next = new Date(Date.now() + (Number(cfg?.intervalo_sorteio_auto_seg || 120) * 1000)).toISOString();
+            await supabaseAdmin.from('partidas').update({ winners: updatedWinners, next_auto_call_timestamp: next }).eq('id', matchId);
           } else {
-              await supabaseAdmin.from('partidas').update({ winners: updatedWinners }).eq('id', matchId);
+            await supabaseAdmin.from('partidas').update({ winners: updatedWinners }).eq('id', matchId);
           }
         } else {
-          // Não há mais ninguém jogando com crédito real, encerra.
-          await supabaseAdmin.from('partidas').update({ status: 'finished', winners: updatedWinners, is_auto_calling: false, next_auto_call_timestamp: null }).eq('id', matchId);
+          await supabaseAdmin.from('partidas').update({
+            status: 'finished',
+            winners: updatedWinners,
+            is_auto_calling: false,
+            next_auto_call_timestamp: null,
+            tie_break_status: 'none',
+            tie_break_session_id: null
+          }).eq('id', matchId);
         }
       }
     } else if (match.is_auto_calling && !checkOnly) {
@@ -243,7 +287,7 @@ serve(async (req) => {
       await supabaseAdmin.from('partidas').update({ next_auto_call_timestamp: next }).eq('id', matchId);
     }
 
-    return new Response(JSON.stringify({ success: true, newWinners: newWinnersFound }), { headers: corsHeaders });
+    return new Response(JSON.stringify({ success: true, newWinners: newWinnersFound, tieBreak: tieBreakInfo }), { headers: corsHeaders });
 
   } catch (error: any) {
     console.error("[call-number] Erro fatal:", error.message);

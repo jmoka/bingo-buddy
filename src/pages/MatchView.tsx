@@ -32,6 +32,7 @@ import { LiveBroadcaster } from '@/components/LiveBroadcaster';
 import { LiveViewer } from '@/components/LiveViewer';
 import { useLiveStatus } from '@/hooks/useLiveStatus';
 import { MatchCommentsPanel } from '@/components/MatchCommentsPanel';
+import { TieBreakModal } from '@/components/TieBreakModal';
 
 const MatchView = () => {
   const { id } = useParams<{ id: string }>();
@@ -45,11 +46,13 @@ const MatchView = () => {
   const [confirmManualCard, setConfirmManualCard] = useState<{cardId: string} | null>(null);
   const [showLiveControls, setShowLiveControls] = useState(false);
   const [showAllNumbers, setShowAllNumbers] = useState(false);
+  const [tieBreakDetails, setTieBreakDetails] = useState<any>(null);
   
   const { isLive, startLive, stopLive } = useLiveStatus(id || '');
   
   const checkedCardsRef = useRef<Set<string>>(new Set());
   const warnedCardsRef = useRef<Set<string>>(new Set());
+  const tieBreakBootstrapRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     if (!id) return;
@@ -161,6 +164,71 @@ const MatchView = () => {
     });
   }, [matchCards, match, profile, checkWinState]);
 
+  useEffect(() => {
+    if (!match || (match.status !== 'in_progress' && match.status !== 'finished')) return;
+
+    const realWinners = (match.winners || []).filter((w: any) => w.creditType === 'real');
+    const uniqueWinnerIds = Array.from(new Set(realWinners.map((w: any) => w.playerId).filter(Boolean)));
+    const alreadyPending = match.tie_break_status === 'pending' || match.tie_break_status === 'resolved';
+
+    if (uniqueWinnerIds.length < 2 || alreadyPending) return;
+
+    const bootstrapKey = `${match.id}:${uniqueWinnerIds.sort().join(',')}`;
+    if (tieBreakBootstrapRef.current.has(bootstrapKey)) return;
+    tieBreakBootstrapRef.current.add(bootstrapKey);
+
+    (async () => {
+      const { data, error } = await supabase.rpc('create_tie_break_session', {
+        p_match_id: match.id,
+        p_player_ids: uniqueWinnerIds,
+      });
+
+      if (error || !data?.success) {
+        tieBreakBootstrapRef.current.delete(bootstrapKey);
+        console.error('[tie-break] Falha ao iniciar desempate automaticamente:', error?.message || data?.error);
+        return;
+      }
+
+      queryClient.invalidateQueries({ queryKey: ['matches'] });
+      toast.info('Empate detectado. Abrindo votação de desempate...', { duration: 4000 });
+    })();
+  }, [match, queryClient]);
+
+  useEffect(() => {
+    if (!match) return;
+    if (match.tie_break_status !== 'resolved') return;
+    if (match.status === 'finished') return;
+
+    (async () => {
+      const { data, error } = await (supabase as any).rpc('finalize_tie_break_resolution', {
+        p_match_id: match.id,
+      });
+
+      if (error || !data?.success) {
+        console.error('[tie-break] Falha ao finalizar partida resolvida:', error?.message || data?.error);
+        return;
+      }
+
+      queryClient.invalidateQueries({ queryKey: ['matches'] });
+      toast.success('Desempate finalizado. Partida encerrada.');
+    })();
+  }, [match, queryClient]);
+
+  // Buscar informações detalhadas do desempate
+  useEffect(() => {
+    if (!match || match.tie_break_status !== 'resolved' || !match.tie_break_session_id) return;
+
+    (async () => {
+      const { data, error } = await (supabase as any).rpc('get_tie_break_session_state', {
+        p_match_id: match.id,
+      });
+
+      if (!error && data?.success && data?.session) {
+        setTieBreakDetails(data.session);
+      }
+    })();
+  }, [match?.tie_break_status, match?.id, match?.tie_break_session_id]);
+
   const handleCellClick = async (cardId: string, num: number, currentMode: 'auto' | 'manual') => {
     if (!match || match.status !== 'in_progress' || num === 0) return;
 
@@ -202,6 +270,13 @@ const MatchView = () => {
   const myCards = profile && id ? getPlayerMatchCards(id, profile.id) : [];
   const allCardsForThisMatch = matchCards.filter(c => c.match_id === id);
   const playersInMatchCount = new Set(allCardsForThisMatch.map(mc => mc.player_id)).size;
+
+  // mapa player_id → nome para o modal de desempate
+  const tiedPlayerNames: Record<string, string> = {};
+  if (match?.tie_break_status === 'pending' || match?.tie_break_status === 'resolved') {
+    const tiedWinners = (match.winners || []).filter((w: any) => w.creditType === 'real');
+    tiedWinners.forEach((w: any) => { tiedPlayerNames[w.playerId] = w.playerName; });
+  }
   const lastCalled = match.called_numbers?.length > 0 ? match.called_numbers[match.called_numbers.length - 1] : null;
   const countdown = match.next_auto_call_timestamp ? Math.max(0, Math.round((new Date(match.next_auto_call_timestamp).getTime() - now) / 1000)) : null;
   const funWinnersInProgress = (match.winners || []).filter(w => (w as any).creditType === 'fake');
@@ -347,6 +422,63 @@ const MatchView = () => {
 
       <WinnerDisplay match={match} allMatchCards={allCardsForThisMatch} />
 
+      {/* DETALHES DO DESEMPATE */}
+      {match.tie_break_status === 'resolved' && (
+        <div className="card-container mb-6 border-2 border-amber-500/30 bg-amber-50/30">
+          <div className="flex items-center gap-2 mb-4">
+            <Trophy className="w-5 h-5 text-amber-600" />
+            <h3 className="font-heading font-bold text-amber-900">Desempate Resolvido</h3>
+          </div>
+          
+          {tieBreakDetails && (
+            <div className="space-y-3">
+              {/* Método de resolução */}
+              <div className="rounded-lg border border-amber-200 bg-white p-3">
+                <p className="text-xs text-muted-foreground mb-1">Método de Resolução</p>
+                <p className="font-semibold text-sm text-foreground">
+                  {tieBreakDetails.selected_resolution === 'split_prize' && '💰 Prêmio Dividido'}
+                  {tieBreakDetails.selected_resolution === 'random_number' && '🎲 Número Aleatório'}
+                  {tieBreakDetails.selected_resolution === 'rematch' && '🔄 Nova Partida'}
+                </p>
+              </div>
+
+              {/* Detalhes por método */}
+              {tieBreakDetails.selected_resolution === 'split_prize' && tieBreakDetails.resolution_payload?.splitPerPlayer && (
+                <div className="rounded-lg border border-amber-200 bg-white p-3">
+                  <p className="text-xs text-muted-foreground mb-1">Valor por Ganhador</p>
+                  <p className="font-bold text-base text-green-600">
+                    {Number(tieBreakDetails.resolution_payload.splitPerPlayer).toFixed(2)} créditos
+                  </p>
+                </div>
+              )}
+
+              {tieBreakDetails.selected_resolution === 'random_number' && tieBreakDetails.resolution_payload?.winningNumber && (
+                <div className="rounded-lg border border-amber-200 bg-white p-3">
+                  <p className="text-xs text-muted-foreground mb-1">Número Vencedor</p>
+                  <p className="font-bold text-base text-green-600">
+                    {tieBreakDetails.resolution_payload.winningNumber}
+                  </p>
+                </div>
+              )}
+
+              {tieBreakDetails.selected_resolution === 'rematch' && tieBreakDetails.resolution_payload?.rematchMatchId && (
+                <div className="rounded-lg border border-amber-200 bg-white p-3">
+                  <p className="text-xs text-muted-foreground mb-1">Nova Partida Criada</p>
+                  <p className="font-semibold text-sm text-foreground">
+                    ID: {tieBreakDetails.resolution_payload.rematchMatchId.slice(0, 8)}...
+                  </p>
+                </div>
+              )}
+
+              {/* Data da resolução */}
+              <div className="text-xs text-muted-foreground text-right">
+                Resolvido em {new Date().toLocaleTimeString('pt-BR')}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {match.status !== 'finished' && match.is_auto_calling && (
         <div className="card-container mb-6 bg-accent/10 text-accent text-center p-4">
           <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2">
@@ -452,6 +584,16 @@ const MatchView = () => {
         matchId={id || ''}
         canSend={match.status === 'open' || match.status === 'in_progress'}
       />
+
+      {(match?.tie_break_status === 'pending' || match?.tie_break_status === 'resolved') && id && (
+        <TieBreakModal 
+          matchId={id} 
+          playerNames={tiedPlayerNames} 
+          winners={match.winners || []}
+          isLive={isLive}
+          isAutomatic={match.is_auto_calling ?? false}
+        />
+      )}
 
       <AlertDialog open={!!confirmManualCard} onOpenChange={(open) => !open && setConfirmManualCard(null)}>
         <AlertDialogContent>

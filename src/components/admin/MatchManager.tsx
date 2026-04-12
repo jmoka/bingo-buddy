@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useGame } from '@/contexts/GameContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -20,6 +20,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from '@/lib/utils';
 import { MatchDetailsModal } from './MatchDetailsModal';
 import { useQueryClient } from '@tanstack/react-query';
+import { LiveBroadcaster } from '@/components/LiveBroadcaster';
+import { LiveViewer } from '@/components/LiveViewer';
+import { MatchCommentsPanel } from '@/components/MatchCommentsPanel';
+import { TieBreakModal } from '@/components/TieBreakModal';
 
 const statusLabels: Record<MatchStatus, string> = {
   waiting: 'Aguardando',
@@ -77,6 +81,18 @@ const MatchManager = () => {
   const [expandedNumbers, setExpandedNumbers] = useState<Record<string, boolean>>({});
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [matchIdForDialog, setMatchIdForDialog] = useState<string | null>(null);
+  const [editingNumber, setEditingNumber] = useState<{ matchId: string; oldNumber: number; newNumber: string } | null>(null);
+  const [isCorrectingNumber, setIsCorrectingNumber] = useState(false);
+  const manualInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+
+  const focusManualInput = (matchId: string) => {
+    window.setTimeout(() => {
+      const el = manualInputRefs.current[matchId];
+      if (!el) return;
+      el.focus();
+      el.select();
+    }, 0);
+  };
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(timer);
@@ -205,6 +221,7 @@ const MatchManager = () => {
       setCallerInput(prev => ({ ...prev, [matchId]: '' }));
       setIsCallingManual(null);
     }
+    focusManualInput(matchId);
   };
 
   const handleRandomCall = async (matchId: string) => {
@@ -228,6 +245,55 @@ const MatchManager = () => {
     setIsAdvancingRound(matchId);
     await nextFestivalRound(matchId);
     setIsAdvancingRound(null);
+  };
+
+  const handleCorrectNumber = async () => {
+    if (!editingNumber) return;
+    const newNum = parseInt(editingNumber.newNumber, 10);
+    if (newNum < 1 || newNum > 75) {
+      toast.error('Número inválido', { description: 'O número deve estar entre 1 e 75.' });
+      return;
+    }
+    if (newNum === editingNumber.oldNumber) {
+      toast.error('Sem alteração', { description: 'O novo número é igual ao anterior.' });
+      return;
+    }
+    setIsCorrectingNumber(true);
+    try {
+      const { data, error } = await (supabase as any).rpc('correct_called_number', {
+        p_match_id: editingNumber.matchId,
+        p_old_number: editingNumber.oldNumber,
+        p_new_number: newNum,
+      });
+      setIsCorrectingNumber(false);
+      if (error) {
+        console.error('[correct-number] RPC Error:', error);
+        toast.error('Erro ao corrigir número', { description: error.message });
+        return;
+      }
+      if (!data?.success) {
+        console.error('[correct-number] Operation failed:', data?.error);
+        const errorMsg = data?.error === 'new_number_already_called' 
+          ? 'Este número já foi chamado!' 
+          : data?.error === 'auto_calling_not_allowed'
+            ? 'Correção só é permitida em chamada manual (desative o automático).'
+          : data?.error === 'old_number_not_found' 
+            ? 'Número original não encontrado!' 
+            : data?.error || 'Erro desconhecido';
+        toast.error('Erro ao corrigir número', { description: errorMsg });
+        return;
+      }
+      console.log('[correct-number] Success:', data);
+      toast.success('Número corrigido', { 
+        description: `${editingNumber.oldNumber} alterado para ${newNum}.` 
+      });
+      await queryClient.invalidateQueries({ queryKey: ['matches'] });
+      setEditingNumber(null);
+    } catch (err: any) {
+      setIsCorrectingNumber(false);
+      console.error('[correct-number] Exception:', err);
+      toast.error('Erro ao corrigir número', { description: err.message });
+    }
   };
 
   const handleRefreshBeforeDialog = async (matchId: string) => {
@@ -366,6 +432,11 @@ const MatchManager = () => {
           const cardsInMatch = matchCards.filter(mc => mc.match_id === match.id);
           const playersInMatchCount = new Set(cardsInMatch.map(mc => mc.player_id)).size;
           const totalCardsCount = cardsInMatch.length;
+          const tiedPlayerNames: Record<string, string> = {};
+          if (match.tie_break_status === 'pending' || match.tie_break_status === 'resolved') {
+            const tiedWinners = (match.winners || []).filter((w: any) => w.creditType === 'real');
+            tiedWinners.forEach((w: any) => { tiedPlayerNames[w.playerId] = w.playerName; });
+          }
           
           const prizeValue = match.prize.type === 'percentage' 
             ? Math.floor((match.pot * (match.prize.value || 0)) / 100) 
@@ -379,7 +450,7 @@ const MatchManager = () => {
           const hasMoreRounds = isFestival && (match.current_round ?? 0) < (match.prizes?.length || 0) - 1;
 
           return (
-            <div key={match.id} className={cn("card-container border-2", isFestival ? 'border-purple-500/30 shadow-md' : 'border-transparent')}>
+            <div key={match.id} className={cn("card-container border-2 overflow-x-hidden", isFestival ? 'border-purple-500/30 shadow-md' : 'border-transparent')}>
               <div className="flex flex-wrap items-start justify-between gap-3 mb-6">
                 <div>
                   <div className="flex items-center gap-2 mb-1">
@@ -506,17 +577,19 @@ const MatchManager = () => {
                       return (
                         <>
                           {displayNums.map((num, idx) => (
-                            <div
+                            <button
                               key={`${match.id}-${num}-${idx}`}
+                              onClick={() => setEditingNumber({ matchId: match.id, oldNumber: num, newNumber: String(num) })}
                               className={cn(
-                                "w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold shadow-sm border transition-all",
+                                "w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold shadow-sm border transition-all hover:ring-2 hover:ring-amber-400",
                                 idx === 0
                                   ? "bg-accent text-accent-foreground border-accent scale-110 ring-2 ring-accent/20 animate-pulse"
-                                  : "bg-white dark:bg-background text-foreground border-border"
+                                  : "bg-white dark:bg-background text-foreground border-border hover:border-amber-400"
                               )}
+                              title="Clique para corrigir"
                             >
                               {num}
-                            </div>
+                            </button>
                           ))}
                           {!isExpanded && allNums.length > 10 && (
                             <div className="hidden sm:flex w-9 h-9 rounded-full items-center justify-center text-[10px] font-bold bg-muted text-muted-foreground border border-dashed border-border">
@@ -540,12 +613,18 @@ const MatchManager = () => {
                     </div>
                     <div className="flex flex-wrap gap-2">
                         <Input
+                          ref={(el) => { manualInputRefs.current[match.id] = el; }}
                           placeholder="Nº"
                           type="number"
                           className="w-16 sm:w-20 font-bold text-center text-lg"
                           value={callerInput[match.id] || ''}
                           onChange={e => setCallerInput(p => ({ ...p, [match.id]: e.target.value }))}
-                          onKeyDown={e => e.key === 'Enter' && handleCallNumber(match.id)}
+                          onKeyDown={e => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              handleCallNumber(match.id);
+                            }
+                          }}
                           disabled={isCallingManual === match.id || isCallingRandom === match.id}
                         />
                         <Button
@@ -585,6 +664,52 @@ const MatchManager = () => {
                     </div>
                 </div>
               )}
+
+              {match.status === 'in_progress' && (
+                <div className="mt-6 pt-6 border-t space-y-5 overflow-x-hidden">
+                  <div className="rounded-xl border border-border/60 bg-muted/10 p-3 min-w-0 overflow-hidden">
+                    <Tabs defaultValue="controle" className="w-full min-w-0">
+                      <TabsList className="grid grid-cols-2 w-full h-auto">
+                        <TabsTrigger value="controle" className="text-xs">Controle da Live</TabsTrigger>
+                        <TabsTrigger value="monitor" className="text-xs">Monitor da Live</TabsTrigger>
+                      </TabsList>
+
+                      <TabsContent value="controle" className="mt-3 min-w-0">
+                        <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3">
+                          Transmissao ao vivo (controle)
+                        </p>
+                        <div className="min-w-0 overflow-hidden">
+                          <LiveBroadcaster matchId={match.id} />
+                        </div>
+                      </TabsContent>
+
+                      <TabsContent value="monitor" className="mt-3 min-w-0">
+                        <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3">
+                          Visao do publico (monitor)
+                        </p>
+                        <div className="min-w-0 overflow-hidden">
+                          <LiveViewer matchId={match.id} />
+                        </div>
+                      </TabsContent>
+                    </Tabs>
+                  </div>
+
+                  <MatchCommentsPanel
+                    matchId={match.id}
+                    canSend={match.status === 'open' || match.status === 'in_progress'}
+                  />
+
+                  {(match.tie_break_status === 'pending' || match.tie_break_status === 'resolved') && (
+                    <TieBreakModal
+                      matchId={match.id}
+                      playerNames={tiedPlayerNames}
+                      winners={match.winners || []}
+                      isLive={true}
+                      isAutomatic={match.is_auto_calling ?? false}
+                    />
+                  )}
+                </div>
+              )}
             </div>
           );
         })}
@@ -617,6 +742,67 @@ const MatchManager = () => {
       </div>
 
       {/* Modal de Edição */}
+      {/* Dialog de Corrigir Número Chamado */}
+      <Dialog open={!!editingNumber} onOpenChange={(open) => !open && setEditingNumber(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Edit className="w-5 h-5 text-amber-600" />
+              Corrigir Número Chamado
+            </DialogTitle>
+            <DialogDescription>
+              Altere o número que foi digitado incorretamente na chamada manual.
+            </DialogDescription>
+          </DialogHeader>
+          {editingNumber && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="rounded-lg border border-muted p-3 text-center">
+                  <p className="text-xs text-muted-foreground mb-1 font-medium">Número Errado</p>
+                  <p className="text-4xl font-bold text-destructive">{editingNumber.oldNumber}</p>
+                </div>
+                <div className="flex items-center justify-center">
+                  <ArrowRight className="w-5 h-5 text-muted-foreground" />
+                </div>
+                <div className="col-span-2">
+                  <p className="text-xs text-muted-foreground mb-2 font-medium">Número Correto (1-75)</p>
+                  <Input
+                    type="number"
+                    min="1"
+                    max="75"
+                    value={editingNumber.newNumber}
+                    onChange={(e) => setEditingNumber({ ...editingNumber, newNumber: e.target.value })}
+                    placeholder="Ingrese el número correcto"
+                    autoFocus
+                    className="text-center text-xl font-bold"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditingNumber(null)}>Cancelar</Button>
+            <Button 
+              onClick={handleCorrectNumber} 
+              disabled={isCorrectingNumber}
+              className="gradient-primary"
+            >
+              {isCorrectingNumber ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Corrigindo...
+                </>
+              ) : (
+                <>
+                  <Edit className="w-4 h-4 mr-2" />
+                  Confirmar Correção
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={!!editingMatch} onOpenChange={(open) => !open && setEditingMatch(null)}>
         <DialogContent className="max-w-md flex flex-col max-h-[90vh]">
           <DialogHeader className="flex-shrink-0">

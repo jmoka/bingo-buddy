@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -155,11 +155,42 @@ const Lobby = () => {
   }, [rifas, profile]);
   const hasWonRifa = rifasGanhas.length > 0;
   const activeRifasCount = rifas.filter(r => r.status === 'ativa').length;
+  const prevMatchStatusRef = useRef<Record<string, MatchStatus>>({});
+  const hasLoadedStatusesRef = useRef(false);
 
   useEffect(() => {
     const interval = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    const currentStatusMap: Record<string, MatchStatus> = {};
+    for (const m of matches) {
+      currentStatusMap[m.id] = m.status;
+    }
+
+    // Evita alertas falsos no primeiro carregamento da tela.
+    if (!hasLoadedStatusesRef.current) {
+      prevMatchStatusRef.current = currentStatusMap;
+      hasLoadedStatusesRef.current = true;
+      return;
+    }
+
+    if (profile?.role !== 'admin') {
+      for (const m of matches) {
+        const previous = prevMatchStatusRef.current[m.id];
+        const changedToLive = previous && previous !== 'in_progress' && m.status === 'in_progress';
+        if (changedToLive) {
+          toast.info('Partida ao vivo agora', {
+            description: `${m.name} acabou de entrar em Ao Vivo.`,
+            duration: 5000,
+          });
+        }
+      }
+    }
+
+    prevMatchStatusRef.current = currentStatusMap;
+  }, [matches, profile?.role]);
 
   const schedule = useMemo(() => {
     if (!gameSettings?.auto_engine_enabled) return [];

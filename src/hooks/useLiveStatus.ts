@@ -15,10 +15,24 @@ export const useLiveStatus = (matchId: string) => {
     viewerCount: 0
   });
   const [socket, setSocket] = useState<Socket | null>(null);
+  const [liveServerAvailable, setLiveServerAvailable] = useState(true);
 
   useEffect(() => {
-    const newSocket = io(liveServerUrl);
+    if (!liveServerAvailable) {
+      return;
+    }
+
+    const newSocket = io(liveServerUrl, {
+      reconnectionAttempts: 2,
+      reconnectionDelay: 1500,
+      timeout: 3000,
+    });
     setSocket(newSocket);
+
+    newSocket.on('connect_error', () => {
+      setLiveServerAvailable(false);
+      newSocket.disconnect();
+    });
 
     newSocket.on('connect', () => {
       newSocket.emit('join-match', matchId);
@@ -56,10 +70,11 @@ export const useLiveStatus = (matchId: string) => {
     const checkStatus = async () => {
       try {
         const response = await fetch(`${liveServerUrl}/api/live-status/${matchId}`);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const status = await response.json();
         setLiveStatus(status);
       } catch (error) {
-        console.error('Erro ao verificar status da live:', error);
+        setLiveServerAvailable(false);
       }
     };
 

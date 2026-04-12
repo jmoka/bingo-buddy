@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './AuthContext';
 import { Win } from '@/types/match';
@@ -9,7 +9,6 @@ import { usePlayerCards } from '@/hooks/usePlayerCards';
 import { useCreditRequests } from '@/hooks/useCreditRequests';
 import { useRedeemRequests } from '@/hooks/useRedeemRequests';
 import { useAdminData } from '@/hooks/useAdminData';
-import { useRealtimeNotifications } from '@/hooks/useRealtimeNotifications';
 
 type GameContextType = 
   ReturnType<typeof useGameSettings> &
@@ -28,10 +27,6 @@ const GameContext = createContext<GameContextType | null>(null);
 
 export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user } = useAuth();
-  const queryClient = useQueryClient();
-
-  // Ativar notificações realtime
-  useRealtimeNotifications();
 
   const gameSettingsHook = useGameSettings();
   const matchesHook = useMatches();
