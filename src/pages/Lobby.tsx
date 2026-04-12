@@ -897,15 +897,15 @@ const Lobby = () => {
             <div className="text-center sm:text-left flex flex-col justify-center">
               {(() => {
                 const valorPorUso = (gameSettings?.custo_recarga_cartela || 0) / (gameSettings?.usos_por_recarga || 1);
-                const effectivePrice = (selectedMatch?.card_price || 0) - valorPorUso;
+                const effectivePrice = Math.max(0, (selectedMatch?.card_price || 0) - valorPorUso);
                 const totalCost = cardsToJoin.size * effectivePrice;
                 return (
                   <>
                     <p className="text-[10px] uppercase font-bold text-muted-foreground leading-none">
-                      {totalCost > 0 ? 'Total a Pagar (Diferença)' : totalCost < 0 ? 'Troco a Receber' : 'Custo Adicional'}
+                      {totalCost > 0 ? 'Total a Pagar (Diferença)' : 'Custo Adicional'}
                     </p>
-                    <p className={cn("text-xl font-black font-heading mt-0.5", totalCost < 0 ? "text-success" : "text-primary")}>
-                      {totalCost < 0 ? '+' : ''}{Math.abs(totalCost).toFixed(2)} cr.
+                    <p className="text-xl font-black font-heading mt-0.5 text-primary">
+                      {totalCost.toFixed(2)} cr.
                     </p>
                   </>
                 );

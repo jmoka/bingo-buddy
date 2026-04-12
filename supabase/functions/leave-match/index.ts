@@ -58,13 +58,13 @@ serve(async (req) => {
     const realCardsToRemove = matchCardsToRemove.filter(c => c.credit_type === 'real');
     const fakeCardsToRemove = matchCardsToRemove.filter(c => c.credit_type === 'fake');
     
-    // Usa o mesmo cálculo reverso para devolver apenas a diferença exata e recuperar o "uso"
-    const valorPorUso = (settings?.custo_recarga_cartela || 0) / (settings?.usos_por_recarga || 1);
-    const effectivePrice = match.card_price - valorPorUso;
+    // Nunca permitir preço efetivo negativo para evitar qualquer crédito indevido.
+    const valorPorUso = Number(settings?.custo_recarga_cartela || 0) / Math.max(1, Number(settings?.usos_por_recarga || 1));
+    const effectivePrice = Math.max(0, Number(match.card_price) - valorPorUso);
     
     const realRefundAmount = realCardsToRemove.length * effectivePrice;
     const fakeRefundAmount = fakeCardsToRemove.length * effectivePrice;
-    const fullRealCostForPot = realCardsToRemove.length * match.card_price;
+    const fullRealCostForPot = realCardsToRemove.length * Number(match.card_price);
     
     const playerCardIdsToRestore = matchCardsToRemove.map(c => c.player_card_id).filter(id => id);
     const matchCardIdsToDelete = matchCardsToRemove.map(c => c.id);

@@ -9,6 +9,9 @@ const useUpdateMatchMutation = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async ({ matchId, updates }: { matchId: string; updates: Partial<Match> }) => {
+      if (typeof updates.card_price === 'number' && updates.card_price < 0) {
+        throw new Error('O preço da partida não pode ser menor que 0.');
+      }
       const { error } = await supabase.from('partidas').update(updates).eq('id', matchId);
       if (error) throw error;
     },
@@ -113,6 +116,10 @@ export const useMatches = () => {
   }, [matches, gameSettings?.auto_engine_enabled, queryClient]);
 
   const createMatch = async (data: any) => {
+    if (typeof data.card_price === 'number' && data.card_price < 0) {
+      toast.error('O preço da partida não pode ser menor que 0.');
+      return;
+    }
     const status = data.is_auto_calling ? 'open' : 'waiting';
     const { error } = await supabase.from('partidas').insert([{ ...data, status }]);
     if (error) toast.error(error.message);

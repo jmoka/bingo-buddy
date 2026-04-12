@@ -83,15 +83,19 @@ serve(async (req) => {
     const realCards = playerCards.filter(c => c.credit_type === 'real');
     const fakeCards = playerCards.filter(c => c.credit_type === 'fake');
     
-    // Matemática Inteligente: Abate o valor do uso da cartela do preço da partida
-    const valorPorUso = (settings.custo_recarga_cartela || 0) / (settings.usos_por_recarga || 1);
-    const effectivePrice = match.card_price - valorPorUso;
+    if (Number(match.card_price) < 0) {
+      throw new Error('Preço da partida inválido. Contate o administrador.');
+    }
+
+    // Nunca permitir preço efetivo negativo para evitar crédito indevido ao entrar na partida.
+    const valorPorUso = Number(settings.custo_recarga_cartela || 0) / Math.max(1, Number(settings.usos_por_recarga || 1));
+    const effectivePrice = Math.max(0, Number(match.card_price) - valorPorUso);
 
     const realCost = realCards.length * effectivePrice;
     const fakeCost = fakeCards.length * effectivePrice;
     
     // O valor integral que vai para o Pote e calcula Comissão (pq o admin já recebeu a recarga antes)
-    const fullRealCostForPot = realCards.length * match.card_price;
+    const fullRealCostForPot = realCards.length * Number(match.card_price);
 
     if (realCost > 0 && profile.credits < realCost) {
       throw new Error(`Créditos reais insuficientes! O valor de entrada requer mais ${realCost.toFixed(2)} créditos.`);

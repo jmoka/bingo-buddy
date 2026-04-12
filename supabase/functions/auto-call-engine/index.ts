@@ -43,7 +43,7 @@ const cancelAutomaticMatchForSingleParticipant = async (supabaseAdmin: any, matc
   }
 
   const valorPorUso = Number(settings?.custo_recarga_cartela || 0) / Math.max(1, Number(settings?.usos_por_recarga || 1));
-  const effectivePrice = Number(match.card_price || 0) - valorPorUso;
+  const effectivePrice = Math.max(0, Number(match.card_price || 0) - valorPorUso);
 
   const refundByPlayer = new Map<string, { real: number; fake: number }>();
   for (const card of cards) {

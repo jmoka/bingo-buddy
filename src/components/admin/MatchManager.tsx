@@ -110,6 +110,10 @@ const MatchManager = () => {
 
   const handleCreateMatch = async () => {
     if (!matchForm.name.trim() || !matchForm.startTime) return;
+    if (matchForm.cardPrice < 0) {
+      toast.error('O preço da partida não pode ser menor que 0.');
+      return;
+    }
 
     let matchData: any = {
         name: matchForm.name,
@@ -171,6 +175,10 @@ const MatchManager = () => {
 
   const handleUpdateMatch = async () => {
     if (!editingMatch) return;
+    if (matchForm.cardPrice < 0) {
+      toast.error('O preço da partida não pode ser menor que 0.');
+      return;
+    }
     
     let matchData: any = {
         name: matchForm.name,
@@ -345,7 +353,7 @@ const MatchManager = () => {
       <div><Label>Data/Hora Início</Label><Input type="datetime-local" value={matchForm.startTime} onChange={e => setMatchForm(p => ({ ...p, startTime: e.target.value }))} /></div>
       <div><Label>Tipo de Jogo</Label><Select value={matchForm.gameType} onValueChange={(v: GameType) => setMatchForm(p => ({ ...p, gameType: v }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{Object.entries(gameTypeLabels).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}</SelectContent></Select></div>
       <div className="grid grid-cols-2 gap-4">
-          <div><Label>Preço</Label><Input type="number" value={matchForm.cardPrice} onChange={e => setMatchForm(p => ({ ...p, cardPrice: +e.target.value }))} /></div>
+          <div><Label>Preço</Label><Input type="number" min={0} step="0.01" value={matchForm.cardPrice} onChange={e => setMatchForm(p => ({ ...p, cardPrice: Math.max(0, Number(e.target.value)) }))} /></div>
           <div><Label>Máx. Cartelas</Label><Input type="number" value={matchForm.maxCardsPerPlayer} onChange={e => setMatchForm(p => ({ ...p, maxCardsPerPlayer: +e.target.value }))} /></div>
       </div>
       
