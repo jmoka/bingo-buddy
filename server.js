@@ -34,7 +34,9 @@ const distPath = path.join(__dirname, "dist");
 const hasBuiltFrontend = existsSync(distPath);
 
 if (hasBuiltFrontend) {
-  app.use(express.static(distPath));
+  // Do not auto-serve directory index files (e.g. /admin/index.html)
+  // because it can shadow SPA routes like /admin.
+  app.use(express.static(distPath, { index: false }));
 }
 
 const activeLives = new Map();

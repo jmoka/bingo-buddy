@@ -213,15 +213,27 @@ const MatchManager = () => {
       });
   };
 
-  const handleCallNumber = async (matchId: string) => {
-    const num = parseInt(callerInput[matchId] || '', 10);
-    if (num >= 1 && num <= 75) {
-      setIsCallingManual(matchId);
+  const handleCallNumber = async (matchId: string, inputValue?: string) => {
+    const liveInputValue = manualInputRefs.current[matchId]?.value ?? '';
+    const rawValue = typeof inputValue === 'string' ? inputValue : (liveInputValue || callerInput[matchId] || '');
+    const num = parseInt(rawValue, 10);
+
+    if (!(num >= 1 && num <= 75)) {
+      toast.error('Número inválido', {
+        description: 'Digite um número entre 1 e 75.',
+      });
+      focusManualInput(matchId);
+      return;
+    }
+
+    setIsCallingManual(matchId);
+    try {
       await callNumber(matchId, num);
       setCallerInput(prev => ({ ...prev, [matchId]: '' }));
+    } finally {
       setIsCallingManual(null);
+      focusManualInput(matchId);
     }
-    focusManualInput(matchId);
   };
 
   const handleRandomCall = async (matchId: string) => {
@@ -611,25 +623,28 @@ const MatchManager = () => {
                             Mesa de Operação <Badge variant="outline" className="text-xs bg-muted">Bolas: {(match.called_numbers || []).length}</Badge>
                         </h4>
                     </div>
-                    <div className="flex flex-wrap gap-2">
+                    <form
+                      className="flex flex-wrap gap-2"
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        const manualValue = callerInput[match.id] || '';
+                        void handleCallNumber(match.id, manualValue);
+                      }}
+                    >
                         <Input
                           ref={(el) => { manualInputRefs.current[match.id] = el; }}
                           placeholder="Nº"
                           type="number"
+                          min={1}
+                          max={75}
                           className="w-16 sm:w-20 font-bold text-center text-lg"
                           value={callerInput[match.id] || ''}
                           onChange={e => setCallerInput(p => ({ ...p, [match.id]: e.target.value }))}
-                          onKeyDown={e => {
-                            if (e.key === 'Enter') {
-                              e.preventDefault();
-                              handleCallNumber(match.id);
-                            }
-                          }}
                           disabled={isCallingManual === match.id || isCallingRandom === match.id}
                         />
                         <Button
+                          type="submit"
                           className="flex-1 sm:flex-none h-10 px-4 sm:px-8"
-                          onClick={() => handleCallNumber(match.id)}
                           disabled={isCallingManual === match.id || isCallingRandom === match.id || !callerInput[match.id]}
                         >
                             {isCallingManual === match.id ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Cantar Manual'}
@@ -661,7 +676,7 @@ const MatchManager = () => {
                             <span className="text-[9px] text-muted-foreground font-normal">Intervalo: {gameSettings?.intervalo_sorteio_auto_seg}s</span>
                           </Label>
                         </div>
-                    </div>
+                    </form>
                 </div>
               )}
 
