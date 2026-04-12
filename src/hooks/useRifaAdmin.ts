@@ -13,8 +13,9 @@ export const useRifaAdmin = () => {
   useEffect(() => {
     if (!isAdmin) return;
 
+    const channelName = `admin-rifa-changes-${Date.now()}`;
     const channel = supabase
-      .channel('admin-rifa-changes')
+      .channel(channelName)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'compras_rifa' }, () => {
         queryClient.invalidateQueries({ queryKey: ['todasComprasRifa'] });
       })
