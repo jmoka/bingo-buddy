@@ -23,3 +23,11 @@ dist-ssr
 *.sln
 *.sw?
 .dyad/
+.env
+.env.production
+.env.production.local
+.env.development
+.env.development.local
+.env.test
+.env.test.local
+.env.example
