@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { Video, Users } from 'lucide-react';
 import { getLiveServerUrl } from '@/lib/liveServer';
 
@@ -44,6 +45,17 @@ export const LiveViewer: React.FC<LiveViewerProps> = ({ matchId }) => {
     socketRef.current?.emit('watcher', matchId);
   }, [matchId]);
 
+  const reloadVideo = useCallback(() => {
+    if (peerConnectionRef.current) {
+      peerConnectionRef.current.close();
+      peerConnectionRef.current = null;
+    }
+    setIsWatching(false);
+    if (socketRef.current) {
+      socketRef.current.emit('watch-live', matchId);
+    }
+  }, [matchId]);
+
   useEffect(() => {
     // Conectar ao servidor Socket.IO
     socketRef.current = io(liveServerUrl);
@@ -67,6 +79,10 @@ export const LiveViewer: React.FC<LiveViewerProps> = ({ matchId }) => {
       if (liveMatchId === matchId) {
         setIsLiveAvailable(false);
         setIsWatching(false);
+        if (peerConnectionRef.current) {
+          peerConnectionRef.current.close();
+          peerConnectionRef.current = null;
+        }
       }
     });
 
@@ -168,9 +184,12 @@ export const LiveViewer: React.FC<LiveViewerProps> = ({ matchId }) => {
 
         {!isWatching && (
           <div className="text-center mt-4">
-            <p className="text-sm text-muted-foreground">
+            <p className="text-sm text-muted-foreground mb-2">
               Conectando à transmissão...
             </p>
+            <Button onClick={reloadVideo} variant="outline" size="sm">
+              Recarregar Imagem
+            </Button>
           </div>
         )}
       </CardContent>

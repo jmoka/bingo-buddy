@@ -7,12 +7,21 @@ import { AcertoVendedor } from '@/types/rifa';
 import { MatchCard } from '@/types/match';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { TrendingUp, Landmark, Trophy, HandCoins, BadgeDollarSign, BarChart3, ChevronRight } from 'lucide-react';
+import { TrendingUp, Landmark, Trophy, HandCoins, BadgeDollarSign, BarChart3, ChevronRight, Users, CreditCard, ArrowUpDown } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import PlayerAvatar from '@/components/PlayerAvatar';
 
 const fmt = (v: number) =>
   v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+const isValidDate = (date: any): boolean => {
+  return date && !isNaN(new Date(date).getTime());
+};
+
+const safeDate = (date: any): Date => {
+  return isValidDate(date) ? new Date(date) : new Date();
+};
 
 const statusLabel: Record<string, string> = {
   waiting: 'Aguardando',
@@ -78,10 +87,13 @@ const FinanceiroAdmin = () => {
     todasFolhasBingo: FolhaBingoFisico[];
     acertosPendentes: AcertoVendedor[];
   };
-  const { gameSettings, matches = [], matchCards = [], isLoading: isLoadingMatches } = useGame() as {
+  const { gameSettings, matches = [], matchCards = [], players = [], allCreditRequests = [], allRedeemRequests = [], isLoading: isLoadingMatches } = useGame() as {
     gameSettings: { admin_profit?: number } | null;
     matches: Match[];
     matchCards: MatchCard[];
+    players: any[];
+    allCreditRequests: any[];
+    allRedeemRequests: any[];
     isLoading: boolean;
   };
   const partidas = matches;
@@ -155,6 +167,96 @@ const FinanceiroAdmin = () => {
 
   const adminProfit = Number(gameSettings?.admin_profit ?? 0);
 
+  // Cálculos para jogadores
+  const totalSaldoJogadores = useMemo(() => {
+    return players.reduce((acc, player) => acc + Number(player.credits || 0), 0);
+  }, [players]);
+
+  // Histórico de transações
+  const historicoTransacoes = useMemo(() => {
+    const transacoes: Array<{
+      id: string;
+      data: Date;
+      origem: string;
+      tipo: 'entrada' | 'saida';
+      valor: number;
+      descricao: string;
+    }> = [];
+
+    // Créditos solicitados (entradas para jogadores)
+    allCreditRequests.forEach(req => {
+      if (req.status === 'approved' && isValidDate(req.created_at)) {
+        transacoes.push({
+          id: `credit-${req.id}`,
+          data: safeDate(req.created_at),
+          origem: 'Solicitação de Crédito',
+          tipo: 'entrada',
+          valor: Number(req.amount),
+          descricao: `Crédito aprovado para ${req.user_name || 'Jogador'}`
+        });
+      }
+    });
+
+    // Resgates (saídas para jogadores)
+    allRedeemRequests.forEach(req => {
+      if (req.status === 'approved' && isValidDate(req.created_at)) {
+        transacoes.push({
+          id: `redeem-${req.id}`,
+          data: safeDate(req.created_at),
+          origem: 'Resgate de Crédito',
+          tipo: 'saida',
+          valor: Number(req.amount),
+          descricao: `Resgate aprovado de ${req.user_name || 'Jogador'}`
+        });
+      }
+    });
+
+    // Acertos de vendedores (saídas do admin)
+    acertosPendentes.forEach(acerto => {
+      if (acerto.status === 'aprovado' && isValidDate(acerto.created_at)) {
+        transacoes.push({
+          id: `acerto-${acerto.id}`,
+          data: safeDate(acerto.created_at),
+          origem: 'Acerto Vendedor',
+          tipo: 'saida',
+          valor: Number(acerto.comissao_paga),
+          descricao: `Comissão paga ao vendedor ${acerto.vendedor_name || 'Vendedor'}`
+        });
+      }
+    });
+
+    // Receitas das partidas (entradas para admin)
+    partidas.forEach(partida => {
+      if (partida.pot && Number(partida.pot) > 0 && isValidDate(partida.start_time || partida.created_at)) {
+        transacoes.push({
+          id: `partida-${partida.id}`,
+          data: safeDate(partida.start_time || partida.created_at),
+          origem: 'Partida de Bingo',
+          tipo: 'entrada',
+          valor: Number(partida.pot),
+          descricao: `Arrecadação da partida ${partida.name}`
+        });
+      }
+    });
+
+    // Prêmios pagos (saídas do admin)
+    partidas.forEach(partida => {
+      const premioInfo = getPremioInfo(partida);
+      if (premioInfo.premioValor && premioInfo.premioValor > 0 && isValidDate(partida.start_time || partida.created_at)) {
+        transacoes.push({
+          id: `premio-${partida.id}`,
+          data: safeDate(partida.start_time || partida.created_at),
+          origem: 'Prêmio Pago',
+          tipo: 'saida',
+          valor: premioInfo.premioValor,
+          descricao: `Prêmio da partida ${partida.name}`
+        });
+      }
+    });
+
+    return transacoes.sort((a, b) => b.data.getTime() - a.data.getTime());
+  }, [allCreditRequests, allRedeemRequests, acertosPendentes, partidas]);
+
   return (
     <div className="space-y-6">
       <h2 className="font-heading text-xl font-bold text-foreground flex items-center gap-2">
@@ -172,6 +274,12 @@ const FinanceiroAdmin = () => {
           highlight
         />
         <SummaryCard
+          icon={<Users className="w-5 h-5 text-blue-500" />}
+          label="Saldo dos Jogadores"
+          value={fmt(totalSaldoJogadores)}
+          sub="créditos totais dos jogadores"
+        />
+        <SummaryCard
           icon={<TrendingUp className="w-5 h-5 text-blue-500" />}
           label="Arrecadação Total"
           value={fmt(totais.totalArrecadado)}
@@ -182,12 +290,6 @@ const FinanceiroAdmin = () => {
           label="Prêmios"
           value={fmt(totais.totalPremios)}
           sub="valor pago aos vencedores"
-        />
-        <SummaryCard
-          icon={<HandCoins className="w-5 h-5 text-amber-500" />}
-          label="Comissões Pagas"
-          value={fmt(totais.totalComissoes)}
-          sub="acertos aprovados"
         />
       </div>
 
@@ -201,6 +303,97 @@ const FinanceiroAdmin = () => {
           </div>
         </div>
         <ChevronRight className="w-5 h-5 text-emerald-400" />
+      </div>
+
+      {/* Detalhamento dos Jogadores */}
+      <div className="space-y-4">
+        <h3 className="font-heading text-lg font-bold text-foreground flex items-center gap-2">
+          <Users className="w-5 h-5 text-primary" />
+          Detalhamento dos Jogadores
+        </h3>
+        <div className="card-container p-4">
+          <div className="space-y-3">
+            {players.length === 0 ? (
+              <p className="text-muted-foreground text-sm">Nenhum jogador encontrado.</p>
+            ) : (
+              players
+                .filter(player => Number(player.credits || 0) > 0)
+                .sort((a, b) => Number(b.credits || 0) - Number(a.credits || 0))
+                .map(player => (
+                  <div key={player.id} className="flex items-center justify-between py-3 border-b border-border last:border-b-0">
+                    <div className="flex items-center gap-3">
+                      <PlayerAvatar
+                        url={player.avatar_url || null}
+                        fallback={player.full_name || player.email || 'J'}
+                        className="w-10 h-10"
+                      />
+                      <div>
+                        <p className="font-semibold text-sm">{player.full_name || player.email || 'Jogador'}</p>
+                        <p className="text-xs text-muted-foreground">{player.email}</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-bold text-sm">{fmt(Number(player.credits || 0))}</p>
+                      <p className="text-xs text-muted-foreground">créditos</p>
+                    </div>
+                  </div>
+                ))
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Histórico de Transações */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="font-heading text-lg font-bold text-foreground flex items-center gap-2">
+            <ArrowUpDown className="w-5 h-5 text-primary" />
+            Histórico de Transações
+          </h3>
+          {historicoTransacoes.length > 0 && (
+            <p className="text-sm text-muted-foreground">
+              Mostrando {Math.min(historicoTransacoes.length, 100)} de {historicoTransacoes.length} transações
+            </p>
+          )}
+        </div>
+        <div className="card-container p-4">
+          <div className="space-y-3">
+            {historicoTransacoes.length === 0 ? (
+              <p className="text-muted-foreground text-sm">Nenhuma transação encontrada.</p>
+            ) : (
+              historicoTransacoes.slice(0, 100).map(transacao => (
+                <div key={transacao.id} className="flex items-center justify-between py-3 border-b border-border last:border-b-0">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <Badge
+                        variant={transacao.tipo === 'entrada' ? 'default' : 'secondary'}
+                        className={cn(
+                          'text-xs px-2 py-0.5',
+                          transacao.tipo === 'entrada' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                        )}
+                      >
+                        {transacao.tipo === 'entrada' ? 'Entrada' : 'Saída'}
+                      </Badge>
+                      <span className="text-xs font-medium text-muted-foreground">{transacao.origem}</span>
+                    </div>
+                    <p className="text-sm font-semibold">{transacao.descricao}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {format(transacao.data, "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className={cn(
+                      'font-bold text-sm',
+                      transacao.tipo === 'entrada' ? 'text-green-600' : 'text-red-600'
+                    )}>
+                      {transacao.tipo === 'entrada' ? '+' : '-'}{fmt(transacao.valor)}
+                    </p>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Tabela por partida */}
@@ -259,8 +452,8 @@ const PartidaRow = ({ d }: { d: PartidaFinanceiro }) => {
         <div>
           <p className="font-semibold text-sm">{partida.name}</p>
           <p className="text-xs text-muted-foreground">
-            {partida.start_time
-              ? format(new Date(partida.start_time), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })
+            {partida.start_time && isValidDate(partida.start_time)
+              ? format(safeDate(partida.start_time), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })
               : '—'}
           </p>
         </div>
