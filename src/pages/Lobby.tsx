@@ -39,7 +39,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { cn } from '@/lib/utils';
+import { cn, roundMoney } from '@/lib/utils';
 import { format, addMinutes, startOfDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -362,7 +362,9 @@ const Lobby = () => {
           const alreadyJoined = myMatchCards.length > 0;
           
           const countdownMatch = (match.status === 'waiting' || match.status === 'open') ? getMatchCountdown(match.start_time) : null;
-          const prizeValue = match.prize.type === 'percentage' ? (Number(match.pot || 0) * (Number(match.prize.value) || 0)) / 100 : (Number(match.prize.value) || 0);
+          const prizeValue = match.prize.type === 'percentage'
+            ? roundMoney((Number(match.pot || 0) * (Number(match.prize.value) || 0)) / 100)
+            : (Number(match.prize.value) || 0);
 
           const isFestival = match.is_festival && match.prizes && match.prizes.length > 0;
 

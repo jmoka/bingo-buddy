@@ -9,7 +9,7 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { TrendingUp, Landmark, Trophy, HandCoins, BadgeDollarSign, BarChart3, ChevronRight, Users, CreditCard, ArrowUpDown } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { cn } from '@/lib/utils';
+import { cn, roundMoney } from '@/lib/utils';
 import PlayerAvatar from '@/components/PlayerAvatar';
 
 const fmt = (v: number) =>
@@ -62,7 +62,7 @@ const getPremioInfo = (partida: Match) => {
   }
 
   if (prizeType === 'percentage') {
-    const premioCalculado = (pot * prizeValue) / 100;
+    const premioCalculado = roundMoney((pot * prizeValue) / 100);
     return {
       premioValor: premioCalculado,
       premioLabel: `${prizeValue}% (${fmt(premioCalculado)})`,
@@ -133,11 +133,11 @@ const FinanceiroAdmin = () => {
         c => c.match_id === partida.id && c.credit_type === 'real',
       );
       const receitaOnline = cartelasReaisOnline.length * Number(partida.card_price ?? 0);
-      const arrecadacaoTotal = Number(partida.pot ?? receitaOnline + receitaFisica);
+      const arrecadacaoTotal = roundMoney(Number(partida.pot ?? receitaOnline + receitaFisica));
       const { premioValor, premioLabel } = getPremioInfo(partida);
       const ganhoAdminEstimado = premioValor === null
         ? null
-        : arrecadacaoTotal - premioValor - comissaoFisica;
+        : roundMoney(arrecadacaoTotal - premioValor - comissaoFisica);
 
       return {
         partida,

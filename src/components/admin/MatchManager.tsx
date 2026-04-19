@@ -17,7 +17,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { cn } from '@/lib/utils';
+import { cn, roundMoney } from '@/lib/utils';
 import { MatchDetailsModal } from './MatchDetailsModal';
 import { useQueryClient } from '@tanstack/react-query';
 import { LiveBroadcaster } from '@/components/LiveBroadcaster';
@@ -458,11 +458,11 @@ const MatchManager = () => {
             tiedWinners.forEach((w: any) => { tiedPlayerNames[w.playerId] = w.playerName; });
           }
           
-          const prizeValue = match.prize.type === 'percentage' 
-            ? Math.floor((match.pot * (match.prize.value || 0)) / 100) 
-            : (match.prize.value || 0);
+          const prizeValue = match.prize.type === 'percentage'
+            ? roundMoney((Number(match.pot || 0) * (Number(match.prize.value || 0))) / 100)
+            : Number(match.prize.value || 0);
           
-          const profit = match.pot - prizeValue;
+          const profit = roundMoney(Number(match.pot || 0) - prizeValue);
           const canStart = playersInMatchCount >= match.min_players;
           const countdown = (match.status === 'waiting' || match.status === 'open') ? getCountdown(match.start_time) : null;
 
