@@ -4,19 +4,17 @@ import path from 'path';
 import { componentTagger } from 'lovable-tagger';
 
 export default defineConfig(({ mode }) => {
-  // Carregar variaveis de ambiente do .env / .env.production / process.env
-  const env = {
-    ...loadEnv(mode, process.cwd(), ''),
-    ...process.env,
-  };
+  const env = loadEnv(mode, process.cwd(), '');
 
-  const VITE_SUPABASE_URL = env.VITE_SUPABASE_URL;
-  const VITE_SUPABASE_PUBLISHABLE_KEY = env.VITE_SUPABASE_PUBLISHABLE_KEY;
-  const VITE_LIVE_SERVER_URL = env.VITE_LIVE_SERVER_URL;
+  const VITE_SUPABASE_URL =
+    process.env.VITE_SUPABASE_URL || env.VITE_SUPABASE_URL;
 
-  if (!VITE_SUPABASE_URL || !VITE_SUPABASE_PUBLISHABLE_KEY) {
-    throw new Error('Missing Supabase environment variables. Check VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY.');
-  }
+  const VITE_SUPABASE_PUBLISHABLE_KEY =
+    process.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
+    env.VITE_SUPABASE_PUBLISHABLE_KEY;
+
+  const VITE_LIVE_SERVER_URL =
+    process.env.VITE_LIVE_SERVER_URL || env.VITE_LIVE_SERVER_URL || '';
 
   return {
     server: {
@@ -45,9 +43,13 @@ export default defineConfig(({ mode }) => {
     envPrefix: 'VITE_',
 
     define: {
-      'import.meta.env.VITE_SUPABASE_URL': JSON.stringify(env.VITE_SUPABASE_URL),
-      'import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY': JSON.stringify(env.VITE_SUPABASE_PUBLISHABLE_KEY),
-      'import.meta.env.VITE_LIVE_SERVER_URL': JSON.stringify(env.VITE_LIVE_SERVER_URL),
+      'import.meta.env.VITE_SUPABASE_URL': JSON.stringify(VITE_SUPABASE_URL),
+      'import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY': JSON.stringify(
+        VITE_SUPABASE_PUBLISHABLE_KEY
+      ),
+      'import.meta.env.VITE_LIVE_SERVER_URL': JSON.stringify(
+        VITE_LIVE_SERVER_URL
+      ),
     },
   };
 });
