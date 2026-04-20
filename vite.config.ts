@@ -4,24 +4,19 @@ import path from 'path';
 import { componentTagger } from 'lovable-tagger';
 
 export default defineConfig(({ mode }) => {
-  // Carregar variaveis de ambiente do arquivo .env apropriado
-  const fileEnv = loadEnv(mode, process.cwd(), '');
-
-  // Valores padrao para producao (fallback)
-  const defaultEnv = {
-    VITE_SUPABASE_URL: 'https://vqvnodwojefubbbnbyar.supabase.co',
-    VITE_SUPABASE_PUBLISHABLE_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZxdm5vZHdvamVmdWJiYm5ieWFyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzEzMjkzNjksImV4cCI6MjA4NjkwNTM2OX0.fDEqqVZXw9TLnVOzsWRoEaKdngtrm-fJRbPtDLO1tLU',
-    VITE_LIVE_SERVER_URL: '',
-  };
-
-  // Mesclar: arquivo .env > process.env > valores padrao
+  // Carregar variaveis de ambiente do .env / .env.production / process.env
   const env = {
-    ...defaultEnv,
-    ...fileEnv,
-    VITE_SUPABASE_URL: fileEnv.VITE_SUPABASE_URL || process.env.VITE_SUPABASE_URL || defaultEnv.VITE_SUPABASE_URL,
-    VITE_SUPABASE_PUBLISHABLE_KEY: fileEnv.VITE_SUPABASE_PUBLISHABLE_KEY || process.env.VITE_SUPABASE_PUBLISHABLE_KEY || defaultEnv.VITE_SUPABASE_PUBLISHABLE_KEY,
-    VITE_LIVE_SERVER_URL: fileEnv.VITE_LIVE_SERVER_URL || process.env.VITE_LIVE_SERVER_URL || defaultEnv.VITE_LIVE_SERVER_URL,
+    ...loadEnv(mode, process.cwd(), ''),
+    ...process.env,
   };
+
+  const VITE_SUPABASE_URL = env.VITE_SUPABASE_URL;
+  const VITE_SUPABASE_PUBLISHABLE_KEY = env.VITE_SUPABASE_PUBLISHABLE_KEY;
+  const VITE_LIVE_SERVER_URL = env.VITE_LIVE_SERVER_URL;
+
+  if (!VITE_SUPABASE_URL || !VITE_SUPABASE_PUBLISHABLE_KEY) {
+    throw new Error('Missing Supabase environment variables. Check VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY.');
+  }
 
   return {
     server: {
